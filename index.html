@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>דוח מעקב ריקונים</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <style>
+    :root{
+      --bg:#eef3f8; --card:rgba(255,255,255,.92); --text:#172033; --muted:#6b7280;
+      --line:#e5e7eb; --primary:#1769e0; --ok:#12805c; --warn:#d68a00; --bad:#c93434;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#edf4ff,#f8fafc);color:var(--text)}
+    .wrap{max-width:1500px;margin:auto;padding:18px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    h1{margin:0;font-size:clamp(26px,4vw,42px)} .sub{color:var(--muted);margin-top:6px}
+    .pill{display:inline-block;padding:7px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:700}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}
+    .card{background:var(--card);border:1px solid #fff;border-radius:20px;padding:17px;box-shadow:0 10px 30px #1b2b4b12}
+    .label{color:var(--muted)} .kpi{font-size:30px;font-weight:800;margin-top:6px}
+    .warehouses{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:15px 0}
+    input,select,button,label.btn{font:inherit;border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:#fff}
+    button,label.btn{font-weight:700;cursor:pointer}.primary{background:var(--primary)!important;color:white;border-color:var(--primary)!important}
+    .danger{background:#fff1f1!important;color:var(--bad)}
+    .tablebox{overflow:auto;background:#fff;border-radius:18px;border:1px solid var(--line)}
+    table{width:100%;border-collapse:collapse;min-width:1180px}
+    th,td{padding:12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+    th{background:#f8fafc;position:sticky;top:0;z-index:1}
+    .status{padding:5px 9px;border-radius:999px;font-weight:700}.ok{background:#e9f8f2;color:var(--ok)}
+    .warn{background:#fff6df;color:var(--warn)} .bad{background:#ffe9e9;color:var(--bad)} .wait{background:#eef4ff;color:#305fb8}
+    .small{font-size:12px;color:var(--muted)} .empty{padding:35px;text-align:center;color:var(--muted)}
+    #conn.ok{color:var(--ok)} #conn.bad{color:var(--bad)}
+    @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}.warehouses{grid-template-columns:1fr}.wrap{padding:12px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>דוח מעקב ריקונים</h1>
+      <div class="sub">מערכת שיתופית • יעד ריקון 48 שעות • חלוקה ל־3 מחסנים</div>
+    </div>
+    <div>
+      <span id="conn" class="pill">בודק חיבור לענן…</span>
+    </div>
+  </header>
+
+  <section class="cards">
+    <div class="card"><div class="label">סה״כ מכולות</div><div class="kpi" id="kTotal">0</div></div>
+    <div class="card"><div class="label">ממתינות לריקון</div><div class="kpi" id="kWaiting">0</div></div>
+    <div class="card"><div class="label">רוקנו</div><div class="kpi" id="kDone">0</div></div>
+    <div class="card"><div class="label">חריגה מעל 48 שעות</div><div class="kpi" id="kLate">0</div></div>
+  </section>
+
+  <section class="warehouses">
+    <div class="card"><b>מחסן 1</b><div class="kpi" id="w1">0</div><div class="small">מכולות משויכות</div></div>
+    <div class="card"><b>מחסן 2</b><div class="kpi" id="w2">0</div><div class="small">מכולות משויכות</div></div>
+    <div class="card"><b>מחסן 3</b><div class="kpi" id="w3">0</div><div class="small">מכולות משויכות</div></div>
+  </section>
+
+  <div class="toolbar">
+    <input id="search" placeholder="חיפוש מכולה / אונייה / משלח">
+    <select id="warehouseFilter">
+      <option value="">כל המחסנים</option><option value="1">מחסן 1</option><option value="2">מחסן 2</option><option value="3">מחסן 3</option>
+    </select>
+    <select id="statusFilter">
+      <option value="">כל הסטטוסים</option><option value="waiting">ממתינה</option><option value="done">רוקנה</option><option value="late">חריגה</option>
+    </select>
+    <select id="balanceMode">
+      <option value="quantity">חלוקה לפי כמות</option>
+      <option value="forwarder">חלוקה לפי משלח</option>
+    </select>
+    <button id="balanceBtn">חלוקה אוטומטית</button>
+    <button id="refreshBtn">רענון</button>
+  </div>
+
+  <div class="tablebox">
+    <table>
+      <thead>
+        <tr>
+          <th>מס׳ מכולה</th><th>אונייה</th><th>משלח</th><th>כמות</th><th>משקל</th>
+          <th>תאריך שידור</th><th>מחסן</th><th>תאריך ריקון</th><th>זמן שעבר</th><th>בקרת 48 שעות</th><th>פעולה</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty" class="empty">אין עדיין נתונים בענן</div>
+  </div>
+
+  <p class="small">הערה: בגרסת V2 הנתונים נשמרים ב־Supabase. טעינת Excel ישירה תתווסף לאחר חיבור הענן ואימות מבנה הנתונים.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./config.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
