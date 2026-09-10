@@ -1,0 +1,43 @@
+const SUPABASE_URL=process.env.SUPABASE_URL;
+const SERVICE_KEY=process.env.SUPABASE_SERVICE_ROLE_KEY;
+const headers={"Content-Type":"application/json; charset=utf-8","Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type","Access-Control-Allow-Methods":"GET,POST,OPTIONS"};
+
+function sbHeaders(){return{"apikey":SERVICE_KEY,"Authorization":`Bearer ${SERVICE_KEY}`,"Content-Type":"application/json","Prefer":"return=representation"}}
+async function sb(path,opts={}){if(!SUPABASE_URL||!SERVICE_KEY)throw Error("Supabase environment variables are missing");const r=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{...opts,headers:{...sbHeaders(),...(opts.headers||{})}});const text=await r.text();const data=text?JSON.parse(text):null;if(!r.ok)throw Error(data?.message||data?.hint||`Supabase ${r.status}`);return data}
+
+exports.handler=async event=>{
+  if(event.httpMethod==="OPTIONS")return{statusCode:204,headers,body:""};
+  try{
+    const action=event.queryStringParameters?.action||"get";
+    const body=event.body?JSON.parse(event.body):{};
+    if(action==="get"){
+      const p=await sb("paper_portfolio?select=*&status=eq.open&order=updated_at.desc&limit=1");
+      const s=await sb("portfolio_snapshots?select=*&order=date.asc&limit=365");
+      return{statusCode:200,headers,body:JSON.stringify({portfolio:p?.[0]||null,snapshots:s||[]})};
+    }
+    if(action==="save_portfolio"){
+      await sb("paper_portfolio?status=eq.open",{method:"PATCH",body:JSON.stringify({status:"closed",closed_at:new Date().toISOString()})});
+      const row={symbol:body.symbol,start:body.start,allocated_ils:body.allocatedILS,allocated_usd:body.allocatedUSD,entry_fx:body.entryFX,entry_price:body.entryPrice,units:body.units,cash_ils:body.cashILS,entry_date:body.date,plan:body.plan,status:"open"};
+      const p=await sb("paper_portfolio",{method:"POST",body:JSON.stringify(row)});
+      const x=p[0];
+      const portfolio={id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:+x.cash_ils,date:x.entry_date,plan:x.plan,status:x.status};
+      return{statusCode:200,headers,body:JSON.stringify({portfolio})};
+    }
+    if(action==="save_snapshot"){
+      const row={snapshot_key:body.snapshot_key,date:body.date,symbol:body.symbol,value:body.value,pnl:body.pnl,fx:body.fx,score:body.score,market_price:body.market_price,auto:!!body.auto};
+      await sb("portfolio_snapshots?on_conflict=snapshot_key",{method:"POST",headers:{"Prefer":"resolution=ignore-duplicates,return=representation"},body:JSON.stringify(row)});
+      const s=await sb("portfolio_snapshots?select=*&order=date.asc&limit=365");
+      return{statusCode:200,headers,body:JSON.stringify({snapshots:s||[]})};
+    }
+    if(action==="close_portfolio"){
+      await sb("paper_portfolio?status=eq.open",{method:"PATCH",body:JSON.stringify({status:"closed",closed_at:body.closed_at||new Date().toISOString()})});
+      return{statusCode:200,headers,body:JSON.stringify({ok:true})};
+    }
+    if(action==="reset"){
+      await sb("portfolio_snapshots?id=not.is.null",{method:"DELETE"});
+      await sb("paper_portfolio?id=not.is.null",{method:"DELETE"});
+      return{statusCode:200,headers,body:JSON.stringify({ok:true})};
+    }
+    return{statusCode:400,headers,body:JSON.stringify({error:"Unknown action"})};
+  }catch(e){return{statusCode:500,headers,body:JSON.stringify({error:e.message})}}
+};
