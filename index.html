@@ -1,87 +1,50 @@
-<!doctype html>
-<html lang="he" dir="rtl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#07111f">
-  <title>AI Investment Lab</title>
-  <style>
-    :root{--bg:#06101d;--panel:rgba(15,34,57,.88);--panel2:rgba(20,45,75,.82);--line:rgba(94,168,230,.24);--text:#f3f8ff;--muted:#9fb4c8;--blue:#3ab2ff;--green:#47e59a;--yellow:#ffd75a;--purple:#b879ff;--red:#ff6479;--shadow:0 18px 50px rgba(0,0,0,.28)}
-    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,"Segoe UI",sans-serif;background:radial-gradient(circle at 85% 8%,rgba(31,122,220,.20),transparent 35%),radial-gradient(circle at 15% 20%,rgba(54,221,168,.08),transparent 30%),linear-gradient(180deg,#06101d,#081421 58%,#06101b);color:var(--text)}
-    body{padding-bottom:env(safe-area-inset-bottom)}button,input,select{font:inherit}button{cursor:pointer}.app{display:grid;grid-template-columns:238px 1fr;min-height:100vh}
-    .side{padding:22px 14px;border-left:1px solid var(--line);background:rgba(7,20,34,.88);backdrop-filter:blur(18px);position:sticky;top:0;height:100vh}.brand{font-size:27px;font-weight:800;margin:0 10px 26px}.brand b{color:var(--blue)}
-    .side button{width:100%;border:0;background:transparent;color:#dfeefe;text-align:right;padding:13px 15px;border-radius:13px;margin:4px 0}.side button.active{background:linear-gradient(90deg,rgba(28,117,205,.55),rgba(38,147,239,.18))}
-    main{padding:22px 24px 38px;min-width:0}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}h1{font-size:26px;margin:0 0 2px}.sub{color:var(--muted);font-size:13px}
-    .status-pill{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:999px;background:rgba(17,39,65,.8);border:1px solid var(--line);font-size:13px}.dot{width:9px;height:9px;border-radius:50%;background:var(--yellow)}.dot.ok{background:var(--green)}
-    .controls{display:grid;grid-template-columns:1.1fr .9fr auto;gap:10px;margin:14px 0}input,select{width:100%;border:1px solid var(--line);background:#0b1b2d;color:var(--text);border-radius:12px;padding:11px 12px;outline:none}
-    .btn{border:0;border-radius:12px;padding:11px 15px;font-weight:800;background:linear-gradient(135deg,#3ab2ff,#2394f0);color:#031321}.btn.secondary{background:#17334f;color:#eaf5ff;border:1px solid var(--line)}
-    .cards4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow);backdrop-filter:blur(14px);min-width:0}
-    .label{font-size:13px;color:var(--muted);margin-bottom:5px}.value{font-size:27px;font-weight:800;line-height:1.15}.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.blue{color:var(--blue)}
-    .market-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.symbol{font-size:19px;font-weight:800}.quote{font-size:26px;font-weight:800;direction:ltr;text-align:right}
-    .two{display:grid;grid-template-columns:minmax(0,2fr) minmax(270px,1fr);gap:12px;margin-top:12px}.chart-wrap{height:285px;position:relative}.chart-wrap canvas{width:100%;height:100%;display:block}
-    .alloc-row{display:grid;grid-template-columns:110px 1fr 46px;gap:9px;align-items:center;margin:12px 0;font-size:13px}.track{height:9px;background:#15304d;border-radius:20px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:20px}
-    h2{font-size:19px;margin:22px 2px 10px}.agents{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.agent{min-height:184px}.agent h3{font-size:15px;margin:0 0 7px}.agent p{font-size:12.5px;line-height:1.5;color:var(--muted);margin:0}.agent .result{font-size:13px;font-weight:800;margin-top:14px}
-    .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.plan.selected{outline:2px solid var(--blue)}.plan h3{margin:0 0 4px;font-size:20px}.metric{display:flex;justify-content:space-between;gap:10px;margin:8px 0;font-size:13px}
-    .journal-desktop{overflow:auto}.journal{width:100%;border-collapse:collapse;font-size:13px}.journal th,.journal td{padding:11px;border-bottom:1px solid rgba(84,145,196,.17);text-align:right;white-space:nowrap}.journal th{color:#b9cbdb;font-weight:600}.journal-mobile{display:none}
-    .mobile-nav{display:none}.notice{margin-top:16px;padding:12px 14px;border:1px solid var(--line);background:rgba(7,20,34,.72);border-radius:13px;color:#9fb4c8;font-size:11.5px;line-height:1.5}
-    .errorbox{display:none;margin:10px 0;padding:10px 12px;border-radius:12px;background:rgba(255,100,121,.11);border:1px solid rgba(255,100,121,.35);color:#ffc0c9;font-size:13px}
-    @media(max-width:1120px){.agents{grid-template-columns:repeat(2,1fr)}.cards4{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:760px){body{padding-bottom:86px}.app{display:block}.side{display:none}main{padding:14px 12px 24px}.top{align-items:center}.top h1{font-size:21px}.sub{font-size:11.5px}.status-pill{font-size:11px;padding:7px 9px}
-      .controls{grid-template-columns:1fr 1fr}.controls .btn{grid-column:1/-1;padding:12px}.cards4{grid-template-columns:1fr 1fr;gap:9px}.card{border-radius:16px;padding:13px}.value{font-size:21px}.cards4 .label{font-size:11px}
-      .two{grid-template-columns:1fr}.chart-wrap{height:230px}.agents{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:9px;padding-bottom:4px}.agents .card{flex:0 0 78%;scroll-snap-align:start;min-height:160px}
-      .plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:9px}.plan{flex:0 0 86%;scroll-snap-align:start}.journal-desktop{display:none}.journal-mobile{display:block}
-      .mobile-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;z-index:10;bottom:0;left:0;right:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(7,18,31,.94);backdrop-filter:blur(18px);border-top:1px solid var(--line)}
-      .mobile-nav button{border:0;background:transparent;color:#aabed0;font-size:10.5px;padding:3px}.mobile-nav span{display:block;font-size:20px;margin-bottom:2px}.mobile-nav button.active{color:var(--blue)}h2{font-size:17px;margin-top:18px}.alloc-row{grid-template-columns:100px 1fr 42px}}
-  </style>
-</head>
-<body>
-<div class="app">
-  <aside class="side">
-    <div class="brand"><b>AI</b> Investment Lab</div>
-    <button class="active">🏠 דף הבית</button><button>🤖 הסוכנים</button><button>🧪 סימולציות</button><button>📒 יומן החלטות</button><button>⚙️ הגדרות</button>
-  </aside>
-  <main>
-    <div class="top">
-      <div><h1>מעבדת השקעות חכמה</h1><div class="sub">נתוני שוק אמיתיים · תיק וכסף וירטואליים בלבד</div></div>
-      <div class="status-pill"><span id="apiDot" class="dot"></span><span id="apiStatus">ממתין לנתונים</span></div>
-    </div>
-    <div id="errorBox" class="errorbox"></div>
-    <div class="controls">
-      <select id="symbolSelect"><option value="SPY">SPY — S&P 500 ETF</option><option value="QQQ">QQQ — Nasdaq 100 ETF</option><option value="DIA">DIA — Dow Jones ETF</option><option value="IWM">IWM — Russell 2000 ETF</option></select>
-      <input id="amount" type="number" min="1000" step="1000" value="100000" aria-label="סכום סימולציה">
-      <button id="refreshBtn" class="btn">טען נתוני שוק</button>
-    </div>
-    <section class="cards4">
-      <div class="card"><div class="label">שווי תיק וירטואלי</div><div id="portfolioValue" class="value">₪100,000</div><div id="profitText" class="green">₪0 (0.0%)</div></div>
-      <div class="card"><div class="label">נכס נצפה</div><div id="tickerValue" class="value">SPY</div><div id="quoteDate" class="sub">—</div></div>
-      <div class="card"><div class="label">מחיר סגירה אחרון</div><div id="lastPrice" class="value">—</div><div id="dailyChange" class="sub">—</div></div>
-      <div class="card"><div class="label">רמת סיכון מחושבת</div><div id="riskValue" class="value yellow">—</div><div id="volatilityText" class="sub">ממתין לנתונים</div></div>
-    </section>
-    <section class="two">
-      <div class="card"><div class="market-head"><div><div class="label">90 ימי מסחר אחרונים</div><div id="chartTitle" class="symbol">SPY</div></div><div id="marketReturn" class="quote">—</div></div><div class="chart-wrap"><canvas id="chart"></canvas></div></div>
-      <div class="card"><div class="label">חלוקת התיק הווירטואלי</div><div id="allocation"></div></div>
-    </section>
-    <h2>סוכני הניתוח</h2>
-    <section class="agents">
-      <div class="card agent"><h3>📈 Market Agent</h3><p>בודק מגמה קצרה וארוכה לפי נתוני המחיר.</p><div id="marketAgent" class="result">ממתין לנתונים</div></div>
-      <div class="card agent"><h3>🔎 Analysis Agent</h3><p>משווה ממוצעים נעים ושינוי בתקופה.</p><div id="analysisAgent" class="result">ממתין לנתונים</div></div>
-      <div class="card agent"><h3>🛡️ Risk Agent</h3><p>מעריך תנודתיות וירידה מקסימלית היסטורית.</p><div id="riskAgent" class="result">ממתין לנתונים</div></div>
-      <div class="card agent"><h3>📰 Data Agent</h3><p>בודק עדכניות ואיכות של נתוני השוק שהתקבלו.</p><div id="dataAgent" class="result">ממתין לנתונים</div></div>
-      <div class="card agent"><h3>🧠 Portfolio Agent</h3><p>מסכם את המדדים ובוחר מסלול סימולציה, ללא ביצוע עסקה.</p><div id="portfolioAgent" class="result">ממתין לנתונים</div></div>
-    </section>
-    <h2>מסלולי סימולציה</h2>
-    <section class="plans">
-      <div id="plan-conservative" class="card plan"><h3 class="green">שמרני</h3><div class="sub">פיזור עם דגש על רכיב הגנתי.</div><div class="metric"><span>מניות/ETF</span><b>25%</b></div><div class="metric"><span>אג"ח</span><b>55%</b></div><div class="metric"><span>מזומן</span><b>20%</b></div><button class="btn secondary" onclick="selectPlan('conservative')">בחר לסימולציה</button></div>
-      <div id="plan-balanced" class="card plan selected"><h3 class="blue">מאוזן</h3><div class="sub">איזון בין צמיחה לפיזור.</div><div class="metric"><span>מניות/ETF</span><b>50%</b></div><div class="metric"><span>אג"ח</span><b>35%</b></div><div class="metric"><span>מזומן</span><b>15%</b></div><button class="btn" onclick="selectPlan('balanced')">בחר לסימולציה</button></div>
-      <div id="plan-growth" class="card plan"><h3 style="color:var(--purple)">צמיחה</h3><div class="sub">חשיפה גבוהה יותר לשוק המניות.</div><div class="metric"><span>מניות/ETF</span><b>80%</b></div><div class="metric"><span>אג"ח</span><b>10%</b></div><div class="metric"><span>מזומן</span><b>10%</b></div><button class="btn secondary" onclick="selectPlan('growth')">בחר לסימולציה</button></div>
-    </section>
-    <h2>יומן מעקב</h2>
-    <section class="card journal-desktop"><table class="journal"><thead><tr><th>תאריך</th><th>נכס</th><th>מסלול</th><th>מחיר</th><th>מסקנת הסוכן</th><th>סטטוס</th></tr></thead><tbody id="journalBody"></tbody></table></section>
-    <section id="journalMobile" class="card journal-mobile"></section>
-    <div class="notice">המערכת מיועדת ללמידה ולסימולציה בלבד. היא אינה מבצעת קנייה או מכירה, אינה מחוברת לחשבון השקעות ואינה מהווה ייעוץ השקעות אישי. נתוני Alpha Vantage עשויים להיות נתוני סוף יום בהתאם למסלול השירות.</div>
-  </main>
-</div>
-<nav class="mobile-nav"><button class="active"><span>🏠</span>בית</button><button><span>🤖</span>סוכנים</button><button><span>🧪</span>סימולציה</button><button><span>📒</span>יומן</button></nav>
-<script src="config.js"></script><script src="app.js"></script>
-</body>
-</html>
+<!doctype html><html lang="he" dir="rtl"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111f"><title>AI Investment Lab V3</title>
+<style>
+:root{--bg:#06101d;--p:#102844;--p2:#0c2036;--l:#244b70;--t:#f4f8ff;--m:#9fb4c8;--b:#3ab2ff;--g:#47e59a;--y:#ffd75a;--r:#ff6479;--v:#b879ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#06101d,#081827);color:var(--t);font-family:Arial,"Segoe UI",sans-serif;padding-bottom:80px}
+main{max-width:1500px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center}.top h1{margin:0;font-size:27px}.muted{color:var(--m);font-size:13px}
+.status{padding:9px 12px;border:1px solid var(--l);border-radius:99px;background:#0c2036}.controls,.kpis,.agents,.plans,.paper{display:grid;gap:12px}.controls{grid-template-columns:1fr 1fr auto;margin:16px 0}.kpis{grid-template-columns:repeat(5,1fr)}
+.card{background:linear-gradient(180deg,var(--p),var(--p2));border:1px solid var(--l);border-radius:17px;padding:16px;box-shadow:0 15px 35px #0004}.label{color:var(--m);font-size:12px}.big{font-size:25px;font-weight:800;margin-top:5px}.green{color:var(--g)}.red{color:var(--r)}.yellow{color:var(--y)}.blue{color:var(--b)}
+input,select,button{font:inherit;border-radius:11px;padding:11px 12px}input,select{background:#0a1b2e;color:white;border:1px solid var(--l)}button{border:0;background:var(--b);font-weight:800;cursor:pointer}.secondary{background:#173754;color:white;border:1px solid var(--l)}
+.paper{grid-template-columns:1.2fr 1fr;margin-top:12px}.positions{width:100%;border-collapse:collapse}.positions th,.positions td{padding:10px;border-bottom:1px solid #244b7066;text-align:right}.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+h2{font-size:19px;margin:22px 0 10px}.agents{grid-template-columns:repeat(5,1fr)}.agentScore{font-size:30px;font-weight:900;margin:10px 0}.scorebar{height:8px;background:#173754;border-radius:9px;overflow:hidden}.scorebar i{display:block;height:100%;background:linear-gradient(90deg,var(--b),var(--g))}
+.plans{grid-template-columns:repeat(3,1fr)}.plan.selected{outline:2px solid var(--b)}.plan h3{margin:0 0 8px}.row{display:flex;justify-content:space-between;margin:7px 0}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.journal{overflow:auto}.journal table{width:100%;border-collapse:collapse}.journal th,.journal td{padding:10px;border-bottom:1px solid #244b7066;text-align:right;white-space:nowrap}
+.note{margin-top:15px;border:1px solid var(--l);border-radius:12px;padding:12px;color:var(--m);font-size:12px}.error{display:none;background:#4b1722;color:#ffd2d8;padding:10px;border-radius:10px;margin:10px 0}
+@media(max-width:900px){main{padding:13px}.top h1{font-size:21px}.controls{grid-template-columns:1fr 1fr}.controls button{grid-column:1/-1}.kpis{grid-template-columns:1fr 1fr}.paper{grid-template-columns:1fr}.agents{display:flex;overflow:auto}.agents .card{min-width:78%}.plans{display:flex;overflow:auto}.plans .card{min-width:86%}.big{font-size:21px}.positions{font-size:12px}}
+</style></head><body><main>
+<div class="top"><div><h1>AI Investment Lab · V3</h1><div class="muted">מעבדת מעקב והשקעות וירטואלית</div></div><div id="status" class="status">ממתין לנתונים</div></div>
+<div id="error" class="error"></div>
+<div class="controls"><select id="symbol"><option>SPY</option><option>QQQ</option><option>DIA</option><option>IWM</option></select><input id="capital" type="number" value="100000" min="1000"><button id="load">טען ונתח שוק</button></div>
+<section class="kpis">
+<div class="card"><div class="label">הון התחלתי</div><div id="startCapital" class="big">₪100,000</div></div>
+<div class="card"><div class="label">שווי תיק נייר</div><div id="paperValue" class="big">₪100,000</div><div id="paperPnl" class="muted">טרם נפתחה פוזיציה</div></div>
+<div class="card"><div class="label">מחיר שוק אחרון</div><div id="price" class="big">—</div><div id="date" class="muted">—</div></div>
+<div class="card"><div class="label">ציון משוקלל</div><div id="masterScore" class="big yellow">—</div><div id="signal" class="muted">ממתין לניתוח</div></div>
+<div class="card"><div class="label">מסלול פעיל</div><div id="activePlan" class="big blue">מאוזן</div><div id="exposure" class="muted">50% חשיפת שוק</div></div>
+</section>
+
+<h2>תיק נייר וירטואלי</h2><section class="paper">
+<div class="card"><table class="positions"><thead><tr><th>נכס</th><th>מחיר כניסה</th><th>יחידות</th><th>מחיר נוכחי</th><th>שווי</th><th>רווח/הפסד</th></tr></thead><tbody id="positions"><tr><td colspan="6" class="muted">עדיין לא נפתחה פוזיציה.</td></tr></tbody></table></div>
+<div class="card"><div class="label">פעולת סימולציה</div><div class="muted">הפעולה אינה שולחת הוראה לברוקר ואינה משתמשת בכסף אמיתי.</div><div class="actions"><button id="openPaper">פתח פוזיציית נייר</button><button id="closePaper" class="secondary">סגור פוזיציה</button><button id="resetPaper" class="secondary">אפס סימולציה</button></div></div>
+</section>
+
+<h2>ציוני הסוכנים</h2><section class="agents">
+<div class="card"><b>📈 Market Agent</b><div id="sMarket" class="agentScore">—</div><div class="scorebar"><i id="bMarket" style="width:0"></i></div><div id="tMarket" class="muted"></div></div>
+<div class="card"><b>🔎 Trend Agent</b><div id="sTrend" class="agentScore">—</div><div class="scorebar"><i id="bTrend" style="width:0"></i></div><div id="tTrend" class="muted"></div></div>
+<div class="card"><b>🛡️ Risk Agent</b><div id="sRisk" class="agentScore">—</div><div class="scorebar"><i id="bRisk" style="width:0"></i></div><div id="tRisk" class="muted"></div></div>
+<div class="card"><b>⚡ Momentum Agent</b><div id="sMomentum" class="agentScore">—</div><div class="scorebar"><i id="bMomentum" style="width:0"></i></div><div id="tMomentum" class="muted"></div></div>
+<div class="card"><b>🧠 Portfolio Agent</b><div id="sPortfolio" class="agentScore">—</div><div class="scorebar"><i id="bPortfolio" style="width:0"></i></div><div id="tPortfolio" class="muted"></div></div>
+</section>
+
+<h2>מסלולי סימולציה</h2><section class="plans">
+<div id="pc" class="card plan"><h3 class="green">שמרני</h3><div class="row"><span>חשיפת שוק</span><b>25%</b></div><div class="row"><span>רכיב הגנתי/מזומן</span><b>75%</b></div><button onclick="choose('conservative')">בחר</button></div>
+<div id="pb" class="card plan selected"><h3 class="blue">מאוזן</h3><div class="row"><span>חשיפת שוק</span><b>50%</b></div><div class="row"><span>רכיב הגנתי/מזומן</span><b>50%</b></div><button onclick="choose('balanced')">בחר</button></div>
+<div id="pg" class="card plan"><h3 style="color:var(--v)">צמיחה</h3><div class="row"><span>חשיפת שוק</span><b>80%</b></div><div class="row"><span>רכיב הגנתי/מזומן</span><b>20%</b></div><button onclick="choose('growth')">בחר</button></div>
+</section>
+
+<h2>יומן החלטות ומעקב</h2><section class="card journal"><table><thead><tr><th>תאריך</th><th>נכס</th><th>ציון</th><th>מסלול</th><th>מחיר</th><th>החלטה</th></tr></thead><tbody id="journal"></tbody></table></section>
+<div class="note">סימולציה ולמידה בלבד. אין כאן מסחר אמיתי, חיבור לברוקר או ייעוץ השקעות אישי. ציוני הסוכנים הם מודל ניסויי המבוסס על נתוני מחיר היסטוריים.</div>
+</main><script src="config.js"></script><script src="app.js"></script></body></html>

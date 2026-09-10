@@ -1,1 +1,1 @@
-window.APP_CONFIG = { marketEndpoint: "/.netlify/functions/market-data" };
+window.APP_CONFIG={marketEndpoint:"/.netlify/functions/market-data"};
