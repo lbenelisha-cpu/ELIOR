@@ -56,6 +56,7 @@ async function load(){
     $("signal").textContent=a.signal;
     $("status").textContent=(marketFromCache||fxFromCache)?"נתונים נטענו · חלקם מהמטמון":"נתוני שוק ומט״ח נטענו";
     renderAgents();renderPaper();
+    autoSnapshot();
   }catch(e){
     $("error").textContent=shortError(e.message);
     $("error").style.display="block";
@@ -67,7 +68,21 @@ function paper(){return JSON.parse(localStorage.getItem("v4paper")||"null")}func
 function openPaper(){if(!market||!fx)return alert("טען שוק ומט״ח תחילה");let cap=Math.max(1000,+$("capital").value||100000),ils=cap*exp[plan],usd=ils/fx.rate,units=usd/a.last;save({symbol:market.symbol,start:cap,allocatedILS:ils,allocatedUSD:usd,entryFX:fx.rate,entryPrice:a.last,units,cashILS:cap-ils,date:market.lastRefreshed,plan})}
 function currentValue(p){let px=(market&&market.symbol===p.symbol&&a)?a.last:p.entryPrice,rate=fx?fx.rate:p.entryFX,marketILS=p.units*px*rate,total=p.cashILS+marketILS;return{px,rate,marketILS,total,pnl:total-p.start}}
 function renderPaper(){let p=paper(),cap=Math.max(1000,+$("capital").value||100000);$("start").textContent=money(p?p.start:cap);if(!p){$("value").textContent=money(cap);$("pnl").textContent="—";$("position").innerHTML='<tr><td colspan="8" class="muted">אין פוזיציה.</td></tr>';return}let v=currentValue(p),pc=v.pnl/p.start*100;$("value").textContent=money(v.total);$("pnl").textContent=`${v.pnl>=0?"+":""}${money(v.pnl)} (${pc.toFixed(2)}%)`;$("pnl").className=v.pnl>=0?"green":"red";$("position").innerHTML=`<tr><td>${p.symbol}</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${p.allocatedUSD.toFixed(2)}</span></td><td>${p.entryFX.toFixed(4)}</td><td><span class=ltr>$${p.entryPrice.toFixed(2)}</span></td><td><span class=ltr>${p.units.toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}
-function snapshots(){return JSON.parse(localStorage.getItem("v4snaps")||"[]")}function snapshot(){let p=paper();if(!p||!market||!fx||!a)return alert("יש לפתוח פוזיציה ולטעון נתונים");let v=currentValue(p),s=snapshots(),stamp=market.lastRefreshed,key=p.symbol+"-"+stamp;if(!s.some(x=>x.key===key)){s.push({key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master});s.sort((x,y)=>x.date.localeCompare(y.date));localStorage.setItem("v4snaps",JSON.stringify(s.slice(-365)))}renderHistory()}
+
+function autoSnapshot(){
+  const p=paper();
+  if(!p||!market||!fx||!a) return;
+  if(p.symbol!==market.symbol) return;
+  const v=currentValue(p),s=snapshots(),stamp=market.lastRefreshed,key=p.symbol+"-"+stamp;
+  if(s.some(x=>x.key===key)){renderHistory();return}
+  s.push({key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,auto:true});
+  s.sort((x,y)=>x.date.localeCompare(y.date));
+  localStorage.setItem("v4snaps",JSON.stringify(s.slice(-365)));
+  $("status").textContent="נתונים נטענו · Snapshot יומי נשמר אוטומטית";
+  renderHistory();
+}
+
+function snapshots(){return JSON.parse(localStorage.getItem("v4snaps")||"[]")}function snapshot(){let p=paper();if(!p||!market||!fx||!a)return alert("יש לפתוח פוזיציה ולטעון נתונים");let v=currentValue(p),s=snapshots(),stamp=market.lastRefreshed,key=p.symbol+"-"+stamp;if(!s.some(x=>x.key===key)){s.push({key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,auto:false});s.sort((x,y)=>x.date.localeCompare(y.date));localStorage.setItem("v4snaps",JSON.stringify(s.slice(-365)));$("status").textContent="Snapshot נשמר ידנית"}else{$("status").textContent="Snapshot להיום כבר קיים"}renderHistory()}
 function renderHistory(){let s=snapshots();$("snapCount").textContent=s.length+" Snapshots";$("journal").innerHTML=s.length?[...s].reverse().map(x=>`<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(x.value)}</td><td class="${x.pnl>=0?"green":"red"}">${x.pnl>=0?"+":""}${money(x.pnl)}</td><td>${x.fx.toFixed(4)}</td><td>${x.score}/100</td></tr>`).join(""):'<tr><td colspan="6" class="muted">אין Snapshots.</td></tr>';if(s.length>1){let r=(s.at(-1).value/s[0].value-1)*100;$("performanceText").textContent=`שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}draw(s)}
 function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(q=>q.value),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
 function closeP(){if(paper()&&!confirm("לסגור את פוזיציית הנייר?"))return;localStorage.removeItem("v4paper");renderPaper()}
