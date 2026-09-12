@@ -120,22 +120,35 @@ function renderPaper(){
   $("position").innerHTML=`<tr><td>${p.symbol}</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`
 }
 function snapshots(){return cloudSnapshots||[]}
+function aiSnapshotFields(){
+  if(!a)return{};
+  return{
+    market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,
+    recommendation:a.signal,plan:plan
+  };
+}
 async function autoSnapshot(){
   const p=paper();if(!p||p.status==="closed"||!market||!fx||!a||p.symbol!==market.symbol)return;
   const v=currentValue(p),stamp=market.lastRefreshed,key=p.symbol+"-"+stamp;
   if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){renderHistory();return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:true});
+  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:true,...aiSnapshotFields()});
 }
 async function snapshot(){
   let p=paper();if(!p||!market||!fx||!a)return alert("יש לפתוח פוזיציה ולטעון נתונים");
   let v=currentValue(p),stamp=market.lastRefreshed,key=p.symbol+"-"+stamp;
   if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){$("status").textContent="Snapshot להיום כבר קיים";return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false});
+  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false,...aiSnapshotFields()});
   $("status").textContent="Snapshot נשמר בענן";
 }
 function renderHistory(){
   let s=snapshots();$("snapCount").textContent=s.length+" Snapshots";
   $("journal").innerHTML=s.length?[...s].reverse().map(x=>`<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(Number(x.value))}</td><td class="${Number(x.pnl)>=0?"green":"red"}">${Number(x.pnl)>=0?"+":""}${money(Number(x.pnl))}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
+  const decision=$("decisionJournal");
+  if(decision)decision.innerHTML=s.length?[...s].reverse().map(x=>{
+    const rec=x.recommendation||"—",cls=/חיובי/.test(rec)?"green":/שלילי|זהירות/.test(rec)?"red":"yellow";
+    const score=v=>v==null?"—":`${v}/100`;
+    return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
+  }).join(""):'<tr><td colspan="10" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr>';
   if(s.length>1){let r=(Number(s.at(-1).value)/Number(s[0].value)-1)*100;$("performanceText").textContent=`שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}else{$("performanceText").textContent="ה-Snapshots נשמרים בענן ומופיעים בכל מכשיר."}
   draw(s);
 }

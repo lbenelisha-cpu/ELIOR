@@ -100,7 +100,10 @@ exports.handler=async event=>{
       const row={
         snapshot_key:body.snapshot_key,date:body.date,symbol:body.symbol,
         value:body.value,pnl:body.pnl,fx:body.fx,score:body.score,
-        market_price:body.market_price,auto:!!body.auto
+        market_price:body.market_price,auto:!!body.auto,
+        market_score:body.market_score??null,trend_score:body.trend_score??null,
+        risk_score:body.risk_score??null,momentum_score:body.momentum_score??null,
+        recommendation:body.recommendation??null,plan:body.plan??null
       };
       await sb("portfolio_snapshots?on_conflict=snapshot_key",{
         method:"POST",
