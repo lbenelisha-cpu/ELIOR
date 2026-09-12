@@ -1,6 +1,15 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
 let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null;
-const exp={conservative:.25,balanced:.5,growth:.8},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה"};
+const exp={conservative:.25,balanced:.5,growth:.8,ai_dynamic:.5},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה",ai_dynamic:"AI דינמי"};
+function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=55?.65:score>=45?.50:score>=30?.35:.25}
+function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(a?.master??50):(exp[p]||.5)}
+function selectedPortfolio(){return portfolios().find(p=>p.symbol===$("symbol").value)||null}
+function setPlanUI(){
+  const p=selectedPortfolio(),chosen=p?.plan||$("programPlan")?.value||plan||"balanced";plan=chosen;
+  if($("programPlan"))$("programPlan").value=chosen;
+  $("plan").textContent=names[chosen]||chosen;
+  const e=planExposure(chosen);$("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
+}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=30*60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
 function cacheGet(key,maxAge){try{const x=JSON.parse(localStorage.getItem(key)||"null");if(!x||!x.savedAt)return null;if(Date.now()-x.savedAt>maxAge)return null;return x.data}catch{return null}}
@@ -65,9 +74,7 @@ async function syncCloud(){
     const c=await cloud("get");
     cloudPortfolios=c.portfolios||(c.portfolio?[c.portfolio]:[]);
     cloudSnapshots=c.snapshots||[];
-    if(cloudPortfolios[0]?.plan) plan=cloudPortfolios[0].plan;
-    $("plan").textContent=names[plan]||plan;
-    $("expo").textContent=(exp[plan]||.5)*100+"% חשיפה";
+    setPlanUI();
     $("status").textContent="מסונכרן לענן";
     renderPaper();renderHistory();
   }catch(e){
@@ -98,7 +105,7 @@ async function load(){
     a=analyze(market.prices);
     $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=market.lastRefreshed+(marketFromCache?" · שמור":"");renderMarketState(marketFromCache);
     $("fx").textContent=Number(fx.rate).toFixed(4);$("fxDate").textContent=(fx.lastRefreshed||"")+(fxFromCache?" · שמור":"");
-    $("master").textContent=a.master+"/100";$("signal").textContent=a.signal;renderAgents();renderPaper();
+    $("master").textContent=a.master+"/100";$("signal").textContent=a.signal;renderAgents();renderPaper();setPlanUI();
     await autoSnapshot();
     $("status").textContent="נתונים נטענו · הענן מעודכן";
   }catch(e){$("error").textContent=shortError(e.message);$("error").style.display="block";$("status").textContent="שגיאת טעינה"}
@@ -111,11 +118,11 @@ function positionValue(p){const selected=market&&market.symbol===p.symbol&&a;con
 function portfolioTotals(){const cap=Math.max(1000,+$("capital").value||100000),ps=portfolios(),used=ps.reduce((n,p)=>n+Number(p.allocatedILS||0),0),marketValue=ps.reduce((n,p)=>n+positionValue(p).marketILS,0),cash=Math.max(0,cap-used),total=cash+marketValue;return{cap,used,cash,total,pnl:total-cap}}
 async function openPaper(){
   if(!market||!fx)return alert("טען שוק ומט״ח תחילה");
-  const cap=Math.max(1000,+$("capital").value||100000),allocation=cap*exp[plan],t=portfolioTotals();
+  const cap=Math.max(1000,+$("capital").value||100000),chosen=$("programPlan")?.value||plan,allocation=cap*planExposure(chosen),t=portfolioTotals();
   if(portfolios().some(p=>p.symbol===market.symbol))return alert("כבר קיימת תוכנית נייר פתוחה עבור "+market.symbol);
   if(t.cash+0.01<allocation)return alert("אין מספיק מזומן מדומה פנוי לתוכנית נוספת");
   const usd=allocation/fx.rate,units=usd/a.last;
-  const p={symbol:market.symbol,start:cap,allocatedILS:allocation,allocatedUSD:usd,entryFX:fx.rate,entryPrice:a.last,units,cashILS:0,date:market.lastRefreshed,plan,status:"open"};
+  const p={symbol:market.symbol,start:cap,allocatedILS:allocation,allocatedUSD:usd,entryFX:fx.rate,entryPrice:a.last,units,cashILS:0,date:market.lastRefreshed,plan:chosen,status:"open"};
   await savePortfolioCloud(p);await autoSnapshot();
 }
 function currentValue(p){const v=positionValue(p),t=portfolioTotals();return{...v,total:t.total,pnl:t.pnl}}
@@ -123,27 +130,27 @@ function renderPaper(){
   const ps=portfolios(),t=portfolioTotals();
   $("start").textContent=money(t.cap);$("value").textContent=money(t.total);$("pnl").textContent=`${t.pnl>=0?"+":""}${money(t.pnl)} (${(t.pnl/t.cap*100).toFixed(2)}%)`;$("pnl").className=t.pnl>=0?"green":"red";
   if(!ps.length){$("position").innerHTML='<tr><td colspan="9" class="muted">אין תוכניות פתוחות בענן.</td></tr>';return}
-  $("position").innerHTML=ps.map(p=>{const v=positionValue(p);return `<tr><td>${p.symbol}</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
+  $("position").innerHTML=ps.map(p=>{const v=positionValue(p),pe=p.plan==="ai_dynamic"?aiTargetExposure((latestSnap(p)?.score)??(market?.symbol===p.symbol?a?.master:50)):(exp[p.plan]||.5);return `<tr><td>${p.symbol}</td><td>${names[p.plan]||p.plan||"—"}</td><td>${Math.round(pe*100)}%</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
 }
 function snapshots(){return cloudSnapshots||[]}
-function aiSnapshotFields(){
+function aiSnapshotFields(p){
   if(!a)return{};
   return{
     market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,
-    recommendation:a.signal,plan:plan
+    recommendation:a.signal,plan:p?.plan||plan
   };
 }
 async function autoSnapshot(){
   const p=portfolios().find(x=>x.symbol===market?.symbol);if(!p||p.status==="closed"||!market||!fx||!a)return;
   const v=currentValue(p),pv=positionValue(p),stamp=market.lastRefreshed,key=`${p.id||p.symbol}-${p.symbol}-${stamp}`;
   if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){renderHistory();return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:true,...aiSnapshotFields()});
+  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:true,...aiSnapshotFields(p)});
 }
 async function snapshot(){
   let p=portfolios().find(x=>x.symbol===market?.symbol);if(!p||!market||!fx||!a)return alert("יש לבחור תוכנית פתוחה ולטעון נתונים");
   let v=currentValue(p),pv=positionValue(p),stamp=market.lastRefreshed,key=`${p.id||p.symbol}-${p.symbol}-${stamp}`;
   if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){$("status").textContent="Snapshot להיום כבר קיים";return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false,...aiSnapshotFields()});
+  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false,...aiSnapshotFields(p)});
   $("status").textContent="Snapshot נשמר בענן";
 }
 function renderHistory(){
@@ -159,10 +166,18 @@ function renderHistory(){
   draw(s);
 }
 function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(q=>Number(q.value)),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
+async function saveSelectedPlan(){
+  const p=selectedPortfolio();if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");
+  const newPlan=$("programPlan").value;
+  await cloud("update_plan",{id:p.id,plan:newPlan});p.plan=newPlan;plan=newPlan;renderPaper();setPlanUI();
+  $("status").textContent=`המסלול של ${p.symbol} עודכן ל-${names[newPlan]||newPlan}`;
+}
 async function closeP(){const p=portfolios().find(x=>x.symbol===$("symbol").value);if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");if(!confirm(`לסגור את תוכנית הנייר ${p.symbol}?`))return;await cloud("close_portfolio",{id:p.id,closed_at:new Date().toISOString()});cloudPortfolios=portfolios().filter(x=>x.id!==p.id);renderPaper()}
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolios=[];cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
-$("symbol").onchange=()=>renderPaper();
+$("symbol").onchange=()=>{renderPaper();setPlanUI()};
+$("programPlan").onchange=()=>{plan=$("programPlan").value;setPlanUI()};
+$("savePlan").onclick=()=>saveSelectedPlan().catch(e=>alert(shortError(e.message)));
 $("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
 syncCloud().catch(()=>{});startLive();

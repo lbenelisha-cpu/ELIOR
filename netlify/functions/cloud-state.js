@@ -114,6 +114,16 @@ exports.handler=async event=>{
       return{statusCode:200,headers,body:JSON.stringify({snapshots:s||[]})};
     }
 
+    if(action==="update_plan"){
+      if(!body.id||!body.plan)return{statusCode:400,headers,body:JSON.stringify({error:"Missing portfolio id or plan"})};
+      const allowed=["conservative","balanced","growth","ai_dynamic"];
+      if(!allowed.includes(body.plan))return{statusCode:400,headers,body:JSON.stringify({error:"Unknown plan"})};
+      await sb(`paper_portfolio?id=eq.${encodeURIComponent(body.id)}`,{
+        method:"PATCH",body:JSON.stringify({plan:body.plan,updated_at:new Date().toISOString()})
+      });
+      return{statusCode:200,headers,body:JSON.stringify({ok:true,plan:body.plan})};
+    }
+
     if(action==="close_portfolio"){
       const filter=body.id?`id=eq.${encodeURIComponent(body.id)}`:"status=eq.open";
       await sb(`paper_portfolio?${filter}`,{

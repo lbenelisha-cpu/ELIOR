@@ -1,12 +1,16 @@
-ELIOR V5 - שתי תוכניות נייר במקביל
+ELIOR — מסלול נפרד לכל תוכנית
 
-1. הרץ פעם אחת ב-Supabase SQL Editor את 01_supabase_multi_program.sql
-2. העלה ל-GitHub והחלף רק:
-   app.js
-   index.html
-   netlify/functions/cloud-state.js
-   netlify/functions/daily-snapshot.mjs
-3. המתן ל-Netlify Published ובצע Ctrl+F5.
-4. הפוזיציה הקיימת SPY נשמרת. כדי להוסיף תוכנית שנייה: בחר QQQ/DIA/IWM, טען שוק+מט"ח, ואז "הוסף תוכנית נייר".
+קבצים להחלפה ב-GitHub:
+1. app.js
+2. index.html
+3. netlify/functions/cloud-state.js
 
-המערכת היא סימולציה בלבד.
+אין צורך ב-SQL נוסף. העמודה plan כבר קיימת.
+
+אחרי Deploy:
+1. בחר SPY, בחר "מאוזן · 50%" ולחץ "שמור מסלול לנכס נבחר".
+2. בחר QQQ, בחר "AI דינמי" ולחץ "שמור מסלול לנכס נבחר".
+3. אין לפתוח מחדש את הפוזיציות ואין לאפס.
+
+AI דינמי מציג יעד חשיפה לפי Master: 25% / 35% / 50% / 65% / 80%.
+העדכון אינו קונה או מוכר יחידות אוטומטית; הוא שומר את אסטרטגיית התוכנית ואת יעד החשיפה לצורך המעקב.
