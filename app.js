@@ -1,5 +1,5 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced";
+let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null;
 const exp={conservative:.25,balanced:.5,growth:.8},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה"};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=30*60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
@@ -7,6 +7,27 @@ function cacheGet(key,maxAge){try{const x=JSON.parse(localStorage.getItem(key)||
 function cacheSet(key,data){try{localStorage.setItem(key,JSON.stringify({savedAt:Date.now(),data}))}catch{}}
 function shortError(msg=""){msg=String(msg);if(/rate limit|25 requests per day|free API requests|premium plans|1 request per second/i.test(msg))return "מגבלת Alpha Vantage החינמית הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API key/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
 async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...(opts||{})}),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||"Request failed");return j}
+
+
+function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}
+function renderLive(){
+  const st=$("liveStatus"),price=$("livePrice"),events=$("liveEvents"),time=$("liveTime"),err=$("liveError");
+  if(!st)return;
+  if(!liveMarket){st.textContent="מתחבר...";st.className="big yellow";price.textContent="—";events.textContent="—";time.textContent="—";err.textContent="";return}
+  const connected=liveMarket.status==="connected"&&liveMarket.ok;
+  st.textContent=connected?"LIVE מחובר":"מנותק";st.className="big "+(connected?"green":"red");
+  price.innerHTML=Number.isFinite(Number(liveMarket.lastPrice))?`<span class=ltr>$${Number(liveMarket.lastPrice).toLocaleString("en-US",{maximumFractionDigits:2})}</span>`:"—";
+  events.textContent=Number(liveMarket.eventCount||0).toLocaleString("he-IL");
+  time.textContent=liveMarket.lastEventAt?fmtLiveTime(liveMarket.lastEventAt):"—";
+  err.textContent=liveMarket.lastError?`שגיאה אחרונה: ${liveMarket.lastError}`:`${liveMarket.symbol||"BTCUSDT"} · Binance WebSocket`;
+}
+async function loadLive(){
+  try{liveMarket=await fetchJson(APP_CONFIG.liveEndpoint);renderLive()}
+  catch(e){liveMarket={ok:false,status:"disconnected",lastError:e.message};renderLive()}
+}
+function startLive(){
+  clearInterval(liveTimer);loadLive();liveTimer=setInterval(loadLive,2000);
+}
 
 function analyze(p){let c=p.map(x=>x.close),last=c[0],r5=(last/c[Math.min(5,c.length-1)]-1)*100,r20=(last/c[Math.min(20,c.length-1)]-1)*100,r60=(last/c[Math.min(60,c.length-1)]-1)*100,s20=mean(c.slice(0,20)),s60=mean(c.slice(0,60)),rs=[];for(let i=0;i<c.length-1;i++)rs.push(c[i]/c[i+1]-1);let m=mean(rs),vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*Math.sqrt(252)*100,marketS=clamp(50+r60*2),trend=clamp(50+(last/s20-1)*500+(s20/s60-1)*400),risk=clamp(90-vol*2.2),mom=clamp(50+r5*3+r20*1.5),master=clamp((marketS+trend+risk+mom)/4);return{last,r5,r20,r60,vol,marketS,trend,risk,mom,master,signal:master>=70?"חיובי":master>=55?"חיובי מתון":master>=45?"ניטרלי":master>=30?"זהירות":"שלילי"}}
 function renderAgents(){if(!a)return;let x=[["Market",a.marketS,`60 ימים ${a.r60.toFixed(1)}%`],["Trend",a.trend,`20 ימים ${a.r20.toFixed(1)}%`],["Risk",a.risk,`תנודתיות ${a.vol.toFixed(1)}%`],["Momentum",a.mom,`5 ימים ${a.r5.toFixed(1)}%`],["Portfolio",a.master,a.signal]];$("agents").innerHTML=x.map(([n,s,t])=>`<div class="card"><b>${n} Agent</b><div class="score">${s}/100</div><div class="bar"><i style="width:${s}%"></i></div><div class="muted">${t}</div></div>`).join("")}
@@ -103,4 +124,4 @@ async function resetAll(){if(!confirm("לאפס את התיק הווירטואל
 
 $("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
-syncCloud().catch(()=>{});
+syncCloud().catch(()=>{});startLive();
