@@ -1,17 +1,12 @@
-ELIOR - עדכון היסטוריית החלטות AI
+ELIOR V5 - שתי תוכניות נייר במקביל
 
-1. לפני העלאת הקבצים ל-GitHub, פתח Supabase > SQL Editor.
-2. הרץ את הקובץ 01_supabase_ai_history.sql פעם אחת בלבד.
-3. לאחר הצלחה, העלה ל-GitHub והחלף רק את הקבצים:
-   - app.js
-   - index.html
-   - netlify/functions/cloud-state.js
-   - netlify/functions/daily-snapshot.mjs
-4. המתן ל-Netlify Published.
-5. באפליקציה לחץ פעם אחת על 'טען שוק + מט"ח'.
+1. הרץ פעם אחת ב-Supabase SQL Editor את 01_supabase_multi_program.sql
+2. העלה ל-GitHub והחלף רק:
+   app.js
+   index.html
+   netlify/functions/cloud-state.js
+   netlify/functions/daily-snapshot.mjs
+3. המתן ל-Netlify Published ובצע Ctrl+F5.
+4. הפוזיציה הקיימת SPY נשמרת. כדי להוסיף תוכנית שנייה: בחר QQQ/DIA/IWM, טען שוק+מט"ח, ואז "הוסף תוכנית נייר".
 
-מה חדש:
-- כל Snapshot חדש שומר Market / Trend / Risk / Momentum / Master.
-- נשמרת המלצת ה-AI באותו יום והמסלול הפעיל.
-- נוספה טבלת 'היסטוריית החלטות AI'.
-- Snapshots ישנים נשמרים ולא נמחקים; בשדות החדשים שלהם יוצג —.
+המערכת היא סימולציה בלבד.

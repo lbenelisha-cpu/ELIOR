@@ -61,44 +61,44 @@ exports.handler=async event=>{
     }
 
     if(action==="get"){
-      const p=await sb("paper_portfolio?select=*&status=eq.open&order=updated_at.desc&limit=1");
-      const s=await sb("portfolio_snapshots?select=*&order=date.asc&limit=365");
-      const x=p?.[0]||null;
-      const portfolio=x?{
+      const rows=await sb("paper_portfolio?select=*&status=eq.open&order=updated_at.asc");
+      const s=await sb("portfolio_snapshots?select=*&order=date.asc&limit=730");
+      const portfolios=(rows||[]).map(x=>({
         id:x.id,symbol:x.symbol,start:+x.start,
         allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,
         entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,
         cashILS:+x.cash_ils,date:x.entry_date,plan:x.plan,status:x.status
-      }:null;
-      return{statusCode:200,headers,body:JSON.stringify({portfolio,snapshots:s||[]})};
+      }));
+      return{statusCode:200,headers,body:JSON.stringify({portfolio:portfolios[0]||null,portfolios,snapshots:s||[]})};
     }
 
     if(action==="save_portfolio"){
-      await sb("paper_portfolio?status=eq.open",{
-        method:"PATCH",
-        body:JSON.stringify({status:"closed",closed_at:new Date().toISOString(),updated_at:new Date().toISOString()})
-      });
+      const open=await sb("paper_portfolio?select=*&status=eq.open");
+      if((open||[]).some(x=>String(x.symbol).toUpperCase()===String(body.symbol).toUpperCase())){
+        return{statusCode:409,headers,body:JSON.stringify({error:"A paper program for this symbol is already open"})};
+      }
+      const used=(open||[]).reduce((n,x)=>n+(+x.allocated_ils||0),0);
+      const total=+body.start||100000,allocation=+body.allocatedILS||0;
+      if(used+allocation>total+0.01){
+        return{statusCode:409,headers,body:JSON.stringify({error:"Not enough simulated cash for another program"})};
+      }
       const row={
         symbol:body.symbol,start:body.start,allocated_ils:body.allocatedILS,
         allocated_usd:body.allocatedUSD,entry_fx:body.entryFX,
-        entry_price:body.entryPrice,units:body.units,cash_ils:body.cashILS,
+        entry_price:body.entryPrice,units:body.units,cash_ils:0,
         entry_date:body.date,plan:body.plan,status:"open",
         updated_at:new Date().toISOString()
       };
-      const p=await sb("paper_portfolio",{method:"POST",body:JSON.stringify(row)});
-      const x=p[0];
-      const portfolio={
-        id:x.id,symbol:x.symbol,start:+x.start,
-        allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,
-        entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,
-        cashILS:+x.cash_ils,date:x.entry_date,plan:x.plan,status:x.status
-      };
+      const r=await sb("paper_portfolio",{method:"POST",body:JSON.stringify(row)});
+      const x=r[0];
+      const portfolio={id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:0,date:x.entry_date,plan:x.plan,status:x.status};
       return{statusCode:200,headers,body:JSON.stringify({portfolio})};
     }
 
     if(action==="save_snapshot"){
       const row={
         snapshot_key:body.snapshot_key,date:body.date,symbol:body.symbol,
+        position_id:body.position_id??null,position_value:body.position_value??null,position_pnl:body.position_pnl??null,
         value:body.value,pnl:body.pnl,fx:body.fx,score:body.score,
         market_price:body.market_price,auto:!!body.auto,
         market_score:body.market_score??null,trend_score:body.trend_score??null,
@@ -115,7 +115,8 @@ exports.handler=async event=>{
     }
 
     if(action==="close_portfolio"){
-      await sb("paper_portfolio?status=eq.open",{
+      const filter=body.id?`id=eq.${encodeURIComponent(body.id)}`:"status=eq.open";
+      await sb(`paper_portfolio?${filter}`,{
         method:"PATCH",
         body:JSON.stringify({
           status:"closed",
