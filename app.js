@@ -10,11 +10,11 @@ function setPlanUI(){
   $("plan").textContent=names[chosen]||chosen;
   const e=planExposure(chosen);$("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
 }
-const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=30*60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
 function cacheGet(key,maxAge){try{const x=JSON.parse(localStorage.getItem(key)||"null");if(!x||!x.savedAt)return null;if(Date.now()-x.savedAt>maxAge)return null;return x.data}catch{return null}}
 function cacheSet(key,data){try{localStorage.setItem(key,JSON.stringify({savedAt:Date.now(),data}))}catch{}}
-function shortError(msg=""){msg=String(msg);if(/rate limit|25 requests per day|free API requests|premium plans|1 request per second/i.test(msg))return "מגבלת Alpha Vantage החינמית הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API key/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
+function shortError(msg=""){msg=String(msg);if(/rate limit|too many requests|credits|429/i.test(msg))return "מגבלת ספק נתוני השוק הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API key/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
 async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...(opts||{})}),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||"Request failed");return j}
 
 
@@ -65,8 +65,9 @@ function renderMarketState(marketFromCache=false){
   const s=marketSession();
   badge.textContent=(s.open?"🟢 ":"🔴 ")+s.label;
   badge.className="market-badge "+(s.open?"open":"closed");
-  const type=market.dataType==="daily_close"?"מחיר סגירה יומי אחרון":"נתון שוק";
-  source.textContent=`${type} · ${market.lastRefreshed||"—"}${marketFromCache?" · שמור":""} · ${s.detail}`;
+  const type=market.dataType==="daily_close"?"מחיר סגירה יומי אחרון":market.dataType==="realtime_quote"?"מחיר שוק עדכני":"נתון שוק";
+  const provider=market.source?` · ${market.source}`:"";
+  source.textContent=`${type}${provider} · ${market.lastRefreshed||"—"}${marketFromCache?" · שמור":""} · ${s.detail}`;
 }
 function analyze(p){let c=p.map(x=>x.close),last=c[0],r5=(last/c[Math.min(5,c.length-1)]-1)*100,r20=(last/c[Math.min(20,c.length-1)]-1)*100,r60=(last/c[Math.min(60,c.length-1)]-1)*100,s20=mean(c.slice(0,20)),s60=mean(c.slice(0,60)),rs=[];for(let i=0;i<c.length-1;i++)rs.push(c[i]/c[i+1]-1);let m=mean(rs),vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*Math.sqrt(252)*100,marketS=clamp(50+r60*2),trend=clamp(50+(last/s20-1)*500+(s20/s60-1)*400),risk=clamp(90-vol*2.2),mom=clamp(50+r5*3+r20*1.5),master=clamp((marketS+trend+risk+mom)/4);return{last,r5,r20,r60,vol,marketS,trend,risk,mom,master,signal:master>=70?"חיובי":master>=55?"חיובי מתון":master>=45?"ניטרלי":master>=30?"זהירות":"שלילי"}}
 function renderAgents(){if(!a)return;let x=[["Market",a.marketS,`60 ימים ${a.r60.toFixed(1)}%`],["Trend",a.trend,`20 ימים ${a.r20.toFixed(1)}%`],["Risk",a.risk,`תנודתיות ${a.vol.toFixed(1)}%`],["Momentum",a.mom,`5 ימים ${a.r5.toFixed(1)}%`],["Portfolio",a.master,a.signal]];$("agents").innerHTML=x.map(([n,s,t])=>`<div class="card"><b>${n} Agent</b><div class="score">${s}/100</div><div class="bar"><i style="width:${s}%"></i></div><div class="muted">${t}</div></div>`).join("")}
