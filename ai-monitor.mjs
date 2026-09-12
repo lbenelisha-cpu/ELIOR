@@ -30,5 +30,5 @@ export default async()=>{try{
   }
   await heartbeat({status:"ok",symbols:ps.map(p=>p.symbol),last_market_date:marketDates.sort().reverse()[0]||null,scores,note:"בדיקה אוטומטית הסתיימה. מקור SPY/QQQ הוא Daily Close, לא מחיר תוך-יומי."});
 }catch(e){console.error("AI_MONITOR_ERROR",e?.stack||String(e));try{await heartbeat({status:"error",note:String(e?.message||e)})}catch{};throw e}};
-// 8 hourly checks on US trading weekdays. With 2 symbols + FX = 24 Alpha Vantage requests/day.
-export const config={schedule:"0 14-21 * * 1-5"};
+// 8 automatic checks every 3 hours, 24/7. With 2 symbols + FX = 24 Alpha Vantage requests/day.
+export const config={schedule:"0 */3 * * *"};
