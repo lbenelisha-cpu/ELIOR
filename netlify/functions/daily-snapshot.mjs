@@ -19,7 +19,7 @@ export default async()=>{try{
  const cap=Math.max(...rows.map(p=>+p.start||0),100000),used=rows.reduce((n,p)=>n+(+p.allocated_ils||0),0),cash=Math.max(0,cap-used),total=cash+data.reduce((n,x)=>n+x.positionValue,0),totalPnl=total-cap;
  for(const x of data){const {p,latest,a,positionValue}=x,key=`${p.id}-${p.symbol}-${latest.date}`,ex=await db(`portfolio_snapshots?select=id&snapshot_key=eq.${encodeURIComponent(key)}&limit=1`);if(ex?.length){console.log("DAILY_SNAPSHOT already exists",key);continue}
    const positionPnl=positionValue-(+p.allocated_ils);
-   await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:latest.date,symbol:p.symbol,position_id:String(p.id),position_value:positionValue,position_pnl:positionPnl,value:total,pnl:totalPnl,fx,score:a.master,market_price:a.last,auto:true,market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,recommendation:a.signal,plan:p.plan||null})});
+   await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:latest.date,symbol:p.symbol,position_id:String(p.id),position_value:positionValue,position_pnl:positionPnl,value:total,pnl:totalPnl,fx,score:a.master,market_price:a.last,auto:true,market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,recommendation:a.signal,plan:(p.strategy_mode||p.plan)||null})});
    console.log("DAILY_SNAPSHOT saved",key);
  }
 }catch(e){console.error("DAILY_SNAPSHOT_ERROR",e?.stack||String(e));throw e}};

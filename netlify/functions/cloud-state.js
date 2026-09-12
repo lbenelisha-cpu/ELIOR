@@ -67,7 +67,7 @@ exports.handler=async event=>{
         id:x.id,symbol:x.symbol,start:+x.start,
         allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,
         entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,
-        cashILS:+x.cash_ils,date:x.entry_date,plan:x.plan,status:x.status
+        cashILS:+x.cash_ils,date:x.entry_date,plan:(x.strategy_mode||x.plan),status:x.status
       }));
       return{statusCode:200,headers,body:JSON.stringify({portfolio:portfolios[0]||null,portfolios,snapshots:s||[]})};
     }
@@ -91,7 +91,7 @@ exports.handler=async event=>{
       };
       const r=await sb("paper_portfolio",{method:"POST",body:JSON.stringify(row)});
       const x=r[0];
-      const portfolio={id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:0,date:x.entry_date,plan:x.plan,status:x.status};
+      const portfolio={id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:0,date:x.entry_date,plan:(x.strategy_mode||x.plan),status:x.status};
       return{statusCode:200,headers,body:JSON.stringify({portfolio})};
     }
 
@@ -118,10 +118,11 @@ exports.handler=async event=>{
       if(!body.id||!body.plan)return{statusCode:400,headers,body:JSON.stringify({error:"Missing portfolio id or plan"})};
       const allowed=["conservative","balanced","growth","ai_dynamic"];
       if(!allowed.includes(body.plan))return{statusCode:400,headers,body:JSON.stringify({error:"Unknown plan"})};
-      await sb(`paper_portfolio?id=eq.${encodeURIComponent(body.id)}`,{
-        method:"PATCH",body:JSON.stringify({plan:body.plan,updated_at:new Date().toISOString()})
+      const updated=await sb(`paper_portfolio?id=eq.${encodeURIComponent(body.id)}`,{
+        method:"PATCH",body:JSON.stringify({strategy_mode:body.plan,updated_at:new Date().toISOString()})
       });
-      return{statusCode:200,headers,body:JSON.stringify({ok:true,plan:body.plan})};
+      if(!updated?.length)return{statusCode:404,headers,body:JSON.stringify({error:"Portfolio program not found"})};
+      return{statusCode:200,headers,body:JSON.stringify({ok:true,plan:body.plan,id:body.id})};
     }
 
     if(action==="close_portfolio"){
