@@ -1,5 +1,5 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null,marketTimer=null;
+let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null;
 const exp={conservative:.25,balanced:.5,growth:.8},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה"};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=30*60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
@@ -29,6 +29,27 @@ function startLive(){
   clearInterval(liveTimer);loadLive();liveTimer=setInterval(loadLive,2000);
 }
 
+function nyParts(){
+  try{
+    const parts=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date());
+    const o=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+    return{weekday:o.weekday||"",hour:Number(o.hour||0),minute:Number(o.minute||0)};
+  }catch{return{weekday:"",hour:0,minute:0}}
+}
+function marketSession(){
+  const n=nyParts(),weekend=n.weekday==="Sat"||n.weekday==="Sun",mins=n.hour*60+n.minute;
+  if(weekend)return{open:false,label:"שוק סגור",detail:"סוף שבוע בארה״ב"};
+  if(mins>=570&&mins<960)return{open:true,label:"שעות מסחר",detail:"NYSE/Nasdaq · 09:30–16:00 ניו יורק"};
+  return{open:false,label:"שוק סגור",detail:"מחוץ לשעות המסחר הרגילות"};
+}
+function renderMarketState(marketFromCache=false){
+  const badge=$("marketState"),source=$("marketSource");if(!badge||!source||!market)return;
+  const s=marketSession();
+  badge.textContent=(s.open?"🟢 ":"🔴 ")+s.label;
+  badge.className="market-badge "+(s.open?"open":"closed");
+  const type=market.dataType==="daily_close"?"מחיר סגירה יומי אחרון":"נתון שוק";
+  source.textContent=`${type} · ${market.lastRefreshed||"—"}${marketFromCache?" · שמור":""} · ${s.detail}`;
+}
 function analyze(p){let c=p.map(x=>x.close),last=c[0],r5=(last/c[Math.min(5,c.length-1)]-1)*100,r20=(last/c[Math.min(20,c.length-1)]-1)*100,r60=(last/c[Math.min(60,c.length-1)]-1)*100,s20=mean(c.slice(0,20)),s60=mean(c.slice(0,60)),rs=[];for(let i=0;i<c.length-1;i++)rs.push(c[i]/c[i+1]-1);let m=mean(rs),vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*Math.sqrt(252)*100,marketS=clamp(50+r60*2),trend=clamp(50+(last/s20-1)*500+(s20/s60-1)*400),risk=clamp(90-vol*2.2),mom=clamp(50+r5*3+r20*1.5),master=clamp((marketS+trend+risk+mom)/4);return{last,r5,r20,r60,vol,marketS,trend,risk,mom,master,signal:master>=70?"חיובי":master>=55?"חיובי מתון":master>=45?"ניטרלי":master>=30?"זהירות":"שלילי"}}
 function renderAgents(){if(!a)return;let x=[["Market",a.marketS,`60 ימים ${a.r60.toFixed(1)}%`],["Trend",a.trend,`20 ימים ${a.r20.toFixed(1)}%`],["Risk",a.risk,`תנודתיות ${a.vol.toFixed(1)}%`],["Momentum",a.mom,`5 ימים ${a.r5.toFixed(1)}%`],["Portfolio",a.master,a.signal]];$("agents").innerHTML=x.map(([n,s,t])=>`<div class="card"><b>${n} Agent</b><div class="score">${s}/100</div><div class="bar"><i style="width:${s}%"></i></div><div class="muted">${t}</div></div>`).join("")}
 
@@ -65,17 +86,17 @@ async function saveSnapshotCloud(s){
   renderHistory();
 }
 
-async function load(forceMarket=false){
+async function load(){
   try{
     $("status").textContent="טוען נתונים...";
     $("error").style.display="none";
     const symbol=$("symbol").value,marketKey="v5_market_"+symbol,fxKey="v5_fx_usdils";
-    market=forceMarket?null:cacheGet(marketKey,CACHE_MARKET_MS);let marketFromCache=!!market;
-    if(!market){market=await fetchJson(`${APP_CONFIG.marketEndpoint}?symbol=${symbol}&_=${Date.now()}`);cacheSet(marketKey,market)}
+    market=cacheGet(marketKey,CACHE_MARKET_MS);let marketFromCache=!!market;
+    if(!market){market=await fetchJson(`${APP_CONFIG.marketEndpoint}?symbol=${symbol}`);cacheSet(marketKey,market)}
     fx=cacheGet(fxKey,CACHE_FX_MS);let fxFromCache=!!fx;
     if(!fx){if(!marketFromCache)await sleep(1300);try{fx=await fetchJson(APP_CONFIG.fxEndpoint);cacheSet(fxKey,fx)}catch(err){const stale=cacheGet(fxKey,STALE_FX_MS);if(stale)fx=stale;else throw err}}
     a=analyze(market.prices);
-    $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=(market.lastRefreshed||"")+(marketFromCache?" · שמור":"")+(market.freshnessLabel?` · ${market.freshnessLabel}`:"");
+    $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=market.lastRefreshed+(marketFromCache?" · שמור":"");renderMarketState(marketFromCache);
     $("fx").textContent=Number(fx.rate).toFixed(4);$("fxDate").textContent=(fx.lastRefreshed||"")+(fxFromCache?" · שמור":"");
     $("master").textContent=a.master+"/100";$("signal").textContent=a.signal;renderAgents();renderPaper();
     await autoSnapshot();
@@ -94,9 +115,9 @@ function currentValue(p){let px=(market&&market.symbol===p.symbol&&a)?a.last:p.e
 function renderPaper(){
   let p=paper(),cap=Math.max(1000,+$("capital").value||100000);
   $("start").textContent=money(p?p.start:cap);
-  if(!p||p.status==="closed"){$("value").textContent=money(cap);$("pnl").textContent="—";$("position").innerHTML='<tr><td colspan="8" class="muted">אין פוזיציה פתוחה בענן.</td></tr>';return}
+  if(!p||p.status==="closed"){$("value").textContent=money(cap);$("pnl").textContent="—";$("position").innerHTML='<tr><td colspan="9" class="muted">אין פוזיציה פתוחה בענן.</td></tr>';return}
   let v=currentValue(p),pc=v.pnl/p.start*100;$("value").textContent=money(v.total);$("pnl").textContent=`${v.pnl>=0?"+":""}${money(v.pnl)} (${pc.toFixed(2)}%)`;$("pnl").className=v.pnl>=0?"green":"red";
-  $("position").innerHTML=`<tr><td>${p.symbol}</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`
+  $("position").innerHTML=`<tr><td>${p.symbol}</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`
 }
 function snapshots(){return cloudSnapshots||[]}
 async function autoSnapshot(){
@@ -122,7 +143,6 @@ function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio
 async function closeP(){if(paper()&&!confirm("לסגור את פוזיציית הנייר בענן?"))return;await cloud("close_portfolio",{closed_at:new Date().toISOString()});cloudPortfolio=null;renderPaper()}
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolio=null;cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
-$("load").onclick=()=>load(true);$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
+$("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
-function startMarketRefresh(){clearInterval(marketTimer);marketTimer=setInterval(()=>{if(document.visibilityState==="visible")load(true).catch(()=>{})},60*60*1000)}
-syncCloud().catch(()=>{});startLive();load().catch(()=>{});startMarketRefresh();
+syncCloud().catch(()=>{});startLive();
