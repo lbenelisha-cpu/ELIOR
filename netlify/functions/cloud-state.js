@@ -63,7 +63,14 @@ exports.handler=async event=>{
     if(action==="get"){
       const p=await sb("paper_portfolio?select=*&status=eq.open&order=updated_at.desc&limit=1");
       const s=await sb("portfolio_snapshots?select=*&order=date.asc&limit=365");
-      return{statusCode:200,headers,body:JSON.stringify({portfolio:p?.[0]||null,snapshots:s||[]})};
+      const x=p?.[0]||null;
+      const portfolio=x?{
+        id:x.id,symbol:x.symbol,start:+x.start,
+        allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,
+        entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,
+        cashILS:+x.cash_ils,date:x.entry_date,plan:x.plan,status:x.status
+      }:null;
+      return{statusCode:200,headers,body:JSON.stringify({portfolio,snapshots:s||[]})};
     }
 
     if(action==="save_portfolio"){
