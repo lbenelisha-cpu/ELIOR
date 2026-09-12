@@ -1,5 +1,5 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null;
+let market=null,fx=null,a=null,cloudPortfolio=null,cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null,marketTimer=null;
 const exp={conservative:.25,balanced:.5,growth:.8},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה"};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=30*60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
@@ -65,17 +65,17 @@ async function saveSnapshotCloud(s){
   renderHistory();
 }
 
-async function load(){
+async function load(forceMarket=false){
   try{
     $("status").textContent="טוען נתונים...";
     $("error").style.display="none";
     const symbol=$("symbol").value,marketKey="v5_market_"+symbol,fxKey="v5_fx_usdils";
-    market=cacheGet(marketKey,CACHE_MARKET_MS);let marketFromCache=!!market;
-    if(!market){market=await fetchJson(`${APP_CONFIG.marketEndpoint}?symbol=${symbol}`);cacheSet(marketKey,market)}
+    market=forceMarket?null:cacheGet(marketKey,CACHE_MARKET_MS);let marketFromCache=!!market;
+    if(!market){market=await fetchJson(`${APP_CONFIG.marketEndpoint}?symbol=${symbol}&_=${Date.now()}`);cacheSet(marketKey,market)}
     fx=cacheGet(fxKey,CACHE_FX_MS);let fxFromCache=!!fx;
     if(!fx){if(!marketFromCache)await sleep(1300);try{fx=await fetchJson(APP_CONFIG.fxEndpoint);cacheSet(fxKey,fx)}catch(err){const stale=cacheGet(fxKey,STALE_FX_MS);if(stale)fx=stale;else throw err}}
     a=analyze(market.prices);
-    $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=market.lastRefreshed+(marketFromCache?" · שמור":"");
+    $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=(market.lastRefreshed||"")+(marketFromCache?" · שמור":"")+(market.freshnessLabel?` · ${market.freshnessLabel}`:"");
     $("fx").textContent=Number(fx.rate).toFixed(4);$("fxDate").textContent=(fx.lastRefreshed||"")+(fxFromCache?" · שמור":"");
     $("master").textContent=a.master+"/100";$("signal").textContent=a.signal;renderAgents();renderPaper();
     await autoSnapshot();
@@ -122,6 +122,7 @@ function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio
 async function closeP(){if(paper()&&!confirm("לסגור את פוזיציית הנייר בענן?"))return;await cloud("close_portfolio",{closed_at:new Date().toISOString()});cloudPortfolio=null;renderPaper()}
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolio=null;cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
-$("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
+$("load").onclick=()=>load(true);$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
-syncCloud().catch(()=>{});startLive();
+function startMarketRefresh(){clearInterval(marketTimer);marketTimer=setInterval(()=>{if(document.visibilityState==="visible")load(true).catch(()=>{})},60*60*1000)}
+syncCloud().catch(()=>{});startLive();load().catch(()=>{});startMarketRefresh();
