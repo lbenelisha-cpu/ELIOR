@@ -137,7 +137,10 @@ function aiSnapshotFields(p){
   if(!a)return{};
   return{
     market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,
-    recommendation:a.signal,plan:p?.plan||plan
+    recommendation:a.signal,plan:p?.plan||plan,
+    target_exposure:(p?.plan==="ai_dynamic"?aiTargetExposure(a.master):(exp[p?.plan]||.5)),
+    actual_exposure:(Number(p?.start)>0?Number(p?.allocatedILS)/Number(p.start):null),
+    ai_action:(p?.plan==="ai_dynamic"?(aiTargetExposure(a.master)>(Number(p?.allocatedILS)/Number(p?.start)+.02)?"הגדלת חשיפה":aiTargetExposure(a.master)<(Number(p?.allocatedILS)/Number(p?.start)-.02)?"הקטנת חשיפה":"ללא שינוי"):"מסלול קבוע")
   };
 }
 async function autoSnapshot(){
@@ -175,11 +178,7 @@ async function saveSelectedPlan(){
 async function closeP(){const p=portfolios().find(x=>x.symbol===$("symbol").value);if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");if(!confirm(`לסגור את תוכנית הנייר ${p.symbol}?`))return;await cloud("close_portfolio",{id:p.id,closed_at:new Date().toISOString()});cloudPortfolios=portfolios().filter(x=>x.id!==p.id);renderPaper()}
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolios=[];cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
-$("symbol").onchange=async()=>{
-  renderPaper();setPlanUI();
-  // Keep the top market cards and agent scores synchronized with the selected asset.
-  await load();
-};
+$("symbol").onchange=()=>{renderPaper();setPlanUI()};
 $("programPlan").onchange=()=>{
   const chosen=$("programPlan").value;
   plan=chosen;

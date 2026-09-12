@@ -103,7 +103,9 @@ exports.handler=async event=>{
         market_price:body.market_price,auto:!!body.auto,
         market_score:body.market_score??null,trend_score:body.trend_score??null,
         risk_score:body.risk_score??null,momentum_score:body.momentum_score??null,
-        recommendation:body.recommendation??null,plan:body.plan??null
+        recommendation:body.recommendation??null,plan:body.plan??null,
+        target_exposure:body.target_exposure??null,actual_exposure:body.actual_exposure??null,
+        ai_action:body.ai_action??null
       };
       await sb("portfolio_snapshots?on_conflict=snapshot_key",{
         method:"POST",
