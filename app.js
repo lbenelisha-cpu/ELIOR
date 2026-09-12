@@ -176,7 +176,13 @@ async function closeP(){const p=portfolios().find(x=>x.symbol===$("symbol").valu
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolios=[];cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
 $("symbol").onchange=()=>{renderPaper();setPlanUI()};
-$("programPlan").onchange=()=>{plan=$("programPlan").value;setPlanUI()};
+$("programPlan").onchange=()=>{
+  const chosen=$("programPlan").value;
+  plan=chosen;
+  $("plan").textContent=names[chosen]||chosen;
+  const e=planExposure(chosen);
+  $("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
+};
 $("savePlan").onclick=()=>saveSelectedPlan().catch(e=>alert(shortError(e.message)));
 $("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
