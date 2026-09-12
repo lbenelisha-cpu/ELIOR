@@ -14,6 +14,12 @@
 <div class="card"><div class="label">ציון סוכנים</div><div id="master" class="big yellow">—</div><div id="signal" class="muted">—</div></div>
 <div class="card"><div class="label">מסלול</div><div id="plan" class="big blue">מאוזן</div><div id="expo" class="muted">50% חשיפה</div></div>
 </section>
+<h2>AI Monitor · מעקב אוטומטי</h2><section class="grid livegrid">
+<div class="card"><div class="label">מצב הסוכן</div><div id="monitorStatus" class="big yellow">ממתין</div><div class="muted">Paper Trading בלבד</div></div>
+<div class="card"><div class="label">בדיקה אחרונה</div><div id="monitorLast" class="big">—</div><div class="muted">נשמר ב-Supabase</div></div>
+<div class="card"><div class="label">מספר בדיקות</div><div id="monitorChecks" class="big">0</div><div class="muted">בדיקות אוטומטיות</div></div>
+<div class="card"><div class="label">מקור / פירוט</div><div id="monitorDetail" class="muted">ממתין להרצה ראשונה</div><div class="muted">SPY/QQQ: Daily Close, לא מחיר תוך-יומי</div></div>
+</section>
 <h2>Binance Live · זרם שוק 24/7</h2><section class="grid livegrid">
 <div class="card"><div class="label">מצב חיבור</div><div id="liveStatus" class="big yellow">מתחבר...</div><div id="liveError" class="muted">BTCUSDT · Binance WebSocket</div></div>
 <div class="card"><div class="label">BTCUSDT מחיר חי</div><div id="livePrice" class="big blue">—</div><div class="muted">קריאה בלבד · ללא הרשאת מסחר</div></div>
@@ -26,4 +32,4 @@
 <h2>ציוני הסוכנים</h2><section class="grid agents" id="agents"></section>
 <h2>יומן ביצועים</h2><section class="card table"><table><thead><tr><th>תאריך</th><th>נכס</th><th>שווי תיק</th><th>P/L</th><th>USD/ILS</th><th>ציון</th></tr></thead><tbody id="journal"></tbody></table></section>
 <div class="note">המערכת היא סימולציה לימודית בלבד ואינה מבצעת מסחר אמיתי. שער USD/ILS מתקבל דרך API. הפוזיציה וה-Snapshots נשמרים ב-Supabase דרך Netlify Functions, כך שכל מכשיר מציג את אותו תיק וירטואלי.</div>
-</main><script src="config.js?v=20260912-6"></script><script src="app.js?v=20260912-6"></script></body></html>
+</main><script src="config.js?v=20260912-7"></script><script src="app.js?v=20260912-7"></script></body></html>

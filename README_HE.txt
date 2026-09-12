@@ -1,39 +1,26 @@
-ELIOR Live Agent — שלב 1
-========================
+ELIOR – Continuous AI Monitor (Paper Trading)
 
-מטרה:
-להוכיח שנתוני Binance יכולים להגיע ברצף 24/7 לשרת גם כאשר האפליקציה סגורה.
+מה העדכון עושה:
+- מוסיף Netlify Scheduled Function בשם ai-monitor.mjs.
+- בודק אוטומטית SPY ו-QQQ בימי מסחר, פעם בשעה בחלון 14:00–21:00 UTC.
+- מחשב Market / Trend / Risk / Momentum / Master ללא לחיצה ידנית.
+- שומר heartbeat ב-Supabase: זמן בדיקה אחרון, מספר בדיקות, סטטוס וציונים אחרונים.
+- שומר החלטת AI יומית לכל תוכנית בלי ליצור כפילויות בכל בדיקה שעתית.
+- QQQ במסלול AI דינמי שומר גם יעד חשיפה והחלטה (הגדלה/הקטנה/ללא שינוי).
+- אינו מבצע מסחר אמיתי ואינו משנה יחידות בפוזיציה.
 
-מה הקוד עושה:
-1. מתחבר ל-WebSocket הציבורי של Binance.
-2. מאזין לעסקאות BTCUSDT בזמן אמת.
-3. לא משתמש ב-API Key.
-4. לא ניגש לחשבון Binance.
-5. לא יכול לבצע קנייה/מכירה.
-6. אם החיבור נופל — מתחבר מחדש אוטומטית.
-7. פותח כתובת /health שמציגה את המצב והמחיר האחרון שהתקבל.
+חשוב מאוד:
+מקור SPY/QQQ הנוכחי הוא Alpha Vantage TIME_SERIES_DAILY. לכן הסוכן אוטומטי ורץ ללא לחיצה,
+אבל המחיר עצמו הוא Daily Close ולא מחיר תוך-יומי רציף. Binance BTC נשאר WebSocket חי 24/7.
 
-קבצים:
-- server.mjs — מנוע ההאזנה החי.
-- package.json — הגדרת Node.js והתלות ws.
+סדר התקנה:
+1. להריץ 01_supabase_ai_monitor.sql ב-Supabase SQL Editor.
+2. להחליף ב-GitHub:
+   app.js
+   index.html
+   netlify/functions/cloud-state.js
+3. להוסיף ב-GitHub:
+   netlify/functions/ai-monitor.mjs
+4. Commit ולהמתין ל-Netlify Published.
 
-בדיקה מקומית במחשב:
-1. התקן Node.js 20 ומעלה אם עדיין לא מותקן.
-2. פתח Terminal בתוך התיקייה.
-3. הרץ: npm install
-4. הרץ: npm start
-5. בדפדפן פתח: http://localhost:8080/health
-
-כאשר הכל תקין יופיע status=connected וה-lastPrice יתעדכן.
-
-חשוב:
-זהו שלב קריאה בלבד. עדיין אין חיבור ל-Supabase, אין MCP ואין שינוי בקוד של ELIOR הקיים.
-
-עדכון מחיר שוק אוטומטי:
-- האפליקציה טוענת נתוני שוק אוטומטית בפתיחה ומרעננת פעם בשעה כאשר הדף פתוח.
-- בחשבון Alpha Vantage חינמי המחיר הוא מחיר סגירת יום אחרון.
-- אם קיים מנוי Alpha Vantage עם הרשאת שוק אמריקאי, ניתן להוסיף ב-Netlify משתנה סביבה:
-  ALPHA_VANTAGE_ENTITLEMENT=realtime
-  או:
-  ALPHA_VANTAGE_ENTITLEMENT=delayed
-- מחיר הכניסה לפוזיציית נייר נשמר ואינו נדרס; שווי התיק ורווח/הפסד מחושבים מול מחיר השוק האחרון שהתקבל.
+אין צורך לאפס את התיק ואין לפתוח מחדש SPY/QQQ.

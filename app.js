@@ -1,5 +1,5 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],plan="balanced",liveMarket=null,liveTimer=null;
+let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null;
 const exp={conservative:.25,balanced:.5,growth:.8,ai_dynamic:.5},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה",ai_dynamic:"AI דינמי"};
 function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=55?.65:score>=45?.50:score>=30?.35:.25}
 function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(a?.master??50):(exp[p]||.5)}
@@ -17,6 +17,15 @@ function cacheSet(key,data){try{localStorage.setItem(key,JSON.stringify({savedAt
 function shortError(msg=""){msg=String(msg);if(/rate limit|25 requests per day|free API requests|premium plans|1 request per second/i.test(msg))return "מגבלת Alpha Vantage החינמית הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API key/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
 async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...(opts||{})}),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||"Request failed");return j}
 
+
+
+function renderMonitor(){
+  const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
+  const m=cloudMonitor;if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="יש להריץ תחילה את SQL של AI Monitor";return}
+  const ok=m.status==="ok",err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
+  last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
+  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||""}`;
+}
 
 function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}
 function renderLive(){
@@ -74,6 +83,8 @@ async function syncCloud(){
     const c=await cloud("get");
     cloudPortfolios=c.portfolios||(c.portfolio?[c.portfolio]:[]);
     cloudSnapshots=c.snapshots||[];
+    cloudMonitor=c.monitor||null;
+    renderMonitor();
     setPlanUI();
     $("status").textContent="מסונכרן לענן";
     renderPaper();renderHistory();
