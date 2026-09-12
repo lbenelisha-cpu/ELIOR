@@ -178,7 +178,12 @@ async function saveSelectedPlan(){
 async function closeP(){const p=portfolios().find(x=>x.symbol===$("symbol").value);if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");if(!confirm(`לסגור את תוכנית הנייר ${p.symbol}?`))return;await cloud("close_portfolio",{id:p.id,closed_at:new Date().toISOString()});cloudPortfolios=portfolios().filter(x=>x.id!==p.id);renderPaper()}
 async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolios=[];cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
 
-$("symbol").onchange=()=>{renderPaper();setPlanUI()};
+$("symbol").onchange=()=>{
+  // Keep every top card and agent score synchronized with the selected asset.
+  market=null; a=null;
+  renderPaper(); setPlanUI();
+  load().catch(e=>{console.error(e); $("status").textContent="שגיאת טעינה"});
+};
 $("programPlan").onchange=()=>{
   const chosen=$("programPlan").value;
   plan=chosen;
