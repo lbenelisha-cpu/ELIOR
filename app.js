@@ -217,8 +217,9 @@ function renderHistory(){
   if(decision)decision.innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{
     const rec=x.recommendation||"—",cls=/חיובי/.test(rec)?"green":/שלילי|זהירות/.test(rec)?"red":"yellow";
     const score=v=>v==null?"—":`${v}/100`;
-    return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
-  }).join(""):'<tr><td colspan="10" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr>';
+    const act=x.ai_action||"—",actCls=/קנייה|הגדלת/.test(act)?"green":/מכירה|הקטנת/.test(act)?"red":"yellow";
+    return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td class="${actCls}">${act}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
+  }).join(""):'<tr><td colspan="11" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr>';
   const sym=$("symbol")?.value;
   const chartRows=s.filter(x=>x.symbol===sym && (x.position_id||String(x.snapshot_key||"").startsWith("monitor-")));
   if(chartRows.length>1){let first=snapValue(chartRows[0]),last=snapValue(chartRows.at(-1)),r=(last/first-1)*100;$("performanceText").textContent=`${sym}: שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}else{$("performanceText").textContent="ה-Snapshots נשמרים בענן ומופיעים בכל מכשיר."}
