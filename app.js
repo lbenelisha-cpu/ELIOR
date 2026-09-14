@@ -19,12 +19,31 @@ async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...
 
 
 
+function monitorFallback(){
+  const rows=(cloudSnapshots||[]).filter(x=>String(x.snapshot_key||"").startsWith("monitor-"));
+  if(!rows.length)return null;
+  const slots=new Set(rows.map(x=>{
+    const k=String(x.snapshot_key||"");
+    const m=k.match(/(\d{4}-\d{2}-\d{2}-\d{2}-\d{2})$/);
+    return m?m[1]:String(x.created_at||x.date||k);
+  }));
+  const latest=[...rows].sort((a,b)=>new Date(a.created_at||a.date)-new Date(b.created_at||b.date)).at(-1);
+  const age=latest?.created_at?Date.now()-new Date(latest.created_at).getTime():Infinity;
+  return{
+    status:age<=20*60*1000?"ok":"idle",
+    checked_at:latest?.created_at||null,
+    checks:slots.size,
+    symbols:[...new Set(rows.map(x=>x.symbol).filter(Boolean))],
+    note:"Twelve Data · בדיקה אוטומטית כל 5 דקות"
+  };
+}
 function renderMonitor(){
   const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
-  const m=cloudMonitor;if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="יש להריץ תחילה את SQL של AI Monitor";return}
+  const m=cloudMonitor||monitorFallback();
+  if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
   const ok=m.status==="ok",err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
-  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||""}`;
+  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||"Twelve Data · כל 5 דקות"}`;
 }
 
 function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}
@@ -168,19 +187,24 @@ async function snapshot(){
   await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false,...aiSnapshotFields(p)});
   $("status").textContent="Snapshot נשמר בענן";
 }
+function snapValue(x){return x?.position_value!=null?Number(x.position_value):Number(x?.value)}
+function snapPnl(x){return x?.position_pnl!=null?Number(x.position_pnl):Number(x?.pnl)}
 function renderHistory(){
   let s=snapshots();$("snapCount").textContent=s.length+" Snapshots";
-  $("journal").innerHTML=s.length?[...s].reverse().map(x=>`<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(Number(x.value))}</td><td class="${Number(x.pnl)>=0?"green":"red"}">${Number(x.pnl)>=0?"+":""}${money(Number(x.pnl))}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
+  $("journal").innerHTML=s.length?[...s].reverse().map(x=>{const sv=snapValue(x),sp=snapPnl(x);return `<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(sv)}</td><td class="${sp>=0?"green":"red"}">${sp>=0?"+":""}${money(sp)}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`}).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
   const decision=$("decisionJournal");
   if(decision)decision.innerHTML=s.length?[...s].reverse().map(x=>{
     const rec=x.recommendation||"—",cls=/חיובי/.test(rec)?"green":/שלילי|זהירות/.test(rec)?"red":"yellow";
     const score=v=>v==null?"—":`${v}/100`;
     return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
   }).join(""):'<tr><td colspan="10" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr>';
-  if(s.length>1){let r=(Number(s.at(-1).value)/Number(s[0].value)-1)*100;$("performanceText").textContent=`שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}else{$("performanceText").textContent="ה-Snapshots נשמרים בענן ומופיעים בכל מכשיר."}
-  draw(s);
+  const sym=$("symbol")?.value;
+  const chartRows=s.filter(x=>x.symbol===sym && (x.position_id||String(x.snapshot_key||"").startsWith("monitor-")));
+  if(chartRows.length>1){let first=snapValue(chartRows[0]),last=snapValue(chartRows.at(-1)),r=(last/first-1)*100;$("performanceText").textContent=`${sym}: שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}else{$("performanceText").textContent="ה-Snapshots נשמרים בענן ומופיעים בכל מכשיר."}
+  draw(chartRows);
+  renderMonitor();
 }
-function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(q=>Number(q.value)),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
+function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(snapValue).filter(Number.isFinite),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
 async function saveSelectedPlan(){
   const p=selectedPortfolio();if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");
   const newPlan=$("programPlan").value;
@@ -193,7 +217,7 @@ async function resetAll(){if(!confirm("לאפס את התיק הווירטואל
 $("symbol").onchange=()=>{
   // Keep every top card and agent score synchronized with the selected asset.
   market=null; a=null;
-  renderPaper(); setPlanUI();
+  renderPaper(); setPlanUI(); renderHistory();
   load().catch(e=>{console.error(e); $("status").textContent="שגיאת טעינה"});
 };
 $("programPlan").onchange=()=>{
