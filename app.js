@@ -212,9 +212,9 @@ function snapValue(x){return x?.position_value!=null?Number(x.position_value):Nu
 function snapPnl(x){return x?.position_pnl!=null?Number(x.position_pnl):Number(x?.pnl)}
 function renderHistory(){
   let s=snapshots();$("snapCount").textContent=s.length+" Snapshots";
-  $("journal").innerHTML=s.length?[...s].reverse().map(x=>{const sv=snapValue(x),sp=snapPnl(x);return `<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(sv)}</td><td class="${sp>=0?"green":"red"}">${sp>=0?"+":""}${money(sp)}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`}).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
+  $("journal").innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{const sv=snapValue(x),sp=snapPnl(x);return `<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(sv)}</td><td class="${sp>=0?"green":"red"}">${sp>=0?"+":""}${money(sp)}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`}).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
   const decision=$("decisionJournal");
-  if(decision)decision.innerHTML=s.length?[...s].reverse().map(x=>{
+  if(decision)decision.innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{
     const rec=x.recommendation||"—",cls=/חיובי/.test(rec)?"green":/שלילי|זהירות/.test(rec)?"red":"yellow";
     const score=v=>v==null?"—":`${v}/100`;
     return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
