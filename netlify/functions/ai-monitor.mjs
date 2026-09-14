@@ -8,7 +8,7 @@ async function td(endpoint,q={}){if(!TK)throw Error("TWELVE_DATA_API_KEY is miss
 const mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
 function calc(pr){const c=pr.map(x=>x.close),last=c[0],r5=(last/c[Math.min(5,c.length-1)]-1)*100,r20=(last/c[Math.min(20,c.length-1)]-1)*100,r60=(last/c[Math.min(60,c.length-1)]-1)*100,s20=mean(c.slice(0,20)),s60=mean(c.slice(0,60)),rs=[];for(let i=0;i<c.length-1;i++)rs.push(c[i]/c[i+1]-1);const m=mean(rs),vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*Math.sqrt(252)*100,marketS=clamp(50+r60*2),trend=clamp(50+(last/s20-1)*500+(s20/s60-1)*400),risk=clamp(90-vol*2.2),mom=clamp(50+r5*3+r20*1.5),master=clamp((marketS+trend+risk+mom)/4);return{last,marketS,trend,risk,mom,master,signal:master>=70?"חיובי":master>=55?"חיובי מתון":master>=45?"ניטרלי":master>=30?"זהירות":"שלילי"}}
 function target(score){return score>=70?.80:score>=55?.65:score>=45?.50:score>=30?.35:.25}
-function slot5(d=new Date()){const z=new Date(d);z.setUTCSeconds(0,0);z.setUTCMinutes(Math.floor(z.getUTCMinutes()/5)*5);return z.toISOString().slice(0,16).replace(/[:T]/g,"-")}
+function slot6(d=new Date()){const z=new Date(d);z.setUTCSeconds(0,0);z.setUTCMinutes(Math.floor(z.getUTCMinutes()/6)*6);return z.toISOString().slice(0,16).replace(/[:T]/g,"-")}
 async function heartbeat(patch){const prev=await db("agent_monitor_status?select=checks&id=eq.1&limit=1"),checks=Number(prev?.[0]?.checks||0)+1;await db("agent_monitor_status?id=eq.1",{method:"PATCH",body:JSON.stringify({...patch,checks,checked_at:new Date().toISOString(),updated_at:new Date().toISOString()})})}
 export default async()=>{try{
   const rows=await db("paper_portfolio?select=*&status=eq.open&order=updated_at.asc");
@@ -32,11 +32,11 @@ export default async()=>{try{
     scores[p.symbol]={master:a.master,market:a.marketS,trend:a.trend,risk:a.risk,momentum:a.mom,recommendation:a.signal,target_exposure:te,actual_exposure:actual,ai_action:action,market_price:a.last,market_date:latest.date};
 
     // A separate simulated observation every 5-minute slot. No real trade is executed and units are never changed.
-    const key=`monitor-${p.id}-${p.symbol}-${slot5()}`,ex=await db(`portfolio_snapshots?select=id&snapshot_key=eq.${encodeURIComponent(key)}&limit=1`);
+    const key=`monitor-${p.id}-${p.symbol}-${slot6()}`
     if(!ex?.length){const pv=(+p.units)*a.last*fx,ppnl=pv-(+p.allocated_ils);await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:latest.date,symbol:p.symbol,position_id:String(p.id),position_value:pv,position_pnl:ppnl,value:pv,pnl:ppnl,fx,score:a.master,market_price:a.last,auto:true,market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,recommendation:a.signal,plan:mode||null,target_exposure:te,actual_exposure:actual,ai_action:action})})}
   }
   await heartbeat({status:"ok",symbols:ps.map(p=>p.symbol),last_market_date:marketDates.sort().reverse()[0]||null,scores,note:"Twelve Data · בדיקה אוטומטית כל 5 דקות בחלון המסחר · סימולציה בלבד"});
 }catch(e){console.error("AI_MONITOR_ERROR",e?.stack||String(e));try{await heartbeat({status:"error",note:String(e?.message||e)})}catch{};throw e}};
 // 5-minute checks, Monday-Friday, 14:00-21:59 UTC. This covers the US regular session across DST changes with margin.
 // Each run is about 5 Twelve Data credits for SPY + QQQ + USD/ILS => about 480/day, below the Basic 800/day limit.
-export const config={schedule:"*/5 14-21 * * 1-5"};
+export const config={schedule:"*/6 14-21 * * 1-5"};
