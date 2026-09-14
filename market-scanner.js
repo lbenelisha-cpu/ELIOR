@@ -1,82 +1,15 @@
+const RAW=process.env.SUPABASE_URL||"";
+const SB=RAW.trim().replace(/\/+$/,"" ).replace(/\/rest\/v1$/i,"");
+const SK=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TK=process.env.TWELVE_DATA_API_KEY;
-
-async function td(endpoint,q={}){
-  if(!TK)throw Error("TWELVE_DATA_API_KEY is missing");
-  const u=new URL(`https://api.twelvedata.com/${endpoint}`);
-  Object.entries(q).forEach(([k,v])=>u.searchParams.set(k,String(v)));
-  const r=await fetch(u,{headers:{Authorization:`apikey ${TK}`}});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok||d?.status==="error"||d?.code>=400)throw Error(d?.message||`Twelve Data HTTP ${r.status}`);
-  return d;
-}
-
-const mean=a=>a.reduce((s,x)=>s+x,0)/a.length;
-const clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-
-function scoreBars(values){
-  const closes=values.map(v=>Number(v.close)).filter(Number.isFinite);
-  if(closes.length<25)return null;
-  const last=closes[0];
-  const r5=(last/closes[Math.min(5,closes.length-1)]-1)*100;
-  const r20=(last/closes[Math.min(20,closes.length-1)]-1)*100;
-  const sma10=mean(closes.slice(0,10));
-  const sma25=mean(closes.slice(0,25));
-  const rs=[];
-  for(let i=0;i<Math.min(24,closes.length-1);i++)rs.push(closes[i]/closes[i+1]-1);
-  const m=mean(rs);
-  const vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*100;
-  const market=clamp(50+r20*8);
-  const trend=clamp(50+(last/sma10-1)*700+(sma10/sma25-1)*500);
-  const risk=clamp(82-vol*35);
-  const momentum=clamp(50+r5*12+r20*4);
-  const master=clamp((market+trend+risk+momentum)/4);
-  return {price:last,r5,r20,vol,market,trend,risk,momentum,master};
-}
-
-const WATCHLIST=[
-  ["SPY","S&P 500"],
-  ["QQQ","Nasdaq 100"],
-  ["DIA","Dow Jones"],
-  ["IWM","Russell 2000"],
-  ["XLK","Technology"],
-  ["XLF","Financials"],
-  ["XLE","Energy"],
-  ["XLV","Health Care"]
-];
-
-exports.handler=async()=>{
-  const headers={
-    "Content-Type":"application/json; charset=utf-8",
-    "Access-Control-Allow-Origin":"*",
-    "Cache-Control":"public,max-age=300",
-    "Netlify-CDN-Cache-Control":"public, durable, max-age=1800"
-  };
-  try{
-    const rows=[];
-    for(const [symbol,name] of WATCHLIST){
-      const d=await td("time_series",{symbol,interval:"30min",outputsize:80,order:"DESC"});
-      const values=Array.isArray(d?.values)?d.values:[];
-      const s=scoreBars(values);
-      if(!s)continue;
-      rows.push({
-        symbol,name,
-        ...s,
-        signal:s.master>=70?"חזק":s.master>=60?"חיובי":s.master>=50?"ניטרלי":s.master>=40?"חלש":"זהירות",
-        updated_at:String(values[0]?.datetime||"")
-      });
-    }
-    rows.sort((a,b)=>b.master-a.master);
-    return {
-      statusCode:200,
-      headers,
-      body:JSON.stringify({
-        generated_at:new Date().toISOString(),
-        interval:"30min",
-        universe:"ETF educational watchlist",
-        candidates:rows
-      })
-    };
-  }catch(e){
-    return {statusCode:500,headers,body:JSON.stringify({error:String(e?.message||e)})};
-  }
-};
+const H=()=>({apikey:SK,Authorization:`Bearer ${SK}`,"Content-Type":"application/json",Prefer:"return=representation"});
+async function db(p,o={}){const r=await fetch(`${SB}/rest/v1/${p}`,{...o,headers:{...H(),...(o.headers||{})}}),t=await r.text();let d;try{d=t?JSON.parse(t):null}catch{d={raw:t}}if(!r.ok)throw Error(d?.message||`Supabase ${r.status}`);return d}
+async function td(endpoint,q={}){if(!TK)throw Error("TWELVE_DATA_API_KEY is missing");const u=new URL(`https://api.twelvedata.com/${endpoint}`);Object.entries(q).forEach(([k,v])=>u.searchParams.set(k,String(v)));const r=await fetch(u,{headers:{Authorization:`apikey ${TK}`}}),d=await r.json().catch(()=>({}));if(!r.ok||d?.status==="error"||d?.code>=400)throw Error(d?.message||`Twelve Data HTTP ${r.status}`);return d}
+const mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
+function scoreBars(values){const c=values.map(v=>Number(v.close)).filter(Number.isFinite);if(c.length<25)return null;const last=c[0],r5=(last/c[Math.min(5,c.length-1)]-1)*100,r20=(last/c[Math.min(20,c.length-1)]-1)*100,s10=mean(c.slice(0,10)),s25=mean(c.slice(0,25)),rs=[];for(let i=0;i<Math.min(24,c.length-1);i++)rs.push(c[i]/c[i+1]-1);const m=mean(rs),vol=Math.sqrt(mean(rs.map(x=>(x-m)**2)))*100,market=clamp(50+r20*8),trend=clamp(50+(last/s10-1)*700+(s10/s25-1)*500),risk=clamp(82-vol*35),momentum=clamp(50+r5*12+r20*4),master=clamp((market+trend+risk+momentum)/4);return{price:last,r5,r20,vol,market,trend,risk,momentum,master}}
+const WATCHLIST=[["SPY","S&P 500"],["QQQ","Nasdaq 100"],["DIA","Dow Jones"],["IWM","Russell 2000"],["XLK","Technology"],["XLF","Financials"],["XLE","Energy"],["XLV","Health Care"]];
+function scanSlot(d=new Date()){const z=new Date(d);z.setUTCSeconds(0,0);z.setUTCMinutes(Math.floor(z.getUTCMinutes()/30)*30);return z.toISOString().slice(0,16).replace(/[:T]/g,"-")}
+exports.handler=async()=>{const headers={"Content-Type":"application/json; charset=utf-8","Access-Control-Allow-Origin":"*","Cache-Control":"no-store"};try{const rows=[];for(const [symbol,name] of WATCHLIST){const d=await td("time_series",{symbol,interval:"30min",outputsize:80,order:"DESC"}),values=Array.isArray(d?.values)?d.values:[],s=scoreBars(values);if(!s)continue;rows.push({symbol,name,...s,signal:s.master>=70?"חזק":s.master>=60?"חיובי":s.master>=50?"ניטרלי":s.master>=40?"חלש":"זהירות",updated_at:String(values[0]?.datetime||"")})}rows.sort((a,b)=>b.master-a.master);const top=rows[0]||null;let consecutive=0,verified=false;
+if(top){const key=`scanner-leader-${scanSlot()}`;const ex=await db(`portfolio_snapshots?select=id&snapshot_key=eq.${encodeURIComponent(key)}&limit=1`);if(!ex?.length){await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:new Date().toISOString().slice(0,10),symbol:top.symbol,position_id:"scanner",position_value:0,position_pnl:0,value:0,pnl:0,fx:1,score:top.master,market_price:top.price,auto:true,market_score:top.market,trend_score:top.trend,risk_score:top.risk,momentum_score:top.momentum,recommendation:"SCANNER_LEADER",plan:"scanner",target_exposure:0,actual_exposure:0,ai_action:"מועמד מוביל"})})}
+const hist=await db("portfolio_snapshots?select=symbol,score,snapshot_key&plan=eq.scanner&recommendation=eq.SCANNER_LEADER&order=id.desc&limit=10");for(const h of hist||[]){if(h.symbol===top.symbol&&Number(h.score)>=60)consecutive++;else break}verified=top.master>=60&&consecutive>=3;}
+return{statusCode:200,headers,body:JSON.stringify({generated_at:new Date().toISOString(),interval:"30min",universe:"ETF educational watchlist",candidates:rows,leader:top?{symbol:top.symbol,score:top.master,consecutive,required:3,min_score:60,verified,status:verified?"מאומת לקנייה בסימולציה":top.master<60?"ציון נמוך מ-60":`ממתין לאימות ${consecutive}/3`}:null})}}catch(e){return{statusCode:500,headers,body:JSON.stringify({error:String(e?.message||e)})}}};

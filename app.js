@@ -85,9 +85,15 @@ function renderScanner(){
     return;
   }
   if(best){
-    const top=rows[0];
-    best.innerHTML=`${top.symbol} · ${top.master}/100`;
-    best.className="big "+scannerSignalClass(top.master);
+    const top=rows[0],lead=scannerData?.leader;
+    const verify=lead?` · ${lead.consecutive}/${lead.required} ${lead.verified?"✓ מאומת":"ממתין"}`:"";
+    best.innerHTML=`${top.symbol} · ${top.master}/100${verify}`;
+    best.className="big "+(lead?.verified?"green":scannerSignalClass(top.master));
+    const st=$("scannerVerifyStatus");
+    if(st){
+      st.textContent=lead?.status||"ממתין לנתונים";
+      st.className="muted "+(lead?.verified?"green":"");
+    }
   }
   if(stamp){
     const d=scannerData?.generated_at?new Date(scannerData.generated_at):null;

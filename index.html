@@ -32,8 +32,8 @@
 <section class="grid two">
   <div class="card">
     <div class="label">המועמד המדורג ראשון כרגע</div>
-    <div id="scannerBest" class="big yellow">—</div>
-    <p class="muted">הדירוג מבוסס על Market, Trend, Risk ו-Momentum בנתוני 30 דקות. זהו כלי לימודי לתיק נייר ואינו המלצת השקעה.</p>
+    <div id="scannerBest" class="big yellow">—</div><div id="scannerVerifyStatus" class="muted">ממתין לנתונים</div>
+    <p class="muted">הדירוג מבוסס על Market, Trend, Risk ו-Momentum בנתוני 30 דקות. מועמד מאומת רק לאחר 3 סריקות רצופות במקום הראשון ובציון 60 ומעלה. זהו כלי לימודי לתיק נייר ואינו המלצת השקעה.</p>
     <div class="actions"><button id="scanNow" class="secondary">רענן סריקה</button></div>
   </div>
   <div class="card">
@@ -54,4 +54,4 @@
 <h2>ציוני הסוכנים</h2><section class="grid agents" id="agents"></section>
 <h2>יומן ביצועים</h2><section class="card table"><table><thead><tr><th>תאריך</th><th>נכס</th><th>שווי תיק</th><th>P/L</th><th>USD/ILS</th><th>ציון</th></tr></thead><tbody id="journal"></tbody></table></section>
 <div class="note">המערכת היא סימולציה לימודית בלבד ואינה מבצעת מסחר אמיתי. שער USD/ILS מתקבל דרך API. הפוזיציה וה-Snapshots נשמרים ב-Supabase דרך Netlify Functions, כך שכל מכשיר מציג את אותו תיק וירטואלי.</div>
-</main><script src="config.js?v=20260912-7"></script><script src="app.js?v=20260914-scanner-1"></script></body></html>
+</main><script src="config.js?v=20260912-7"></script><script src="app.js?v=20260914-scanner-verify-1"></script></body></html>
