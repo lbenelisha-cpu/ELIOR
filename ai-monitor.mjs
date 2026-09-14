@@ -33,7 +33,7 @@ export default async()=>{try{
 
     // A separate simulated observation every 5-minute slot. No real trade is executed and units are never changed.
     const key=`monitor-${p.id}-${p.symbol}-${slot5()}`,ex=await db(`portfolio_snapshots?select=id&snapshot_key=eq.${encodeURIComponent(key)}&limit=1`);
-    if(!ex?.length){const pv=(+p.units)*a.last*fx,ppnl=pv-(+p.allocated_ils);await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:latest.date,symbol:p.symbol,position_id:String(p.id),position_value:pv,position_pnl:ppnl,value:null,pnl:null,fx,score:a.master,market_price:a.last,auto:true,market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,recommendation:a.signal,plan:mode||null,target_exposure:te,actual_exposure:actual,ai_action:action})})}
+    if(!ex?.length){const pv=(+p.units)*a.last*fx,ppnl=pv-(+p.allocated_ils);await db("portfolio_snapshots",{method:"POST",body:JSON.stringify({snapshot_key:key,date:latest.date,symbol:p.symbol,position_id:String(p.id),position_value:pv,position_pnl:ppnl,value:pv,pnl:ppnl,fx,score:a.master,market_price:a.last,auto:true,market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,recommendation:a.signal,plan:mode||null,target_exposure:te,actual_exposure:actual,ai_action:action})})}
   }
   await heartbeat({status:"ok",symbols:ps.map(p=>p.symbol),last_market_date:marketDates.sort().reverse()[0]||null,scores,note:"Twelve Data · בדיקה אוטומטית כל 5 דקות בחלון המסחר · סימולציה בלבד"});
 }catch(e){console.error("AI_MONITOR_ERROR",e?.stack||String(e));try{await heartbeat({status:"error",note:String(e?.message||e)})}catch{};throw e}};
