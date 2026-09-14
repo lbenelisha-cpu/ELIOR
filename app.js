@@ -34,7 +34,7 @@ function monitorFallback(){
     checked_at:latest?.created_at||null,
     checks:slots.size,
     symbols:[...new Set(rows.map(x=>x.symbol).filter(Boolean))],
-    note:"Twelve Data · בדיקה אוטומטית כל 5 דקות"
+    note:"Twelve Data · בדיקה אוטומטית כל 6 דקות · 80 דגימות ביום"
   };
 }
 function renderMonitor(){
@@ -43,7 +43,7 @@ function renderMonitor(){
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
   const ok=m.status==="ok",err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
-  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||"Twelve Data · כל 5 דקות"}`;
+  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||"Twelve Data · כל 6 דקות · 80 דגימות ביום"}`;
 }
 
 function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}
