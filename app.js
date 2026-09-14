@@ -1,5 +1,5 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null;
+let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null,scannerData=null;
 const exp={conservative:.25,balanced:.5,growth:.8,ai_dynamic:.5},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה",ai_dynamic:"AI דינמי"};
 function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=55?.65:score>=45?.50:score>=30?.35:.25}
 function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(a?.master??50):(exp[p]||.5)}
@@ -64,6 +64,65 @@ async function loadLive(){
 }
 function startLive(){
   clearInterval(liveTimer);loadLive();liveTimer=setInterval(loadLive,2000);
+}
+
+
+function scannerEndpoint(){
+  return APP_CONFIG.scannerEndpoint||"/.netlify/functions/market-scanner";
+}
+function scannerSignalClass(score){
+  score=Number(score)||0;
+  return score>=60?"green":score>=50?"yellow":"red";
+}
+function renderScanner(){
+  const body=$("scannerBody"),stamp=$("scannerUpdated"),best=$("scannerBest");
+  if(!body)return;
+  const rows=scannerData?.candidates||[];
+  if(!rows.length){
+    body.innerHTML='<tr><td colspan="9" class="muted">ממתין לסריקת מועמדים.</td></tr>';
+    if(best)best.textContent="—";
+    if(stamp)stamp.textContent="—";
+    return;
+  }
+  if(best){
+    const top=rows[0];
+    best.innerHTML=`${top.symbol} · ${top.master}/100`;
+    best.className="big "+scannerSignalClass(top.master);
+  }
+  if(stamp){
+    const d=scannerData?.generated_at?new Date(scannerData.generated_at):null;
+    stamp.textContent=d&&!Number.isNaN(d.getTime())?d.toLocaleString("he-IL"):"—";
+  }
+  body.innerHTML=rows.map((x,i)=>`<tr>
+    <td>${i+1}</td>
+    <td><b>${x.symbol}</b><div class="muted">${x.name||""}</div></td>
+    <td class="${scannerSignalClass(x.master)}"><b>${x.master}/100</b></td>
+    <td>${x.trend}/100</td>
+    <td>${x.momentum}/100</td>
+    <td>${x.risk}/100</td>
+    <td><span class="ltr">$${Number(x.price).toFixed(2)}</span></td>
+    <td class="${scannerSignalClass(x.master)}">${x.signal}</td>
+    <td>${x.updated_at||"—"}</td>
+  </tr>`).join("");
+}
+async function loadScanner(force=false){
+  const key="v5_scanner_30m";
+  if(!force){
+    const cached=cacheGet(key,30*60*1000);
+    if(cached){scannerData=cached;renderScanner();return}
+  }
+  const btn=$("scanNow");
+  if(btn){btn.disabled=true;btn.textContent="סורק..."}
+  try{
+    scannerData=await fetchJson(scannerEndpoint());
+    cacheSet(key,scannerData);
+    renderScanner();
+  }catch(e){
+    const body=$("scannerBody");
+    if(body)body.innerHTML=`<tr><td colspan="9" class="muted">הסריקה לא זמינה כרגע: ${shortError(e.message)}</td></tr>`;
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent="רענן סריקה"}
+  }
 }
 
 function nyParts(){
@@ -249,7 +308,8 @@ $("programPlan").onchange=()=>{
   const e=planExposure(chosen);
   $("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
 };
+$("scanNow")&&($("scanNow").onclick=()=>loadScanner(true));
 $("savePlan").onclick=()=>saveSelectedPlan().catch(e=>alert(shortError(e.message)));
 $("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
 window.addEventListener("resize",()=>draw(snapshots()));
-syncCloud().catch(()=>{});startLive();
+syncCloud().catch(()=>{});startLive();loadScanner(false);
