@@ -94,6 +94,9 @@ function renderScanner(){
   const body=$("scannerBody"),stamp=$("scannerUpdated"),best=$("scannerBest");
   if(!body)return;
   const rows=scannerData?.candidates||[];
+  const history=scannerData?.history||[],historyBody=$("scanHistory"),explanation=$("scanExplanation");
+  if(explanation)explanation.textContent='מוצגות עד 24 סריקות סוכן שמורות. תצוגות ביניים מנתונים חלקיים אינן נשמרות כסריקת סוכן, ולכן לא תמיד ניתן לשחזר שינוי שנראה לפני דקות אחדות. מעבר אוטומטי דורש גם 3 אישורים רצופים, ציון של לפחות 60 ויתרון של 10 נקודות, בהתאם להגדרות התיק.';
+  if(historyBody)historyBody.innerHTML=history.length?history.map(x=>'<tr><td>'+escapeHTML(new Date(x.time).toLocaleString('he-IL'))+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.score)+'/100</td><td>'+['market','trend','risk','momentum'].map(k=>k+': '+(x[k]??'—')).map(escapeHTML).join(' · ')+'</td><td style="white-space:normal;min-width:260px">'+escapeHTML(x.reason)+'</td></tr>').join(''):'<tr><td colspan="5">אין עדיין סריקות שמורות להסבר. לא ניתן לקבוע בדיעבד מדוע השתנתה תצוגה שלא נשמרה.</td></tr>';
   if(!rows.length){
     body.innerHTML='<tr><td colspan="9" class="muted">ממתין לסריקת מועמדים.</td></tr>';
     if(best)best.textContent="—";
@@ -128,7 +131,7 @@ function renderScanner(){
   </tr>`).join("");
 }
 async function loadScanner(force=false){
-  const key="v63_scanner_30m";
+  const key="v63_scanner_history";
   if(!force){
     const cached=cacheGet(key,30*60*1000);
     if(cached){scannerData=cached;renderScanner();return}

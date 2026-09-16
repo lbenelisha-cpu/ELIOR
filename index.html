@@ -51,6 +51,8 @@
     <tbody id="scannerBody"><tr><td colspan="9" class="muted">ממתין לסריקת מועמדים.</td></tr></tbody>
   </table>
 </section>
+<section class="card"><h2>למה המועמד לקנייה השתנה?</h2><p>המועמד הוא המקום הראשון בדירוג, ולא בהכרח מניה שנקנתה. הציון המשולב הוא ממוצע של Market, Trend, Risk ו־Momentum. עסקה בפועל מופיעה ביומן הביצועים ובתיקים הפעילים.</p><p id="scanExplanation" class="muted"></p><div class="table"><table><thead><tr><th>מועד סריקת סוכן</th><th>מוביל</th><th>ציון</th><th>מרכיבי הציון</th><th>הסבר</th></tr></thead><tbody id="scanHistory"></tbody></table></div></section>
+
 
 <h2>היסטוריית החלטות AI</h2><section class="card table"><table><thead><tr><th>תאריך</th><th>נכס</th><th>המלצה</th><th>Master</th><th>Market</th><th>Trend</th><th>Risk</th><th>Momentum</th><th>מסלול</th><th>פעולת AI</th><th>מקור</th></tr></thead><tbody id="decisionJournal"><tr><td colspan="11" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr></tbody></table></section>
 <h2>ביצועי תיק והיסטוריה קיימת</h2><label for="historyMode">סדרת ביצועים: </label><select id="historyMode"><option value="auto">בחירה אוטומטית</option><option value="account">התיק הכולל · הגרסה החדשה</option><option value="legacy">היסטוריית הנכס הנבחר · היומן הקיים</option></select><section class="grid two"><div class="card chart"><canvas id="chart"></canvas></div><div class="card"><div class="label">מדדי מעקב</div><div class="big" id="snapCount">0 Snapshots</div><p id="performanceText" class="muted">פתח פוזיציה ושמור Snapshot עכשיו לאורך זמן.</p></div></section>
