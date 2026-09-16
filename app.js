@@ -1,14 +1,28 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null,scannerData=null,cloudAccount=null,accountHistory=[],closedPositions=[],latestRotation=null,marketRequestId=0,compatibilityMode=false,chartData=[];
+let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null,scannerData=null,cloudAccount=null,accountHistory=[],closedPositions=[],latestRotation=null,marketRequestId=0,compatibilityMode=false,chartData=[],automationSettingsSupported=false,settingsDirty=false,settingsFormFor=null;
 const exp={conservative:.25,balanced:.5,growth:.8,ai_dynamic:.5},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה",ai_dynamic:"AI דינמי"};
 function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=60?.65:score>=50?.50:score>=40?.25:0}
 function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(cloudAccount?.marks?.[$("symbol").value]?.master??a?.master??50):(exp[p]||.5)}
 function selectedPortfolio(){return portfolios().find(p=>p.symbol===$("symbol").value)||null}
+function automationFlags(p){return {rebalance:p?.autoRebalance??(p?.plan==='ai_dynamic'),rotate:p?.autoRotate??(p?.plan==='ai_dynamic')};}
+function automationText(p){const x=automationFlags(p);return [x.rebalance?'איזון אוטומטי פעיל':'איזון אוטומטי כבוי',x.rotate?'מעבר בין מניות פעיל':'מעבר בין מניות כבוי'].join(' · ');}
+function renderSettingsHint(){
+  const chosen=$("programPlan").value,rebalance=$("autoRebalance").checked,rotate=$("autoRotate").checked;
+  const target=chosen==='ai_dynamic'?'יעד משתנה לפי ציוני הסוכן':Math.round(exp[chosen]*100)+'% יעד חשיפה';
+  $("automationHint").textContent=target+' · '+(rebalance?'הסוכן מאזן בקנייה ומכירה':'אין איזון של ההחזקה')+' · '+(rotate?'מותר מעבר לנכס אחר, כולל מכירה וקנייה':'המניה הקיימת נשמרת')+(settingsDirty?' · השינויים טרם נשמרו':'');
+}
 function setPlanUI(){
-  const p=selectedPortfolio(),chosen=p?.plan||$("programPlan")?.value||plan||"balanced";plan=chosen;
-  if($("programPlan"))$("programPlan").value=chosen;
+  const p=selectedPortfolio(),formFor=p?String(p.id):'new-'+$("symbol").value;
+  if(settingsFormFor!==formFor){settingsDirty=false;settingsFormFor=formFor;}
+  if(!settingsDirty){
+    $("programPlan").value=p?.plan||plan||'balanced';
+    const flags=p?automationFlags(p):{rebalance:true,rotate:true};
+    $("autoRebalance").checked=flags.rebalance;$("autoRotate").checked=flags.rotate;
+  }
+  const chosen=p?.plan||$("programPlan").value;plan=chosen;
   $("plan").textContent=names[chosen]||chosen;
-  const e=planExposure(chosen);$("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
+  const e=planExposure(chosen);$("expo").textContent=Math.round(e*100)+'% יעד חשיפה'+(p?' · '+automationText(p):'');
+  renderSettingsHint();
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=60*1000,CACHE_FX_MS=12*60*60*1000,STALE_FX_MS=7*24*60*60*1000;
 
@@ -207,10 +221,12 @@ function acceptCloud(c){
   const old=selectedPortfolio(),oldSymbol=$("symbol").value;
   cloudPortfolios=c.portfolios||[];cloudSnapshots=c.snapshots||[];
   compatibilityMode=!c.account;
+  automationSettingsSupported=c.apiVersion==='6.2'&&c.capabilities?.automationSettings===true&&cloudPortfolios.every(p=>typeof p.autoRebalance==='boolean'&&typeof p.autoRotate==='boolean');
   cloudAccount=c.account||null;accountHistory=c.accountSnapshots||[];
   if(cloudPortfolios.length&&(!cloudAccount?.initialized||!cloudAccount?.updated_at||!Object.keys(cloudAccount?.marks||{}).length))cloudAccount=legacyAccount(c);
-  const notice=$("deploymentNotice");if(notice){notice.textContent=compatibilityMode?'ההחזקות והיומן הישן נטענו. שירות הענן אינו מחזיר את נתוני V6: יש לפרוס גם את Netlify Functions המעודכנות. הסיכום מחושב מנתוני העבר עד להשלמת הפריסה.':'';notice.style.display=compatibilityMode?'block':'none';}
+  const notice=$("deploymentNotice");if(notice){notice.textContent=compatibilityMode?'ההחזקות והיומן הישן נטענו. שירות הענן אינו מחזיר את נתוני V6: יש לפרוס גם את Netlify Functions המעודכנות. הסיכום מחושב מנתוני העבר עד להשלמת הפריסה.':'';if(!compatibilityMode&&!automationSettingsSupported)notice.textContent='הנתונים נשמרו. להפעלת האוטומציה בכל המסלולים יש לעדכן גם את ה־SQL וגם את Netlify Functions לגרסה 6.2.';notice.style.display=compatibilityMode||!automationSettingsSupported?'block':'none';}
   for(const id of ['open','savePlan','close','snapshot','reset'])if($(id))$(id).disabled=compatibilityMode;
+  for(const id of ["autoRebalance","autoRotate","savePlan","open"])if($(id))$(id).disabled=!automationSettingsSupported;
   closedPositions=c.closed||[];cloudMonitor=c.monitor||null;latestRotation=c.rotation||null;
   for(const p of cloudPortfolios){if(!Array.from($("symbol").options).some(o=>o.value===p.symbol)){const o=document.createElement('option');o.value=p.symbol;o.textContent=p.symbol;$("symbol").appendChild(o);}}
   let active=cloudPortfolios.find(p=>String(p.id)===String(latestRotation?.to_id));
@@ -227,7 +243,8 @@ async function syncCloud(){
   try{acceptCloud(await cloud("get"));$("status").textContent=compatibilityMode?"נתוני עבר נטענו · נדרש עדכון שירות הענן":"מסונכרן לענן";}
   catch(e){$("status").textContent="הענן לא זמין — מוצגים נתונים שמורים";throw e;}
 }
-async function savePortfolioCloud(p){acceptCloud(await cloud("save_portfolio",p));}
+async function savePortfolioCloud(p){if(!automationSettingsSupported)throw Error("נדרש עדכון SQL ו־Functions לגרסה 6.2");
+  const response=await cloud("save_portfolio",p);settingsDirty=false;acceptCloud(response);}
 function renderSelectedQuote(){
   const sym=$("symbol").value,q=cloudAccount?.marks?.[sym];
   if(!q)return;
@@ -271,8 +288,8 @@ function portfolioTotals(){
   return {cap,cash:cap,total:cap,pnl:0,realized:0};
 }
 async function openPaper(){
-  const p={symbol:$("symbol").value,start:Math.max(1000,+$("capital").value||100000),plan:$("programPlan").value||plan};
-  acceptCloud(await cloud("save_portfolio",p));
+  const p={symbol:$("symbol").value,start:Math.max(1000,+$("capital").value||100000),plan:$("programPlan").value||plan,autoRebalance:$("autoRebalance").checked,autoRotate:$("autoRotate").checked};
+  await savePortfolioCloud(p);
   $("status").textContent='תוכנית נייר נשמרה בענן';
 }
 function currentValue(p){const v=positionValue(p),t=portfolioTotals();return{...v,total:t.total,pnl:t.pnl}}
@@ -282,7 +299,7 @@ function renderPaper(){
   $("accountUpdated").textContent=cloudAccount?.estimated?(cloudAccount.valuation_source==="entry_price"?"שווי לפי מחירי כניסה עבור נכסים שחסרים להם נתוני עבר — אינו מחיר שוק עדכני":"שווי לפי מחירים ושערי מט״ח מהיומן הקיים — אינו עדכון שוק חי"):cloudAccount?.updated_at?"עדכון תיק: "+new Date(cloudAccount.updated_at).toLocaleString("he-IL"):"ממתין לעדכון התיק הראשון";
   $("start").textContent=money(t.cap);$("value").textContent=money(t.total);$("pnl").textContent=`${t.pnl>=0?"+":""}${money(t.pnl)} (${(t.pnl/t.cap*100).toFixed(2)}%)`;$("pnl").className=t.pnl>=0?"green":"red";
   if(!ps.length){$("position").innerHTML='<tr><td colspan="9" class="muted">אין תוכניות פתוחות בענן.</td></tr>';return}
-  $("position").innerHTML=ps.map(p=>{const v=positionValue(p),pe=p.plan==="ai_dynamic"?aiTargetExposure((latestSnap(p)?.score)??(market?.symbol===p.symbol?a?.master:50)):(exp[p.plan]||.5);return `<tr><td><b>${p.symbol}</b>${p.predecessorId?'<div class="muted">נפתח במעבר אוטומטי</div>':''}</td><td>${names[p.plan]||p.plan||"—"}</td><td>${Math.round(pe*100)}%</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
+  $("position").innerHTML=ps.map(p=>{const v=positionValue(p),pe=p.plan==="ai_dynamic"?aiTargetExposure((latestSnap(p)?.score)??(market?.symbol===p.symbol?a?.master:50)):(exp[p.plan]||.5);return `<tr><td><b>${p.symbol}</b>${p.predecessorId?'<div class="muted">נפתח במעבר אוטומטי</div>':''}</td><td>${names[p.plan]||p.plan||"—"}<div class="muted">${automationText(p)}</div></td><td>${Math.round(pe*100)}%</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
 }
 function snapshots(){return cloudSnapshots||[]}
 async function snapshot(){
@@ -314,8 +331,9 @@ function renderHistory(){
 function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.save?.();x.direction="rtl";x.textAlign="right";x.fillText("נדרשות לפחות שתי נקודות להצגת גרף",r.width-20,40,r.width-40);x.restore?.();return}let vals=s.map(x=>Number(x.value)).filter(Number.isFinite),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
 async function saveSelectedPlan(){
   const p=selectedPortfolio();if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");
-  acceptCloud(await cloud("update_plan",{id:p.id,plan:$("programPlan").value}));
-  $("status").textContent="המסלול עודכן";
+  if(!automationSettingsSupported)throw Error("נדרש עדכון SQL ו־Functions לגרסה 6.2");
+  const response=await cloud("update_plan",{id:p.id,plan:$("programPlan").value,autoRebalance:$("autoRebalance").checked,autoRotate:$("autoRotate").checked});settingsDirty=false;acceptCloud(response);
+  $("status").textContent="המסלול והאוטומציה נשמרו · ההחזקה לא השתנתה כעת";
 }
 async function closeP(){const p=selectedPortfolio();if(!p)return alert("בחר תוכנית פתוחה");if(!confirm('לסגור את תוכנית הנייר '+p.symbol+'?'))return;acceptCloud(await cloud('close_portfolio',{id:p.id}));}
 async function resetAll(){if(!confirm("לאפס את כל הסימולציה וההיסטוריה?"))return;acceptCloud(await cloud("reset",{}));marketRequestId++;market=null;a=null;$("status").textContent="הסימולציה אופסה בענן";}
@@ -326,13 +344,9 @@ $("symbol").onchange=()=>{
   renderPaper(); setPlanUI(); renderHistory();
   load().catch(e=>{console.error(e); $("status").textContent="שגיאת טעינה"});
 };
-$("programPlan").onchange=()=>{
-  const chosen=$("programPlan").value;
-  plan=chosen;
-  $("plan").textContent=names[chosen]||chosen;
-  const e=planExposure(chosen);
-  $("expo").textContent=chosen==="ai_dynamic"?`${Math.round(e*100)}% יעד חשיפה לפי AI`:`${Math.round(e*100)}% חשיפה`;
-};
+$("programPlan").onchange=()=>{settingsDirty=true;renderSettingsHint();};
+$("autoRebalance").onchange=()=>{settingsDirty=true;renderSettingsHint();};
+$("autoRotate").onchange=()=>{settingsDirty=true;renderSettingsHint();};
 $("historyMode")&&($("historyMode").onchange=()=>renderHistory());
 $("scanNow")&&($("scanNow").onclick=()=>loadScanner(true));
 $("savePlan").onclick=()=>saveSelectedPlan().catch(e=>alert(shortError(e.message)));

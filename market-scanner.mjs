@@ -11,7 +11,7 @@ export async function handler(){
     const h=saved[i];if(h.symbol!==row.symbol||h.score<60||Date.parse(row.slot)-Date.parse(h.slot)!==i*1800000||seen.has(h.bar_time))break;
     seen.add(h.bar_time);count++;
    }
-   return {statusCode:200,headers,body:JSON.stringify({generated_at:row.slot,candidates,warnings:[],leader:{symbol:row.symbol,score:row.score,consecutive:count,required:3,verified:count===3,status:count===3?'מועמד מאומת; מעבר דורש יתרון של 10 נקודות על תוכנית דינמית':'ממתין ל־3 סריקות סוכן רצופות'}})};
+   return {statusCode:200,headers,body:JSON.stringify({generated_at:row.slot,candidates,warnings:[],leader:{symbol:row.symbol,score:row.score,consecutive:count,required:3,verified:count===3,status:count===3?'מועמד מאומת; מעבר דורש יתרון של 10 נקודות על תוכנית שמאפשרת מעבר':'ממתין ל־3 סריקות סוכן רצופות'}})};
   }
   const warnings=[],candidates=[];
   await Promise.all(WATCHLIST.map(async symbol=>{try{const q=await bars(symbol);candidates.push({symbol,name:symbol,...q,stale:!fresh(q.updated_at)});}catch(e){warnings.push(`${symbol}: ${e.message}`);}}));

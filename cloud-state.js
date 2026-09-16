@@ -1,10 +1,10 @@
 import {db,td,bars} from '../../lib/agent.mjs';
 const headers={'Content-Type':'application/json; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Cache-Control':'no-store'};
-const mapPosition=x=>({id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:+x.cash_ils,date:x.entry_date,plan:x.strategy_mode||x.plan,status:x.status,predecessorId:x.predecessor_id,realizedPnl:+x.realized_pnl_ils,closedAt:x.closed_at,closedValue:+x.closed_value_ils,closedPrice:+x.closed_market_price,closedUnits:+x.closed_units});
+const mapPosition=x=>({id:x.id,symbol:x.symbol,start:+x.start,allocatedILS:+x.allocated_ils,allocatedUSD:+x.allocated_usd,entryFX:+x.entry_fx,entryPrice:+x.entry_price,units:+x.units,cashILS:+x.cash_ils,date:x.entry_date,plan:x.strategy_mode||x.plan,status:x.status,autoRebalance:x.auto_rebalance??((x.strategy_mode||x.plan)==='ai_dynamic'),autoRotate:x.auto_rotate??((x.strategy_mode||x.plan)==='ai_dynamic'),settingsVersion:Number(x.settings_version||1),predecessorId:x.predecessor_id,realizedPnl:+x.realized_pnl_ils,closedAt:x.closed_at,closedValue:+x.closed_value_ils,closedPrice:+x.closed_market_price,closedUnits:+x.closed_units});
 async function state(){
  const [s,monitor]=await Promise.all([db('rpc/paper_get_state',{method:'POST',body:'{}'}),db('agent_monitor_status?select=*&id=eq.1&limit=1').catch(()=>[])]);
  const portfolios=(s.rows||[]).map(mapPosition);
- return {...s,rows:undefined,portfolio:portfolios[0]||null,portfolios,closed:(s.closed||[]).map(mapPosition),monitor:portfolios.length?monitor[0]||null:null};
+ return {...s,apiVersion:"6.2",rows:undefined,portfolio:portfolios[0]||null,portfolios,closed:(s.closed||[]).map(mapPosition),monitor:portfolios.length?monitor[0]||null:null};
 }
 export async function handler(event){
  if(event.httpMethod==='OPTIONS')return {statusCode:204,headers,body:''};
@@ -13,7 +13,7 @@ export async function handler(event){
   const body=event.body?JSON.parse(event.body):{};
   if(action==='health'){
    await db('rpc/paper_get_state',{method:'POST',body:'{}'});
-   return {statusCode:200,headers,body:JSON.stringify({ok:true,rotationSchema:true})};
+   return {statusCode:200,headers,body:JSON.stringify({ok:true,rotationSchema:true,apiVersion:'6.2'})};
   }
   if(action==='get')return {statusCode:200,headers,body:JSON.stringify(await state())};
   if(event.httpMethod!=='POST')return {statusCode:405,headers,body:JSON.stringify({error:'POST required'})};

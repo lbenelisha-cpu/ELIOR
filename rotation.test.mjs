@@ -9,11 +9,11 @@ create table paper_portfolio(id bigint generated always as identity primary key,
 create table portfolio_snapshots(id bigint generated always as identity primary key,created_at timestamptz default now(),snapshot_key text unique,date date,symbol text,position_id text,position_value numeric,position_pnl numeric,value numeric,pnl numeric,fx numeric,score numeric,market_price numeric,auto boolean,market_score numeric,trend_score numeric,risk_score numeric,momentum_score numeric,recommendation text,plan text,target_exposure numeric,actual_exposure numeric,ai_action text);
 create table agent_monitor_status(id integer primary key,status text,scores jsonb,symbols jsonb,checks integer,note text,updated_at timestamptz,checked_at timestamptz);
 `);
-for(const file of ['001-paper-agent.sql','002-paper-rotation.sql','003-preserve-existing.sql'])await db.exec(fs.readFileSync(new URL('../sql/'+file,import.meta.url),'utf8'));
+for(const file of ['001-paper-agent.sql','002-paper-rotation.sql','003-preserve-existing.sql','004-automation-plans.sql'])await db.exec(fs.readFileSync(new URL('../sql/'+file,import.meta.url),'utf8'));
 const universe=['SPY','QQQ','DIA','IWM','AAPL','MSFT','NVDA','AMZN'];
 let quotes,slot;
 async function setup({cost=9000,mode='ai_dynamic',confirm=true}={}){
- await db.exec('truncate paper_portfolio,portfolio_snapshots,paper_agent_decisions,paper_cycle_runs,paper_rotation_scans,paper_account_snapshots,paper_account_state restart identity');
+ await db.exec('truncate paper_settings_history,paper_portfolio,portfolio_snapshots,paper_agent_decisions,paper_cycle_runs,paper_rotation_scans,paper_account_snapshots,paper_account_state restart identity');
  slot=new Date(Math.floor(Date.now()/1800000)*1800000).toISOString();
  quotes=Object.fromEntries(universe.map(symbol=>[symbol,{price:symbol==='MSFT'?200:100,master:symbol==='MSFT'?80:50,market:60,trend:60,momentum:60,risk:60,signal:'test',updated_at:slot.slice(0,19).replace('T',' ')}]));
  await db.query("insert into paper_portfolio(symbol,start,units,allocated_ils,allocated_usd,entry_price,entry_fx,plan,strategy_mode,status,updated_at) values('SPY',100000,100,$1,$1,90,1,$2,$2,'open',now())",[cost,mode]);
@@ -84,3 +84,54 @@ test('absent old quote uses entry-price estimate and never fabricates all-cash a
  await setup({confirm:false});const s=await state();assert.equal(s.account.cash,91000);assert.equal(s.account.value,100000);assert.equal(s.account.valuation_source,'entry_price');
 });
 after(()=>db.close());
+async function seedDecisions(action,version=1){
+ await db.query(`insert into paper_agent_decisions select '1',$1::timestamptz-n*interval '30 minutes',timezone('UTC',$1::timestamptz)-n*interval '30 minutes',$2,jsonb_build_object('settings_version',$3::integer) from generate_series(1,2)n`,[slot,action,version]);
+}
+test('all fixed plans automatically BUY to their own target, independent of AI score target',async()=>{
+ for(const [mode,expected] of [['conservative',25000],['balanced',50000],['growth',80000]]){
+  await setup({cost:10000,mode});await db.exec('update paper_portfolio set auto_rebalance=true,auto_rotate=false');await seedDecisions('BUY');
+  const r=await run(),s=await state();assert.equal(r.rotation,null);assert.equal(s.rows[0].symbol,'SPY');assert.equal(s.rows[0].allocated_ils,expected);assert.equal(s.rows[0].units,expected/100);assert.equal(r.scores.SPY.target_exposure,expected/100000);
+ }
+});
+test('all fixed plans automatically SELL excess exposure without switching assets',async()=>{
+ for(const [mode,expected] of [['conservative',25000],['balanced',50000],['growth',80000]]){
+  await setup({cost:90000,mode});await db.exec('update paper_portfolio set units=900,auto_rebalance=true,auto_rotate=false');await seedDecisions('SELL');
+  const r=await run(),s=await state();assert.equal(r.rotation,null);assert.equal(s.rows[0].allocated_ils,expected);assert.equal(s.rows[0].units,expected/100);assert.ok(r.scores.SPY.trade_ils<0);
+ }
+});
+test('both controls work independently for all four combinations',async()=>{
+ for(const rebalance of [false,true])for(const rotate of [false,true]){
+  await setup({cost:10000,mode:'balanced'});await db.query('update paper_portfolio set auto_rebalance=$1,auto_rotate=$2',[rebalance,rotate]);await seedDecisions('BUY');
+  const r=await run(),s=await state();assert.equal(!!r.rotation,rotate);
+  assert.equal(s.rows[0].symbol,rotate?'MSFT':'SPY');assert.equal(s.rows[0].auto_rebalance,rebalance);assert.equal(s.rows[0].auto_rotate,rotate);
+  assert.equal(s.rows[0].allocated_ils,rotate||rebalance?50000:10000);
+ }
+});
+test('rotation preserves fixed plan, allocation target, settings version and controls',async()=>{
+ for(const [mode,target] of [['conservative',25000],['balanced',50000],['growth',80000]]){
+  await setup({mode});await db.exec('update paper_portfolio set auto_rebalance=false,auto_rotate=true,settings_version=5');
+  const r=await run(),s=await state();assert.equal(r.rotation.to_symbol,'MSFT');assert.equal(r.rotation.bought_ils,target);
+  assert.equal(s.rows[0].strategy_mode,mode);assert.equal(s.rows[0].auto_rebalance,false);assert.equal(s.rows[0].auto_rotate,true);assert.equal(s.rows[0].settings_version,5);
+  assert.equal(s.account.value,101000);assert.equal(s.closed[0].realized_pnl_ils,1000);
+ }
+});
+test('changing plan preserves enabled automation and starts new confirmations instead of trading immediately',async()=>{
+ await setup({cost:10000});await seedDecisions('BUY');
+ await db.query("select manage_paper_portfolio('update_plan',$1::jsonb)",[JSON.stringify({id:1,plan:'conservative'})]);
+ let s=await state();assert.equal(s.rows[0].units,100);assert.equal(s.rows[0].auto_rebalance,true);assert.equal(s.rows[0].auto_rotate,true);assert.equal(s.rows[0].settings_version,2);
+ const r=await run();s=await state();assert.equal(r.rotation,null);assert.equal(r.scores.SPY.trade_ils,0);assert.equal(s.rows[0].units,100);
+ assert.equal((await db.query('select * from paper_settings_history')).rows.length,1);
+ const t=s.rows[0].automation_updated_at;
+ await db.query("select manage_paper_portfolio('update_plan',$1::jsonb)",[JSON.stringify({id:1,plan:'conservative',autoRebalance:true,autoRotate:true})]);
+ s=await state();assert.equal(s.rows[0].settings_version,2);assert.equal(s.rows[0].automation_updated_at,t);
+});
+test('paused AI dynamic programs do not rebalance or rotate even with prior confirmations',async()=>{
+ await setup();await seedDecisions('BUY');await db.query("select manage_paper_portfolio('update_plan',$1::jsonb)",[JSON.stringify({id:1,plan:'ai_dynamic',autoRebalance:false,autoRotate:false})]);
+ const r=await run(),s=await state();assert.equal(r.rotation,null);assert.equal(r.scores.SPY.action,'HOLD');assert.equal(s.rows[0].units,100);
+});
+test('new fixed automatic program starts without a manual purchase and rejects invalid flags',async()=>{
+ await setup({confirm:false});await db.exec('truncate paper_portfolio restart identity');
+ await db.query("select manage_paper_portfolio('save_portfolio',$1::jsonb,$2::jsonb,1)",[JSON.stringify({symbol:'AAPL',start:100000,plan:'balanced',autoRebalance:true,autoRotate:true}),JSON.stringify(quotes)]);
+ const s=await state();assert.equal(s.rows[0].units,0);assert.equal(s.rows[0].auto_rebalance,true);assert.equal(s.rows[0].auto_rotate,true);assert.equal(s.account.cash,100000);
+ await assert.rejects(db.query("select manage_paper_portfolio('update_plan',$1::jsonb)",[JSON.stringify({id:1,plan:'balanced',autoRebalance:'true'})]),/boolean/);
+});

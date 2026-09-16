@@ -11,7 +11,7 @@ export default async function monitor(){
       symbols=result.symbols||symbols;
     }
   }catch(e){errors.push(e.message);}
-  const note=errors.length?errors.join(' | '):!symbols.length?'אין תוכניות פתוחות':!open?'מחוץ לשעות המסחר — ממתין':result?.rotation?`מעבר אוטומטי מ־${result.rotation.from_symbol} ל־${result.rotation.to_symbol}; ההיסטוריה והרווח המצטבר נשמרו`:'מעקב כל 30 דקות · מעבר נכס אחרי 3 סריקות מאמתות ופער של 10 נקודות · סימולציה בלבד';
+  const note=errors.length?errors.join(' | '):!symbols.length?'אין תוכניות פתוחות':!open?'מחוץ לשעות המסחר — ממתין':result?.rotation?`מעבר אוטומטי מ־${result.rotation.from_symbol} ל־${result.rotation.to_symbol}; ההיסטוריה והרווח המצטבר נשמרו`:'מעקב כל 30 דקות לפי מסלול והגדרות האוטומציה · מעבר נכס אחרי 3 סריקות מאמתות ופער של 10 נקודות · סימולציה בלבד';
   await db('agent_monitor_status?on_conflict=id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify({id:1,checks,status:errors.length?'error':symbols.length&&open?'ok':'idle',symbols,scores:result?.scores||{},checked_at:new Date().toISOString(),updated_at:new Date().toISOString(),note})});
   if(errors.length)throw Error(note);
   return new Response(null,{status:204});
