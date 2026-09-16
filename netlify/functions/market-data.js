@@ -1,5 +1,4 @@
-const API_KEY=process.env.TWELVE_DATA_API_KEY;
-
+import {td} from "../../lib/agent.mjs";
 const headers={
   "Content-Type":"application/json; charset=utf-8",
   "Access-Control-Allow-Origin":"*",
@@ -7,15 +6,6 @@ const headers={
   "Access-Control-Allow-Methods":"GET,OPTIONS"
 };
 
-async function td(endpoint,params={}){
-  if(!API_KEY) throw Error("TWELVE_DATA_API_KEY is missing");
-  const u=new URL(`https://api.twelvedata.com/${endpoint}`);
-  Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,String(v)));
-  const r=await fetch(u,{headers:{Authorization:`apikey ${API_KEY}`}});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok||d?.status==="error"||d?.code>=400) throw Error(d?.message||`Twelve Data HTTP ${r.status}`);
-  return d;
-}
 
 export const handler=async event=>{
   if(event.httpMethod==="OPTIONS")return{statusCode:204,headers,body:""};
@@ -41,8 +31,8 @@ export const handler=async event=>{
       symbol,
       prices,
       lastRefreshed:marketDate,
-      quoteAsOf:new Date().toISOString(),
-      dataType:"realtime_quote",
+      quoteAsOf:quote.cached_at||null,
+      dataType:"cached_quote",
       source:"Twelve Data",
       currentPrice:Number.isFinite(current)?current:prices[0]?.close
     })};

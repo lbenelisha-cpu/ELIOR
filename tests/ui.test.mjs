@@ -66,3 +66,18 @@ test('saving sends the selected plan and both boolean controls; server values ar
 test('old backend cannot silently accept settings it does not support',()=>{
  const u=ui();u.accept(data([pos(1,'SPY')]));assert.equal(u.el('savePlan').disabled,true);assert.equal(u.el('autoRotate').disabled,true);assert.match(u.el('deploymentNotice').textContent,/6.2/);
 });
+
+test('opening account balance is not plotted as a stock loss; journal is retained',()=>{
+ const u=ui();u.accept(data([pos(1,'SPY')],{snapshots:[
+ {symbol:'SPY',created_at:'2026-09-12T10:00:00Z',value:100000,pnl:0},
+ {symbol:'SPY',position_id:'1',created_at:'2026-09-12T11:00:00Z',position_value:50000,position_pnl:0},
+ {symbol:'SPY',position_id:'1',created_at:'2026-09-13T11:00:00Z',position_value:49500,position_pnl:-500}]}));
+ assert.equal(u.run('legacyHistory().length'),2);assert.equal(u.run('snapshots().length'),3);
+ assert.equal(u.run('legacyHistory()[0].value'),50000);
+});
+test('old monitor cannot report new agent success and budget wait is explicit',()=>{
+ const u=ui();u.accept(data([pos(1,'SPY')],{monitor:{status:'ok',checked_at:new Date().toISOString(),note:'old agent'}}));
+ assert.match(u.el('monitorStatus').textContent,/ממתין לסוכן המעודכן/);
+ u.accept(data([pos(1,'SPY')],{monitor:{status:'waiting',checked_at:new Date().toISOString(),note:'V6.3 · wait'}}));
+ assert.match(u.el('monitorStatus').textContent,/ממתין למכסת/);
+});

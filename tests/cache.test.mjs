@@ -1,0 +1,21 @@
+import {test,after} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const {PGlite}=await import(process.env.PGLITE_MODULE||'@electric-sql/pglite');
+const db=new PGlite();
+await db.exec('create role anon;create role authenticated;create role service_role;');
+const sql=fs.readFileSync(new URL('../sql/005-market-cache.sql',import.meta.url),'utf8');
+await db.exec(sql);await db.exec(sql);
+after(()=>db.close());
+const reserve=async k=>(await db.query('select paper_market_reserve($1) r',[k])).rows[0].r;
+test('rolling budget, duplicate lease, cache hit and recovery',async()=>{
+ assert.equal((await reserve('a')).state,'fetch');
+ assert.equal((await reserve('a')).state,'waiting');
+ for(let i=0;i<7;i++)assert.equal((await reserve('k'+i)).state,'fetch');
+ assert.equal((await reserve('ninth')).state,'limited');
+ await db.exec("update paper_market_cache set payload='{\"price\":123}',expires_at=now()+interval '10 minutes' where key='a'");
+ assert.equal((await reserve('a')).payload.price,123);
+ assert.equal((await db.query('select count(*) n from paper_api_requests')).rows[0].n,8);
+ await db.exec("update paper_api_requests set created_at=now()-interval '66 seconds'");
+ assert.equal((await reserve('ninth')).state,'fetch');
+});

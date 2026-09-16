@@ -24,18 +24,11 @@ test('deployed handlers import as ESM',async()=>{
     assert.equal(typeof (await import('../netlify/functions/'+name)).handler,'function');
   }
 });
-test('scanner preserves partial candidates when provider or database fails',async()=>{
-  process.env.TWELVE_DATA_API_KEY='test';
-  const original=global.fetch;
-  global.fetch=async url=>{
-    const symbol=new URL(url).searchParams.get('symbol');
-    if(symbol==='AAPL')return Response.json({status:'error',message:'API credits exhausted'},{status:429});
-    return Response.json({values:values.map(v=>({...v,datetime:new Date().toISOString().slice(0,19).replace('T',' ')}))});
-  };
-  try{
-    const {handler}=await import('../netlify/functions/market-scanner.mjs');
-    const r=await handler(),body=JSON.parse(r.body);
-    assert.equal(r.statusCode,200);assert.equal(body.candidates.length,7);
-    assert.equal(body.leader.verified,false);assert.match(body.warnings[0],/AAPL/);
-  }finally{global.fetch=original;}
+test('scanner reads cached data without provider calls',async()=>{
+ process.env.SUPABASE_URL='https://db.test';process.env.SUPABASE_SERVICE_ROLE_KEY='test';
+ const original=global.fetch;let calls=0;
+ global.fetch=async url=>{calls++;assert.ok(String(url).startsWith('https://db.test'));
+ if(String(url).includes('paper_rotation_scans'))return Response.json([]);
+ return Response.json([{key:'time_series:'+JSON.stringify([['interval','30min'],['symbol','SPY']]),payload:{values:values.map(v=>({...v,datetime:'2026-09-16 13:30:00'}))}}]);};
+ try{const r=await (await import('../netlify/functions/market-scanner.mjs')).handler();assert.equal(r.statusCode,200);assert.equal(JSON.parse(r.body).candidates.length,1);assert.equal(calls,2);}finally{global.fetch=original;}
 });

@@ -56,7 +56,8 @@ function renderMonitor(){
   const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
   const m=cloudMonitor||monitorFallback();
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
-  const ok=m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
+  const modern=String(m.note||" ").startsWith("V6.3");
+  const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?"ממתין למכסת נתונים":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
   const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"אין תוכניות פתוחות"} · ${m.note||"Twelve Data · כל 30 דקות · נתונים עדכניים בלבד"}`;
 }
@@ -127,7 +128,7 @@ function renderScanner(){
   </tr>`).join("");
 }
 async function loadScanner(force=false){
-  const key="v5_scanner_30m";
+  const key="v63_scanner_30m";
   if(!force){
     const cached=cacheGet(key,30*60*1000);
     if(cached){scannerData=cached;renderScanner();return}
@@ -310,7 +311,8 @@ function snapValue(x){return x?.position_value!=null?Number(x.position_value):Nu
 function snapPnl(x){return x?.position_pnl!=null?Number(x.position_pnl):Number(x?.pnl)}
 function legacyHistory(){
   const sym=$("symbol").value;
-  return snapshots().filter(x=>x.plan!=='scanner'&&x.symbol===sym&&(numeric(x.position_value)||numeric(x.value))).map(x=>({...x,value:Number(x.position_value??x.value),pnl:Number(x.position_pnl??x.pnl),symbols:[x.symbol],created_at:x.created_at||x.date,reason:'היסטוריית נכס קיימת — '+(x.ai_action||x.recommendation||'תיעוד שמור')}));
+  const explicit=snapshots().some(x=>x.symbol===sym&&numeric(x.position_value));
+  return snapshots().filter(x=>(!explicit||numeric(x.position_value)||x.position_id)&&x.plan!=='scanner'&&x.symbol===sym&&(numeric(x.position_value)||numeric(x.value))).map(x=>({...x,value:Number(x.position_value??x.value),pnl:Number(x.position_pnl??x.pnl),symbols:[x.symbol],created_at:x.created_at||x.date,reason:'היסטוריית נכס קיימת — '+(x.ai_action||x.recommendation||'תיעוד שמור')}));
 }
 function renderHistory(){
   const s=snapshots(),mode=$("historyMode");
@@ -324,7 +326,7 @@ function renderHistory(){
     return '<tr><td>'+new Date(x.created_at||x.date).toLocaleString('he-IL')+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.recommendation||'—')+'</td><td>'+score(x.score)+'</td><td>'+score(x.market_score)+'</td><td>'+score(x.trend_score)+'</td><td>'+score(x.risk_score)+'</td><td>'+score(x.momentum_score)+'</td><td>'+escapeHTML(names[x.plan]||x.plan||'—')+'</td><td>'+escapeHTML(x.ai_action||'—')+'</td><td>'+(x.auto?'אוטומטי':'ידני')+'</td></tr>';
   }).join(''):'<tr><td colspan="11" class="muted">אין החלטות מתועדות.</td></tr>';
   $("closedPositions").innerHTML=closedPositions.length?closedPositions.map(p=>'<tr><td>'+escapeHTML(p.symbol)+'</td><td>'+new Date(p.closedAt).toLocaleString('he-IL')+'</td><td>'+Number(p.closedUnits).toFixed(4)+'</td><td>'+money(p.closedValue)+'</td><td class="'+(p.realizedPnl>=0?'green':'red')+'">'+money(p.realizedPnl)+'</td></tr>').join(''):'<tr><td colspan="5" class="muted">אין עדיין תוכניות שנסגרו עם רישום מימוש.</td></tr>';
-  $("performanceText").textContent=legacy?"היסטוריית הנכס "+$("symbol").value+" מהיומן הקיים. זו סדרת שווי נכס, ולא שווי התיק הכולל.":accountHistory.length?'שווי התיק הכולל לאורך זמן — מזומן וכל ההחזקות, כולל רווח והפסד מתוכניות שנסגרו. מעבר מניה אינו מאפס את הגרף.':'ממתין לעדכון תיק. ההיסטוריה הישנה לכל נכס נשארת ביומן ההחלטות.';
+  $("performanceText").textContent=legacy?"היסטוריית הנכס "+$("symbol").value+" מהיומן הקיים. זו סדרת שווי נכס, ולא שווי התיק הכולל. רשומות פתיחה ללא זיהוי החזקה ושווי נכס אינן נכללות בגרף.":accountHistory.length?'שווי התיק הכולל לאורך זמן — מזומן וכל ההחזקות, כולל רווח והפסד מתוכניות שנסגרו. מעבר מניה אינו מאפס את הגרף.':'ממתין לעדכון תיק. ההיסטוריה הישנה לכל נכס נשארת ביומן ההחלטות.';
   draw(displayed);renderMonitor();
 }
 
