@@ -9,7 +9,7 @@ create table paper_portfolio(id bigint generated always as identity primary key,
 create table portfolio_snapshots(id bigint generated always as identity primary key,created_at timestamptz default now(),snapshot_key text unique,date date,symbol text,position_id text,position_value numeric,position_pnl numeric,value numeric,pnl numeric,fx numeric,score numeric,market_price numeric,auto boolean,market_score numeric,trend_score numeric,risk_score numeric,momentum_score numeric,recommendation text,plan text,target_exposure numeric,actual_exposure numeric,ai_action text);
 create table agent_monitor_status(id integer primary key,status text,scores jsonb,symbols jsonb,checks integer,note text,updated_at timestamptz,checked_at timestamptz);
 `);
-for(const file of ['001-paper-agent.sql','002-paper-rotation.sql'])await db.exec(fs.readFileSync(new URL('../sql/'+file,import.meta.url),'utf8'));
+for(const file of ['001-paper-agent.sql','002-paper-rotation.sql','003-preserve-existing.sql'])await db.exec(fs.readFileSync(new URL('../sql/'+file,import.meta.url),'utf8'));
 const universe=['SPY','QQQ','DIA','IWM','AAPL','MSFT','NVDA','AMZN'];
 let quotes,slot;
 async function setup({cost=9000,mode='ai_dynamic',confirm=true}={}){
@@ -72,5 +72,15 @@ test('full SQL installer can be rerun without losing positions or realized profi
  await setup();await run();const before=await state();
  await db.exec(fs.readFileSync(new URL('../sql/INSTALL_ALL.sql',import.meta.url),'utf8'));
  const afterState=await state();assert.deepEqual(afterState,before);
+});
+test('legacy holdings are valued before the first account snapshot without writing data',async()=>{
+ await setup({confirm:false});
+ await db.exec("insert into portfolio_snapshots(snapshot_key,date,symbol,position_id,market_price,fx,position_value,position_pnl,score) values('legacy',current_date,'SPY','1',97,1,9700,700,50)");
+ const s=await state();assert.equal(s.account.value,100700);assert.equal(s.account.cash,91000);assert.equal(s.account.pnl,700);
+ assert.equal(s.account.estimated,true);assert.equal(s.account.valuation_source,'legacy_snapshot');assert.equal(s.accountSnapshots.length,0);
+ assert.equal(s.snapshots.length,1);assert.equal(s.rows[0].units,100);
+});
+test('absent old quote uses entry-price estimate and never fabricates all-cash account',async()=>{
+ await setup({confirm:false});const s=await state();assert.equal(s.account.cash,91000);assert.equal(s.account.value,100000);assert.equal(s.account.valuation_source,'entry_price');
 });
 after(()=>db.close());
