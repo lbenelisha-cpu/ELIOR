@@ -57,7 +57,7 @@ function renderMonitor(){
   const m=cloudMonitor||monitorFallback();
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
   const modern=String(m.note||" ").startsWith("V6.3");
-  const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?"ממתין למכסת נתונים":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
+  const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?(String(m.note).includes("מסונכרנים")?"ממתין לסנכרון נתונים":"ממתין למכסת נתונים"):"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
   const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"אין תוכניות פתוחות"} · ${m.note||"Twelve Data · כל 30 דקות · נתונים עדכניים בלבד"}`;
 }
