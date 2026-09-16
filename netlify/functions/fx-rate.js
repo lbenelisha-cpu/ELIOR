@@ -1,10 +1,24 @@
-let memoryCache=null;
-exports.handler=async()=>{const h={"Content-Type":"application/json; charset=utf-8","Access-Control-Allow-Origin":"*","Netlify-CDN-Cache-Control":"public, durable, max-age=43200","Cache-Control":"public,max-age=43200"};try{
-if(memoryCache&&Date.now()-memoryCache.savedAt<12*60*60*1000)return{statusCode:200,headers:h,body:JSON.stringify(memoryCache.data)};
-const key=process.env.ALPHA_VANTAGE_API_KEY;if(!key)throw Error("API key is not configured");
-const u=new URL("https://www.alphavantage.co/query");u.searchParams.set("function","CURRENCY_EXCHANGE_RATE");u.searchParams.set("from_currency","USD");u.searchParams.set("to_currency","ILS");u.searchParams.set("apikey",key);
-const r=await fetch(u),d=await r.json();if(d.Note||d.Information)return{statusCode:429,headers:h,body:JSON.stringify({error:"Alpha Vantage rate limit"})};
-const x=d["Realtime Currency Exchange Rate"];if(!x)throw Error(d["Error Message"]||"USD/ILS rate was not returned");
-const rate=Number(x["5. Exchange Rate"]);if(!Number.isFinite(rate)||rate<=0)throw Error("Invalid USD/ILS rate");
-const data={pair:"USD/ILS",rate,lastRefreshed:x["6. Last Refreshed"]||"",timezone:x["7. Time Zone"]||""};memoryCache={savedAt:Date.now(),data};
-return{statusCode:200,headers:h,body:JSON.stringify(data)}}catch(e){return{statusCode:500,headers:h,body:JSON.stringify({error:e.message})}}};
+const API_KEY=process.env.TWELVE_DATA_API_KEY;
+const headers={
+  "Content-Type":"application/json; charset=utf-8",
+  "Access-Control-Allow-Origin":"*",
+  "Access-Control-Allow-Headers":"Content-Type",
+  "Access-Control-Allow-Methods":"GET,OPTIONS"
+};
+async function tdPrice(symbol){
+  if(!API_KEY)throw Error("TWELVE_DATA_API_KEY is missing");
+  const u=new URL("https://api.twelvedata.com/price");u.searchParams.set("symbol",symbol);
+  const r=await fetch(u,{headers:{Authorization:`apikey ${API_KEY}`}}),d=await r.json().catch(()=>({}));
+  if(!r.ok||d?.status==="error"||d?.code>=400)throw Error(d?.message||`Twelve Data HTTP ${r.status}`);
+  const price=Number(d?.price);if(!Number.isFinite(price))throw Error("No USD/ILS rate");return price;
+}
+export const handler=async event=>{
+  if(event.httpMethod==="OPTIONS")return{statusCode:204,headers,body:""};
+  try{
+    const rate=await tdPrice("USD/ILS");
+    return{statusCode:200,headers,body:JSON.stringify({rate,lastRefreshed:new Date().toISOString(),source:"Twelve Data"})};
+  }catch(e){
+    console.error("TWELVE_FX_ERROR",e?.stack||String(e));
+    return{statusCode:500,headers,body:JSON.stringify({error:e.message||"FX data error"})};
+  }
+};
