@@ -12,7 +12,7 @@ async function tdPrice(symbol){
   if(!r.ok||d?.status==="error"||d?.code>=400)throw Error(d?.message||`Twelve Data HTTP ${r.status}`);
   const price=Number(d?.price);if(!Number.isFinite(price))throw Error("No USD/ILS rate");return price;
 }
-exports.handler=async event=>{
+export const handler=async event=>{
   if(event.httpMethod==="OPTIONS")return{statusCode:204,headers,body:""};
   try{
     const rate=await tdPrice("USD/ILS");

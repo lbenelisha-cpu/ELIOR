@@ -1,8 +1,8 @@
 const $=x=>document.getElementById(x),money=x=>new Intl.NumberFormat("he-IL",{style:"currency",currency:"ILS",maximumFractionDigits:0}).format(x),mean=a=>a.reduce((s,x)=>s+x,0)/a.length,clamp=x=>Math.max(0,Math.min(100,Math.round(x)));
-let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null,scannerData=null;
+let market=null,fx=null,a=null,cloudPortfolios=[],cloudSnapshots=[],cloudMonitor=null,plan="balanced",liveMarket=null,liveTimer=null,scannerData=null,cloudAccount=null,accountHistory=[],closedPositions=[],latestRotation=null,marketRequestId=0;
 const exp={conservative:.25,balanced:.5,growth:.8,ai_dynamic:.5},names={conservative:"שמרני",balanced:"מאוזן",growth:"צמיחה",ai_dynamic:"AI דינמי"};
-function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=55?.65:score>=45?.50:score>=30?.35:.25}
-function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(a?.master??50):(exp[p]||.5)}
+function aiTargetExposure(score){score=Number(score);return score>=70?.80:score>=60?.65:score>=50?.50:score>=40?.25:0}
+function planExposure(p){return p==="ai_dynamic"?aiTargetExposure(cloudAccount?.marks?.[$("symbol").value]?.master??a?.master??50):(exp[p]||.5)}
 function selectedPortfolio(){return portfolios().find(p=>p.symbol===$("symbol").value)||null}
 function setPlanUI(){
   const p=selectedPortfolio(),chosen=p?.plan||$("programPlan")?.value||plan||"balanced";plan=chosen;
@@ -14,8 +14,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms)),CACHE_MARKET_MS=60*1000,CACHE_F
 
 function cacheGet(key,maxAge){try{const x=JSON.parse(localStorage.getItem(key)||"null");if(!x||!x.savedAt)return null;if(Date.now()-x.savedAt>maxAge)return null;return x.data}catch{return null}}
 function cacheSet(key,data){try{localStorage.setItem(key,JSON.stringify({savedAt:Date.now(),data}))}catch{}}
-function shortError(msg=""){msg=String(msg);if(/rate limit|too many requests|credits|429/i.test(msg))return "מגבלת ספק נתוני השוק הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API key/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
-async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...(opts||{})}),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||"Request failed");return j}
+function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function shortError(msg=""){msg=String(msg);if(/stale quote|synchronized/i.test(msg))return "נתוני השוק אינם עדכניים או אינם מסונכרנים. הפעולה תתאפשר לאחר עדכון נתוני המסחר.";if(/schema cache|paper_get_state|apply_paper_cycle/i.test(msg))return "נדרש להריץ את קובץ ה־SQL של גרסת המעבר ב־Supabase.";if(/rate limit|too many requests|credits|429/i.test(msg))return "מגבלת ספק נתוני השוק הופעלה. המערכת תשתמש בנתונים שמורים כשאפשר.";if(/supabase|cloud|database|fetch failed/i.test(msg))return "לא ניתן כרגע לסנכרן מול הענן.";if(/API.key|API_KEY/i.test(msg))return "מפתח API חסר ב-Netlify.";return "לא ניתן להשלים את הפעולה כרגע."}
+async function fetchJson(url,opts){const r=await fetch(url,{cache:"no-store",...(opts||{})}),j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||`HTTP ${r.status} — ${url}`);return j}
 
 
 
@@ -34,16 +35,16 @@ function monitorFallback(){
     checked_at:latest?.created_at||null,
     checks:slots.size,
     symbols:[...new Set(rows.map(x=>x.symbol).filter(Boolean))],
-    note:"Twelve Data · בדיקה אוטומטית כל 6 דקות · 80 דגימות ביום"
+    note:"Twelve Data · בדיקה אוטומטית כל 30 דקות · נתונים עדכניים בלבד"
   };
 }
 function renderMonitor(){
   const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
   const m=cloudMonitor||monitorFallback();
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
-  const ok=m.status==="ok",err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
+  const ok=m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"פעיל אוטומטית":err?"שגיאה":"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
-  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"SPY + QQQ"} · ${m.note||"Twelve Data · כל 6 דקות · 80 דגימות ביום"}`;
+  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"אין תוכניות פתוחות"} · ${m.note||"Twelve Data · כל 30 דקות · נתונים עדכניים בלבד"}`;
 }
 
 function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}
@@ -87,11 +88,11 @@ function renderScanner(){
   if(best){
     const top=rows[0],lead=scannerData?.leader;
     const verify=lead?` · ${lead.consecutive}/${lead.required} ${lead.verified?"✓ מאומת":"ממתין"}`:"";
-    best.innerHTML=`${top.symbol} · ${top.master}/100${verify}`;
+    best.innerHTML=`${escapeHTML(top.symbol)} · ${top.master}/100${verify}`;
     best.className="big "+(lead?.verified?"green":scannerSignalClass(top.master));
     const st=$("scannerVerifyStatus");
     if(st){
-      st.textContent=lead?.status||"ממתין לנתונים";
+      st.textContent=[lead?.status||"ממתין לנתונים",...(scannerData?.warnings||[])].join(" · ");
       st.className="muted "+(lead?.verified?"green":"");
     }
   }
@@ -107,7 +108,7 @@ function renderScanner(){
     <td>${x.momentum}/100</td>
     <td>${x.risk}/100</td>
     <td><span class="ltr">$${Number(x.price).toFixed(2)}</span></td>
-    <td class="${scannerSignalClass(x.master)}">${x.signal}</td>
+    <td class="${scannerSignalClass(x.master)}">${escapeHTML(x.signal)}${x.stale?" · נתון ישן":""}</td>
     <td>${x.updated_at||"—"}</td>
   </tr>`).join("");
 }
@@ -125,7 +126,7 @@ async function loadScanner(force=false){
     renderScanner();
   }catch(e){
     const body=$("scannerBody");
-    if(body)body.innerHTML=`<tr><td colspan="9" class="muted">הסריקה לא זמינה כרגע: ${shortError(e.message)}</td></tr>`;
+    if(body)body.innerHTML=`<tr><td colspan="9" class="muted">הסריקה לא זמינה כרגע: ${escapeHTML(shortError(e.message))}<br>${escapeHTML(e.message)}</td></tr>`;
   }finally{
     if(btn){btn.disabled=false;btn.textContent="רענן סריקה"}
   }
@@ -163,8 +164,9 @@ function agentTrend(field,current){
   return delta>0?{arrow:"↑",delta,label:"משתפר",cls:"green"}:{arrow:"↓",delta,label:"נחלש",cls:"red"};
 }
 function renderAgents(){
-  if(!a)return;
-  let x=[
+  const q=cloudAccount?.marks?.[$("symbol").value];
+  if(!a&&!q)return;
+  let x=q?[["Market",q.market,"30 דקות","market_score"],["Trend",q.trend,"30 דקות","trend_score"],["Risk",q.risk,"30 דקות","risk_score"],["Momentum",q.momentum,"30 דקות","momentum_score"],["Portfolio",q.master,q.signal,"score"]]:[
     ["Market",a.marketS,`60 ימים ${a.r60.toFixed(1)}%`,"market_score"],
     ["Trend",a.trend,`20 ימים ${a.r20.toFixed(1)}%`,"trend_score"],
     ["Risk",a.risk,`תנודתיות ${a.vol.toFixed(1)}%`,"risk_score"],
@@ -173,7 +175,7 @@ function renderAgents(){
   ];
   $("agents").innerHTML=x.map(([n,s,t,f])=>{
     const tr=agentTrend(f,s),d=Math.round(Math.abs(tr.delta));
-    return `<div class="card"><b>${n} Agent</b><div class="score">${s}/100 <span class="${tr.cls}" style="font-size:18px">${tr.arrow}${d?` ${d}`:""}</span></div><div class="bar"><i style="width:${s}%"></i></div><div class="muted">${t} · <span class="${tr.cls}">${tr.label}</span></div></div>`;
+    return `<div class="card"><b>${n} Agent</b><div class="score">${s}/100 <span class="${tr.cls}" style="font-size:18px">${tr.arrow}${d?` ${d}`:""}</span></div><div class="bar"><i style="width:${s}%"></i></div><div class="muted">${s>=60?"איתות קנייה":s<40?"איתות מכירה":"המתנה"} · ${t} · <span class="${tr.cls}">${tr.label}</span></div></div>`;
   }).join("");
 }
 
@@ -184,126 +186,113 @@ async function cloud(action,body){
     body: body?JSON.stringify(body):undefined
   });
 }
+function acceptCloud(c){
+  const old=selectedPortfolio(),oldSymbol=$("symbol").value;
+  cloudPortfolios=c.portfolios||[];cloudSnapshots=c.snapshots||[];
+  cloudAccount=c.account||null;accountHistory=c.accountSnapshots||[];
+  closedPositions=c.closed||[];cloudMonitor=c.monitor||null;latestRotation=c.rotation||null;
+  for(const p of cloudPortfolios){if(!Array.from($("symbol").options).some(o=>o.value===p.symbol)){const o=document.createElement('option');o.value=p.symbol;o.textContent=p.symbol;$("symbol").appendChild(o);}}
+  let active=cloudPortfolios.find(p=>String(p.id)===String(latestRotation?.to_id));
+  if(old&&!cloudPortfolios.some(p=>String(p.id)===String(old.id))){
+    const records=[...cloudPortfolios,...closedPositions];
+    active=cloudPortfolios.find(p=>{let n=p;const seen=new Set();while(n?.predecessorId&&!seen.has(n.predecessorId)){if(String(n.predecessorId)===String(old.id))return true;seen.add(n.predecessorId);n=records.find(x=>String(x.id)===String(n.predecessorId));}return false;})||active||cloudPortfolios[0];
+  }else if(cloudPortfolios.some(p=>p.symbol===oldSymbol)){active=null;}
+  if(active)$("symbol").value=active.symbol;
+  if($("symbol").value!==oldSymbol){marketRequestId++;market=null;a=null;}
+  if(cloudAccount?.initialized){$("capital").value=cloudAccount.capital;$("capital").readOnly=true;}else{$("capital").readOnly=false;}
+  renderSelectedQuote();renderMonitor();setPlanUI();renderAgents();renderPaper();renderHistory();
+}
 async function syncCloud(){
-  try{
-    const c=await cloud("get");
-    cloudPortfolios=c.portfolios||(c.portfolio?[c.portfolio]:[]);
-    cloudSnapshots=c.snapshots||[];
-    cloudMonitor=c.monitor||null;
-    renderMonitor();
-    setPlanUI();
-    $("status").textContent="מסונכרן לענן";
-    renderPaper();renderHistory();
-  }catch(e){
-    $("status").textContent="עובד מקומית · הענן לא זמין";
-    throw e;
-  }
+  try{acceptCloud(await cloud("get"));$("status").textContent="מסונכרן לענן";}
+  catch(e){$("status").textContent="הענן לא זמין — מוצגים נתונים שמורים";throw e;}
 }
-async function savePortfolioCloud(p){
-  const r=await cloud("save_portfolio",p);
-  if(r.portfolio)cloudPortfolios.push(r.portfolio);
-  renderPaper();
-}
-async function saveSnapshotCloud(s){
-  const r=await cloud("save_snapshot",s);
-  cloudSnapshots=r.snapshots||cloudSnapshots;
-  renderHistory();
+async function savePortfolioCloud(p){acceptCloud(await cloud("save_portfolio",p));}
+function renderSelectedQuote(){
+  const sym=$("symbol").value,q=cloudAccount?.marks?.[sym];
+  if(!q)return;
+  $("price").textContent='$'+Number(q.price).toFixed(2);$("marketDate").textContent=q.updated_at+' UTC';
+  $("master").textContent=q.master+'/100';$("signal").textContent=q.signal||'';
+  $("fx").textContent=Number(cloudAccount.fx).toFixed(4);$("fxDate").textContent=cloudAccount.updated_at?new Date(cloudAccount.updated_at).toLocaleString('he-IL'):'';
+  $("marketSource").textContent='נתוני הסוכן · 30 דקות · המחיר ששימש לעדכון התיק';
+  const session=marketSession();$("marketState").textContent=session.label;$("marketState").className='market-badge '+(session.open?'open':'closed');
 }
 
 async function load(){
+  const requestId=++marketRequestId,symbol=$("symbol").value;
   try{
-    $("status").textContent="טוען נתונים...";
-    $("error").style.display="none";
-    const symbol=$("symbol").value,marketKey="v5_market_"+symbol,fxKey="v5_fx_usdils";
-    market=cacheGet(marketKey,CACHE_MARKET_MS);let marketFromCache=!!market;
-    if(!market){market=await fetchJson(`${APP_CONFIG.marketEndpoint}?symbol=${symbol}`);cacheSet(marketKey,market)}
-    fx=cacheGet(fxKey,CACHE_FX_MS);let fxFromCache=!!fx;
-    if(!fx){if(!marketFromCache)await sleep(1300);try{fx=await fetchJson(APP_CONFIG.fxEndpoint);cacheSet(fxKey,fx)}catch(err){const stale=cacheGet(fxKey,STALE_FX_MS);if(stale)fx=stale;else throw err}}
-    a=analyze(market.prices);
-    $("price").innerHTML=`<span class=ltr>$${a.last.toFixed(2)}</span>`;$("marketDate").textContent=market.lastRefreshed+(marketFromCache?" · שמור":"");renderMarketState(marketFromCache);
-    $("fx").textContent=Number(fx.rate).toFixed(4);$("fxDate").textContent=(fx.lastRefreshed||"")+(fxFromCache?" · שמור":"");
-    $("master").textContent=a.master+"/100";$("signal").textContent=a.signal;renderAgents();renderPaper();setPlanUI();
-    await autoSnapshot();
-    $("status").textContent="נתונים נטענו · הענן מעודכן";
-  }catch(e){$("error").textContent=shortError(e.message);$("error").style.display="block";$("status").textContent="שגיאת טעינה"}
+    $("status").textContent="טוען נתונים...";$("error").style.display="none";
+    const marketKey="v6_market_"+symbol,fxKey="v6_fx_usdils";
+    let loadedMarket=cacheGet(marketKey,CACHE_MARKET_MS),loadedFX=cacheGet(fxKey,CACHE_FX_MS);
+    const cachedMarket=!!loadedMarket,cachedFX=!!loadedFX;
+    if(!loadedMarket){loadedMarket=await fetchJson(APP_CONFIG.marketEndpoint+'?symbol='+encodeURIComponent(symbol));cacheSet(marketKey,loadedMarket);}
+    if(!loadedFX){loadedFX=await fetchJson(APP_CONFIG.fxEndpoint);cacheSet(fxKey,loadedFX);}
+    if(requestId!==marketRequestId||symbol!==$("symbol").value)return;
+    market=loadedMarket;fx=loadedFX;a=analyze(market.prices);
+    $("price").textContent='$'+a.last.toFixed(2);$("marketDate").textContent=market.lastRefreshed+(cachedMarket?' · שמור':'');renderMarketState(cachedMarket);
+    $("fx").textContent=Number(fx.rate).toFixed(4);$("fxDate").textContent=fx.lastRefreshed+(cachedFX?' · שמור':'');
+    $("master").textContent=a.master+'/100';$("signal").textContent=a.signal;
+    renderSelectedQuote();renderAgents();renderPaper();setPlanUI();$("status").textContent="נתוני הנכס נטענו";
+  }catch(e){if(requestId!==marketRequestId)return;$("error").textContent=shortError(e.message);$("error").style.display="block";$("status").textContent="שגיאת טעינה";}
 }
 
 function portfolios(){return cloudPortfolios||[]}
 function paper(){return portfolios().find(p=>p.symbol===$("symbol").value)||portfolios()[0]||null}
 function latestSnap(p){return [...snapshots()].reverse().find(x=>String(x.position_id||"")===String(p.id)||(!x.position_id&&x.symbol===p.symbol))||null}
-function positionValue(p){const selected=market&&market.symbol===p.symbol&&a;const last=latestSnap(p);const px=selected?a.last:(Number(last?.market_price)||Number(p.entryPrice));const rate=fx?Number(fx.rate):(Number(last?.fx)||Number(p.entryFX));const marketILS=Number(p.units)*px*rate;return{px,rate,marketILS,pnl:marketILS-Number(p.allocatedILS)}}
-function portfolioTotals(){const cap=Math.max(1000,+$("capital").value||100000),ps=portfolios(),used=ps.reduce((n,p)=>n+Number(p.allocatedILS||0),0),marketValue=ps.reduce((n,p)=>n+positionValue(p).marketILS,0),cash=Math.max(0,cap-used),total=cash+marketValue;return{cap,used,cash,total,pnl:total-cap}}
+function positionValue(p){
+  const q=cloudAccount?.marks?.[p.symbol],last=latestSnap(p);
+  const px=Number(q?.price??last?.market_price??p.entryPrice),rate=Number(cloudAccount?.fx??last?.fx??p.entryFX);
+  const marketILS=Number(p.units)*px*rate;return {px,rate,marketILS,pnl:marketILS-Number(p.allocatedILS)};
+}
+function portfolioTotals(){
+  const cap=cloudAccount?.initialized?Number(cloudAccount.capital):Math.max(1000,+$("capital").value||100000);
+  if(cloudAccount?.initialized)return {cap,cash:Number(cloudAccount.cash),total:Number(cloudAccount.value),pnl:Number(cloudAccount.pnl),realized:Number(cloudAccount.realized_pnl)};
+  return {cap,cash:cap,total:cap,pnl:0,realized:0};
+}
 async function openPaper(){
-  if(!market||!fx)return alert("טען שוק ומט״ח תחילה");
-  const cap=Math.max(1000,+$("capital").value||100000),chosen=$("programPlan")?.value||plan,allocation=cap*planExposure(chosen),t=portfolioTotals();
-  if(portfolios().some(p=>p.symbol===market.symbol))return alert("כבר קיימת תוכנית נייר פתוחה עבור "+market.symbol);
-  if(t.cash+0.01<allocation)return alert("אין מספיק מזומן מדומה פנוי לתוכנית נוספת");
-  const usd=allocation/fx.rate,units=usd/a.last;
-  const p={symbol:market.symbol,start:cap,allocatedILS:allocation,allocatedUSD:usd,entryFX:fx.rate,entryPrice:a.last,units,cashILS:0,date:market.lastRefreshed,plan:chosen,status:"open"};
-  await savePortfolioCloud(p);await autoSnapshot();
+  const p={symbol:$("symbol").value,start:Math.max(1000,+$("capital").value||100000),plan:$("programPlan").value||plan};
+  acceptCloud(await cloud("save_portfolio",p));
+  $("status").textContent='תוכנית נייר נשמרה בענן';
 }
 function currentValue(p){const v=positionValue(p),t=portfolioTotals();return{...v,total:t.total,pnl:t.pnl}}
 function renderPaper(){
   const ps=portfolios(),t=portfolioTotals();
+  $("cashValue").textContent=money(t.cash);$("realizedValue").textContent=money(t.realized);
+  $("accountUpdated").textContent=cloudAccount?.updated_at?"עדכון תיק: "+new Date(cloudAccount.updated_at).toLocaleString("he-IL"):"ממתין לעדכון התיק הראשון";
   $("start").textContent=money(t.cap);$("value").textContent=money(t.total);$("pnl").textContent=`${t.pnl>=0?"+":""}${money(t.pnl)} (${(t.pnl/t.cap*100).toFixed(2)}%)`;$("pnl").className=t.pnl>=0?"green":"red";
   if(!ps.length){$("position").innerHTML='<tr><td colspan="9" class="muted">אין תוכניות פתוחות בענן.</td></tr>';return}
-  $("position").innerHTML=ps.map(p=>{const v=positionValue(p),pe=p.plan==="ai_dynamic"?aiTargetExposure((latestSnap(p)?.score)??(market?.symbol===p.symbol?a?.master:50)):(exp[p.plan]||.5);return `<tr><td>${p.symbol}</td><td>${names[p.plan]||p.plan||"—"}</td><td>${Math.round(pe*100)}%</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
+  $("position").innerHTML=ps.map(p=>{const v=positionValue(p),pe=p.plan==="ai_dynamic"?aiTargetExposure((latestSnap(p)?.score)??(market?.symbol===p.symbol?a?.master:50)):(exp[p.plan]||.5);return `<tr><td><b>${p.symbol}</b>${p.predecessorId?'<div class="muted">נפתח במעבר אוטומטי</div>':''}</td><td>${names[p.plan]||p.plan||"—"}</td><td>${Math.round(pe*100)}%</td><td>${money(p.allocatedILS)}</td><td><span class=ltr>$${Number(p.allocatedUSD).toFixed(2)}</span></td><td>${Number(p.entryFX).toFixed(4)}</td><td><span class=ltr>$${Number(p.entryPrice).toFixed(2)}</span></td><td><span class="ltr ${v.px>=Number(p.entryPrice)?"green":"red"}">$${Number(v.px).toFixed(2)}</span></td><td><span class=ltr>${Number(p.units).toFixed(4)}</span></td><td>${money(v.marketILS)}</td><td class="${v.pnl>=0?"green":"red"}">${v.pnl>=0?"+":""}${money(v.pnl)}</td></tr>`}).join("");
 }
 function snapshots(){return cloudSnapshots||[]}
-function aiSnapshotFields(p){
-  if(!a)return{};
-  return{
-    market_score:a.marketS,trend_score:a.trend,risk_score:a.risk,momentum_score:a.mom,
-    recommendation:a.signal,plan:p?.plan||plan,
-    target_exposure:(p?.plan==="ai_dynamic"?aiTargetExposure(a.master):(exp[p?.plan]||.5)),
-    actual_exposure:(Number(p?.start)>0?Number(p?.allocatedILS)/Number(p.start):null),
-    ai_action:(p?.plan==="ai_dynamic"?(aiTargetExposure(a.master)>(Number(p?.allocatedILS)/Number(p?.start)+.02)?"הגדלת חשיפה":aiTargetExposure(a.master)<(Number(p?.allocatedILS)/Number(p?.start)-.02)?"הקטנת חשיפה":"ללא שינוי"):"מסלול קבוע")
-  };
-}
-async function autoSnapshot(){
-  const p=portfolios().find(x=>x.symbol===market?.symbol);if(!p||p.status==="closed"||!market||!fx||!a)return;
-  const v=currentValue(p),pv=positionValue(p),stamp=market.lastRefreshed,key=`${p.id||p.symbol}-${p.symbol}-${stamp}`;
-  if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){renderHistory();return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:true,...aiSnapshotFields(p)});
-}
 async function snapshot(){
-  let p=portfolios().find(x=>x.symbol===market?.symbol);if(!p||!market||!fx||!a)return alert("יש לבחור תוכנית פתוחה ולטעון נתונים");
-  let v=currentValue(p),pv=positionValue(p),stamp=market.lastRefreshed,key=`${p.id||p.symbol}-${p.symbol}-${stamp}`;
-  if(snapshots().some(x=>x.snapshot_key===key||x.key===key)){$("status").textContent="Snapshot להיום כבר קיים";return}
-  await saveSnapshotCloud({snapshot_key:key,date:stamp,symbol:p.symbol,position_id:String(p.id||""),position_value:pv.marketILS,position_pnl:pv.pnl,value:v.total,pnl:v.pnl,fx:fx.rate,score:a.master,market_price:a.last,auto:false,...aiSnapshotFields(p)});
-  $("status").textContent="Snapshot נשמר בענן";
+  acceptCloud(await cloud("account_snapshot",{}));$("status").textContent="צילום מצב התיק כולו נשמר בענן";
 }
+
 function snapValue(x){return x?.position_value!=null?Number(x.position_value):Number(x?.value)}
 function snapPnl(x){return x?.position_pnl!=null?Number(x.position_pnl):Number(x?.pnl)}
 function renderHistory(){
-  let s=snapshots();$("snapCount").textContent=s.length+" Snapshots";
-  $("journal").innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{const sv=snapValue(x),sp=snapPnl(x);return `<tr><td>${x.date}</td><td>${x.symbol}</td><td>${money(sv)}</td><td class="${sp>=0?"green":"red"}">${sp>=0?"+":""}${money(sp)}</td><td>${Number(x.fx).toFixed(4)}</td><td>${x.score}/100</td></tr>`}).join(""):'<tr><td colspan="6" class="muted">אין Snapshots בענן.</td></tr>';
-  const decision=$("decisionJournal");
-  if(decision)decision.innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{
-    const rec=x.recommendation||"—",cls=/חיובי/.test(rec)?"green":/שלילי|זהירות/.test(rec)?"red":"yellow";
-    const score=v=>v==null?"—":`${v}/100`;
-    const act=x.ai_action||"—",actCls=/קנייה|הגדלת/.test(act)?"green":/מכירה|הקטנת/.test(act)?"red":"yellow";
-    return `<tr><td>${x.date}</td><td>${x.symbol}</td><td class="${cls}">${rec}</td><td>${x.score??"—"}/100</td><td>${score(x.market_score)}</td><td>${score(x.trend_score)}</td><td>${score(x.risk_score)}</td><td>${score(x.momentum_score)}</td><td>${names[x.plan]||x.plan||"—"}</td><td class="${actCls}">${act}</td><td>${x.auto?"אוטומטי":"ידני"}</td></tr>`;
-  }).join(""):'<tr><td colspan="11" class="muted">היסטוריית החלטות AI תתחיל מה-Snapshot הבא.</td></tr>';
-  const sym=$("symbol")?.value;
-  const chartRows=s.filter(x=>x.symbol===sym && (x.position_id||String(x.snapshot_key||"").startsWith("monitor-")));
-  if(chartRows.length>1){let first=snapValue(chartRows[0]),last=snapValue(chartRows.at(-1)),r=(last/first-1)*100;$("performanceText").textContent=`${sym}: שינוי בין Snapshot ראשון לאחרון: ${r>=0?"+":""}${r.toFixed(2)}%`}else{$("performanceText").textContent="ה-Snapshots נשמרים בענן ומופיעים בכל מכשיר."}
-  draw(chartRows);
-  renderMonitor();
+  const s=snapshots();$("snapCount").textContent=accountHistory.length+" עדכוני תיק";
+  $("journal").innerHTML=accountHistory.length?[...accountHistory].reverse().slice(0,20).map(x=>    '<tr><td>'+new Date(x.created_at).toLocaleString('he-IL')+'</td><td>'+escapeHTML((x.symbols||[]).join(' + ')||'מזומן')+'</td><td>'+money(x.value)+'</td><td class="'+(x.pnl>=0?'green':'red')+'">'+money(x.pnl)+'</td><td>'+Number(x.fx).toFixed(4)+'</td><td>'+escapeHTML(x.reason)+'</td></tr>'  ).join(''):'<tr><td colspan="6" class="muted">היסטוריית התיק הכולל תתחיל מהעדכון הבא. החלטות קודמות נשמרו ביומן ההחלטות.</td></tr>';
+  $("decisionJournal").innerHTML=s.length?[...s].reverse().slice(0,30).map(x=>{
+    const score=v=>v==null?'—':v+'/100';
+    return '<tr><td>'+new Date(x.created_at||x.date).toLocaleString('he-IL')+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.recommendation||'—')+'</td><td>'+score(x.score)+'</td><td>'+score(x.market_score)+'</td><td>'+score(x.trend_score)+'</td><td>'+score(x.risk_score)+'</td><td>'+score(x.momentum_score)+'</td><td>'+escapeHTML(names[x.plan]||x.plan||'—')+'</td><td>'+escapeHTML(x.ai_action||'—')+'</td><td>'+(x.auto?'אוטומטי':'ידני')+'</td></tr>';
+  }).join(''):'<tr><td colspan="11" class="muted">אין החלטות מתועדות.</td></tr>';
+  $("closedPositions").innerHTML=closedPositions.length?closedPositions.map(p=>'<tr><td>'+escapeHTML(p.symbol)+'</td><td>'+new Date(p.closedAt).toLocaleString('he-IL')+'</td><td>'+Number(p.closedUnits).toFixed(4)+'</td><td>'+money(p.closedValue)+'</td><td class="'+(p.realizedPnl>=0?'green':'red')+'">'+money(p.realizedPnl)+'</td></tr>').join(''):'<tr><td colspan="5" class="muted">אין עדיין תוכניות שנסגרו עם רישום מימוש.</td></tr>';
+  $("performanceText").textContent=accountHistory.length?'שווי התיק הכולל לאורך זמן — מזומן וכל ההחזקות, כולל רווח והפסד מתוכניות שנסגרו. מעבר מניה אינו מאפס את הגרף.':'ממתין לעדכון תיק. ההיסטוריה הישנה לכל נכס נשארת ביומן ההחלטות.';
+  draw(accountHistory);renderMonitor();
 }
-function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(snapValue).filter(Number.isFinite),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
+
+function draw(s){let c=$("chart"),r=c.getBoundingClientRect(),d=devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;let x=c.getContext("2d");x.scale(d,d);x.clearRect(0,0,r.width,r.height);if(s.length<2){x.fillStyle="#9eb5ca";x.font="14px Arial";x.fillText("נדרשים לפחות שני Snapshots להצגת גרף",20,40);return}let vals=s.map(x=>Number(x.value)).filter(Number.isFinite),mn=Math.min(...vals),mx=Math.max(...vals),sp=Math.max(1,mx-mn);x.strokeStyle="#39b4ff";x.lineWidth=2.5;x.beginPath();vals.forEach((v,i)=>{let px=15+(r.width-30)*i/(vals.length-1),py=15+(r.height-30)*(1-(v-mn)/sp);i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke()}
 async function saveSelectedPlan(){
   const p=selectedPortfolio();if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");
-  const newPlan=$("programPlan").value;
-  await cloud("update_plan",{id:p.id,plan:newPlan});p.plan=newPlan;plan=newPlan;renderPaper();setPlanUI();
-  $("status").textContent=`המסלול של ${p.symbol} עודכן ל-${names[newPlan]||newPlan}`;
+  acceptCloud(await cloud("update_plan",{id:p.id,plan:$("programPlan").value}));
+  $("status").textContent="המסלול עודכן";
 }
-async function closeP(){const p=portfolios().find(x=>x.symbol===$("symbol").value);if(!p)return alert("בחר נכס שיש לו תוכנית פתוחה");if(!confirm(`לסגור את תוכנית הנייר ${p.symbol}?`))return;await cloud("close_portfolio",{id:p.id,closed_at:new Date().toISOString()});cloudPortfolios=portfolios().filter(x=>x.id!==p.id);renderPaper()}
-async function resetAll(){if(!confirm("לאפס את התיק הווירטואלי ואת כל ה-Snapshots בענן?"))return;await cloud("reset",{});cloudPortfolios=[];cloudSnapshots=[];renderPaper();renderHistory();$("status").textContent="הסימולציה אופסה בענן"}
+async function closeP(){const p=selectedPortfolio();if(!p)return alert("בחר תוכנית פתוחה");if(!confirm('לסגור את תוכנית הנייר '+p.symbol+'?'))return;acceptCloud(await cloud('close_portfolio',{id:p.id}));}
+async function resetAll(){if(!confirm("לאפס את כל הסימולציה וההיסטוריה?"))return;acceptCloud(await cloud("reset",{}));marketRequestId++;market=null;a=null;$("status").textContent="הסימולציה אופסה בענן";}
 
 $("symbol").onchange=()=>{
   // Keep every top card and agent score synchronized with the selected asset.
-  market=null; a=null;
+  marketRequestId++;market=null; a=null;$("price").textContent="—";$("master").textContent="—";$("signal").textContent="";$("agents").innerHTML="";
   renderPaper(); setPlanUI(); renderHistory();
   load().catch(e=>{console.error(e); $("status").textContent="שגיאת טעינה"});
 };
@@ -317,5 +306,7 @@ $("programPlan").onchange=()=>{
 $("scanNow")&&($("scanNow").onclick=()=>loadScanner(true));
 $("savePlan").onclick=()=>saveSelectedPlan().catch(e=>alert(shortError(e.message)));
 $("load").onclick=load;$("open").onclick=()=>openPaper().catch(e=>alert(shortError(e.message)));$("snapshot").onclick=()=>snapshot().catch(e=>alert(shortError(e.message)));$("close").onclick=()=>closeP().catch(e=>alert(shortError(e.message)));$("reset").onclick=()=>resetAll().catch(e=>alert(shortError(e.message)));
-window.addEventListener("resize",()=>draw(snapshots()));
+window.addEventListener("resize",()=>draw(accountHistory));
 syncCloud().catch(()=>{});startLive();loadScanner(false);
+setInterval(()=>{syncCloud().catch(()=>{});},60000);
+setInterval(()=>loadScanner(false),60000);
