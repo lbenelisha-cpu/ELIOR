@@ -1,3 +1,4 @@
+import {contractAudit,exportContracts} from '../../lib/atrade-contracts.mjs';
 import {timingSafeEqual} from 'node:crypto';
 // Keep diagnostics limited to HTTP/database codes; never return SQL messages or credentials.
 async function db(path,options={}){
@@ -26,7 +27,9 @@ export async function handler(e){
    stage='ingest';state=await db('rpc/atrade_ingest_market',{method:'POST',body:JSON.stringify({p_batch:batch})});
   }else {stage='read-state';state=(await db('atrade_market_state?id=eq.1&select=*'))[0];}
   if(state){state={...state,totalAvailable:state.total_available};}
+  if(e.httpMethod==='GET'&&e.queryStringParameters?.action==='contracts')return reply(200,exportContracts(state?.items));
   stage='analyze';const analysis=analyzeMarket(state);
+  const contracts=contractAudit(state?.items);
   // Only authenticated collector uploads can create a vote. A browser refresh never does.
   if(e.httpMethod==='POST'&&analysis.complete&&analysis.candidates.length){
    const top=analysis.candidates[0];
@@ -35,6 +38,6 @@ export async function handler(e){
   stage='read-scans';const scans=await db('atrade_market_scans?select=*&order=bar_time.desc&limit=10');
   const leader=confirmation(scans);
   if(!analysis.complete||Number(scans[0]?.bar_time)!==analysis.barTime||scans[0]?.universe_id!==analysis.universeId)leader.verified=false;
-  return reply(200,{...analysis,leader,history:scans,executionEnabled:false,notice:'ניתוח מחירי אטרייד בלבד. מעבר בתיק הכספי ממתין לאימות מפרטי החוזים והעלויות; אין פקודות לברוקר.'});
+  return reply(200,{...analysis,contracts,leader,history:scans,executionEnabled:false,notice:'ניתוח מחירי אטרייד בלבד. מעבר בתיק הכספי ממתין לאימות מפרטי החוזים והעלויות; אין פקודות לברוקר.'});
  }catch(e){const code=e.diagnostic||'PROCESSING_ERROR';return reply(503,{error:'תקלה בחיבור נתוני אטרייד: '+stage+' / '+code+' / project: '+projectRef(),diagnostic:{stage,code,project:projectRef()},version:'market-diagnostics-3'});}
 }
