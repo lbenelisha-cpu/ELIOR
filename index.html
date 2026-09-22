@@ -7,7 +7,7 @@
 .active-portfolios{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.active-portfolio{border:1px solid #36d99a;background:#0c3328;color:#53e6ae;border-radius:12px;padding:12px 16px}.active-portfolio strong{font-size:18px}.active-portfolio small{display:block;margin-top:6px;color:#c2e6d8}.active-label{display:block;color:#53e6ae;font-size:12px;margin-top:5px}
 </style></head><body><main>
 <div class="top"><div><h1>AI Investment Lab · V6.3 Cloud</h1><div class="muted">תיק נייר · המרת USD/ILS · סנכרון ענן</div></div><div id="status" class="status">ממתין לנתונים</div></div><div id="error" class="error"></div><div id="deploymentNotice" class="note" style="display:none"></div>
-<div class="grid controls"><select id="symbol"><option>SPY</option><option>QQQ</option><option>DIA</option><option>IWM</option><option>AAPL</option><option>MSFT</option><option>NVDA</option><option>AMZN</option></select><input id="capital" type="number" value="100000"><button id="load">טען שוק + מט"ח</button></div>
+<div class="grid controls"><select id="symbol"><option>SPY</option><option>QQQ</option><option>DIA</option><option>IWM</option><option>AAPL</option><option>MSFT</option><option>NVDA</option><option>AMZN</option><option>GOOGL</option><option>META</option><option>TSLA</option><option>JPM</option><option>GLD</option><option>SLV</option><option>USO</option><option>DBA</option><option>TLT</option><option>IEF</option><option>VNQ</option><option>EFA</option><option>EEM</option><option>UUP</option><option>IBIT</option><option>ETHA</option></select><input id="capital" type="number" value="100000"><button id="load">טען שוק + מט"ח</button></div>
 <p id="accountUpdated" class="muted">ממתין לעדכון התיק הראשון</p><section class="grid kpis">
 <div class="card"><div class="label">הון התחלתי</div><div id="start" class="big">₪100,000</div></div>
 <div class="card"><div class="label">שווי תיק</div><div id="value" class="big">₪100,000</div><div id="pnl" class="muted">—</div></div>
@@ -42,7 +42,7 @@
   <div class="card">
     <div class="label">סריקה אחרונה</div>
     <div id="scannerUpdated" class="big">—</div>
-    <p class="muted">Watchlist: SPY, QQQ, DIA, IWM, AAPL, MSFT, NVDA, AMZN. תוצאת הסריקה נשמרת במטמון עד 30 דקות כדי לחסוך קריאות API.</p>
+    <p class="muted">24 נכסים לניתוח: מניות, מדדים וקרנות לחשיפה לזהב, כסף, סחורות, אג״ח, נדל״ן, שווקים בינלאומיים, דולר וקריפטו. חשיפת קריפטו וסחורות היא דרך קרנות בארה״ב ובשעות המסחר שלהן. מעבר מתבצע רק לפי כללי הסוכן והגדרות התוכנית; איסוף נתונים עשוי להימשך כמה הרצות.</p>
   </div>
 </section>
 <section class="card table">

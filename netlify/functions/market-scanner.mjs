@@ -5,7 +5,7 @@ export async function handler(){
  try{
   // Reuse the scheduled scan: viewing recommendations never counts as a new vote.
   const saved=await db('paper_rotation_scans?select=*&order=slot.desc&limit=24').catch(()=>[]);
-  if(saved.length&&Date.now()-Date.parse(saved[0].slot)<35*60000){
+  if(saved.length&&WATCHLIST.every(symbol=>Number.isFinite(saved[0].candidates?.[symbol]?.master))&&Date.now()-Date.parse(saved[0].slot)<35*60000){
    const row=saved[0],candidates=WATCHLIST.map(symbol=>({symbol,name:symbol,...row.candidates[symbol]})).sort((a,b)=>b.master-a.master||a.symbol.localeCompare(b.symbol));
    let count=0;const seen=new Set();
    for(let i=0;i<Math.min(3,saved.length);i++){
