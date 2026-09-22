@@ -10,6 +10,7 @@ async function db(path,options={}){
  return d;
 }
 import {validateMarket,analyzeMarket,confirmation} from '../../lib/atrade-market.mjs';
+function projectRef(){try{const host=new URL((process.env.SUPABASE_URL||'').trim()).hostname;const match=host.match(/^([a-z0-9]{20})\.supabase\.co$/);return match?match[1]:'custom-or-invalid-host';}catch{return 'invalid-url';}}
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 function authorized(e){const expected=process.env[e.httpMethod==='GET'?'MT4_DEMO_READ_TOKEN':'MT4_DEMO_WRITE_TOKEN'];const actual=(e.headers?.authorization||e.headers?.Authorization||'').replace(/^Bearer /,'');if(!expected||expected.length<32)return false;const a=Buffer.from(actual),b=Buffer.from(expected);return a.length===b.length&&timingSafeEqual(a,b);}
 export async function handler(e){
@@ -35,5 +36,5 @@ export async function handler(e){
   const leader=confirmation(scans);
   if(!analysis.complete||Number(scans[0]?.bar_time)!==analysis.barTime||scans[0]?.universe_id!==analysis.universeId)leader.verified=false;
   return reply(200,{...analysis,leader,history:scans,executionEnabled:false,notice:'ניתוח מחירי אטרייד בלבד. מעבר בתיק הכספי ממתין לאימות מפרטי החוזים והעלויות; אין פקודות לברוקר.'});
- }catch(e){const code=e.diagnostic||'PROCESSING_ERROR';return reply(503,{error:'תקלה בחיבור נתוני אטרייד: '+stage+' / '+code,diagnostic:{stage,code},version:'market-diagnostics-2'});}
+ }catch(e){const code=e.diagnostic||'PROCESSING_ERROR';return reply(503,{error:'תקלה בחיבור נתוני אטרייד: '+stage+' / '+code+' / project: '+projectRef(),diagnostic:{stage,code,project:projectRef()},version:'market-diagnostics-3'});}
 }
