@@ -1,0 +1,11 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>אטרייד · ניתוח נכסים</title>
+<style>body{margin:0;background:#071625;color:#edf5ff;font:17px Arial}main{max-width:1200px;margin:auto;padding:24px}a{color:#63cfff}h1{margin-bottom:12px}section{background:#112c43;padding:20px;border-radius:16px;margin:18px 0}input,button{font:inherit;padding:12px;border-radius:8px;margin:4px}button{background:#55c8ff;border:0;cursor:pointer}input{max-width:80%}.muted{color:#adc7dd}.warn{color:#ffd16d}.scroll{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:right;border-bottom:1px solid #345169}#status{min-height:24px}.controls{display:flex;flex-wrap:wrap;align-items:center}</style></head>
+<body><main><a href="/">תיק הסימולציה</a> · <a href="/mt4-demo.html">מצב חשבון MT4</a><h1>אטרייד · ניתוח נכסים מהברוקר</h1>
+<p>מבחר הנכסים נקרא מ־MT4. הניתוח משתמש במגמה, מומנטום, תנודתיות ושינויי מחיר, בדומה לסוכנים הקיימים.</p>
+<p class="warn">שלב אימות נתונים: אין ביצוע עסקאות ואין שינוי בתיק הכספי. בחירת מועמד אינה אישור שמפרט החוזה והעלויות אומתו.</p>
+<div class="controls"><label>מפתח צפייה <input id="key" type="password" autocomplete="off"></label><button id="connect">התחבר לניתוח</button><button id="disconnect">נתק</button></div><p id="status" role="status">ממתין לחיבור</p>
+<section id="summary">הזן את מפתח הקריאה הקיים של MT4.</section>
+<section><h2>נכסים שנותחו</h2><label>סינון לפי שם או סמל <input id="filter" type="search"></label><div class="scroll"><table><thead><tr><th>נכס</th><th>תיאור הברוקר</th><th>ציון משוקלל</th><th>שוק</th><th>מגמה</th><th>סיכון</th><th>מומנטום</th><th>מרווח %</th></tr></thead><tbody id="candidates"></tbody></table></div></section>
+<section><h2>אימות מועמדים · 10 סריקות אחרונות</h2><p>נדרשות 3 סריקות חצי־שעתיות רצופות, על נרות סגורים שונים ובאותו מבחר זמין, עם ציון 60 לפחות. מעבר עתידי דורש גם יתרון של 10 נקודות על הנכס המוחזק.</p><div id="history"></div></section>
+<section><h2>נכסים שממתינים לנתונים</h2><p class="muted">נכס ללא מחיר טרי, היסטוריה מספקת או מפרט חוזה אינו משתתף בדירוג. שוק סגור עשוי להופיע כאן.</p><div id="blocked"></div></section>
+<script src="/atrade-market.js"></script></main></body></html>
