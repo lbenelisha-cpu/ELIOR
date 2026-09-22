@@ -94,8 +94,8 @@ function renderScanner(){
   const body=$("scannerBody"),stamp=$("scannerUpdated"),best=$("scannerBest");
   if(!body)return;
   const rows=scannerData?.candidates||[];
-  const history=scannerData?.history||[],historyBody=$("scanHistory"),explanation=$("scanExplanation");
-  if(explanation)explanation.textContent='מוצגות עד 24 סריקות סוכן שמורות. תצוגות ביניים מנתונים חלקיים אינן נשמרות כסריקת סוכן, ולכן לא תמיד ניתן לשחזר שינוי שנראה לפני דקות אחדות. מעבר אוטומטי דורש גם 3 אישורים רצופים, ציון של לפחות 60 ויתרון של 10 נקודות, בהתאם להגדרות התיק.';
+  const history=(scannerData?.history||[]).slice(0,10),historyBody=$("scanHistory"),explanation=$("scanExplanation");
+  if(explanation)explanation.textContent='מוצגות עד 10 סריקות סוכן שמורות. תצוגות ביניים מנתונים חלקיים אינן נשמרות כסריקת סוכן, ולכן לא תמיד ניתן לשחזר שינוי שנראה לפני דקות אחדות. מעבר אוטומטי דורש גם 3 אישורים רצופים, ציון של לפחות 60 ויתרון של 10 נקודות, בהתאם להגדרות התיק.';
   if(historyBody)historyBody.innerHTML=history.length?history.map(x=>'<tr><td>'+escapeHTML(new Date(x.time).toLocaleString('he-IL'))+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.score)+'/100</td><td>'+['market','trend','risk','momentum'].map(k=>k+': '+(x[k]??'—')).map(escapeHTML).join(' · ')+'</td><td style="white-space:normal;min-width:260px">'+escapeHTML(x.reason)+'</td></tr>').join(''):'<tr><td colspan="5">אין עדיין סריקות שמורות להסבר. לא ניתן לקבוע בדיעבד מדוע השתנתה תצוגה שלא נשמרה.</td></tr>';
   if(!rows.length){
     body.innerHTML='<tr><td colspan="9" class="muted">ממתין לסריקת מועמדים.</td></tr>';
@@ -226,6 +226,7 @@ function acceptCloud(c){
   cloudPortfolios=c.portfolios||[];cloudSnapshots=c.snapshots||[];
   compatibilityMode=!c.account;
   automationSettingsSupported=c.apiVersion==='6.2'&&c.capabilities?.automationSettings===true&&cloudPortfolios.every(p=>typeof p.autoRebalance==='boolean'&&typeof p.autoRotate==='boolean');
+  renderBenchmark(c.comparison);
   cloudAccount=c.account||null;accountHistory=c.accountSnapshots||[];
   if(cloudPortfolios.length&&(!cloudAccount?.initialized||!cloudAccount?.updated_at||!Object.keys(cloudAccount?.marks||{}).length))cloudAccount=legacyAccount(c);
   const notice=$("deploymentNotice");if(notice){notice.textContent=compatibilityMode?'ההחזקות והיומן הישן נטענו. שירות הענן אינו מחזיר את נתוני V6: יש לפרוס גם את Netlify Functions המעודכנות. הסיכום מחושב מנתוני העבר עד להשלמת הפריסה.':'';if(!compatibilityMode&&!automationSettingsSupported)notice.textContent='הנתונים נשמרו. להפעלת האוטומציה בכל המסלולים יש לעדכן גם את ה־SQL וגם את Netlify Functions לגרסה 6.2.';notice.style.display=compatibilityMode||!automationSettingsSupported?'block':'none';}
@@ -325,8 +326,8 @@ function renderHistory(){
   const legacy=mode&&mode.value!=='auto'?mode.value==='legacy':!accountHistory.length;
   const displayed=legacy?legacyHistory():accountHistory;chartData=displayed;
   $("snapCount").textContent=displayed.length+(legacy?' רשומות נכס מהיומן הקיים':' עדכוני תיק');
-  $("journal").innerHTML=displayed.length?[...displayed].reverse().slice(0,20).map(x=>    '<tr><td>'+new Date(x.created_at).toLocaleString('he-IL')+'</td><td>'+escapeHTML((x.symbols||[]).join(' + ')||'מזומן')+'</td><td>'+money(x.value)+'</td><td class="'+(x.pnl>=0?'green':'red')+'">'+money(x.pnl)+'</td><td>'+Number(x.fx).toFixed(4)+'</td><td>'+escapeHTML(x.reason)+'</td></tr>'  ).join(''):'<tr><td colspan="6" class="muted">היסטוריית התיק הכולל תתחיל מהעדכון הבא. החלטות קודמות נשמרו ביומן ההחלטות.</td></tr>';
-  $("decisionJournal").innerHTML=s.length?[...s].reverse().slice(0,30).map(x=>{
+  $("journal").innerHTML=displayed.length?[...displayed].reverse().slice(0,10).map(x=>    '<tr><td>'+new Date(x.created_at).toLocaleString('he-IL')+'</td><td>'+escapeHTML((x.symbols||[]).join(' + ')||'מזומן')+'</td><td>'+money(x.value)+'</td><td class="'+(x.pnl>=0?'green':'red')+'">'+money(x.pnl)+'</td><td>'+Number(x.fx).toFixed(4)+'</td><td>'+escapeHTML(x.reason)+'</td></tr>'  ).join(''):'<tr><td colspan="6" class="muted">היסטוריית התיק הכולל תתחיל מהעדכון הבא. החלטות קודמות נשמרו ביומן ההחלטות.</td></tr>';
+  $("decisionJournal").innerHTML=s.length?[...s].reverse().slice(0,10).map(x=>{
     const score=v=>v==null?'—':v+'/100';
     return '<tr><td>'+new Date(x.created_at||x.date).toLocaleString('he-IL')+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.recommendation||'—')+'</td><td>'+score(x.score)+'</td><td>'+score(x.market_score)+'</td><td>'+score(x.trend_score)+'</td><td>'+score(x.risk_score)+'</td><td>'+score(x.momentum_score)+'</td><td>'+escapeHTML(names[x.plan]||x.plan||'—')+'</td><td>'+escapeHTML(x.ai_action||'—')+'</td><td>'+(x.auto?'אוטומטי':'ידני')+'</td></tr>';
   }).join(''):'<tr><td colspan="11" class="muted">אין החלטות מתועדות.</td></tr>';
@@ -362,3 +363,13 @@ window.addEventListener("resize",()=>draw(chartData));
 syncCloud().catch(()=>{});startLive();loadScanner(false);
 setInterval(()=>{syncCloud().catch(()=>{});},60000);
 setInterval(()=>loadScanner(false),60000);
+function renderBenchmark(b){
+ const root=$('benchmark');if(!root)return;
+ if(!b?.available){root.textContent=b?.reason||'ממתין לעדכון שירות הענן להשוואה';return;}
+ const pct=n=>(n>=0?'+':'')+Number(n).toFixed(2)+'%';
+ root.innerHTML='<p>תקופת ההשוואה: '+escapeHTML(new Date(b.start).toLocaleString('he-IL'))+' — '+escapeHTML(new Date(b.end).toLocaleString('he-IL'))+'</p><div class="grid livegrid">'+
+ '<div class="card">תשואת הסוכנים באותה תקופה<div class="big">'+pct(b.portfolioReturn)+'</div>'+money(b.portfolioValue)+'</div>'+
+ '<div class="card">תיק ההשוואה<div class="big">'+pct(b.benchmarkReturn)+'</div>'+money(b.benchmarkValue)+'</div>'+
+ '<div class="card">פער מול ההשוואה<div class="big '+(b.excessPoints>=0?'green':'red')+'">'+(b.excessPoints>=0?'+':'')+Number(b.excessPoints).toFixed(2)+' נקודות אחוז</div></div></div>'+
+ '<p class="muted">שני התיקים מתחילים מאותו שווי: '+money(b.initial)+'. תיק ההשוואה קונה 50% SPY ו־50% QQQ בתחילת התקופה ומחזיק ללא איזון מחדש. החישוב בשקלים, כולל שינוי דולר/שקל, ללא דיבידנדים, עמלות והחלקת מחיר. תאריך הבסיס קבוע במסד הנתונים ואינו משתנה בבחירת מניה או ברענון. התשואה כאן עשויה להיות שונה מהתשואה מול ההון המקורי.</p>';
+}
