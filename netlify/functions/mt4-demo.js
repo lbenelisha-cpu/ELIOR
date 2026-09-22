@@ -3,12 +3,15 @@ import {db} from '../../lib/agent.mjs';
 const response=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify(data)});
 function matches(a,b){if(!a||!b||b.length<32)return false;const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);}
 export function validate(d){
- if(d.mode!=='demo'||String(d.account)!==process.env.MT4_DEMO_ACCOUNT||d.server!==process.env.MT4_DEMO_SERVER)throw Error('Unexpected demo account or server');
+ if(!d||String(d.account)!==process.env.MT4_DEMO_ACCOUNT||d.server!==process.env.MT4_DEMO_SERVER)throw Error('Unexpected account or server');
+ const exception=d.mode==='real'&&d.tradeMode===2&&d.isDemo===false&&String(d.account)==='23091074'&&d.server==='Ava-Demo';
+ const demo=d.mode==='demo'&&(d.tradeMode===undefined||d.tradeMode===0)&&(d.isDemo===undefined||d.isDemo===true);
+ if(!demo&&!exception)throw Error('Unsupported account classification');
  if(!/^[A-Z]{3}$/.test(d.currency))throw Error('Invalid currency');
  for(const k of ['balance','equity','profit','margin','freeMargin'])if(typeof d[k]!=='number'||!Number.isFinite(d[k]))throw Error('Invalid '+k);
  if(!Array.isArray(d.positions)||d.positions.length>300)throw Error('Invalid positions');
  const positions=d.positions.map(p=>{if(!Number.isInteger(p.ticket)||typeof p.symbol!=='string'||p.symbol.length>40||!['buy','sell','pending'].includes(p.side))throw Error('Invalid position');for(const k of ['lots','openPrice','profit','swap','commission'])if(typeof p[k]!=='number'||!Number.isFinite(p[k]))throw Error('Invalid position number');return {ticket:p.ticket,symbol:p.symbol,side:p.side,lots:p.lots,openPrice:p.openPrice,profit:p.profit,swap:p.swap,commission:p.commission};});
- return {mode:'demo',account:String(d.account),server:d.server,currency:d.currency,balance:d.balance,equity:d.equity,profit:d.profit,margin:d.margin,freeMargin:d.freeMargin,positions};
+ return {mode:d.mode,tradeMode:exception?2:0,isDemo:!exception,classification:exception?'broker-demo-mt4-real':'mt4-demo',readOnly:true,account:String(d.account),server:d.server,currency:d.currency,balance:d.balance,equity:d.equity,profit:d.profit,margin:d.margin,freeMargin:d.freeMargin,positions};
 }
 export async function handler(e){
  if(!['GET','POST'].includes(e.httpMethod))return response(405,{error:'Method not allowed'});
