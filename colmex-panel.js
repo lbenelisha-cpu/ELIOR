@@ -1,8 +1,8 @@
 (() => {
  const root=document.getElementById('colmex-panel');if(!root)return;
  root.innerHTML=`<h2>קולמקס · נכסים לניתוח</h2><p>נתונים ישירות מ־MT4. הסוכנים מדרגים לפי נרות חצי־שעתיים סגורים; מצב הביצוע והעסקאות בדמו מופיעים בנפרד מהדירוג הכללי.</p>
- <div id="colmex-execution-state"><p>התחבר להצגת מצב שתי תוכניות הדמו.</p></div><div class="actions"><label for="colmex-key">מפתח צפייה של קולמקס </label><input id="colmex-key" type="password" autocomplete="off"><button id="colmex-connect" type="button">התחבר לקולמקס</button><button id="colmex-disconnect" type="button" class="secondary">נתק</button><button id="colmex-export" type="button" class="secondary" disabled>הורד מפרטי חוזים לבדיקה</button></div>
- <p id="colmex-status" role="status">ממתין לחיבור באמצעות מפתח הקריאה של קולמקס.</p><div id="colmex-summary"></div>
+ <div id="colmex-execution-state"><p>התחבר להצגת מצב שתי תוכניות הדמו.</p></div><details class="connection-settings" open><summary>הגדרות חיבור</summary><div class="actions"><label for="colmex-key">מפתח צפייה של קולמקס </label><input id="colmex-key" type="password" autocomplete="off"><button id="colmex-connect" type="button">התחבר לקולמקס</button><button id="colmex-disconnect" type="button" class="secondary">נתק</button><button id="colmex-export" type="button" class="secondary" disabled>הורד מפרטי חוזים לבדיקה</button></div>
+ </details><p id="colmex-status" role="status">ממתין לחיבור באמצעות מפתח הקריאה של קולמקס.</p><div id="colmex-summary"></div>
  <p class="yellow">אימות מועמד לניתוח אינו מאמת את עלויות החוזה. לביצוע נדרשים נכס שמתאים לתקציב, נתונים עדכניים ו־3 אימותים; מעבר דורש יתרון של 10 נקודות. הדירוג הכללי עשוי לכלול נכסים שאינם כשירים לביצוע.</p>
  <label for="colmex-filter">חיפוש נכס </label><input id="colmex-filter" type="search" placeholder="שם או סמל אצל הברוקר">
  <div class="table"><table><thead><tr><th>נכס</th><th>תיאור</th><th>ציון</th><th>שוק / מגמה / סיכון / מומנטום</th><th>מרווח %</th><th>בדיקת חוזה</th></tr></thead><tbody id="colmex-rows"></tbody></table></div>
@@ -27,7 +27,7 @@
  async function refresh(){
   if(!token||controller)return;const g=generation,c=new AbortController();controller=c;const timeout=setTimeout(()=>c.abort(),20000);
   try{const r=await fetch('/.netlify/functions/colmex-market',{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:c.signal});const d=await r.json();if(g!==generation)return;if(!r.ok)throw Error(d.error||'לא ניתן לקרוא נתונים');
-   data=d;render();el('export').disabled=false;window.ColmexExecutionUI?.refresh(token);
+   data=d;root.querySelector('.connection-settings').open=false;render();el('export').disabled=false;window.ColmexExecutionUI?.refresh(token,data);
    el('status').textContent=d.complete?'התקבל מחזור איסוף לכל הנכסים':'האיסוף אינו שלם או שאינו עדכני; אין אימות חדש';
    el('summary').innerHTML='<p><b>'+d.candidates.length+' נכסים נותחו מתוך '+d.catalogCount+'</b> · עדכונים התקבלו עבור '+d.observed+' נכסים.</p><p>מועמד בסריקה האחרונה: '+esc(d.leader.symbol||'טרם נקבע')+' · '+d.leader.consecutive+'/3 · '+(d.leader.verified?'מאומת לניתוח':'לא מאומת כעת')+'</p><p>בדיקת מפרטים: '+(d.contracts?.unitConsistent||0)+' נכסים עם יחידות מחיר עקביות. בדיקת יחידות אינה מאמתת עלויות. מצב הביצוע בפועל מוצג למעלה.</p>';
    el('history').innerHTML=d.history.slice(0,10).map(x=>'<p>'+esc(new Date(Number(x.bar_time)*1000).toLocaleString('he-IL'))+' · '+esc(x.leader)+' · '+esc(x.score)+'</p>').join('')||'אין סריקות שמורות';
