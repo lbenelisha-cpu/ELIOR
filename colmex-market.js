@@ -1,0 +1,13 @@
+let token='',generation=0,controller=null,current=null;
+const el=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function rows(){const term=el('filter').value.toLowerCase();el('candidates').innerHTML=(current?.candidates||[]).filter(x=>(x.symbol+' '+x.description).toLowerCase().includes(term)).map(x=>'<tr>'+[x.symbol,x.description,x.master,x.market,x.trend,x.risk,x.momentum,x.spreadPercent.toFixed(3)].map(v=>'<td>'+esc(v)+'</td>').join('')+'</tr>').join('')||'<tr><td colspan="8">אין נכסים זמינים להצגה</td></tr>';}
+async function refresh(){if(!token||controller)return;const g=generation;const c=new AbortController();controller=c;const timer=setTimeout(()=>c.abort(),15000);try{
+ const r=await fetch('/.netlify/functions/colmex-market',{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:c.signal});const d=await r.json();if(g!==generation)return;if(!r.ok)throw Error(d.error||'שגיאת חיבור');current=d;
+ el('status').textContent=d.complete?'התקבל מחזור איסוף לכל הנכסים שבקטלוג':'ממתין להשלמת איסוף הנתונים מ־MT4';
+ el('summary').innerHTML='<h2>'+d.candidates.length+' נכסים נותחו מתוך '+d.catalogCount+'</h2><p>התקבלו עדכונים עבור '+d.observed+' נכסים. הברוקר מציג '+d.totalAvailable+' נכסים בסך הכול.</p>'+(d.totalAvailable>d.catalogCount?'<p class="warn">הקטלוג מוגבל כרגע ל־600 נכסים; לא כל נכסי הברוקר נכללים.</p>':'')+'<p>מועמד אחרון: '+esc(d.leader.symbol||'טרם נקבע')+' · אימותים: '+d.leader.consecutive+'/3 · '+(d.leader.verified?'מאומת לניתוח בלבד':'ממתין לאימות עדכני')+'</p><p class="warn">'+esc(d.notice)+'</p>';
+ rows();el('blocked').innerHTML=d.blocked.map(x=>'<p><b>'+esc(x.symbol)+'</b> — '+esc(x.reason)+'</p>').join('')||'אין נכסים חסומים במחזור הנוכחי';
+ el('history').innerHTML=d.history.slice(0,10).map(x=>'<p>'+esc(new Date(x.bar_time*1000).toLocaleString('he-IL'))+' · '+esc(x.leader)+' · ציון '+esc(x.score)+'</p>').join('')||'ממתין לסריקה מלאה ראשונה';
+ }catch(e){if(g===generation){current=null;rows();el('status').textContent='הנתונים אינם עדכניים: '+e.message;el('summary').textContent='לא ניתן לאמת מועמד עד לחידוש החיבור.';el('history').textContent='';el('blocked').textContent='';}}finally{clearTimeout(timer);if(controller===c)controller=null;}}
+el('connect').onclick=()=>{generation++;controller?.abort();controller=null;token=el('key').value.trim();el('key').value='';current=null;rows();refresh();};
+el('disconnect').onclick=()=>{generation++;controller?.abort();controller=null;token='';current=null;rows();el('summary').textContent='התצוגה נותקה';el('status').textContent='מנותק';el('history').textContent='';el('blocked').textContent='';};
+el('filter').oninput=rows;setInterval(refresh,30000);
