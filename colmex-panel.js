@@ -1,15 +1,15 @@
 (() => {
  const root=document.getElementById('colmex-panel');if(!root)return;
- root.innerHTML=`<h2>קולמקס · נכסים לניתוח</h2><p>נתונים ישירות מ־MT4. הסוכנים מדרגים לפי נרות חצי־שעתיים סגורים; מצב הביצוע והעסקאות בדמו מופיעים בנפרד מהדירוג הכללי.</p>
+ root.innerHTML=`<div class="brand-bar"><b>ELIOR<span> INVEST</span></b><span class="tag">סביבת דמו · קולמקס</span></div><p>נתונים ישירות מ־MT4. הסוכנים מדרגים לפי נרות חצי־שעתיים סגורים; מצב הביצוע והעסקאות בדמו מופיעים בנפרד מהדירוג הכללי.</p>
  <div id="colmex-execution-state"><p>התחבר להצגת מצב שתי תוכניות הדמו.</p></div><details class="connection-settings" open><summary>הגדרות חיבור</summary><div class="actions"><label for="colmex-key">מפתח צפייה של קולמקס </label><input id="colmex-key" type="password" autocomplete="off"><button id="colmex-connect" type="button">התחבר לקולמקס</button><button id="colmex-disconnect" type="button" class="secondary">נתק</button><button id="colmex-export" type="button" class="secondary" disabled>הורד מפרטי חוזים לבדיקה</button></div>
  </details><p id="colmex-status" role="status">ממתין לחיבור באמצעות מפתח הקריאה של קולמקס.</p><div id="colmex-summary"></div>
  <p class="yellow">אימות מועמד לניתוח אינו מאמת את עלויות החוזה. לביצוע נדרשים נכס שמתאים לתקציב, נתונים עדכניים ו־3 אימותים; מעבר דורש יתרון של 10 נקודות. הדירוג הכללי עשוי לכלול נכסים שאינם כשירים לביצוע.</p>
- <label for="colmex-filter">חיפוש נכס </label><input id="colmex-filter" type="search" placeholder="שם או סמל אצל הברוקר">
+ <details class="research"><summary>מחקר שוק · כל הנכסים והדירוגים</summary><label for="colmex-filter">חיפוש נכס </label><input id="colmex-filter" type="search" placeholder="שם או סמל אצל הברוקר">
  <div class="table"><table><thead><tr><th>נכס</th><th>תיאור</th><th>ציון</th><th>שוק / מגמה / סיכון / מומנטום</th><th>מרווח %</th><th>בדיקת חוזה</th></tr></thead><tbody id="colmex-rows"></tbody></table></div>
  <div class="actions"><button id="colmex-prev" type="button" class="secondary">הקודם</button><span id="colmex-page"></span><button id="colmex-next" type="button" class="secondary">הבא</button></div>
  <details><summary>10 סריקות קולמקס אחרונות</summary><div id="colmex-history"></div></details>
  <details><summary>נכסים שממתינים לנתונים</summary><div id="colmex-blocked"></div></details>
- <p class="muted">המפתח נשמר בזיכרון הלשונית בלבד ונמחק בניתוק או בסגירה. <a href="/colmex-market.html">פתיחת עמוד קולמקס המלא</a></p>`;
+ </details><p class="muted">המפתח נשמר בזיכרון הלשונית בלבד ונמחק בניתוק או בסגירה. <a href="/colmex-market.html">פתיחת עמוד קולמקס המלא</a></p>`;
  const el=id=>document.getElementById('colmex-'+id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let token='',data=null,page=0,generation=0,controller=null;
  const number=x=>Number(x).toLocaleString('he-IL',{maximumFractionDigits:4});
