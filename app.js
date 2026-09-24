@@ -56,10 +56,19 @@ function renderMonitor(){
   const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
   const m=cloudMonitor||monitorFallback();
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
-  const modern=String(m.note||" ").startsWith("V6.3");
-  const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?(String(m.note).includes("מסונכרנים")?"ממתין לסנכרון נתונים":"ממתין למכסת נתונים"):"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
+  const modern=/^V6\.[34]/.test(String(m.note||""));
+  const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?(String(m.note).includes("מסונכרנים")?"ממתין לסנכרון נתונים":(String(m.note).includes("מכסת")?"ממתין למכסת נתונים":"ממתין לנתונים")):"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
-  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";detail.textContent=`${syms||"אין תוכניות פתוחות"} · ${m.note||"Twelve Data · כל 30 דקות · נתונים עדכניים בלבד"}`;
+  const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";
+  const d=m.diagnostics||{},lines=[`${syms||"אין תוכניות פתוחות"} · ${m.note||"ממתין להרצת הסוכן"}`];
+  lines.push("מחזור מוצלח אחרון: "+(d.last_success_at?new Date(d.last_success_at).toLocaleString("he-IL"):"טרם תועד בגרסה זו"));
+  if(d.next_cycle_at)lines.push("חלון החלטה הבא: "+new Date(d.next_cycle_at).toLocaleString("he-IL")+" · בכפוף לשעות הפעילות ולנתונים עדכניים");
+  if(d.retry_note)lines.push(d.retry_note);
+  if(d.rotation_reason)lines.push("מעבר בין נכסים: "+d.rotation_reason);
+  for(const [symbol,reason] of Object.entries(d.decisions||{}))lines.push(symbol+": "+reason);
+  if(d.bar_times)lines.push("זמני הנתונים שהתקבלו (UTC): "+Object.entries(d.bar_times).map(([s,t])=>s+": "+(t||"חסר")).join(" | "));
+  if(Date.now()-Date.parse(m.checked_at)>10*60000)lines.push("הסטטוס לא עודכן מעל 10 דקות; יש לבדוק את שעות הפעילות ואת הרצות הסוכן");
+  detail.style.whiteSpace="pre-line";detail.textContent=lines.join("\n");
 }
 
 function fmtLiveTime(iso){try{return new Date(iso).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}catch{return "—"}}

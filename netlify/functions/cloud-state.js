@@ -8,7 +8,7 @@ async function state(){
  let comparison={available:false,reason:'לא ניתן לטעון את נקודת הבסיס להשוואה'};
  try{const base=await db('paper_account_snapshots?select=*&order=sequence_id.asc&limit=1');comparison=benchmark(base[0],s.account);}catch{}
 
- return {...s,comparison,apiVersion:"6.2",rows:undefined,portfolio:portfolios[0]||null,portfolios,closed:(s.closed||[]).map(mapPosition),monitor:portfolios.length?monitor[0]||null:null};
+ return {...s,comparison,apiVersion:"6.2",rows:undefined,portfolio:portfolios[0]||null,portfolios,closed:(s.closed||[]).map(mapPosition),monitor:monitor[0]||null};
 }
 export async function handler(event){
  if(event.httpMethod==='OPTIONS')return {statusCode:204,headers,body:''};
