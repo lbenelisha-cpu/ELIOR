@@ -1,6 +1,6 @@
 (() => {
  const root=document.getElementById('colmex-panel');if(!root)return;
- root.innerHTML=`<div class="brand-bar"><b>ELIOR<span> INVEST</span></b><span class="tag">סביבת דמו · קולמקס</span></div><p>נתונים ישירות מ־MT4. הסוכנים מדרגים לפי נרות חצי־שעתיים סגורים; מצב הביצוע והעסקאות בדמו מופיעים בנפרד מהדירוג הכללי.</p>
+ root.innerHTML=`<div class="brand-bar"><b>ELIOR<span> INVEST</span></b><span class="tag">סביבת דמו · קולמקס</span></div><p>נתונים ישירות מ־MT4. הסוכנים מדרגים לפי נרות של 5 דקות סגורים; מצב הביצוע והעסקאות בדמו מופיעים בנפרד מהדירוג הכללי.</p>
  <div id="colmex-execution-state"><p>התחבר להצגת מצב שתי תוכניות הדמו.</p></div><details class="connection-settings" open><summary>הגדרות חיבור</summary><div class="actions"><label for="colmex-key">מפתח צפייה של קולמקס </label><input id="colmex-key" type="password" autocomplete="off"><button id="colmex-connect" type="button">התחבר לקולמקס</button><button id="colmex-disconnect" type="button" class="secondary">נתק</button><button id="colmex-export" type="button" class="secondary" disabled>הורד מפרטי חוזים לבדיקה</button></div>
  </details><p id="colmex-status" role="status">ממתין לחיבור באמצעות מפתח הקריאה של קולמקס.</p><div id="colmex-summary"></div>
  <p class="yellow">אימות מועמד לניתוח אינו מאמת את עלויות החוזה. לביצוע נדרשים נכס שמתאים לתקציב, נתונים עדכניים ו־3 אימותים; מעבר דורש יתרון של 10 נקודות. הדירוג הכללי עשוי לכלול נכסים שאינם כשירים לביצוע.</p>
