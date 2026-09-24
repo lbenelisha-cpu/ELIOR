@@ -26,7 +26,8 @@ export async function handler(e){
   let snap;try{snap=validateSnapshot(JSON.parse(e.body||'{}'));}catch{return reply(400,{error:'Invalid demo snapshot'});}
   const [market,scans,closed,recentCommands]=await Promise.all([db('colmex_market_state?id=eq.1&select=*'),db('colmex_execution_scans?select=*&order=bar_time.desc&limit=3'),db('rpc/colmex_execution_read_ledger',{method:'POST',body:'{}'}),db('colmex_execution_commands?select=*&order=created_at.desc&limit=20')]);
   if(closed.length>=10000)throw Error('LEDGER_LIMIT');
-  const summary=planCycle(snap,market[0],scans,closed,Date.now()/1000,recentCommands);
+  const initialFills=(await Promise.all([1,2].map(p=>db('colmex_execution_commands?status=eq.filled&command->>action=eq.BUY&command->>program=eq.'+p+'&select=command,status&limit=1')))).flat();
+  const summary=planCycle(snap,market[0],scans,closed,Date.now()/1000,[...recentCommands,...initialFills],true);
   let command=enabled&&snap.enabled?summary.command:null;
   if(command)command={...command,id:randomUUID(),expires:Math.floor(Date.now()/1000)+20};
   const stored={...summary};delete stored.command;
