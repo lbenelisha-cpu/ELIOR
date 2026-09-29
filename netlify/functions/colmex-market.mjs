@@ -28,7 +28,7 @@ export async function handler(e){
   }else {stage='read-state';state=(await db('colmex_market_state?id=eq.1&select=*'))[0];}
   if(state){state={...state,totalAvailable:state.total_available};}
   if(e.httpMethod==='GET'&&e.queryStringParameters?.action==='contracts')return reply(200,exportContracts(state?.items));
-  stage='analyze';const analysis=analyzeMarket(state);
+  stage='analyze';const analysis=analyzeMarket(state,Date.now(),{stocksOnly:true});
   const contracts=contractAudit(state?.items);
   // Only authenticated collector uploads can create a vote. A browser refresh never does.
   if(e.httpMethod==='POST'&&analysis.complete&&analysis.candidates.length){
