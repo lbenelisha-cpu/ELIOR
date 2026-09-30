@@ -33,9 +33,10 @@ export function createBridge(client,port=22351){
   });return server;
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
-  const port=22351;const client=new LiveFileClient(process.env.LEVI_MT4_SNAPSHOT);
+  const port=Number(process.env.LEVI_BRIDGE_PORT||22351);const client=new LiveFileClient(process.env.LEVI_MT4_SNAPSHOT);
   createBridge(client,port).listen(port,'127.0.0.1',()=>console.log(`LEVI MT4: http://127.0.0.1:${port}/mt4.html (read-only)`));
 }
+
 
 
 
