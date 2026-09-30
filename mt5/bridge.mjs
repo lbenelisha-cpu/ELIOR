@@ -6,6 +6,8 @@ import {fileURLToPath} from 'node:url';
 const allowedTools=new Set(['get_trading_account_info','get_trading_open_positions']);
 export function checkRequest(req,port){
   if(req.headers.host!==`127.0.0.1:${port}`)return false;
+  const navigation = req.method==='GET' && req.headers['sec-fetch-mode']==='navigate' && req.headers['sec-fetch-dest']==='document' && ['/', '/mt5', '/mt5.html'].includes((req.url||'').split('?')[0]);
+  if(navigation)return true;
   if(req.headers.origin&&req.headers.origin!==`http://127.0.0.1:${port}`)return false;
   if(req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site']))return false;
   return true;
@@ -40,7 +42,7 @@ export class MT5Client {
     return {receivedAt:new Date().toISOString(),connected,readOnly:true,account:{login:a.login,server:a.server,type:a.type,currency:a.currency,balance:connected?a.balance:null,equity:connected?a.equity:null,profit:connected?a.profit:null},positions:connected?p:null};
   }
 }
-export function createBridge(client,port=22347){
+export function createBridge(client,port=22348){
   const secret=randomBytes(32).toString('hex');let busy=false;
   const send=(res,status,data,type='application/json')=>{res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"});res.end(type==='application/json'?JSON.stringify(data):data);};
   const server=http.createServer(async(req,res)=>{
@@ -60,8 +62,10 @@ export function createBridge(client,port=22347){
   });return server;
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
-  const port=22347;const client=new MT5Client(process.env.MT5_MCP_TOKEN,process.env.MT5_MCP_URL);
+  const port=22348;const client=new MT5Client(process.env.MT5_MCP_TOKEN,process.env.MT5_MCP_URL);
   createBridge(client,port).listen(port,'127.0.0.1',()=>console.log(`LEVI MT5: http://127.0.0.1:${port}/mt5.html (read-only)`));
 }
+
+
 
 

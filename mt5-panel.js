@@ -1,5 +1,5 @@
 (() => {
-  if(location.origin!=='http://127.0.0.1:22347')return;
+  if(location.origin!=='http://127.0.0.1:22348')return;
   const el=id=>document.getElementById(id);el('setup').hidden=true;el('account-view').hidden=false;
   let session='',busy=false;
   const add=(root,label,value)=>{const p=document.createElement('p');p.textContent=label+': '+String(value??'—');root.append(p);};
@@ -16,3 +16,4 @@
   }
   el('refresh').onclick=refresh;refresh();setInterval(()=>{if(!document.hidden)refresh();},30000);
 })();
+

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {MT5Client,checkRequest,createBridge} from '../mt5/bridge.mjs';
 test('local request checks reject remote hosts and origins',()=>{
- assert.equal(checkRequest({headers:{host:'127.0.0.1:22347'}},22347),true);
- assert.equal(checkRequest({headers:{host:'attacker.example:22347'}},22347),false);
- assert.equal(checkRequest({headers:{host:'127.0.0.1:22347',origin:'https://attacker.example'}},22347),false);
+ assert.equal(checkRequest({headers:{host:'127.0.0.1:22348'}},22348),true);
+ assert.equal(checkRequest({headers:{host:'attacker.example:22348'}},22348),false);
+ assert.equal(checkRequest({headers:{host:'127.0.0.1:22348',origin:'https://attacker.example'}},22348),false);
 });
 test('disconnected account does not expose stale balances or positions',async()=>{
  const client=new MT5Client('test');client.connect=async()=>{};client.call=async name=>{assert.equal(name,'get_trading_account_info');return {account:{type:'real',balance:999},terminal:{server_connected:false}};};
@@ -20,4 +20,11 @@ test('account requests require a session and reject mutations',async t=>{
  const session=await (await fetch(root+'/api/session')).json();assert.equal((await fetch(root+'/api/account',{headers:{'X-ELIOR-Session':session.session}})).status,200);
  assert.equal((await fetch(root+'/api/account',{method:'POST'})).status,405);
  assert.equal((await fetch(root+'/api/session',{headers:{Origin:'https://attacker.example'}})).status,403);
+});
+
+test('cross-site page navigation is allowed but account reads are blocked',()=>{
+ const headers={host:'127.0.0.1:22348','sec-fetch-site':'cross-site','sec-fetch-mode':'navigate','sec-fetch-dest':'document'};
+ assert.equal(checkRequest({method:'GET',url:'/mt5',headers},22348),true);
+ assert.equal(checkRequest({method:'GET',url:'/api/account',headers},22348),false);
+ assert.equal(checkRequest({method:'GET',url:'/api/session',headers},22348),false);
 });
