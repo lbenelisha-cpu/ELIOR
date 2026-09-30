@@ -54,7 +54,7 @@ export function createBridge(client,port=22347){
       if(busy)return send(res,429,{error:'A refresh is already running'});
       busy=true;try{return send(res,200,await client.snapshot());}catch{return send(res,503,{error:'לא ניתן לקרוא מ־MT5. בדוק שהתוכנה פתוחה ושהמפתח תקין.'});}finally{busy=false;}
     }
-    const assets={'/':['../mt5.html','text/html; charset=utf-8'],'/mt5.html':['../mt5.html','text/html; charset=utf-8'],'/mt5-panel.js':['../mt5-panel.js','text/javascript; charset=utf-8'],'/mt5.css':['../mt5.css','text/css; charset=utf-8']};
+    const assets={'/mt5':['../mt5.html','text/html; charset=utf-8'],'/':['../mt5.html','text/html; charset=utf-8'],'/mt5.html':['../mt5.html','text/html; charset=utf-8'],'/mt5-panel.js':['../mt5-panel.js','text/javascript; charset=utf-8'],'/mt5.css':['../mt5.css','text/css; charset=utf-8']};
     if(!assets[path])return send(res,404,{error:'Not found'});
     try{const [file,type]=assets[path];send(res,200,await readFile(new URL(file,import.meta.url)),type);}catch{send(res,500,{error:'Page unavailable'});}
   });return server;
@@ -63,4 +63,5 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
   const port=22347;const client=new MT5Client(process.env.MT5_MCP_TOKEN,process.env.MT5_MCP_URL);
   createBridge(client,port).listen(port,'127.0.0.1',()=>console.log(`LEVI MT5: http://127.0.0.1:${port}/mt5.html (read-only)`));
 }
+
 
