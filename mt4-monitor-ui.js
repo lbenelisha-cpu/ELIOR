@@ -4,6 +4,7 @@ const el=id=>document.getElementById(id);
 let latest=null,draft=null,tracking=null,lastKinds=new Map();
 try{tracking=JSON.parse(localStorage.getItem('levi-tracking-639367')||'null');}catch{}
 const text=(tag,value)=>{const e=document.createElement(tag);e.textContent=value;return e;};
+const pushedRisks=new Set();
 function notify(id,message){window.LEVIAlerts?.notify({id,message,timestamp:Date.now()}).catch(()=>{});}
 function persist(){try{localStorage.setItem('levi-tracking-639367',JSON.stringify(tracking));}catch{}}
 function visibleQuotes(){return (latest?.quotes||[]).filter(q=>el('watch-symbol').value==='ALL'||/^nvda#?$/i.test(q.symbol));}
@@ -46,7 +47,7 @@ function render(){
  if(!position){el('portfolio-risk').textContent='הפוזיציה המשויכת אינה פתוחה. חסרים נתוני סגירה; חישוב סיכון התיק מושהה.';return;}
  tracking=trackRisk(tracking,position.profit);const equity=tracking.equity;persist();
  el('portfolio-risk').textContent=`שווי למעקב מאז השיוך: ${equity.toFixed(2)} דולר · שיא ${tracking.high.toFixed(2)} · סף 15% ${(tracking.high*.85).toFixed(2)} · ${tracking.halted?'סף הסיכון נחצה; אין סגירה אוטומטית':'בתוך הסף'}. השיוך אינו משנה את גודל העסקה או מבודד כספים בחשבון.`;
- if(tracking.halted)notify('portfolio-stop:'+tracking.ticket+':'+tracking.started,'סיכון: תיק המעקב ירד 15% מהשיא שנמדד מאז השיוך');
+ if(tracking.halted){notify('portfolio-stop:'+tracking.ticket+':'+tracking.started,'סיכון: תיק המעקב ירד 15% מהשיא שנמדד מאז השיוך');const key=tracking.ticket+':'+tracking.started;if(latest.pushStatus?.configured&&!pushedRisks.has(key)){pushedRisks.add(key);window.LEVIRequest('/api/push/portfolio',tracking).catch(()=>{});}}
 }
 window.addEventListener('levi-snapshot',event=>{latest=event.detail;renderOrderStatus();if(latest.connected)render();else{el('signal-cards').replaceChildren(text('p','החשבון מנותק; האותות אינם זמינים'));el('portfolio-risk').textContent='חישוב הסיכון מושהה: החשבון מנותק';notify('disconnected','סיכון נתונים: MT4 מנותק');}});
 window.addEventListener('levi-snapshot-error',()=>{latest=null;el('signal-cards').replaceChildren(text('p','הנתונים אינם זמינים; אין הכנת פקודות'));el('portfolio-risk').textContent='חישוב הסיכון מושהה עד לקבלת נתונים עדכניים';notify('feed-error','סיכון נתונים: לא התקבל עדכון תקין מ־MT4');});
@@ -76,5 +77,6 @@ el('draft-confirm').onclick=async()=>{
  try{const result=await window.LEVIRequest('/api/order/confirm',{id:approval.id,confirm:true});el('draft-result').textContent=result.message;el('execution-status').textContent=result.message;el('refresh').click();}
  catch(e){el('draft-result').textContent=e.message+' — אם השליחה נותקה, בדוק את הפוזיציות ולוג MT4 לפני ניסיון נוסף.';}
 };
+
 
 

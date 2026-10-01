@@ -1,0 +1,1 @@
+(() => {const phone=/iPhone|iPad|iPod|Android/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);location.replace(phone?'/push.html':'http://127.0.0.1:22352/mt4');})();
