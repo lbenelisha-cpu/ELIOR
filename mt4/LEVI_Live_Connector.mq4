@@ -17,8 +17,8 @@ void OnTimer(){
  positions+="]";
  string symbols="[";int total=SymbolsTotal(true);count=0;
  for(int j=0;j<total&&j<600;j++){
-  string s=SymbolName(j,true);if(count++>0)symbols+=",";
-  symbols+="{\"symbol\":"+Q(s)+",\"description\":"+Q(SymbolInfoString(s,SYMBOL_DESCRIPTION))+",\"bid\":"+N(MarketInfo(s,MODE_BID))+",\"ask\":"+N(MarketInfo(s,MODE_ASK))+",\"contractSize\":"+N(MarketInfo(s,MODE_LOTSIZE))+",\"minLot\":"+N(MarketInfo(s,MODE_MINLOT))+",\"lotStep\":"+N(MarketInfo(s,MODE_LOTSTEP))+",\"tickValue\":"+N(MarketInfo(s,MODE_TICKVALUE))+",\"tickSize\":"+N(MarketInfo(s,MODE_TICKSIZE))+",\"profitMode\":"+N(MarketInfo(s,MODE_PROFITCALCMODE))+",\"profitCurrency\":"+Q(SymbolInfoString(s,SYMBOL_CURRENCY_PROFIT))+"}";
+  string s=SymbolName(j,true);if(count++>0)symbols+=","; string bars="["; int offset=(int)(TimeCurrent()-TimeGMT()); for(int k=1;k<=27;k++){datetime bt=iTime(s,PERIOD_M5,k);double bc=iClose(s,PERIOD_M5,k);if(bt<=0||bc<=0)break;if(k>1)bars+=",";bars+="{\"time\":"+IntegerToString((int)bt-offset)+",\"close\":"+N(bc)+"}";}bars+="]";
+  symbols+="{\"symbol\":"+Q(s)+",\"description\":"+Q(SymbolInfoString(s,SYMBOL_DESCRIPTION))+",\"bid\":"+N(MarketInfo(s,MODE_BID))+",\"ask\":"+N(MarketInfo(s,MODE_ASK))+",\"contractSize\":"+N(MarketInfo(s,MODE_LOTSIZE))+",\"minLot\":"+N(MarketInfo(s,MODE_MINLOT))+",\"lotStep\":"+N(MarketInfo(s,MODE_LOTSTEP))+",\"tickValue\":"+N(MarketInfo(s,MODE_TICKVALUE))+",\"tickSize\":"+N(MarketInfo(s,MODE_TICKSIZE))+",\"profitMode\":"+N(MarketInfo(s,MODE_PROFITCALCMODE))+",\"profitCurrency\":"+Q(SymbolInfoString(s,SYMBOL_CURRENCY_PROFIT))+",\"tickTime\":"+IntegerToString((int)MarketInfo(s,MODE_TIME)-offset)+",\"bars\":"+bars+"}";
  }
  symbols+="]";
  string body="{\"version\":1,\"capturedAt\":"+IntegerToString((int)TimeGMT())+",\"connected\":"+(IsConnected()?"true":"false")+",\"account\":{\"login\":"+Q(IntegerToString(AccountNumber()))+",\"server\":"+Q(AccountServer())+",\"type\":\"real\",\"currency\":"+Q(AccountCurrency())+",\"balance\":"+N(AccountBalance())+",\"equity\":"+N(AccountEquity())+",\"profit\":"+N(AccountProfit())+"},\"positions\":"+positions+",\"symbols\":"+symbols+"}";
@@ -28,3 +28,4 @@ void OnTimer(){
  if(!FileMove("LEVI_live_snapshot.tmp",0,"LEVI_live_snapshot.json",FILE_REWRITE)){Print("LEVI snapshot move error: ",GetLastError());return;}
  Comment("LEVI account data connected. Budget: USD 150. Execution disabled.");
 }
+
