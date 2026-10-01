@@ -1,5 +1,5 @@
 import http from 'node:http';
-import {LiveFileClient} from './live-client.mjs';
+import {OrderFileClient,validateOrder} from './orders.mjs';
 import {readFile} from 'node:fs/promises';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
@@ -14,12 +14,35 @@ export function checkRequest(req,port){
   return true;
 }
 export function createBridge(client,port=22351){
-  const secret=randomBytes(32).toString('hex');let busy=false;
+  const secret=randomBytes(32).toString('hex');let busy=false,orderBusy=false;const previews=new Map();
   const send=(res,status,data,type='application/json')=>{res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"});res.end(type==='application/json'?JSON.stringify(data):data);};
   const server=http.createServer(async(req,res)=>{
     if(!checkRequest(req,port))return send(res,403,{error:'Local access only'});
     const path=new URL(req.url,`http://127.0.0.1:${port}`).pathname;
-    if(req.method!=='GET')return send(res,405,{error:'Read-only connection'});
+    if(req.method==='POST'&&['/api/order/preview','/api/order/confirm'].includes(path)){
+      const supplied=Buffer.from(req.headers['x-elior-session']||''),expected=Buffer.from(secret);
+      if(req.headers.origin!==`http://127.0.0.1:${port}`||supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return send(res,401,{error:'רענן את העמוד המקומי לפני שליחת פקודה'});
+      if(!req.headers['content-type']?.startsWith('application/json'))return send(res,415,{error:'JSON required'});
+      if(orderBusy)return send(res,409,{error:'פקודה אחרת נבדקת; אין שליחה חוזרת'});
+      orderBusy=true;
+      try{
+        let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>4096)throw Error('בקשה גדולה מדי');}
+        const input=JSON.parse(body);const snapshot=await client.snapshot();
+        if(snapshot.orderPending)throw Error('פקודה קודמת ממתינה לבירור ב־MT4');
+        for(const [id,p] of previews)if(p.expires<Date.now())previews.delete(id);
+        if(path==='/api/order/preview'){
+          if(previews.size>=20)throw Error('יותר מדי טיוטות פתוחות');
+          const order=validateOrder(snapshot,input),id=randomBytes(16).toString('hex'),expires=Date.now()+20000;
+          previews.set(id,{input,order,expires});return send(res,200,{id,order,expires});
+        }
+        const pending=previews.get(input.id);previews.delete(input.id);
+        if(!pending||pending.expires<Date.now()||input.confirm!==true)throw Error('האישור פג או כבר נוצל; בדוק מחדש את הפקודה');
+        const order=validateOrder(snapshot,pending.input);
+        if(Math.abs(order.price/pending.order.price-1)>.005)throw Error('המחיר השתנה ביותר מ־0.5%; נדרשת בדיקה ואישור חדש');
+        await client.submit({...order,price:pending.order.price},input.id);return send(res,202,{id:input.id,status:'pending',message:'נשלחה למחבר. ממתין לתוצאה מ־MT4; אין לשלוח שוב.'});
+      }catch(e){return send(res,400,{error:e.message||'שליחת הפקודה נכשלה'});}finally{orderBusy=false;}
+    }
+    if(req.method!=='GET')return send(res,405,{error:'Method not allowed'});
     if(path==='/api/session')return send(res,200,{session:secret});
     if(path==='/api/account'){
       const supplied=Buffer.from(req.headers['x-elior-session']||''),expected=Buffer.from(secret);
@@ -33,9 +56,10 @@ export function createBridge(client,port=22351){
   });return server;
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
-  const port=Number(process.env.LEVI_BRIDGE_PORT||22351);const client=new LiveFileClient(process.env.LEVI_MT4_SNAPSHOT);
-  createBridge(client,port).listen(port,'127.0.0.1',()=>console.log(`LEVI MT4: http://127.0.0.1:${port}/mt4.html (read-only)`));
+  const port=Number(process.env.LEVI_BRIDGE_PORT||22352);const client=new OrderFileClient(process.env.LEVI_MT4_SNAPSHOT);
+  createBridge(client,port).listen(port,'127.0.0.1',()=>console.log(`LEVI MT4: http://127.0.0.1:${port}/mt4.html (orders require individual user confirmation and MT4 opt-in)`));
 }
+
 
 
 
