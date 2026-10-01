@@ -19,7 +19,7 @@
     for(const p of positions){const tr=document.createElement('tr');const values=[p.symbol,types[p.type]||'הוראה ממתינה',Number.isFinite(p.lots)?new Intl.NumberFormat('he-IL',{maximumFractionDigits:8}).format(p.lots):'—',money(p.profit),p.ticket];
       values.forEach((value,i)=>{const td=document.createElement('td');td.textContent=String(value??'—');if(i===0||i===4)td.dir='ltr';if(i===0)td.className='position-symbol';if(i===3)td.className=p.profit<0?'pnl-loss':'pnl-gain';tr.append(td);});
       const actions=document.createElement('td'),group=document.createElement('div');group.className='trade-actions';const quote=quotes.find(q=>q.symbol===p.symbol);
-      for(const side of ['buy','sell']){const button=document.createElement('button');button.type='button';button.className='trade-button trade-'+side;button.textContent=side==='buy'?'הכן קנייה':'הכן מכירה';button.setAttribute('aria-label',button.textContent+' '+p.symbol+' עסקה '+p.ticket);button.disabled=!quote||quote.status!=='current'||p.type!==0;button.title=button.disabled?'נדרשים נתונים עדכניים למניה ופוזיציית קנייה פתוחה':'פתיחת טיוטה בלבד — לא נשלחת עסקה';button.onclick=()=>window.dispatchEvent(new CustomEvent('levi-order-draft',{detail:{symbol:p.symbol,side,ticket:p.ticket}}));group.append(button);}actions.append(group);tr.append(actions);body.append(tr);
+      for(const side of ['buy','sell']){const button=document.createElement('button');button.type='button';button.className='trade-button trade-'+side;button.textContent=side==='buy'?'הכן קנייה':'הכן מכירה';button.setAttribute('aria-label',button.textContent+' '+p.symbol+' עסקה '+p.ticket);button.disabled=!quote||quote.status==='stale'||!Number.isFinite(quote.tickTime)||Date.now()/1000-quote.tickTime>90||quote.tickTime>Date.now()/1000+5||p.type!==0;button.title=button.disabled?'נדרשים נתונים עדכניים למניה ופוזיציית קנייה פתוחה':'פתיחת טיוטה בלבד — לא נשלחת עסקה';button.onclick=()=>window.dispatchEvent(new CustomEvent('levi-order-draft',{detail:{symbol:p.symbol,side,ticket:p.ticket}}));group.append(button);}actions.append(group);tr.append(actions);body.append(tr);
     }table.append(body);scroll.append(table);root.append(scroll);
     const note=document.createElement('p');note.className='positions-note';note.textContent='הכמות מוצגת בלוטים לפי MT4. רווח / הפסד כולל עמלות וסוואפ שדווחו במחבר. כפתורי הפעולה פותחים טיוטה. מכירה סוגרת את עסקת הקנייה שנבחרה רק לאחר אישור אישי.';root.append(note);
   }
@@ -42,6 +42,7 @@
   }
   el('refresh').onclick=refresh;refresh();setInterval(()=>{refresh();},30000);
 })();
+
 
 
 

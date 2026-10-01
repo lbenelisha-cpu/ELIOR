@@ -1,4 +1,5 @@
-import {prepareOrder,trackRisk} from './monitor.mjs';
+import {prepareOrder,trackRisk,canPrepareOrder} from './monitor.mjs';
+import {buyingPower} from './buying-power.mjs';
 const el=id=>document.getElementById(id);
 let latest=null,draft=null,tracking=null,lastKinds=new Map();
 try{tracking=JSON.parse(localStorage.getItem('levi-tracking-639367')||'null');}catch{}
@@ -11,12 +12,26 @@ function render(){
  const root=el('signal-cards');root.replaceChildren();
  for(const q of visibleQuotes()){
   const card=document.createElement('section');
-  card.append(text('h3',q.symbol+' · '+(q.kind==='positive'?'אות טכני חיובי':q.kind==='negative'?'אות טכני שלילי':'מעקב')));
+  const title=text('h3',''),symbol=text('span',q.symbol);symbol.dir='ltr';title.append(symbol,text('span',' · '+(q.kind==='positive'?'אות טכני חיובי':q.kind==='negative'?'אות טכני שלילי':'מעקב')));card.append(title);
+  if(q.status==='current'&&q.confirmed&&q.kind==='positive'){
+   symbol.className='buy-signal-symbol';card.classList.add('buy-signal-card');card.append(text('p','● אות קנייה טכני מאומת · נדרש אישור שלך לכל עסקה'));
+  }
+  const power=buyingPower(q,latest.account,latest.positions,latest.quotes);
+  const cash=document.createElement('div');cash.className='buying-power';
+  const money=n=>new Intl.NumberFormat('he-IL',{style:'currency',currency:'USD'}).format(n);
+  if(!power.known)cash.append(text('p',power.message));
+  else{
+   cash.append(text('strong',`מינימום קנייה: ${power.minimumLots} לוטים · שווי מלא ${money(power.cost)}`));
+   cash.append(text('p',power.cashEnough===null?'יתרת המזומן אינה זמינה':`יתרת חשבון: ${money(power.balance)} · ${power.cashEnough?'מספיקה לשווי המלא של כמות המינימום':'אינה מספיקה לשווי המלא של כמות המינימום'}`));
+   cash.append(text('p',power.remaining===null?'חשיפת החזקות קיימות אינה ניתנת לאימות; קנייה חסומה':`מקום שנותר ביעד החשיפה: ${money(power.remaining)} · ${power.budgetEnough?'כמות המינימום בתוך יעד 120 דולר':'כמות המינימום חורגת מיעד 120 דולר — קנייה חסומה'}`));
+   cash.append(text('p',power.freeMargin===null?'ביטחונות פנויים לא מדווחים בגרסת המחבר הזו. במניות CFD היתרה אינה בדיקת ביטחונות; MT4 בודק אותם שוב לפני ביצוע.':`ביטחונות פנויים: ${money(power.freeMargin)}. דרישת הביטחונות בפועל נבדקת ב־MT4 לפני ביצוע.`));
+   cash.classList.add(power.budgetEnough&&power.cashEnough?'power-positive':'power-limited');
+  }card.append(cash);
   card.append(text('p',q.status==='current'?`ציון ${q.score}/100 · ${q.confirmed?'3 אימותים בנרות סגורים':'טרם אומת ב־3 נרות'} · מגמה ${q.components.trend}, מומנטום ${q.components.momentum}, סיכון ${q.components.risk}`:q.reason));
   card.append(text('p',`מקור: ${q.source} · זמן מחיר: ${Number.isFinite(q.tickTime)?new Date(q.tickTime*1000).toLocaleString('he-IL'):'חסר'} · ביקוש ${q.bid??'—'} / היצע ${q.ask??'—'}`));
   card.append(text('p','האות מתאר את הנוסחה הטכנית בלבד; אינו מבטיח תוצאה או כולל עלויות, חדשות ודוחות.'));
   const actions=document.createElement('div');actions.className='trade-actions';
-  for(const side of ['buy','sell']){const button=text('button',side==='buy'?'הכן קנייה':'הכן מכירה');button.type='button';button.className='trade-button trade-'+side;button.title='פתיחת טיוטה בלבד — לא נשלחת עסקה';button.disabled=q.status!=='current'||!latest.connected;button.onclick=()=>showDraft(q,side);actions.append(button);}card.append(actions);
+  for(const side of ['buy','sell']){const button=text('button',side==='buy'?'הכן קנייה':'הכן מכירה');button.type='button';button.className='trade-button trade-'+side;button.title='פתיחת טיוטה בלבד — לא נשלחת עסקה';button.disabled=!canPrepareOrder(q)||!latest.connected;button.onclick=()=>showDraft(q,side);actions.append(button);}card.append(actions);
   const key=q.confirmed?q.kind:'none';
   if(key!=='none'&&lastKinds.get(q.symbol)!==key)notify(q.symbol+':'+q.barTime+':'+key,q.symbol+' · '+(key==='positive'?'אות טכני חיובי חדש':'אות טכני שלילי חדש'));
   if(q.quoteRisk&&!lastKinds.get(q.symbol+'-risk'))notify(q.symbol+':risk:'+q.barTime,q.symbol+' · ציון סיכון נמוך בנוסחה');
@@ -42,7 +57,7 @@ window.addEventListener('levi-order-draft',event=>{
  const {symbol,side,ticket}=event.detail||{};
  const position=latest?.positions?.find(p=>p.ticket===ticket&&p.symbol===symbol);
  const quote=latest?.quotes?.find(q=>q.symbol===symbol);
- if(!latest?.connected||!position||quote?.status!=='current'||!['buy','sell'].includes(side))return;
+ if(!latest?.connected||!position||!canPrepareOrder(quote)||!['buy','sell'].includes(side))return;
  showDraft(quote,side);draft.ticket=ticket;
 });
 el('draft-check').onclick=async()=>{const checked=draft,lotsText=el('draft-lots').value;checked.approved=null;el('draft-confirm').disabled=true;try{if(!latest?.connected)throw Error('אין חיבור עדכני');if(draft.side==='buy'&&tracking?.halted)throw Error('סף סיכון התיק נחצה');const q=latest.quotes.find(q=>q.symbol===draft.quote.symbol),d=prepareOrder(q,draft.side,Number(el('draft-lots').value),latest.positions,Date.now()/1000,latest.quotes);el('draft-result').textContent=`${d.symbol} · ${d.side==='buy'?'קנייה':'מכירה'} · ${d.lots} לוטים · מחיר ייחוס ${d.price} · שווי משוער ${d.estimatedNotional.toFixed(2)} דולר. טיוטה נבדקה בלבד; לא נשלחה פקודה.`;if(latest.executionEnabled){const approved=await window.LEVIRequest('/api/order/preview',{symbol:q.symbol,side:draft.side,lots:d.lots,ticket:draft.ticket});if(draft!==checked||el('draft-lots').value!==lotsText||!el('order-draft').open)return;draft.approved=approved;el('draft-result').textContent=approved.order.symbol+' · '+(draft.side==='buy'?'קנייה חדשה':'סגירת קנייה קיימת')+' · '+d.lots+' לוטים · מחיר ייחוס '+approved.order.price+' · שווי משוער '+approved.order.estimatedNotional.toFixed(2)+' USD · חשבון לייב 639367'+(approved.order.ticket?' · עסקה '+approved.order.ticket:'')+' · אישור תקף ל־20 שניות. מחיר ביצוע עשוי להשתנות עד 0.5%; עמלות נוספות אפשריות.';el('draft-confirm').disabled=false;}else{el('draft-result').textContent+=' הביצוע כבוי במחבר MT4.';}}catch(e){el('draft-result').textContent=e.message;}};
@@ -61,4 +76,5 @@ el('draft-confirm').onclick=async()=>{
  try{const result=await window.LEVIRequest('/api/order/confirm',{id:approval.id,confirm:true});el('draft-result').textContent=result.message;el('execution-status').textContent=result.message;el('refresh').click();}
  catch(e){el('draft-result').textContent=e.message+' — אם השליחה נותקה, בדוק את הפוזיציות ולוג MT4 לפני ניסיון נוסף.';}
 };
+
 

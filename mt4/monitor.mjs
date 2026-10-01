@@ -9,16 +9,23 @@ export function analyzeQuotes(symbols,now=Date.now()/1000){
  return symbols.map(x=>{
   const base={symbol:x.symbol,description:x.description,bid:x.bid,ask:x.ask,contractSize:x.contractSize,minLot:x.minLot,lotStep:x.lotStep,currency:x.profitCurrency,source:'MT4 / TGLColmex-Live',tickTime:x.tickTime};
   if(!Number.isFinite(x.tickTime)||now-x.tickTime>90||x.tickTime>now+5)return {...base,status:'stale',reason:'מחיר אינו עדכני; אין אות מאומת'};
-  const bars=x.bars;
-  if(!Array.isArray(bars)||bars.length<27||bars[0].time!==target||bars.some((b,i)=>!Number.isFinite(b.close)||b.close<=0||!Number.isInteger(b.time)||b.time!==target-i*300))return {...base,status:'waiting',reason:'נדרשים 27 נרות M5 סגורים ורצופים'};
+  const raw=x.bars;
+  if(!Array.isArray(raw)||raw.length<27)return {...base,status:'waiting',reason:`התקבלו ${Array.isArray(raw)?raw.length:0} מתוך 27 נרות M5; אין עדיין אות טכני`};
+  // The exporter estimates broker UTC from the latest tick, which may lag by seconds.
+  const shift=raw[0].time-target;
+  const bars=raw.map(b=>({...b,time:b.time-shift}));
+  if(!Number.isInteger(shift)||Math.abs(shift)>30||bars.some((b,i)=>!Number.isFinite(b.close)||b.close<=0||!Number.isInteger(b.time)||b.time!==target-i*300))return {...base,status:'waiting',reason:'נרות M5 אינם רצופים או אינם מהחלון האחרון; אות טכני מושהה, אך ניתן להכין פקודה ידנית במחיר עדכני'};
   const scores=[0,1,2].map(i=>score(bars.slice(i))),current=scores[0];
   const kind=current.master>=60?'positive':current.master<40?'negative':'neutral';
   const confirmed=kind!=='neutral'&&scores.every(s=>kind==='positive'?s.master>=60:s.master<40);
   return {...base,status:'current',kind,confirmed,barTime:target,score:current.master,components:{trend:current.trend,momentum:current.momentum,risk:current.risk,market:current.market},reason:kind==='positive'?'ציון 60 ומעלה בשלושת הנרות האחרונים':kind==='negative'?'ציון מתחת ל־40 בשלושת הנרות האחרונים':'אין אות כיווני לפי ספי הסוכנים',quoteRisk:current.risk<40};
  });
 }
+export function canPrepareOrder(quote,now=Date.now()/1000){
+ return !!quote&&quote.status!=='stale'&&Number.isFinite(quote.tickTime)&&now-quote.tickTime<=90&&quote.tickTime<=now+5&&quote.currency==='USD'&&quote.contractSize===1&&Number.isFinite(quote.bid)&&quote.bid>0&&Number.isFinite(quote.ask)&&quote.ask>0;
+}
 export function prepareOrder(quote,side,lots,positions,now=Date.now()/1000,quotes=[quote]){
- if(!quote||quote.status!=='current'||!Number.isFinite(quote.tickTime)||now-quote.tickTime>90||quote.tickTime>now+5)throw Error('נדרש מחיר עדכני');
+ if(!canPrepareOrder(quote,now))throw Error('נדרש מחיר עדכני ומפרט מניה תקין');
  if(!['buy','sell'].includes(side)||!Number.isFinite(lots)||lots<=0||quote.currency!=='USD')throw Error('פקודה או מטבע אינם נתמכים');
  if(!Number.isFinite(quote.minLot)||quote.minLot<=0||!Number.isFinite(quote.lotStep)||quote.lotStep<=0||lots<quote.minLot||Math.abs(lots/quote.lotStep-Math.round(lots/quote.lotStep))>1e-6)throw Error('כמות אינה תואמת למפרט הברוקר');
  const price=side==='buy'?quote.ask:quote.bid;

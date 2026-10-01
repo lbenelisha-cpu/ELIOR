@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {buyingPower} from '../mt4/buying-power.mjs';
+const now=1800000000,q={symbol:'NVDA#',currency:'USD',contractSize:1,minLot:10,ask:231,tickTime:now};
+test('cash, full notional and portfolio target are distinct',()=>{const p=buyingPower(q,{balance:306},[{symbol:q.symbol,type:0,lots:10}],[q],now);assert.equal(p.cost,2310);assert.equal(p.cashEnough,false);assert.equal(p.remaining,0);assert.equal(p.budgetEnough,false);assert.equal(p.freeMargin,null);});
+test('sufficient cash does not override a 120 dollar exposure target',()=>{const p=buyingPower(q,{balance:5000,freeMargin:4000},[],[q],now);assert.equal(p.cashEnough,true);assert.equal(p.budgetEnough,false);assert.equal(p.freeMargin,4000);});
+test('small affordable minimum fits and stale data cannot claim buying power',()=>{const small={...q,minLot:1,ask:10};assert.equal(buyingPower(small,{balance:150},[],[small],now).budgetEnough,true);assert.equal(buyingPower({...small,tickTime:now-91},{balance:150},[],[small],now).known,false);assert.equal(buyingPower(small,{balance:150},[{symbol:'missing',type:0,lots:1}],[small],now).remaining,null);});
