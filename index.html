@@ -1,2 +1,62 @@
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LEVI INVEST · מעקב לייב</title><style>body{background:#0c1726;color:#ecf4ff;font:18px Arial;padding:40px}a{color:#65d6b4}</style></head><body><h1>LEVI INVEST</h1><p>פותח את מסך המעקב והחשבון במחשב הזה.</p><a href="http://127.0.0.1:22352/mt4">פתח את המסך הראשי</a><p>MT4 והשירות המקומי צריכים לפעול במחשב הזה.</p><p><a href="legacy-dashboard.html">הסימולציה והמסך הקודם</a></p><p><a href="/push.html">התראות לאייפון</a></p><p><a href="/binance-agent.html">Binance Wave Agent · DEMO / LIVE</a></p><script src="/landing.js" defer></script></body></html>
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LEVI INVEST</title>
+  <style>
+    :root{color-scheme:dark}
+    *{box-sizing:border-box}
+    body{margin:0;background:#08111f;color:#eef5ff;font-family:Arial,sans-serif}
+    .wrap{max-width:1000px;margin:auto;padding:42px 24px}
+    .eyebrow{color:#8da0b9;letter-spacing:2px;font-size:12px}
+    h1{font-size:42px;margin:8px 0}
+    .lead{color:#aab8ca;line-height:1.7;margin-bottom:32px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .card{display:block;text-decoration:none;color:#eef5ff;background:#101c2d;border:1px solid #253750;border-radius:20px;padding:26px;min-height:190px}
+    .card:hover{border-color:#4776a8;transform:translateY(-2px)}
+    .card h2{margin:0 0 10px}
+    .card p{color:#aab8ca;line-height:1.6}
+    .primary{border-color:#31577e}
+    .tag{display:inline-block;margin-top:12px;padding:7px 11px;border-radius:99px;background:#173557;color:#dbeeff;font-size:13px}
+    .links{margin-top:28px;display:flex;gap:18px;flex-wrap:wrap}
+    .links a{color:#8ec5ff}
+    footer{margin-top:36px;color:#7f91a9;font-size:13px}
+    @media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{padding:24px 16px}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <div class="eyebrow">LEVI INVEST · CLOUD</div>
+  <h1>מרכז המסחר והמעקב</h1>
+  <p class="lead">בחר את סביבת העבודה. Binance Wave Agent פועל בענן. מסכי MT4/MT5 נשארים זמינים בנפרד ואינם מפנים עוד אוטומטית ל־127.0.0.1.</p>
 
+  <section class="grid">
+    <a class="card primary" href="/binance-agent.html">
+      <h2>Binance Wave Agent</h2>
+      <p>BTCUSDT · Long Only · D1 · MA200 · Wave ≥ 4% · תיק DEMO של 5,000 ₪.</p>
+      <span class="tag">פתח סוכן Binance</span>
+    </a>
+
+    <a class="card" href="/mt4.html">
+      <h2>MT4</h2>
+      <p>מסך המעקב של MetaTrader 4. חיבורים מקומיים דורשים שהשירות המקומי במחשב יהיה פעיל.</p>
+      <span class="tag">פתח MT4</span>
+    </a>
+
+    <a class="card" href="/mt5.html">
+      <h2>MT5</h2>
+      <p>מסך המעקב של MetaTrader 5.</p>
+      <span class="tag">פתח MT5</span>
+    </a>
+  </section>
+
+  <div class="links">
+    <a href="/legacy-dashboard.html">הסימולציה והמסך הקודם</a>
+    <a href="/push.html">התראות לאייפון</a>
+  </div>
+
+  <footer>Binance DEMO/LIVE מנוהל מתוך מסך הסוכן. LIVE נשאר כפוף להגדרות השרת והרשאות ה־API.</footer>
+</main>
+</body>
+</html>
