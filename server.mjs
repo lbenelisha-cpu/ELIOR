@@ -6,6 +6,19 @@ import {fileURLToPath} from "node:url";
 import {URL} from "node:url";
 import {evaluateWaveStrategy,decidePosition} from "./lib/binance-wave-agent.mjs";
 
+const FALLBACK_USDT_SYMBOLS = [
+  'BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','SOLUSDT',
+  'DOGEUSDT','ADAUSDT','TRXUSDT','LINKUSDT','AVAXUSDT',
+  'SUIUSDT','LTCUSDT','BCHUSDT','DOTUSDT','NEARUSDT',
+  'UNIUSDT','APTUSDT','ATOMUSDT','FILUSDT','ETCUSDT',
+  'ICPUSDT','AAVEUSDT','ARBUSDT','OPUSDT','INJUSDT',
+  'SEIUSDT','TIAUSDT','RUNEUSDT','ALGOUSDT','VETUSDT'
+];
+
+let universeStatus = 'STARTING';
+let universeError = null;
+
+
 const D=path.dirname(fileURLToPath(import.meta.url));
 const PORT=+(process.env.PORT||8080);
 const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||4);
