@@ -1,6 +1,8 @@
-const MODE = '/api/binance-mode';
-const AGENT = '/api/binance-agent';
-const EVALUATE = '/api/binance-agent/evaluate';
+const API_BASE = 'https://binance-wave-agent.onrender.com';
+
+const MODE = API_BASE + '/api/binance-mode';
+const AGENT = API_BASE + '/api/binance-agent';
+const EVALUATE = API_BASE + '/api/binance-agent/evaluate';
 
 const $ = (selector) =>
   document.querySelector(selector);
