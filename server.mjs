@@ -7,43 +7,77 @@ import {URL} from "node:url";
 import {evaluateWaveStrategy,decidePosition} from "./lib/binance-wave-agent.mjs";
 
 
-function markPaperToMarket(paper, agents) {
-  const bySymbol = new Map((agents || []).map(a => [a.symbol, a]));
+function markPaperToMarket(paperState, agentList, streamMap = {}) {
+  const agentBySymbol = new Map((agentList || []).map(a => [a.symbol, a]));
   let positionsValueIls = 0;
 
-  for (const [symbol, pos] of Object.entries(paper.positions || {})) {
-    const agent = bySymbol.get(symbol);
-    const currentPrice = Number(agent?.strategy?.price ?? agent?.lastPrice ?? pos.entryPrice);
+  for (const [symbol, pos] of Object.entries(paperState.positions || {})) {
+    const agent = agentBySymbol.get(symbol);
+    const stream = streamMap?.[symbol];
+
     const entryPrice = Number(pos.entryPrice || 0);
-    const investedIls = Number(pos.investedIls ?? pos.slotIls ?? 0);
-    const btcOrUnits = Number(pos.units ?? pos.qty ?? pos.quantity ?? 0);
+    const investedIls = Number(
+      pos.investedIls ??
+      pos.amountIls ??
+      pos.slotIls ??
+      (paperState.slotIls || 0)
+    );
+
+    // Prefer live stream price; fall back to latest strategy/D1 price.
+    const currentPrice = Number(
+      stream?.lastPrice ??
+      agent?.stream?.lastPrice ??
+      agent?.strategy?.livePrice ??
+      agent?.strategy?.price ??
+      pos.currentPrice ??
+      entryPrice
+    );
 
     let currentValueIls = investedIls;
-    if (entryPrice > 0 && currentPrice > 0 && investedIls > 0) {
+
+    if (
+      Number.isFinite(entryPrice) && entryPrice > 0 &&
+      Number.isFinite(currentPrice) && currentPrice > 0 &&
+      Number.isFinite(investedIls) && investedIls >= 0
+    ) {
       currentValueIls = investedIls * (currentPrice / entryPrice);
-    } else if (btcOrUnits > 0 && currentPrice > 0) {
-      currentValueIls = btcOrUnits * currentPrice;
     }
 
     const pnlIls = currentValueIls - investedIls;
     const pnlPct = investedIls > 0 ? (pnlIls / investedIls) * 100 : 0;
 
-    pos.currentPrice = currentPrice || null;
     pos.investedIls = investedIls;
+    pos.currentPrice = Number.isFinite(currentPrice) ? currentPrice : null;
     pos.currentValueIls = currentValueIls;
     pos.pnlIls = pnlIls;
     pos.pnlPct = pnlPct;
+
     positionsValueIls += currentValueIls;
   }
 
-  paper.valueIls = Number(paper.cashIls || 0) + positionsValueIls;
-  paper.profitIls = paper.valueIls - Number(paper.initialIls || 0);
-  paper.profitPct = Number(paper.initialIls || 0) > 0
-    ? (paper.profitIls / Number(paper.initialIls)) * 100
+  paperState.activePositions = Object.keys(paperState.positions || {}).length;
+  paperState.positionsValueIls = positionsValueIls;
+  paperState.valueIls = Number(paperState.cashIls || 0) + positionsValueIls;
+  paperState.profitIls = paperState.valueIls - Number(paperState.initialIls || 0);
+  paperState.profitPct = Number(paperState.initialIls || 0) > 0
+    ? (paperState.profitIls / Number(paperState.initialIls)) * 100
     : 0;
-  paper.activePositions = Object.keys(paper.positions || {}).length;
-  return paper;
+
+  return paperState;
 }
+
+
+const FALLBACK_USDT_SYMBOLS = [
+  'BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','SOLUSDT',
+  'DOGEUSDT','ADAUSDT','TRXUSDT','LINKUSDT','AVAXUSDT',
+  'SUIUSDT','LTCUSDT','BCHUSDT','DOTUSDT','NEARUSDT',
+  'UNIUSDT','APTUSDT','ATOMUSDT','FILUSDT','ETCUSDT',
+  'ICPUSDT','AAVEUSDT','ARBUSDT','OPUSDT','INJUSDT',
+  'SEIUSDT','TIAUSDT','RUNEUSDT','ALGOUSDT','VETUSDT'
+];
+
+let universeStatus = 'STARTING';
+let universeError = null;
 
 
 const D=path.dirname(fileURLToPath(import.meta.url));
