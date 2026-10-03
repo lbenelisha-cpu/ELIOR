@@ -6,17 +6,44 @@ import {fileURLToPath} from "node:url";
 import {URL} from "node:url";
 import {evaluateWaveStrategy,decidePosition} from "./lib/binance-wave-agent.mjs";
 
-const FALLBACK_USDT_SYMBOLS = [
-  'BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','SOLUSDT',
-  'DOGEUSDT','ADAUSDT','TRXUSDT','LINKUSDT','AVAXUSDT',
-  'SUIUSDT','LTCUSDT','BCHUSDT','DOTUSDT','NEARUSDT',
-  'UNIUSDT','APTUSDT','ATOMUSDT','FILUSDT','ETCUSDT',
-  'ICPUSDT','AAVEUSDT','ARBUSDT','OPUSDT','INJUSDT',
-  'SEIUSDT','TIAUSDT','RUNEUSDT','ALGOUSDT','VETUSDT'
-];
 
-let universeStatus = 'STARTING';
-let universeError = null;
+function markPaperToMarket(paper, agents) {
+  const bySymbol = new Map((agents || []).map(a => [a.symbol, a]));
+  let positionsValueIls = 0;
+
+  for (const [symbol, pos] of Object.entries(paper.positions || {})) {
+    const agent = bySymbol.get(symbol);
+    const currentPrice = Number(agent?.strategy?.price ?? agent?.lastPrice ?? pos.entryPrice);
+    const entryPrice = Number(pos.entryPrice || 0);
+    const investedIls = Number(pos.investedIls ?? pos.slotIls ?? 0);
+    const btcOrUnits = Number(pos.units ?? pos.qty ?? pos.quantity ?? 0);
+
+    let currentValueIls = investedIls;
+    if (entryPrice > 0 && currentPrice > 0 && investedIls > 0) {
+      currentValueIls = investedIls * (currentPrice / entryPrice);
+    } else if (btcOrUnits > 0 && currentPrice > 0) {
+      currentValueIls = btcOrUnits * currentPrice;
+    }
+
+    const pnlIls = currentValueIls - investedIls;
+    const pnlPct = investedIls > 0 ? (pnlIls / investedIls) * 100 : 0;
+
+    pos.currentPrice = currentPrice || null;
+    pos.investedIls = investedIls;
+    pos.currentValueIls = currentValueIls;
+    pos.pnlIls = pnlIls;
+    pos.pnlPct = pnlPct;
+    positionsValueIls += currentValueIls;
+  }
+
+  paper.valueIls = Number(paper.cashIls || 0) + positionsValueIls;
+  paper.profitIls = paper.valueIls - Number(paper.initialIls || 0);
+  paper.profitPct = Number(paper.initialIls || 0) > 0
+    ? (paper.profitIls / Number(paper.initialIls)) * 100
+    : 0;
+  paper.activePositions = Object.keys(paper.positions || {}).length;
+  return paper;
+}
 
 
 const D=path.dirname(fileURLToPath(import.meta.url));
