@@ -7,50 +7,37 @@ import {URL} from "node:url";
 import {evaluateWaveStrategy,decidePosition} from "./lib/binance-wave-agent.mjs";
 
 
-function markPaperToMarket(paperState, agentList, streamMap = {}) {
-  const agentBySymbol = new Map((agentList || []).map(a => [a.symbol, a]));
+function markPaperToMarketExact(paperState, streamMap = {}) {
   let positionsValueIls = 0;
 
   for (const [symbol, pos] of Object.entries(paperState.positions || {})) {
-    const agent = agentBySymbol.get(symbol);
-    const stream = streamMap?.[symbol];
-
     const entryPrice = Number(pos.entryPrice || 0);
-    const investedIls = Number(
-      pos.investedIls ??
-      pos.amountIls ??
-      pos.slotIls ??
-      (paperState.slotIls || 0)
-    );
+    const allocationIls = Number(pos.allocationIls || 0);
+    const qty = Number(pos.qty || 0);
+    const livePrice = Number(streamMap?.[symbol]?.lastPrice);
 
-    // Prefer live stream price; fall back to latest strategy/D1 price.
-    const currentPrice = Number(
-      stream?.lastPrice ??
-      agent?.stream?.lastPrice ??
-      agent?.strategy?.livePrice ??
-      agent?.strategy?.price ??
-      pos.currentPrice ??
-      entryPrice
-    );
+    const currentPrice =
+      Number.isFinite(livePrice) && livePrice > 0
+        ? livePrice
+        : entryPrice;
 
-    let currentValueIls = investedIls;
+    let currentValueIls = allocationIls;
 
-    if (
-      Number.isFinite(entryPrice) && entryPrice > 0 &&
-      Number.isFinite(currentPrice) && currentPrice > 0 &&
-      Number.isFinite(investedIls) && investedIls >= 0
-    ) {
-      currentValueIls = investedIls * (currentPrice / entryPrice);
+    if (entryPrice > 0 && currentPrice > 0 && allocationIls >= 0) {
+      currentValueIls = allocationIls * (currentPrice / entryPrice);
+    } else if (qty > 0 && currentPrice > 0 && entryPrice > 0) {
+      currentValueIls = allocationIls * (currentPrice / entryPrice);
     }
 
-    const pnlIls = currentValueIls - investedIls;
-    const pnlPct = investedIls > 0 ? (pnlIls / investedIls) * 100 : 0;
+    const pnlIls = currentValueIls - allocationIls;
+    const pnlPct = allocationIls > 0 ? (pnlIls / allocationIls) * 100 : 0;
 
-    pos.investedIls = investedIls;
-    pos.currentPrice = Number.isFinite(currentPrice) ? currentPrice : null;
+    pos.currentPrice = currentPrice;
     pos.currentValueIls = currentValueIls;
     pos.pnlIls = pnlIls;
     pos.pnlPct = pnlPct;
+    pos.allocationIls = allocationIls;
+    pos.qty = qty;
 
     positionsValueIls += currentValueIls;
   }
