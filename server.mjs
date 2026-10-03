@@ -127,8 +127,56 @@ function startMarketStream(){
   marketSocket.on('error',()=>{});
 }
 async function candles(s){const r=await j(`/api/v3/klines?symbol=${s}&interval=1d&limit=${Math.max(250,MAP+30)}`),now=Date.now();return r.filter(x=>+x[6]<now).map(x=>({closeTime:+x[6],close:+x[4]}))}
-const value=()=>paper.cashIls+Object.entries(paper.positions).reduce((n,[s,p])=>n+p.qty*+(agents[s]?.strategy?.price||streams[s]?.lastPrice||p.entryPrice),0);
-const snap=()=>{const v=value();return {...paper,slotIls:SLOT,maxPositions:MAX,activePositions:Object.keys(paper.positions).length,valueIls:v,profitIls:v-INITIAL,profitPct:(v/INITIAL-1)*100}};
+const livePriceFor=(symbol,pos)=>{
+  const live=Number(streams[symbol]?.lastPrice);
+  if(Number.isFinite(live)&&live>0)return live;
+  const d1=Number(agents[symbol]?.strategy?.price);
+  if(Number.isFinite(d1)&&d1>0)return d1;
+  return Number(pos?.entryPrice||0);
+};
+
+const snap=()=>{
+  const positions={};
+  let positionsValueIls=0;
+
+  for(const [symbol,p] of Object.entries(paper.positions)){
+    const currentPrice=livePriceFor(symbol,p);
+    const allocationIls=Number(p.allocationIls||0);
+    const entryPrice=Number(p.entryPrice||0);
+
+    const currentValueIls=
+      entryPrice>0&&currentPrice>0
+        ? allocationIls*(currentPrice/entryPrice)
+        : allocationIls;
+
+    const pnlIls=currentValueIls-allocationIls;
+    const pnlPct=allocationIls>0?(pnlIls/allocationIls)*100:0;
+
+    positions[symbol]={
+      ...p,
+      currentPrice,
+      currentValueIls,
+      pnlIls,
+      pnlPct
+    };
+
+    positionsValueIls+=currentValueIls;
+  }
+
+  const valueIls=Number(paper.cashIls||0)+positionsValueIls;
+
+  return {
+    ...paper,
+    positions,
+    slotIls:SLOT,
+    maxPositions:MAX,
+    activePositions:Object.keys(positions).length,
+    positionsValueIls,
+    valueIls,
+    profitIls:valueIls-INITIAL,
+    profitPct:INITIAL>0?(valueIls/INITIAL-1)*100:0
+  };
+};
 const reset=()=>paper={initialIls:INITIAL,cashIls:INITIAL,positions:{},trades:[],lastAction:null};
 function apply(s,d,price,at){price=+price;const p=paper.positions[s];if(d==='BUY'&&!p&&Object.keys(paper.positions).length<MAX&&paper.cashIls>0){const a=Math.min(SLOT,paper.cashIls);paper.positions[s]={symbol:s,qty:a/price,entryPrice:price,allocationIls:a,entryAt:at};paper.cashIls-=a;paper.lastAction={type:'BUY',symbol:s,price,at}}else if(d==='SELL'&&p){const proceeds=p.qty*price,pnlIls=proceeds-p.allocationIls,pnlPct=(price/p.entryPrice-1)*100;paper.cashIls+=proceeds;paper.trades.unshift({symbol:s,buyPrice:p.entryPrice,sellPrice:price,pnlIls,pnlPct,at});paper.trades=paper.trades.slice(0,100);delete paper.positions[s];paper.lastAction={type:'SELL',symbol:s,price,at}}}
 async function evalOne(s){try{const c=await candles(s),st=evaluateWaveStrategy(c,{minWave:MIN,maPeriod:MAP}),pos=paper.positions[s]?'LONG':'CASH';let d=decidePosition(st,pos),ex='IDLE';if(d==='BUY'&&!paper.positions[s]&&Object.keys(paper.positions).length>=MAX){d='WAIT_NO_SLOT';ex='NO_SLOT'}if(mode==='demo'&&(d==='BUY'||d==='SELL')){apply(s,d,st.price,new Date(c.at(-1).closeTime).toISOString());ex='PAPER_EXECUTED'}agents[s]={...agents[s],symbol:s,position:paper.positions[s]?'LONG':'CASH',decision:d,strategy:st,lastDecisionAt:new Date().toISOString(),lastError:null,execution:ex}}catch(e){agents[s]={...(agents[s]||{symbol:s,position:'CASH',decision:'HOLD'}),lastError:e.message,execution:'ERROR'}}}
