@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <title>Binance Wave Agent</title>
+
+  <link rel="stylesheet" href="binance-agent.css">
+</head>
+
+<body>
+
+<main class="wrap">
+
+<header>
+  <div>
+    <div class="eyebrow">
+      BINANCE · WAVE AGENT V1
+    </div>
+
+    <h1>סוכן BTCUSDT</h1>
+
+    <p>
+      Long Only · D1 · Wave ≥ 4% · MA200
+    </p>
+  </div>
+
+  <div id="status" class="status">
+    מתחבר…
+  </div>
+</header>
+
+
+<section class="mode-card">
+
+  <div>
+    <h2>מצב חשבון</h2>
+
+    <p>
+      DEMO משתמש ב־Spot Testnet.
+      LIVE משתמש בסביבת Binance האמיתית.
+    </p>
+  </div>
+
+  <div class="seg">
+
+    <button id="demoBtn">
+      DEMO
+    </button>
+
+    <button id="liveBtn">
+      LIVE
+    </button>
+
+  </div>
+
+  <div id="liveWarning"
+       class="warning hidden">
+
+    <b>LIVE</b>
+
+    <span id="liveText"></span>
+
+  </div>
+
+</section>
+
+
+<section class="grid">
+
+  <article>
+    <span>נכס</span>
+    <strong>BTCUSDT</strong>
+  </article>
+
+  <article>
+    <span>מחיר</span>
+    <strong id="price">—</strong>
+  </article>
+
+  <article>
+    <span>MA200</span>
+    <strong id="ma">—</strong>
+  </article>
+
+  <article>
+    <span>גל נוכחי</span>
+    <strong id="wave">—</strong>
+  </article>
+
+  <article>
+    <span>גל ירידה קודם</span>
+    <strong id="prevDown">—</strong>
+  </article>
+
+  <article>
+    <span>גל עלייה קודם</span>
+    <strong id="prevUp">—</strong>
+  </article>
+
+  <article>
+    <span>מצב תיק</span>
+    <strong id="position">—</strong>
+  </article>
+
+  <article>
+    <span>החלטת הסוכן</span>
+    <strong id="decision"
+            class="decision">
+      —
+    </strong>
+  </article>
+
+</section>
+
+
+<section class="rules paper-card">
+  <h2>תיק DEMO · 5,000 ₪</h2>
+  <div class="grid paper-grid">
+    <article><span>מזומן</span><strong id="paperCash">—</strong></article>
+    <article><span>כמות BTC</span><strong id="paperBtc">—</strong></article>
+    <article><span>מחיר כניסה</span><strong id="paperEntry">—</strong></article>
+    <article><span>שווי תיק</span><strong id="paperValue">—</strong></article>
+    <article><span>רווח / הפסד</span><strong id="paperPnl">—</strong></article>
+    <article><span>עסקאות סגורות</span><strong id="paperTradesCount">0</strong></article>
+  </div>
+  <div class="paper-actions"><button id="resetPaperBtn" class="refresh">איפוס תיק DEMO ל־5,000 ₪</button></div>
+  <div id="paperHistory" class="paper-history"></div>
+</section>
+
+<section class="rules">
+
+  <h2>בדיקת תנאי BUY</h2>
+
+  <div id="checks">
+    טוען נתונים...
+  </div>
+
+</section>
+
+
+<section class="rules">
+
+  <h2>מצב ביצוע</h2>
+
+  <p>
+    API:
+    <b id="keys">—</b>
+  </p>
+
+  <p>
+    Execution:
+    <b id="execution">—</b>
+  </p>
+
+  <p id="error"></p>
+
+  <button id="refreshBtn">
+    בדוק עכשיו
+  </button>
+
+</section>
+
+
+<section class="rules">
+
+  <h2>כללי החלטה</h2>
+
+  <p>
+    <b>BUY:</b>
+    מחיר מעל MA200 +
+    גל עולה לפחות 4% +
+    הגל העולה גדול מהגל היורד הקודם.
+  </p>
+
+  <p>
+    <b>SELL:</b>
+    גל הירידה החדש גדול מהגל העולה הקודם
+    → מעבר ל־USDT.
+  </p>
+
+  <p>
+    <b>HOLD:</b>
+    כל מצב אחר.
+  </p>
+
+</section>
+
+
+<footer>
+
+  מעבר ל־LIVE אינו מפעיל לבדו פקודות אמיתיות.
+
+  ביצוע חי נשאר נעול עד להפעלה מפורשת
+  בצד השרת.
+
+</footer>
+
+</main>
+
+
+<script src="binance-agent.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,36 @@
+BINANCE WAVE AGENT V1
+=====================
+אסטרטגיה: BTCUSDT Spot, Long Only, נר D1 סגור, MA200, גל מינימום 4%.
+BUY: מחיר מעל MA200 + גל עולה >=4% + גל עולה גדול מהגל היורד הקודם.
+SELL: גל יורד גדול מהגל העולה הקודם. SELL עובר ל-USDT; אין Short.
+
+משתני סביבה:
+BINANCE_DEFAULT_MODE=demo
+BINANCE_WAVE_MIN_PERCENT=4
+BINANCE_MA_PERIOD=200
+BINANCE_AUTO_EXECUTION=false
+BINANCE_BUY_BALANCE_PERCENT=95
+
+DEMO / Spot Testnet:
+BINANCE_DEMO_API_KEY=...
+BINANCE_DEMO_API_SECRET=...
+
+LIVE:
+BINANCE_LIVE_API_KEY=...
+BINANCE_LIVE_API_SECRET=...
+BINANCE_LIVE_TRADING_ENABLED=false
+BINANCE_LIVE_MAX_USDT=100
+
+בטיחות:
+1. ברירת המחדל AUTO_EXECUTION=false: החלטות בלבד, ללא Order.
+2. DEMO יכול לבצע פקודות Testnet רק אם AUTO_EXECUTION=true ומפתחות Testnet קיימים.
+3. LIVE דורש גם AUTO_EXECUTION=true וגם BINANCE_LIVE_TRADING_ENABLED=true.
+4. BINANCE_LIVE_MAX_USDT מגביל כל BUY חי. ברירת מחדל 100 USDT.
+5. API Secret נשמר רק ב-Environment Variables בצד השרת. לא להכניס לקוד/GitHub/Frontend.
+6. נתוני ההחלטה מגיעים מ-Binance Production public D1; סביבת DEMO/LIVE משנה רק את החשבון שבו מבוצעת הפקודה.
+
+מומלץ להתחיל:
+DEMO + AUTO_EXECUTION=false -> בדיקת החלטות
+DEMO + AUTO_EXECUTION=true  -> Testnet
+LIVE + LIVE_TRADING_ENABLED=false -> תצוגה בלבד
+ורק לאחר אימות מלא להפעיל LIVE.
