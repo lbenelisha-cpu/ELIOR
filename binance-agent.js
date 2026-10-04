@@ -19,6 +19,7 @@ let currentLiveAccount=null;
 let currentVisibleAgents=[];
 let selectedInterval='1d';
 let selectedRange='6M';
+let activeView='trade';
 
 async function J(u,o={}){
   const r=await fetch(u,{cache:'no-store',...o});
@@ -93,6 +94,7 @@ function activeContext(d,currentMode,liveAccount){
 
 function render(d,currentMode='demo',liveAccount=null){
   currentAgentData=d;
+    if(activeView==='portfolio')renderPortfolioView();
   currentLiveAccount=liveAccount;
   const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   const paperPos=p.positions||{};
@@ -455,6 +457,11 @@ $('#resetPaperBtn').onclick=async()=>{
     load();
   }
 };
+
+document.querySelectorAll('.nav-btn[data-view]').forEach(btn=>{
+  btn.onclick=()=>setDashboardView(btn.dataset.view||'trade');
+});
+setDashboardView('trade');
 
 document.querySelectorAll('.timeframe-btn').forEach(btn=>{
   btn.onclick=async()=>{
