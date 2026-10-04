@@ -128,3 +128,27 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .decision-row .warn{color:var(--amber);font-weight:800}
 .decision-history-section-title{margin-top:14px;color:#c7d7e8;font-weight:800}
 @media(max-width:1000px){.decision-row{grid-template-columns:120px 90px 90px 90px 90px 1fr}.decision-row>div:nth-child(5){display:none}}
+
+.asset-table tbody tr.active-position{
+  background:linear-gradient(90deg,rgba(38,208,124,.16),rgba(38,208,124,.05));
+  box-shadow:inset 4px 0 0 #26d07c;
+}
+.asset-table tbody tr.active-position td:first-child b{color:#7af2b1}
+@keyframes buyPulse{
+  0%,100%{box-shadow:inset 4px 0 0 #2f7cff,0 0 0 rgba(47,124,255,0)}
+  50%{box-shadow:inset 4px 0 0 #2f7cff,0 0 18px rgba(47,124,255,.45)}
+}
+.asset-table tbody tr.buy-alert{
+  background:linear-gradient(90deg,rgba(47,124,255,.18),rgba(47,124,255,.05));
+  animation:buyPulse 1.6s ease-in-out infinite;
+}
+.asset-table tbody tr.buy-alert td:first-child b{color:#7fb2ff}
+@keyframes rotatePulse{
+  0%,100%{box-shadow:inset 4px 0 0 #f5c451,0 0 0 rgba(245,196,81,0)}
+  50%{box-shadow:inset 4px 0 0 #f5c451,0 0 18px rgba(245,196,81,.38)}
+}
+.asset-table tbody tr.rotate-alert{
+  background:linear-gradient(90deg,rgba(245,196,81,.18),rgba(245,196,81,.05));
+  animation:rotatePulse 1.8s ease-in-out infinite;
+}
+.asset-table tbody tr.rotate-alert td:first-child b{color:#ffd978}
