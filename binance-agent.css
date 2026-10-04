@@ -162,3 +162,17 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .decision.active-long{color:#7af2b1;font-weight:900}
 .decision.wait-no-slot{color:#f5c451;font-weight:900}
 .decision.wait-no-rotation{color:#ffd978;font-weight:900}
+
+[hidden]{display:none!important}
+.top-nav .nav-btn{position:relative;transition:.2s ease}
+.top-nav .nav-btn.active:after{
+  content:"";position:absolute;left:18%;right:18%;bottom:-8px;height:2px;border-radius:2px;
+  background:currentColor;opacity:.9
+}
+.portfolio-view-content{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px}
+.portfolio-card{background:#0a1522;border:1px solid #1d3147;border-radius:12px;padding:14px}
+.portfolio-card>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.portfolio-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#91a6bc}
+.portfolio-card-grid b{display:block;color:#e8f0f8;margin-top:2px}
+.status-badge.active{color:#7af2b1;background:rgba(38,208,124,.12);border:1px solid rgba(38,208,124,.3);padding:4px 7px;border-radius:999px;font-size:10px}
+.empty-state{padding:24px;text-align:center;color:#8194a8}
