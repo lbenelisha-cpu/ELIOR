@@ -72,6 +72,7 @@ function loadPaperState(){
       cashIls:Number(raw.cashIls??INITIAL),
       positions:raw.positions||{},
       trades:Array.isArray(raw.trades)?raw.trades:[],
+      actionLog:Array.isArray(raw.actionLog)?raw.actionLog:[],
       lastAction:raw.lastAction||null
     };
     console.log('Paper state restored',Object.keys(paper.positions).length,'positions');
@@ -82,12 +83,53 @@ function loadPaperState(){
   }
 }
 
+const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
+let liveActionLog=[];
+
+function saveLiveActionLog(){
+  try{
+    ensureStateDir();
+    const tmp=LIVE_LOG_FILE+'.tmp';
+    fs.writeFileSync(tmp,JSON.stringify(liveActionLog,null,2),'utf8');
+    fs.renameSync(tmp,LIVE_LOG_FILE);
+    return true;
+  }catch(e){
+    console.error('Live action log save failed',e.message);
+    return false;
+  }
+}
+
+function loadLiveActionLog(){
+  try{
+    ensureStateDir();
+    if(!fs.existsSync(LIVE_LOG_FILE))return false;
+    const raw=JSON.parse(fs.readFileSync(LIVE_LOG_FILE,'utf8'));
+    liveActionLog=Array.isArray(raw)?raw:[];
+    return true;
+  }catch(e){
+    console.error('Live action log load failed',e.message);
+    return false;
+  }
+}
+
+function pushDemoAction(action){
+  paper.actionLog=Array.isArray(paper.actionLog)?paper.actionLog:[];
+  paper.actionLog.unshift(action);
+  paper.actionLog=paper.actionLog.slice(0,200);
+}
+
+function pushLiveAction(action){
+  liveActionLog.unshift(action);
+  liveActionLog=liveActionLog.slice(0,200);
+  saveLiveActionLog();
+}
+
 let mode='demo';
 let SYMBOLS=[];
 let agents={};
 let streams={};
 let marketSocket=null;
-let paper={initialIls:INITIAL,cashIls:INITIAL,positions:{},trades:[],lastAction:null};
+let paper={initialIls:INITIAL,cashIls:INITIAL,positions:{},trades:[],actionLog:[],lastAction:null};
 
 const EXCLUDED_BASES=new Set(['USDC','FDUSD','TUSD','USDP','DAI','EUR','AEUR','TRY','BRL','GBP','AUD','BIDR','IDRT','UAH','RUB','NGN','ZAR','BUSD']);
 const LEVERAGED_SUFFIXES=['UP','DOWN','BULL','BEAR'];
@@ -346,6 +388,7 @@ const reset=()=>{
     cashIls:INITIAL,
     positions:{},
     trades:[],
+    actionLog:[],
     lastAction:null
   };
   savePaperState();
@@ -369,6 +412,17 @@ function apply(s,d,price,at,meta={}){
     };
     paper.cashIls-=a;
     paper.lastAction={type:'BUY',symbol:s,price,at,...meta};
+    pushDemoAction({
+      type:meta.reason==='ROTATION_IN'?'ROTATE_IN':'BUY',
+      symbol:s,
+      price,
+      amountIls:a,
+      qty:a/price,
+      reason:meta.reason||'BUY',
+      at:new Date().toISOString(),
+      score:Number.isFinite(+meta.score)?+meta.score:null,
+      rotatedFrom:meta.rotatedFrom||null
+    });
     savePaperState();
     return true;
   }
@@ -393,6 +447,18 @@ function apply(s,d,price,at,meta={}){
     paper.trades=paper.trades.slice(0,100);
     delete paper.positions[s];
     paper.lastAction={type:'SELL',symbol:s,price,at,...meta};
+    pushDemoAction({
+      type:meta.reason==='ROTATION_OUT'?'ROTATE_OUT':'SELL',
+      symbol:s,
+      price,
+      amountIls:proceeds,
+      qty:p.qty,
+      pnlIls,
+      pnlPct,
+      reason:meta.reason||'SELL',
+      at:new Date().toISOString(),
+      rotatedTo:meta.rotatedTo||null
+    });
     savePaperState();
     return true;
   }
@@ -801,6 +867,14 @@ const server=http.createServer((req,res)=>{
     return;
   }
 
+  if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
+    return send(res,{
+      mode,
+      demo:(paper.actionLog||[]).slice(0,100),
+      live:(liveActionLog||[]).slice(0,100)
+    });
+  }
+
   if(u.pathname==='/api/binance-paper/reset'&&req.method==='POST'){
     reset();
     return send(res,{ok:true,paper:snap()});
@@ -866,5 +940,6 @@ const server=http.createServer((req,res)=>{
 server.listen(PORT,'0.0.0.0',async()=>{
   console.log('Server',PORT);
   loadPaperState();
+  loadLiveActionLog();
   await refreshUniverse();
 });
