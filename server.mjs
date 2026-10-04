@@ -535,6 +535,99 @@ function startMarketStream(){
   marketSocket.on('error',()=>{});
 }
 
+async function fetchHistoricalDaily(symbol,startMs,endMs=Date.now()){
+  const rows=[];
+  let cursor=Number(startMs);
+  const end=Number(endMs);
+  while(cursor<end){
+    const r=await j(`/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=1d&limit=1000&startTime=${cursor}&endTime=${end}`);
+    if(!Array.isArray(r)||!r.length)break;
+    for(const x of r){
+      rows.push({closeTime:+x[6],close:+x[4]});
+    }
+    const next=+r.at(-1)[6]+1;
+    if(next<=cursor)break;
+    cursor=next;
+    if(r.length<1000)break;
+  }
+  return rows.filter(x=>Number.isFinite(x.close)&&Number.isFinite(x.closeTime));
+}
+
+function evalWaveWithWindow(candles,{minWave=4,maxWave=12,maPeriod=200}={}){
+  const closes=candles.map(c=>Number(c.close)).filter(Number.isFinite);
+  if(closes.length<maPeriod+3)return null;
+  const slice=closes.slice(-maPeriod);
+  const ma=slice.reduce((a,b)=>a+b,0)/maPeriod;
+  const pct=(a,b)=>Math.abs((b-a)/a)*100;
+
+  let direction=null,waveStart=closes[0],extreme=closes[0],previousUpWave=null,previousDownWave=null,currentWave=0;
+  for(let i=1;i<closes.length;i++){
+    const p=closes[i],prev=closes[i-1];
+    if(direction===null){
+      if(p>prev)direction='UP';
+      else if(p<prev)direction='DOWN';
+      waveStart=prev;extreme=p;currentWave=pct(waveStart,extreme);continue;
+    }
+    if(direction==='UP'){
+      if(p>=extreme){extreme=p;currentWave=pct(waveStart,extreme);}
+      else{previousUpWave=pct(waveStart,extreme);direction='DOWN';waveStart=extreme;extreme=p;currentWave=pct(waveStart,extreme);}
+    }else{
+      if(p<=extreme){extreme=p;currentWave=pct(waveStart,extreme);}
+      else{previousDownWave=pct(waveStart,extreme);direction='UP';waveStart=extreme;extreme=p;currentWave=pct(waveStart,extreme);}
+    }
+  }
+  const price=closes.at(-1),aboveMA=price>ma;
+  return {
+    price,ma,aboveMA,direction,currentWave,previousUpWave,previousDownWave,
+    buyConfirmed:direction==='UP'&&previousDownWave!=null&&currentWave>=minWave&&currentWave<=maxWave&&currentWave>previousDownWave&&aboveMA,
+    sellConfirmed:direction==='DOWN'&&previousUpWave!=null&&currentWave>previousUpWave
+  };
+}
+
+function backtestWindow(candles,{minWave=4,maxWave=12,maPeriod=200,initial=5000}={}){
+  let cash=initial,qty=0,entryPrice=null;
+  const trades=[];
+  const equity=[];
+  for(let i=maPeriod+3;i<candles.length;i++){
+    const hist=candles.slice(0,i+1);
+    const st=evalWaveWithWindow(hist,{minWave,maxWave,maPeriod});
+    if(!st)continue;
+    const price=st.price;
+
+    if(qty===0&&st.buyConfirmed){
+      qty=cash/price;
+      entryPrice=price;
+      cash=0;
+    }else if(qty>0&&st.sellConfirmed){
+      const proceeds=qty*price;
+      const pnlPct=(price/entryPrice-1)*100;
+      trades.push({entryPrice,exitPrice:price,pnlPct,exitAt:candles[i].closeTime});
+      cash=proceeds;qty=0;entryPrice=null;
+    }
+    const eq=cash+qty*price;
+    equity.push(eq);
+  }
+  const lastPrice=Number(candles.at(-1)?.close||0);
+  const finalValue=cash+qty*lastPrice;
+  let peak=initial,maxDD=0;
+  for(const e of equity){
+    if(e>peak)peak=e;
+    const dd=peak>0?(e/peak-1)*100:0;
+    if(dd<maxDD)maxDD=dd;
+  }
+  const wins=trades.filter(t=>t.pnlPct>0).length;
+  return {
+    minWave,maxWave,initial,finalValue,
+    returnPct:(finalValue/initial-1)*100,
+    closedTrades:trades.length,
+    winRate:trades.length?wins/trades.length*100:0,
+    maxDrawdownPct:maxDD,
+    openPosition:qty>0,
+    openEntryPrice:entryPrice,
+    trades
+  };
+}
+
 async function candles(s){
   const r=await j(`/api/v3/klines?symbol=${s}&interval=1d&limit=${Math.max(250,MAP+30)}`);
   const now=Date.now();
@@ -1175,6 +1268,18 @@ const server=http.createServer((req,res)=>{
       agents:Object.values(agents),
       paper:snap()
     }));
+    return;
+  }
+
+  if(u.pathname==='/api/binance-backtest'&&req.method==='GET'){
+    const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
+    const start=Date.parse(u.searchParams.get('start')||'2021-10-01T00:00:00Z');
+    const windows=String(u.searchParams.get('windows')||'8,10,12,15').split(',').map(Number).filter(Number.isFinite);
+    if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
+    fetchHistoricalDaily(symbol,start,Date.now()).then(c=>{
+      const results=windows.map(maxWave=>backtestWindow(c,{minWave:4,maxWave,maPeriod:MAP,initial:5000}));
+      send(res,{ok:true,symbol,candles:c.length,start:new Date(start).toISOString(),end:c.length?new Date(c.at(-1).closeTime).toISOString():null,results});
+    }).catch(e=>send(res,{ok:false,error:e.message},502));
     return;
   }
 
