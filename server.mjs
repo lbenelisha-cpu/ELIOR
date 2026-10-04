@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {URL} from "node:url";
+import {createHmac} from "node:crypto";
 import {evaluateWaveStrategy,decidePosition} from "./lib/binance-wave-agent.mjs";
 
 const FALLBACK_USDT_SYMBOLS = [
@@ -27,6 +28,9 @@ const INITIAL=5000;
 const SLOT=INITIAL/MAX;
 const UNIVERSE_SIZE=Math.min(30,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||30)));
 const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
+const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
+const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
+const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
 // Rotation controls
@@ -92,6 +96,69 @@ async function j(url){
   const r=await fetch('https://api.binance.com'+url);
   if(!r.ok)throw Error('Binance '+r.status);
   return r.json();
+}
+
+async function binanceServerTime(){
+  try{
+    const t=await j('/api/v3/time');
+    return Number(t.serverTime)||Date.now();
+  }catch{
+    return Date.now();
+  }
+}
+
+async function signedBinanceGet(pathname,params={}){
+  if(!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
+
+  const timestamp=await binanceServerTime();
+  const query=new URLSearchParams({
+    ...Object.fromEntries(Object.entries(params).map(([k,v])=>[k,String(v)])),
+    timestamp:String(timestamp),
+    recvWindow:'5000'
+  });
+  const signature=createHmac('sha256',BINANCE_API_SECRET)
+    .update(query.toString())
+    .digest('hex');
+
+  const url='https://api.binance.com'+pathname+'?'+query.toString()+'&signature='+signature;
+  const r=await fetch(url,{
+    headers:{'X-MBX-APIKEY':BINANCE_API_KEY},
+    cache:'no-store'
+  });
+
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok){
+    throw Error(body?.msg||('Binance '+r.status));
+  }
+  return body;
+}
+
+async function getLiveAccountSnapshot(){
+  const acct=await signedBinanceGet('/api/v3/account',{omitZeroBalances:'true'});
+  const balances=(acct.balances||[])
+    .map(x=>({
+      asset:String(x.asset||''),
+      free:Number(x.free||0),
+      locked:Number(x.locked||0)
+    }))
+    .filter(x=>x.asset&&(x.free>0||x.locked>0));
+
+  const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0};
+
+  return {
+    connected:true,
+    canTrade:Boolean(acct.canTrade),
+    canWithdraw:Boolean(acct.canWithdraw),
+    canDeposit:Boolean(acct.canDeposit),
+    accountType:acct.accountType||'SPOT',
+    balances,
+    usdtFree:usdt.free,
+    usdtLocked:usdt.locked,
+    permissions:Array.isArray(acct.permissions)?acct.permissions:[],
+    makerCommission:acct.makerCommission,
+    takerCommission:acct.takerCommission,
+    updatedAt:new Date().toISOString()
+  };
 }
 
 function isEligibleSymbol(x){
@@ -679,7 +746,8 @@ const server=http.createServer((req,res)=>{
       mode,
       liveTradingEnabled:LIVE,
       autoExecution:false,
-      keysConfigured:false
+      keysConfigured:KEYS_CONFIGURED,
+      liveReadOnly:KEYS_CONFIGURED&&!LIVE
     });
   }
 
@@ -689,13 +757,23 @@ const server=http.createServer((req,res)=>{
     req.on('end',()=>{
       try{
         const m=JSON.parse(b).mode;
-        if(m==='live'&&!LIVE)throw Error('LIVE is locked on server');
+        if(m==='live'&&!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
         mode=m;
         send(res,{ok:true,mode});
       }catch(e){
         send(res,{ok:false,error:e.message},400);
       }
     });
+    return;
+  }
+
+  if(u.pathname==='/api/binance-live-account'&&req.method==='GET'){
+    if(!KEYS_CONFIGURED){
+      return send(res,{connected:false,error:'Binance API keys are not configured'},503);
+    }
+    getLiveAccountSnapshot()
+      .then(account=>send(res,{connected:true,account}))
+      .catch(e=>send(res,{connected:false,error:e.message},502));
     return;
   }
 
@@ -726,7 +804,9 @@ const server=http.createServer((req,res)=>{
         rotationScoreGap:ROTATION_SCORE_GAP,
         rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE,
         stateFile:STATE_FILE,
-        persistentState:true
+        persistentState:true,
+        keysConfigured:KEYS_CONFIGURED,
+        liveTradingEnabled:LIVE
       }
     });
   }
