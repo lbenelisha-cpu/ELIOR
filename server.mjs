@@ -344,7 +344,7 @@ async function evalAll(){
         Object.keys(paper.positions).length>=MAX?'NO_SLOT':'READY'
       );
     }else{
-      setAgentFromEval(ev('HOLD','IDLE');
+      setAgentFromEval(ev,'HOLD','IDLE');
     }
   }
 
