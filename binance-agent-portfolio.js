@@ -11,7 +11,7 @@ async function refreshPortfolioPositions(){
     const n=v=>Number.isFinite(Number(v))?Number(v).toLocaleString('he-IL',{maximumFractionDigits:2}):'—';
     body.innerHTML=ps.map(([sym,p])=>{
       const pnl=Number(p.pnlIls||0),sgn=pnl>=0?'+':'';
-      return `<tr><td><b>${sym}</b></td><td>$${n(p.entryPrice)}</td><td>$${n(p.currentPrice)}</td><td>₪ ${n(p.investedIls)}</td><td>₪ ${n(p.currentValueIls)}</td><td>${sgn}₪ ${n(p.pnlIls)}</td><td>${sgn}${n(p.pnlPct)}%</td></tr>`;
+      return `<tr><td><b>${sym}</b></td><td>${n(p.entryPrice)}</td><td>${n(p.currentPrice)}</td><td>₪ ${n(p.allocationIls)}</td><td>₪ ${n(p.currentValueIls)}</td><td>${sgn}₪ ${n(p.pnlIls)}</td><td>${sgn}${n(p.pnlPct)}%</td></tr>`;
     }).join('');
   }catch{}
 }
