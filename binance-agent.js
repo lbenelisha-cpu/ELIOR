@@ -60,11 +60,15 @@ function render(d,currentMode='demo',liveAccount=null){
     const score=Number(a.score||0);
     let gapText='—';
 
-    if(!held&&weakestActive){
+    if(held){
+      gapText='פעיל';
+    }else if(!a.buyQualified){
+      gapText='— לא כשיר לרוטציה';
+    }else if(weakestActive){
       const gap=score-weakestActive.score;
       gapText=(gap>=0?'+':'')+fmt(gap,1)+' / נדרש +'+fmt(rotationGap,0);
-    }else if(held){
-      gapText='פעיל';
+    }else{
+      gapText='כשיר BUY';
     }
 
     let dec=a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
