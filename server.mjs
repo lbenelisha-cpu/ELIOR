@@ -941,8 +941,9 @@ function decisionReasonFromAgent(agent,ev){
   if(agent?.decision==='WAIT_NO_SLOT')return 'NO_SLOT';
   if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
   if(agent?.decision==='BUY_READY')return 'BUY_READY';
+  if(agent?.position==='LONG')return 'ACTIVE_LONG';
   if(ev.buyQualified)return 'QUALIFIED_BUT_HOLD';
-  return ev.buyReason||'HOLD';
+  return ev.buyReason||'HOLD_NOT_QUALIFIED';
 }
 
 function weakestHeldEvaluation(evals){
@@ -975,7 +976,7 @@ async function evalAll(){
     const isHeld=!!paper.positions[ev.symbol];
 
     if(isHeld){
-      setAgentFromEval(ev,'HOLD','IDLE');
+      setAgentFromEval(ev,'ACTIVE_LONG','HOLDING');
     }else if(ev.rawDecision==='BUY'){
       setAgentFromEval(
         ev,
@@ -1153,8 +1154,8 @@ async function evalAll(){
 
     if(isHeld){
       agents[ev.symbol].position='LONG';
-      agents[ev.symbol].decision='HOLD';
-      agents[ev.symbol].execution='IDLE';
+      agents[ev.symbol].decision='ACTIVE_LONG';
+      agents[ev.symbol].execution='HOLDING';
       continue;
     }
 
