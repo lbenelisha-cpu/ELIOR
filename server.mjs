@@ -1382,15 +1382,53 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-chart'&&req.method==='GET'){
     const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
+    const interval=String(u.searchParams.get('interval')||'1d');
+    const range=String(u.searchParams.get('range')||'6M').toUpperCase();
+
+    const allowedIntervals=new Set(['1h','4h','1d','1w','1M']);
+    const allowedRanges=new Set(['1M','3M','6M','1Y','ALL']);
+
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
-    j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1d&limit=260')
-      .then(rows=>{
-        const candles=(rows||[]).map(x=>({
-          openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]
-        }));
-        send(res,{ok:true,symbol,candles});
-      })
-      .catch(e=>send(res,{ok:false,error:e.message},502));
+    if(!allowedIntervals.has(interval))return send(res,{ok:false,error:'Invalid interval'},400);
+    if(!allowedRanges.has(range))return send(res,{ok:false,error:'Invalid range'},400);
+
+    const now=Date.now();
+    const day=86400000;
+    const startByRange={
+      '1M':now-31*day,
+      '3M':now-93*day,
+      '6M':now-186*day,
+      '1Y':now-366*day,
+      'ALL':Date.UTC(2017,0,1)
+    };
+    const startTime=startByRange[range];
+
+    (async()=>{
+      const rows=[];
+      let cursor=startTime;
+      let pages=0;
+
+      while(cursor<now && pages<15){
+        const batch=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)
+          +'&interval='+encodeURIComponent(interval)
+          +'&limit=1000&startTime='+cursor+'&endTime='+now);
+
+        if(!Array.isArray(batch)||!batch.length)break;
+        rows.push(...batch);
+
+        const next=Number(batch.at(-1)?.[6]||0)+1;
+        if(!Number.isFinite(next)||next<=cursor)break;
+        cursor=next;
+        pages++;
+        if(batch.length<1000)break;
+      }
+
+      const candles=rows.map(x=>({
+        openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]
+      }));
+
+      send(res,{ok:true,symbol,interval,range,candles});
+    })().catch(e=>send(res,{ok:false,error:e.message},502));
     return;
   }
 
