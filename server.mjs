@@ -21,7 +21,7 @@ let universeError = null;
 
 const D=path.dirname(fileURLToPath(import.meta.url));
 const PORT=+(process.env.PORT||8080);
-const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||4);
+const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=3;
 const INITIAL=5000;
@@ -831,7 +831,7 @@ function buyQualification(st){
   if(st.direction!=='UP')return {qualified:false,reason:'NOT_UP'};
   if(!st.aboveMA)return {qualified:false,reason:'BELOW_MA200'};
   if(st.previousDownWave==null)return {qualified:false,reason:'NO_PREVIOUS_DOWN'};
-  if(Number(st.currentWave)<4)return {qualified:false,reason:'WAVE_BELOW_4'};
+  if(Number(st.currentWave)<3)return {qualified:false,reason:'WAVE_BELOW_3'};
   if(Number(st.currentWave)>8)return {qualified:false,reason:'WAVE_ABOVE_8'};
   if(Number(st.currentWave)<=Number(st.previousDownWave))return {qualified:false,reason:'NOT_STRONGER_THAN_PREVIOUS_DOWN'};
   return {qualified:true,reason:'QUALIFIED'};
@@ -850,10 +850,10 @@ function scoreStrategy(st){
 
   // Momentum: strongest around the intended entry zone, but still informative outside it.
   let waveScore=0;
-  if(wave<=4){
-    waveScore=(wave/4)*20;
+  if(wave<=3){
+    waveScore=(wave/3)*20;
   }else if(wave<=8){
-    waveScore=20+((wave-4)/4)*20;
+    waveScore=20+((wave-3)/5)*20;
   }else if(wave<=20){
     waveScore=40-Math.min(20,((wave-8)/12)*20);
   }else{
