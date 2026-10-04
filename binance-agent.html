@@ -125,14 +125,26 @@
           </div>
         </div>
 
-        <div class="chart-toolbar">
-          <button class="time-pill active">1D</button>
-          <button class="time-pill">1W</button>
-          <button class="time-pill">1M</button>
-          <button class="time-pill">3M</button>
-          <button class="time-pill">6M</button>
-          <button class="time-pill">1Y</button>
-          <span class="chart-legend">נרות יומיים · MA200</span>
+        <div class="chart-toolbar multi-toolbar">
+          <div class="toolbar-group">
+            <span class="toolbar-label">נר</span>
+            <button class="time-pill timeframe-btn" data-interval="1h">1H</button>
+            <button class="time-pill timeframe-btn" data-interval="4h">4H</button>
+            <button class="time-pill timeframe-btn active" data-interval="1d">1D</button>
+            <button class="time-pill timeframe-btn" data-interval="1w">1W</button>
+            <button class="time-pill timeframe-btn" data-interval="1M">1M</button>
+          </div>
+
+          <div class="toolbar-group">
+            <span class="toolbar-label">טווח</span>
+            <button class="time-pill range-btn" data-range="1M">1M</button>
+            <button class="time-pill range-btn" data-range="3M">3M</button>
+            <button class="time-pill range-btn active" data-range="6M">6M</button>
+            <button class="time-pill range-btn" data-range="1Y">1Y</button>
+            <button class="time-pill range-btn" data-range="ALL">ALL</button>
+          </div>
+
+          <span id="chartLegend" class="chart-legend">נר 1D · טווח 6M · MA200</span>
         </div>
 
         <div class="chart-wrap">
