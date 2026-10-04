@@ -54,7 +54,9 @@ function render(d,currentMode='demo',liveAccount=null){
     put('#paperTradesCount',(p.trades||[]).length);
   }
 
-  $('#assetsBody').innerHTML=agents.map(a=>{
+  const displayScoreMin=Number(d.config?.rotationMinScore||65);
+  const visibleAgents=agents.filter(a=>isHeld(a)||Number(a.score||0)>=displayScoreMin);
+  $('#assetsBody').innerHTML=visibleAgents.map(a=>{
     const s=a.strategy||{};
     const held=isHeld(a);
     const score=Number(a.score||0);
