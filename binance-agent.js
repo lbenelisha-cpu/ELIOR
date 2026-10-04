@@ -17,6 +17,8 @@ let currentAgentData=null;
 let currentMode='demo';
 let currentLiveAccount=null;
 let currentVisibleAgents=[];
+let selectedInterval='1d';
+let selectedRange='6M';
 
 async function J(u,o={}){
   const r=await fetch(u,{cache:'no-store',...o});
@@ -322,7 +324,8 @@ async function loadDecisionHistory(symbol){
 async function loadChart(symbol){
   try{
     $('#chartEmpty')?.classList.add('hidden');
-    const d=await J(CHART+'?symbol='+encodeURIComponent(symbol));
+    const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
+    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · טווח '+selectedRange+' · MA200');
     drawCandles(d.candles||[]);
   }catch(e){
     $('#chartEmpty')?.classList.remove('hidden');
@@ -450,6 +453,22 @@ $('#resetPaperBtn').onclick=async()=>{
     load();
   }
 };
+
+document.querySelectorAll('.timeframe-btn').forEach(btn=>{
+  btn.onclick=async()=>{
+    selectedInterval=btn.dataset.interval||'1d';
+    document.querySelectorAll('.timeframe-btn').forEach(x=>x.classList.toggle('active',x===btn));
+    await loadChart(selectedSymbol);
+  };
+});
+
+document.querySelectorAll('.range-btn').forEach(btn=>{
+  btn.onclick=async()=>{
+    selectedRange=btn.dataset.range||'6M';
+    document.querySelectorAll('.range-btn').forEach(x=>x.classList.toggle('active',x===btn));
+    await loadChart(selectedSymbol);
+  };
+});
 
 window.addEventListener('resize',()=>{if(selectedSymbol)loadChart(selectedSymbol)});
 load();
