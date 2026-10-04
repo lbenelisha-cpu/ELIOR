@@ -1,5 +1,5 @@
-import json, math, time, urllib.parse, urllib.request
-from datetime import datetime, timezone
+import json, math, time, urllib.request, zipfile, io, csv
+from datetime import datetime, timezone, date
 
 SYMBOLS=['BTCUSDT','ETHUSDT','SOLUSDT','AAVEUSDT','WLDUSDT','ZROUSDT']
 WINDOWS=[8,10,12,15]
@@ -14,18 +14,36 @@ def get_json(url):
     with urllib.request.urlopen(req,timeout=30) as r:
         return json.loads(r.read().decode())
 
+def month_range(start_date,end_date):
+    y,m=start_date.year,start_date.month
+    while (y,m) <= (end_date.year,end_date.month):
+        yield '%04d-%02d' % (y,m)
+        m += 1
+        if m == 13:
+            y += 1
+            m = 1
+
+
 def fetch(symbol):
-    rows=[]; cursor=START_MS
-    while cursor<END_MS:
-        qs=urllib.parse.urlencode({'symbol':symbol,'interval':'1d','limit':1000,'startTime':cursor,'endTime':END_MS})
-        data=get_json('https://api.binance.com/api/v3/klines?'+qs)
-        if not data: break
-        rows.extend({'closeTime':int(x[6]),'close':float(x[4])} for x in data)
-        nxt=int(data[-1][6])+1
-        if nxt<=cursor: break
-        cursor=nxt
-        if len(data)<1000: break
-        time.sleep(0.1)
+    rows=[]
+    start_date=date(2021,10,1)
+    end_date=datetime.now(timezone.utc).date().replace(day=1)
+    base='https://data.binance.vision/data/spot/monthly/klines/{symbol}/1d/{symbol}-1d-{ym}.zip'
+    for ym in month_range(start_date,end_date):
+        url=base.format(symbol=symbol,ym=ym)
+        try:
+            req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+            with urllib.request.urlopen(req,timeout=30) as r:
+                payload=r.read()
+            with zipfile.ZipFile(io.BytesIO(payload)) as z:
+                name=z.namelist()[0]
+                txt=z.read(name).decode('utf-8')
+            for x in csv.reader(txt.splitlines()):
+                if not x: continue
+                rows.append({'closeTime':int(x[6]),'close':float(x[4])})
+        except Exception:
+            continue
+    rows.sort(key=lambda x:x['closeTime'])
     return rows
 
 def eval_wave(candles,min_wave,max_wave,ma_period=200):
