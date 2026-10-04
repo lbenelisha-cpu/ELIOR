@@ -134,16 +134,39 @@ async function signedBinanceGet(pathname,params={}){
 }
 
 async function getLiveAccountSnapshot(){
-  const acct=await signedBinanceGet('/api/v3/account',{omitZeroBalances:'true'});
+  const [acct,prices] = await Promise.all([
+    signedBinanceGet('/api/v3/account',{omitZeroBalances:'true'}),
+    j('/api/v3/ticker/price')
+  ]);
+
+  const priceMap=new Map((prices||[]).map(x=>[String(x.symbol||''),Number(x.price||0)]));
+
   const balances=(acct.balances||[])
     .map(x=>({
       asset:String(x.asset||''),
       free:Number(x.free||0),
       locked:Number(x.locked||0)
     }))
-    .filter(x=>x.asset&&(x.free>0||x.locked>0));
+    .filter(x=>x.asset&&(x.free>0||x.locked>0))
+    .map(x=>{
+      const qty=x.free+x.locked;
+      let usdtPrice=0;
 
-  const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0};
+      if(x.asset==='USDT'){
+        usdtPrice=1;
+      }else{
+        const direct=priceMap.get(x.asset+'USDT');
+        const inverse=priceMap.get('USDT'+x.asset);
+        if(Number.isFinite(direct)&&direct>0)usdtPrice=direct;
+        else if(Number.isFinite(inverse)&&inverse>0)usdtPrice=1/inverse;
+      }
+
+      const valueUsdt=qty*usdtPrice;
+      return {...x,qty,usdtPrice,valueUsdt};
+    });
+
+  const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0,qty:0,usdtPrice:1,valueUsdt:0};
+  const totalValueUsdt=balances.reduce((sum,x)=>sum+(Number.isFinite(x.valueUsdt)?x.valueUsdt:0),0);
 
   return {
     connected:true,
@@ -154,6 +177,7 @@ async function getLiveAccountSnapshot(){
     balances,
     usdtFree:usdt.free,
     usdtLocked:usdt.locked,
+    totalValueUsdt,
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,
     takerCommission:acct.takerCommission,
