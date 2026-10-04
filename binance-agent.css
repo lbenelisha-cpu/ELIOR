@@ -152,3 +152,9 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
   animation:rotatePulse 1.8s ease-in-out infinite;
 }
 .asset-table tbody tr.rotate-alert td:first-child b{color:#ffd978}
+
+.multi-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.toolbar-group{display:flex;align-items:center;gap:5px;background:#0a1623;border:1px solid #1b3046;border-radius:10px;padding:4px}
+.toolbar-label{color:#8095ab;font-size:11px;font-weight:800;padding:0 6px}
+.multi-toolbar .chart-legend{margin-right:auto}
+@media(max-width:800px){.multi-toolbar .chart-legend{width:100%;margin-right:0}}
