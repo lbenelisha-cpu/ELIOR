@@ -86,6 +86,40 @@ function loadPaperState(){
 }
 
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
+const DECISION_HISTORY_FILE=process.env.BINANCE_DECISION_HISTORY_FILE||'/var/data/binance-decision-history.json';
+let decisionHistory={};
+
+function saveDecisionHistory(){
+  try{
+    ensureStateDir();
+    const tmp=DECISION_HISTORY_FILE+'.tmp';
+    fs.writeFileSync(tmp,JSON.stringify(decisionHistory,null,2),'utf8');
+    fs.renameSync(tmp,DECISION_HISTORY_FILE);
+    return true;
+  }catch(e){
+    console.error('Decision history save failed',e.message);
+    return false;
+  }
+}
+
+function loadDecisionHistory(){
+  try{
+    ensureStateDir();
+    if(!fs.existsSync(DECISION_HISTORY_FILE))return false;
+    const raw=JSON.parse(fs.readFileSync(DECISION_HISTORY_FILE,'utf8'));
+    decisionHistory=raw&&typeof raw==='object'?raw:{};
+    return true;
+  }catch(e){
+    console.error('Decision history load failed',e.message);
+    return false;
+  }
+}
+
+function pushDecisionHistory(symbol,row){
+  const arr=Array.isArray(decisionHistory[symbol])?decisionHistory[symbol]:[];
+  arr.unshift(row);
+  decisionHistory[symbol]=arr.slice(0,30);
+}
 let liveActionLog=[];
 
 function saveLiveActionLog(){
@@ -898,6 +932,19 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
   };
 }
 
+function decisionReasonFromAgent(agent,ev){
+  if(!ev?.ok)return 'ERROR';
+  if(agent?.decision==='BUY')return 'BUY_EXECUTED';
+  if(agent?.decision==='SELL')return 'SELL_EXECUTED';
+  if(agent?.decision==='ROTATE_IN')return 'ROTATE_IN';
+  if(agent?.decision==='ROTATE_OUT')return 'ROTATE_OUT';
+  if(agent?.decision==='WAIT_NO_SLOT')return 'NO_SLOT';
+  if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
+  if(agent?.decision==='BUY_READY')return 'BUY_READY';
+  if(ev.buyQualified)return 'QUALIFIED_BUT_HOLD';
+  return ev.buyReason||'HOLD';
+}
+
 function weakestHeldEvaluation(evals){
   const held=evals
     .filter(x=>x.ok&&paper.positions[x.symbol])
@@ -1128,6 +1175,61 @@ async function evalAll(){
       agents[ev.symbol].execution='IDLE';
     }
   }
+
+  // Record the final decision context for every symbol after the cycle completes.
+  const slotCountAtCheck=Object.keys(paper.positions).length;
+  for(const ev of evals){
+    if(!ev.ok)continue;
+    const a=agents[ev.symbol]||{};
+    pushDecisionHistory(ev.symbol,{
+      at:new Date().toISOString(),
+      mode,
+      decision:a.decision||'HOLD',
+      execution:a.execution||'IDLE',
+      reason:decisionReasonFromAgent(a,ev),
+      position:a.position||'CASH',
+      price:Number(ev.strategy?.price||0),
+      ma:Number(ev.strategy?.ma||0),
+      aboveMA:Boolean(ev.strategy?.aboveMA),
+      direction:ev.strategy?.direction||null,
+      currentWave:Number(ev.strategy?.currentWave||0),
+      previousDownWave:ev.strategy?.previousDownWave==null?null:Number(ev.strategy.previousDownWave),
+      previousUpWave:ev.strategy?.previousUpWave==null?null:Number(ev.strategy.previousUpWave),
+      score:Number(ev.score||0),
+      buyQualified:Boolean(ev.buyQualified),
+      buyReason:ev.buyReason||null,
+      activeSlots:slotCountAtCheck,
+      maxSlots:MAX
+    });
+  }
+  saveDecisionHistory();
+}
+
+async function buildTechnicalDailyHistory(symbol,limit=30){
+  const c=await candles(symbol);
+  const rows=[];
+  const start=Math.max(MAP+3,c.length-limit-10);
+  for(let i=start;i<c.length;i++){
+    try{
+      const hist=c.slice(0,i+1);
+      const st=evaluateWaveStrategy(hist,{minWave:MIN,maxWave:8,maPeriod:MAP});
+      const qualification=buyQualification(st);
+      rows.push({
+        at:new Date(c[i].closeTime).toISOString(),
+        price:Number(st.price||0),
+        ma:Number(st.ma||0),
+        aboveMA:Boolean(st.aboveMA),
+        direction:st.direction||null,
+        currentWave:Number(st.currentWave||0),
+        previousDownWave:st.previousDownWave==null?null:Number(st.previousDownWave),
+        previousUpWave:st.previousUpWave==null?null:Number(st.previousUpWave),
+        buyQualified:Boolean(qualification.qualified),
+        buyReason:qualification.reason,
+        technicalDecision:qualification.qualified?'BUY_READY':'HOLD'
+      });
+    }catch{}
+  }
+  return rows.slice(-limit).reverse();
 }
 
 async function refreshUniverse(){
@@ -1263,6 +1365,21 @@ const server=http.createServer((req,res)=>{
     return send(res,{ok:true,paper:snap()});
   }
 
+  if(u.pathname==='/api/binance-decision-history'&&req.method==='GET'){
+    const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
+    const limit=Math.min(30,Math.max(1,Number(u.searchParams.get('limit')||20)));
+    if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
+    buildTechnicalDailyHistory(symbol,limit)
+      .then(technicalDaily=>send(res,{
+        ok:true,
+        symbol,
+        recorded:(decisionHistory[symbol]||[]).slice(0,limit),
+        technicalDaily
+      }))
+      .catch(e=>send(res,{ok:false,error:e.message},502));
+    return;
+  }
+
   if(u.pathname==='/api/binance-chart'&&req.method==='GET'){
     const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
@@ -1350,5 +1467,6 @@ server.listen(PORT,'0.0.0.0',async()=>{
   console.log('Server',PORT);
   loadPaperState();
   loadLiveActionLog();
+  loadDecisionHistory();
   await refreshUniverse();
 });
