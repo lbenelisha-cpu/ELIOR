@@ -103,7 +103,10 @@ function render(d,currentMode='demo',liveAccount=null){
     put('#scanStatusMessage','אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
   }else{
     const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · Score '+fmt(weakestActive.score,1)):'';
-    put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+' · רוטציה דורשת +'+fmt(rotationGap,0));
+    const rotationState=activeAgents.length<maxPositions
+      ? ' · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
+      : ' · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
+    put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState);
   }
 
   if(!isLive){
@@ -126,9 +129,15 @@ function render(d,currentMode='demo',liveAccount=null){
     const held=isHeld(a);
     const score=Number(a.score||0);
     const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive);
-    return `<tr data-symbol="${a.symbol}" class="${a.symbol===selectedSymbol?'selected':''}">
+    const rowClasses=[
+      a.symbol===selectedSymbol?'selected':'',
+      held?'active-position':'',
+      (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
+      dec==='ROTATE READY'?'rotate-alert':''
+    ].filter(Boolean).join(' ');
+    return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
       <td><b>${a.symbol.replace('USDT','')}</b><div class="mini">${buyReasonLabel(a.buyReason)}</div></td>
-      <td>$${fmt(s.price)}</td>
+      <td>${fmt(s.price)}</td>
       <td><b>${fmt(score,1)}</b></td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${dec}</td>
     </tr>`;
