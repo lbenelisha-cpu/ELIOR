@@ -48,7 +48,7 @@ function buyReasonLabel(r){
     NOT_UP:'לא בגל עולה',
     BELOW_MA200:'מתחת ל־MA200',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
-    WAVE_BELOW_4:'גל מתחת ל־4%',
+    WAVE_BELOW_3:'גל מתחת ל־3%',
     WAVE_ABOVE_8:'גל מעל 8%',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'חלש מהירידה הקודמת',
     NO_DATA:'אין נתונים'
@@ -213,7 +213,7 @@ function decisionReasonLabel(r){
     ROTATION_NOT_STRONG_ENOUGH:'לא חזק מספיק לרוטציה',
     BUY_READY:'כשיר BUY',
     QUALIFIED_BUT_HOLD:'כשיר אך HOLD',
-    WAVE_BELOW_4:'גל מתחת ל־4%',
+    WAVE_BELOW_3:'גל מתחת ל־3%',
     WAVE_ABOVE_8:'גל מעל 8%',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
     BELOW_MA200:'מתחת ל־MA200',
