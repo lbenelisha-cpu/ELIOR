@@ -1,25 +1,238 @@
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Binance Wave Agent V3</title><link rel="stylesheet" href="binance-agent.css"></head><body><main class="wrap"><header><div><div class="eyebrow">BINANCE · 60-ASSET WAVE AGENT V5</div><h1>סוכן Wave · סריקת 60 נכסים</h1><p>Long Only · D1 · Wave 4%–8% · MA200 · עד 3 עסקאות פעילות</p></div><div id="status" class="status">מתחבר…</div></header><section class="mode-card"><h2>מצב חשבון</h2><div class="seg"><button id="demoBtn">DEMO</button><button id="liveBtn">LIVE</button></div><div id="liveWarning" class="warning hidden"><b>LIVE</b><span id="liveText"></span></div></section><section id="liveAccountCard" class="rules hidden"><h2>חשבון Binance LIVE</h2><div class="grid"><article><span>שווי חשבון</span><strong id="liveTotalValue">—</strong></article><article><span>USDT זמין</span><strong id="liveUsdt">—</strong></article><article><span>סטטוס</span><strong id="liveConnected">—</strong></article><article><span>הרשאת מסחר</span><strong id="liveCanTrade">—</strong></article><article><span>סוג חשבון</span><strong id="liveAccountType">—</strong></article></div><div id="liveBalances" class="paper-history"></div></section><section class="rules"><h2 id="portfolioTitle">תיק DEMO · 5,000 ₪</h2><div class="grid"><article><span>שווי תיק</span><strong id="paperValue">—</strong></article><article><span>מזומן</span><strong id="paperCash">—</strong></article><article><span>רווח / הפסד</span><strong id="paperPnl">—</strong></article><article><span>Slots</span><strong id="slots">—</strong></article><article><span>הקצאה ל־Slot</span><strong id="slotValue">—</strong></article><article><span>עסקאות סגורות</span><strong id="paperTradesCount">0</strong></article></div><p><button id="resetPaperBtn" class="refresh">איפוס תיק DEMO</button> <button id="refreshBtn" class="refresh">בדוק עכשיו</button></p></section><section class="rules"><h2>סריקת עד 60 נכסי USDT נזילים</h2><p class="mini">היקום נבחר אוטומטית לפי נפח מסחר Spot ב־24 שעות. נסרקים עד 60 נכסים, ומוצגים רק נכסים עם Score 65 ומעלה או פוזיציות פעילות. עדיין מותרות לכל היותר 3 פוזיציות פעילות.</p><div id="scanStatusMessage" class="warning"></div><div class="asset-table-wrap"><table class="asset-table"><thead><tr><th>נכס</th><th>מחיר</th><th>MA200</th><th>מגמה</th><th>גל</th><th>גל ירידה קודם</th><th>Score</th><th>פער לרוטציה</th><th>מצב</th><th>החלטה</th><th>Slot</th></tr></thead><tbody id="assetsBody"></tbody></table></div></section><section class="rules"><h2 id="positionsTitle">פוזיציות פעילות · DEMO</h2><div id="positions" class="paper-history"></div></section><section id="demoTradesSection" class="rules"><h2>10 עסקאות אחרונות</h2><div id="paperHistory" class="paper-history"></div></section><section class="rules"><h2 id="actionJournalTitle">יומן פעולות · DEMO</h2><div id="actionJournal" class="paper-history"><div class="mini">אין פעולות להצגה.</div></div></section><section class="rules"><h2>כללים</h2><p><b>BUY:</b> מעל MA200 + גל עולה בין 4% ל־8% + גדול מהגל היורד הקודם + Slot פנוי.</p><p><b>SELL:</b> גל הירידה החדש גדול מהגל העולה הקודם. אין Short ואין מינוף.</p></section>
-<section id="demoRealtimePositionsSection" class="rules">
-  <h2>פוזיציות פעילות – שווי בזמן אמת</h2>
-  <div style="overflow:auto">
-    <table style="width:100%;border-collapse:collapse;min-width:900px">
-      <thead>
-        <tr>
-          <th>נכס</th>
-          <th>מחיר כניסה</th>
-          <th>מחיר נוכחי</th>
-          <th>סכום כניסה</th>
-          <th>שווי נוכחי</th>
-          <th>P/L ₪</th>
-          <th>P/L %</th>
-        </tr>
-      </thead>
-      <tbody id="activePositionsBody">
-        <tr><td colspan="7">אין פוזיציות פעילות.</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Binance Wave Agent V6</title>
+  <link rel="stylesheet" href="binance-agent.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark">◈</div>
+        <div>
+          <div class="brand-title">LEVI · BINANCE WAVE</div>
+          <div class="brand-sub">60 ASSETS · D1 · MA200 · WAVE 4%–8%</div>
+        </div>
+      </div>
 
-</main><script src="binance-agent.js"></script><script src="binance-agent-portfolio.js"></script>
-</body></html>
+      <nav class="topnav">
+        <button class="nav-pill active">מסחר</button>
+        <button class="nav-pill">תיק</button>
+        <button class="nav-pill">סריקות</button>
+        <button class="nav-pill">יומן פעולות</button>
+      </nav>
+
+      <div class="top-actions">
+        <div id="status" class="status">מתחבר…</div>
+        <div class="seg compact">
+          <button id="demoBtn">DEMO</button>
+          <button id="liveBtn">LIVE</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="market-strip">
+      <div><span>BTC</span><strong id="tickerBTC">—</strong></div>
+      <div><span>ETH</span><strong id="tickerETH">—</strong></div>
+      <div><span>SOL</span><strong id="tickerSOL">—</strong></div>
+      <div><span>BNB</span><strong id="tickerBNB">—</strong></div>
+      <div><span>AAVE</span><strong id="tickerAAVE">—</strong></div>
+    </section>
+
+    <section class="account-strip">
+      <article>
+        <span>שווי תיק</span>
+        <strong id="paperValue">—</strong>
+      </article>
+      <article>
+        <span>מזומן</span>
+        <strong id="paperCash">—</strong>
+      </article>
+      <article>
+        <span>רווח / הפסד</span>
+        <strong id="paperPnl">—</strong>
+      </article>
+      <article>
+        <span>Slots</span>
+        <strong id="slots">—</strong>
+      </article>
+      <article>
+        <span>הקצאה ל־Slot</span>
+        <strong id="slotValue">—</strong>
+      </article>
+      <article>
+        <span>עסקאות סגורות</span>
+        <strong id="paperTradesCount">0</strong>
+      </article>
+    </section>
+
+    <section id="liveAccountCard" class="panel live-panel hidden">
+      <div class="panel-title-row">
+        <h2>חשבון Binance LIVE</h2>
+        <span class="live-dot">●</span>
+      </div>
+      <div class="live-stats">
+        <div><span>שווי חשבון</span><strong id="liveTotalValue">—</strong></div>
+        <div><span>USDT זמין</span><strong id="liveUsdt">—</strong></div>
+        <div><span>סטטוס</span><strong id="liveConnected">—</strong></div>
+        <div><span>הרשאת מסחר</span><strong id="liveCanTrade">—</strong></div>
+        <div><span>סוג חשבון</span><strong id="liveAccountType">—</strong></div>
+      </div>
+      <div id="liveBalances" class="balances-grid"></div>
+    </section>
+
+    <section class="trading-grid">
+      <aside class="panel scanner-panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>סריקת שוק</h2>
+            <p>עד 60 נכסים · מוצגים Score 65+ ופוזיציות פעילות</p>
+          </div>
+          <button id="refreshBtn" class="refresh">בדוק עכשיו</button>
+        </div>
+
+        <div id="scanStatusMessage" class="scan-status"></div>
+
+        <div class="scanner-list">
+          <table class="asset-table">
+            <thead>
+              <tr>
+                <th>נכס</th>
+                <th>מחיר</th>
+                <th>Score</th>
+                <th>החלטה</th>
+              </tr>
+            </thead>
+            <tbody id="assetsBody"></tbody>
+          </table>
+        </div>
+      </aside>
+
+      <section class="panel chart-panel">
+        <div class="selected-asset-head">
+          <div>
+            <div class="selected-symbol-row">
+              <h2 id="chartSymbol">BTCUSDT</h2>
+              <span id="chartDecisionBadge" class="decision-badge">HOLD</span>
+            </div>
+            <div id="chartMeta" class="chart-meta">טוען נתונים…</div>
+          </div>
+          <div class="selected-price">
+            <strong id="chartPrice">—</strong>
+            <span id="chartScore">Score —</span>
+          </div>
+        </div>
+
+        <div class="chart-toolbar">
+          <button class="time-pill active">1D</button>
+          <button class="time-pill">1W</button>
+          <button class="time-pill">1M</button>
+          <button class="time-pill">3M</button>
+          <button class="time-pill">6M</button>
+          <button class="time-pill">1Y</button>
+          <span class="chart-legend">נרות יומיים · MA200</span>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="priceChart" width="1200" height="560"></canvas>
+          <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
+        </div>
+
+        <div class="chart-footer">
+          <div><span>MA200</span><strong id="chartMA">—</strong></div>
+          <div><span>גל נוכחי</span><strong id="chartWave">—</strong></div>
+          <div><span>גל ירידה קודם</span><strong id="chartPrevDown">—</strong></div>
+          <div><span>כשירות BUY</span><strong id="chartQualification">—</strong></div>
+        </div>
+      </section>
+
+      <aside class="panel action-panel">
+        <div class="panel-title-row">
+          <h2 id="portfolioTitle">תיק DEMO · 5,000 ₪</h2>
+        </div>
+
+        <div class="action-card primary-card">
+          <span>נכס נבחר</span>
+          <strong id="actionSelectedSymbol">BTCUSDT</strong>
+          <small id="actionSelectedDecision">HOLD</small>
+        </div>
+
+        <div class="action-card">
+          <span>Score</span>
+          <strong id="actionSelectedScore">—</strong>
+        </div>
+
+        <div class="action-card">
+          <span>פער לרוטציה</span>
+          <strong id="actionRotationGap">—</strong>
+        </div>
+
+        <div class="action-card">
+          <span>סטטוס</span>
+          <strong id="actionQualification">—</strong>
+        </div>
+
+        <button id="resetPaperBtn" class="danger-btn">איפוס תיק DEMO</button>
+
+        <div class="rules-box">
+          <h3>כללי מסחר</h3>
+          <p><b>BUY:</b> מעל MA200 + גל 4%–8% + חזק מהגל היורד הקודם.</p>
+          <p><b>SELL:</b> גל הירידה החדש גדול מהגל העולה הקודם.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="lower-grid">
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2 id="positionsTitle">פוזיציות פעילות · DEMO</h2>
+        </div>
+        <div id="positions" class="paper-history"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2 id="actionJournalTitle">יומן פעולות · DEMO</h2>
+        </div>
+        <div id="actionJournal" class="paper-history"></div>
+      </section>
+    </section>
+
+    <section id="demoTradesSection" class="panel">
+      <div class="panel-title-row">
+        <h2>10 עסקאות אחרונות</h2>
+      </div>
+      <div id="paperHistory" class="paper-history"></div>
+    </section>
+
+    <section id="demoRealtimePositionsSection" class="panel">
+      <div class="panel-title-row">
+        <h2>פוזיציות פעילות – שווי בזמן אמת</h2>
+      </div>
+      <div class="asset-table-wrap">
+        <table class="asset-table wide-table">
+          <thead>
+            <tr>
+              <th>נכס</th>
+              <th>מחיר כניסה</th>
+              <th>מחיר נוכחי</th>
+              <th>סכום כניסה</th>
+              <th>שווי נוכחי</th>
+              <th>P/L ₪</th>
+              <th>P/L %</th>
+            </tr>
+          </thead>
+          <tbody id="activePositionsBody">
+            <tr><td colspan="7">אין פוזיציות פעילות.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="binance-agent.js"></script>
+  <script src="binance-agent-portfolio.js"></script>
+</body>
+</html>
