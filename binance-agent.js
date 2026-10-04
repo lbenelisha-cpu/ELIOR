@@ -12,6 +12,18 @@ function mode(s){
   put('#positionsTitle',isDemo?'פוזיציות פעילות · DEMO':'פוזיציות פעילות · LIVE');
   put('#status',isDemo?'DEMO · PAPER':'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
 }
+function buyReasonLabel(r){
+  return ({
+    QUALIFIED:'כשיר BUY',
+    NOT_UP:'לא בגל עולה',
+    BELOW_MA200:'מתחת ל־MA200',
+    NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
+    WAVE_BELOW_4:'גל מתחת ל־4%',
+    WAVE_ABOVE_8:'גל מעל 8%',
+    NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
+    NO_DATA:'אין נתונים'
+  })[r]||r||'—';
+}
 function render(d,currentMode='demo',liveAccount=null){
   const p=d.paper||{},paperPos=p.positions||{},agents=d.agents||[];
   const isLive=currentMode==='live';
@@ -73,7 +85,7 @@ function render(d,currentMode='demo',liveAccount=null){
 
     const posText=held?'LONG':'CASH';
     const slotText=held?'פעיל':'—';
-    return `<tr><td><b>${a.symbol}</b></td><td>$${fmt(s.price)}</td><td>$${fmt(s.ma)}</td><td>${s.aboveMA?'🟢 מעל':'🔴 מתחת'}</td><td>${s.direction||'—'} · ${fmt(s.currentWave)}%</td><td>${fmt(s.previousDownWave)}%</td><td><b>${fmt(score,1)}</b></td><td>${gapText}</td><td>${posText}</td><td class="decision ${String(dec).toLowerCase()}">${dec}</td><td>${slotText}</td></tr>`;
+    return `<tr><td><b>${a.symbol}</b></td><td>$${fmt(s.price)}</td><td>$${fmt(s.ma)}</td><td>${s.aboveMA?'🟢 מעל':'🔴 מתחת'}</td><td>${s.direction||'—'} · ${fmt(s.currentWave)}%</td><td>${fmt(s.previousDownWave)}%</td><td><b>${fmt(score,1)}</b><div class="mini">${buyReasonLabel(a.buyReason)}</div></td><td>${gapText}</td><td>${posText}</td><td class="decision ${String(dec).toLowerCase()}">${dec}</td><td>${slotText}</td></tr>`;
   }).join('');
 
   if(isLive){
