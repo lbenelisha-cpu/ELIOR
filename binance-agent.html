@@ -33,7 +33,7 @@
       </div>
     </header>
 
-    <section class="market-strip">
+    <section class="market-strip app-view trade-view">
       <div><span>BTC</span><strong id="tickerBTC">—</strong></div>
       <div><span>ETH</span><strong id="tickerETH">—</strong></div>
       <div><span>SOL</span><strong id="tickerSOL">—</strong></div>
@@ -196,7 +196,17 @@
       </aside>
     </section>
 
-    <section class="panel">
+    <section id="portfolioViewPanel" class="panel app-view portfolio-view" hidden>
+      <div class="panel-title-row">
+        <div>
+          <h2>תיק פעיל</h2>
+          <p>פוזיציות פתוחות, שווי נוכחי ורווח / הפסד</p>
+        </div>
+      </div>
+      <div id="portfolioViewContent" class="portfolio-view-content"></div>
+    </section>
+
+    <section class="panel app-view journal-view">
       <div class="panel-title-row">
         <div>
           <h2>היסטוריית החלטות · <span id="decisionHistorySymbol">—</span></h2>
@@ -208,7 +218,7 @@
       </div>
     </section>
 
-    <section class="lower-grid">
+    <section class="lower-grid app-view journal-view portfolio-view">
       <section class="panel">
         <div class="panel-title-row">
           <h2 id="positionsTitle">פוזיציות פעילות · DEMO</h2>
