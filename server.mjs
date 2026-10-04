@@ -26,7 +26,7 @@ const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=3;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
-const UNIVERSE_SIZE=Math.min(30,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||30)));
+const UNIVERSE_SIZE=Math.min(60,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||60)));
 const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
