@@ -35,6 +35,49 @@ const ROTATION_MIN_SCORE=+(process.env.BINANCE_ROTATION_MIN_SCORE||65);
 const ROTATION_SCORE_GAP=+(process.env.BINANCE_ROTATION_SCORE_GAP||20);
 const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_CYCLE||1));
 
+// Durable DEMO state (use Render Persistent Disk mounted at /var/data)
+const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
+
+function ensureStateDir(){
+  try{ fs.mkdirSync(path.dirname(STATE_FILE),{recursive:true}); }catch{}
+}
+
+function savePaperState(){
+  try{
+    ensureStateDir();
+    const tmp=STATE_FILE+'.tmp';
+    fs.writeFileSync(tmp,JSON.stringify(paper,null,2),'utf8');
+    fs.renameSync(tmp,STATE_FILE);
+    return true;
+  }catch(e){
+    console.error('Paper state save failed',e.message);
+    return false;
+  }
+}
+
+function loadPaperState(){
+  try{
+    ensureStateDir();
+    if(!fs.existsSync(STATE_FILE))return false;
+    const raw=JSON.parse(fs.readFileSync(STATE_FILE,'utf8'));
+    if(!raw||typeof raw!=='object')return false;
+    if(!raw.positions||typeof raw.positions!=='object')return false;
+
+    paper={
+      initialIls:Number(raw.initialIls||INITIAL),
+      cashIls:Number(raw.cashIls??INITIAL),
+      positions:raw.positions||{},
+      trades:Array.isArray(raw.trades)?raw.trades:[],
+      lastAction:raw.lastAction||null
+    };
+    console.log('Paper state restored',Object.keys(paper.positions).length,'positions');
+    return true;
+  }catch(e){
+    console.error('Paper state load failed',e.message);
+    return false;
+  }
+}
+
 let mode='demo';
 let SYMBOLS=[];
 let agents={};
@@ -146,30 +189,76 @@ async function candles(s){
     .map(x=>({closeTime:+x[6],close:+x[4]}));
 }
 
-const value=()=>paper.cashIls+Object.entries(paper.positions).reduce(
-  (n,[s,p])=>n+p.qty*+(agents[s]?.strategy?.price||streams[s]?.lastPrice||p.entryPrice),
-  0
-);
+function markPaperToMarket(){
+  let positionsValueIls=0;
+
+  for(const [s,p] of Object.entries(paper.positions)){
+    const live=Number(streams[s]?.lastPrice);
+    const strategyPrice=Number(agents[s]?.strategy?.price);
+    const currentPrice=
+      Number.isFinite(live)&&live>0 ? live :
+      Number.isFinite(strategyPrice)&&strategyPrice>0 ? strategyPrice :
+      Number(p.entryPrice||0);
+
+    const allocationIls=Number(p.allocationIls||0);
+    const entryPrice=Number(p.entryPrice||0);
+    const qty=Number(p.qty||0);
+
+    let currentValueIls=allocationIls;
+    if(qty>0&&currentPrice>0){
+      currentValueIls=qty*currentPrice;
+    }else if(entryPrice>0&&currentPrice>0){
+      currentValueIls=allocationIls*(currentPrice/entryPrice);
+    }
+
+    const pnlIls=currentValueIls-allocationIls;
+    const pnlPct=allocationIls>0?(pnlIls/allocationIls)*100:0;
+
+    p.currentPrice=currentPrice;
+    p.currentValueIls=currentValueIls;
+    p.pnlIls=pnlIls;
+    p.pnlPct=pnlPct;
+
+    positionsValueIls+=currentValueIls;
+  }
+
+  const valueIls=Number(paper.cashIls||0)+positionsValueIls;
+  return {
+    positionsValueIls,
+    valueIls,
+    profitIls:valueIls-Number(paper.initialIls||INITIAL),
+    profitPct:Number(paper.initialIls||INITIAL)>0
+      ? ((valueIls-Number(paper.initialIls||INITIAL))/Number(paper.initialIls||INITIAL))*100
+      : 0
+  };
+}
+
+const value=()=>markPaperToMarket().valueIls;
 
 const snap=()=>{
-  const v=value();
+  const mtm=markPaperToMarket();
   return {
     ...paper,
     slotIls:SLOT,
     maxPositions:MAX,
     activePositions:Object.keys(paper.positions).length,
-    valueIls:v,
-    profitIls:v-INITIAL,
-    profitPct:(v/INITIAL-1)*100
+    positionsValueIls:mtm.positionsValueIls,
+    valueIls:mtm.valueIls,
+    profitIls:mtm.profitIls,
+    profitPct:mtm.profitPct
   };
 };
 
-const reset=()=>paper={
-  initialIls:INITIAL,
-  cashIls:INITIAL,
-  positions:{},
-  trades:[],
-  lastAction:null
+const reset=()=>{
+  paper={
+    initialIls:INITIAL,
+    cashIls:INITIAL,
+    positions:{},
+    trades:[],
+    lastAction:null
+  };
+  savePaperState();
+  return paper;
 };
 
 function apply(s,d,price,at,meta={}){
@@ -189,6 +278,7 @@ function apply(s,d,price,at,meta={}){
     };
     paper.cashIls-=a;
     paper.lastAction={type:'BUY',symbol:s,price,at,...meta};
+    savePaperState();
     return true;
   }
 
@@ -212,6 +302,7 @@ function apply(s,d,price,at,meta={}){
     paper.trades=paper.trades.slice(0,100);
     delete paper.positions[s];
     paper.lastAction={type:'SELL',symbol:s,price,at,...meta};
+    savePaperState();
     return true;
   }
 
@@ -633,7 +724,9 @@ const server=http.createServer((req,res)=>{
         rotationEnabled:ROTATION_ENABLED,
         rotationMinScore:ROTATION_MIN_SCORE,
         rotationScoreGap:ROTATION_SCORE_GAP,
-        rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE
+        rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE,
+        stateFile:STATE_FILE,
+        persistentState:true
       }
     });
   }
@@ -668,5 +761,6 @@ const server=http.createServer((req,res)=>{
 
 server.listen(PORT,'0.0.0.0',async()=>{
   console.log('Server',PORT);
+  loadPaperState();
   await refreshUniverse();
 });
