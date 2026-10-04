@@ -885,23 +885,68 @@ function scoreStrategy(st){
 async function evaluateSymbol(s){
   try{
     const c=await candles(s);
-    const st=evaluateWaveStrategy(c,{minWave:MIN,maPeriod:MAP,sellRetraceRatio:SELL_RETRACE_RATIO});
+
+    // BUY remains conservative: only confirmed, closed D1 candles.
+    const closedStrategy=evaluateWaveStrategy(c,{
+      minWave:MIN,
+      maPeriod:MAP,
+      sellRetraceRatio:SELL_RETRACE_RATIO
+    });
+
     const pos=paper.positions[s]?'LONG':'CASH';
+    let st=closedStrategy;
+    let decisionPriceSource='CLOSED_D1';
+
+    // For an already-open position, evaluate SELL using the live Binance price
+    // as a synthetic current point. This avoids waiting for the daily candle
+    // to close before recognizing a meaningful DOWN wave.
+    if(pos==='LONG'){
+      const livePrice=Number(streams[s]?.lastPrice);
+      const lastClosed=Number(c.at(-1)?.close);
+
+      if(Number.isFinite(livePrice)&&livePrice>0&&Number.isFinite(lastClosed)&&lastClosed>0){
+        const liveCandles=[
+          ...c,
+          {closeTime:Date.now(),close:livePrice}
+        ];
+
+        const liveStrategy=evaluateWaveStrategy(liveCandles,{
+          minWave:MIN,
+          maPeriod:MAP,
+          sellRetraceRatio:SELL_RETRACE_RATIO
+        });
+
+        // MA200 remains anchored to confirmed D1 history.
+        liveStrategy.ma=closedStrategy.ma;
+        liveStrategy.aboveMA=livePrice>closedStrategy.ma;
+        liveStrategy.livePrice=livePrice;
+        liveStrategy.closedPrice=lastClosed;
+        liveStrategy.isLiveEvaluation=true;
+
+        st=liveStrategy;
+        decisionPriceSource='LIVE_PRICE';
+      }
+    }
+
     const rawDecision=decidePosition(st,pos);
-    const score=scoreStrategy(st);
-    const qualification=buyQualification(st);
+
+    // Score/BUY qualification stay based on confirmed D1 candles.
+    const score=scoreStrategy(closedStrategy);
+    const qualification=buyQualification(closedStrategy);
 
     return {
       ok:true,
       symbol:s,
       candles:c,
       strategy:st,
+      closedStrategy,
       position:pos,
       rawDecision,
       score,
       buyQualified:qualification.qualified,
       buyReason:qualification.reason,
-      at:new Date(c.at(-1).closeTime).toISOString()
+      decisionPriceSource,
+      at:new Date().toISOString()
     };
   }catch(e){
     return {ok:false,symbol:s,error:e.message};
@@ -1200,6 +1245,9 @@ async function evalAll(){
       previousUpWave:ev.strategy?.previousUpWave==null?null:Number(ev.strategy.previousUpWave),
       sellThreshold:ev.strategy?.sellThreshold==null?null:Number(ev.strategy.sellThreshold),
       sellRetraceRatio:Number(ev.strategy?.sellRetraceRatio??SELL_RETRACE_RATIO),
+      decisionPriceSource:ev.decisionPriceSource||'CLOSED_D1',
+      livePrice:ev.strategy?.livePrice==null?null:Number(ev.strategy.livePrice),
+      closedPrice:ev.strategy?.closedPrice==null?Number(ev.strategy?.price||0):Number(ev.strategy.closedPrice),
       score:Number(ev.score||0),
       buyQualified:Boolean(ev.buyQualified),
       buyReason:ev.buyReason||null,
