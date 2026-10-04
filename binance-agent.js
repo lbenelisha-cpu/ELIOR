@@ -9,7 +9,31 @@ function mode(s){
   put('#portfolioTitle',isDemo?'תיק DEMO · 5,000 ₪':'חשבון LIVE · Binance');
   put('#status',isDemo?'DEMO · PAPER':'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
 }
-function render(d){const p=d.paper||{},pos=p.positions||{};put('#paperValue',fmt(p.valueIls)+' ₪');put('#paperCash',fmt(p.cashIls)+' ₪');put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ₪ (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);put('#slots',`${p.activePositions||0}/${p.maxPositions||3}`);put('#slotValue',fmt(p.slotIls)+' ₪');put('#paperTradesCount',(p.trades||[]).length);$('#assetsBody').innerHTML=(d.agents||[]).map(a=>{const s=a.strategy||{},dec=a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;return `<tr><td><b>${a.symbol}</b></td><td>$${fmt(s.price)}</td><td>$${fmt(s.ma)}</td><td>${s.aboveMA?'🟢 מעל':'🔴 מתחת'}</td><td>${s.direction||'—'} · ${fmt(s.currentWave)}%</td><td>${fmt(s.previousDownWave)}%</td><td>${a.position}</td><td class="decision ${String(dec).toLowerCase()}">${dec}</td><td>${pos[a.symbol]?'פעיל':'—'}</td></tr>`}).join('');const ps=Object.values(pos);$('#positions').innerHTML=ps.length?ps.map(x=>`<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ₪ · כניסה $${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}</div>`).join(''):'<div class="mini">אין פוזיציות פעילות.</div>';$('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ₪</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>'}
+function render(d){
+  const p=d.paper||{},pos=p.positions||{},agents=d.agents||[];
+  const activeAgents=agents.filter(a=>a.position==='LONG');
+  const weakestActive=activeAgents
+    .map(a=>({symbol:a.symbol,score:(a.strategy?.buyConfirmed?Number(a.score||0):0)}))
+    .sort((a,b)=>a.score-b.score)[0]||null;
+  const rotationGap=Number(d.config?.rotationScoreGap||20);
+
+  if(!activeAgents.length){
+    put('#scanStatusMessage','אין כרגע הזדמנות איכותית — ממתין ב־USDT');
+  }else{
+    const weakText=weakestActive?(' · הפוזיציה החלשה ביותר: '+weakestActive.symbol+' · Score '+fmt(weakestActive.score,1)):'';
+    put('#scanStatusMessage',activeAgents.length+'/'+(p.maxPositions||3)+' פוזיציות פעילות'+weakText+' · רוטציה דורשת יתרון של +'+fmt(rotationGap,0)+' נקודות');
+  }put('#paperValue',fmt(p.valueIls)+' ₪');put('#paperCash',fmt(p.cashIls)+' ₪');put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ₪ (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);put('#slots',`${p.activePositions||0}/${p.maxPositions||3}`);put('#slotValue',fmt(p.slotIls)+' ₪');put('#paperTradesCount',(p.trades||[]).length);$('#assetsBody').innerHTML=agents.map(a=>{
+    const s=a.strategy||{},dec=a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
+    const score=Number(a.score||0);
+    let gapText='—';
+    if(a.position!=='LONG'&&weakestActive){
+      const gap=score-weakestActive.score;
+      gapText=(gap>=0?'+':'')+fmt(gap,1)+' / נדרש +'+fmt(rotationGap,0);
+    }else if(a.position==='LONG'){
+      gapText='פעיל';
+    }
+    return `<tr><td><b>${a.symbol}</b></td><td>${fmt(s.price)}</td><td>${fmt(s.ma)}</td><td>${s.aboveMA?'🟢 מעל':'🔴 מתחת'}</td><td>${s.direction||'—'} · ${fmt(s.currentWave)}%</td><td>${fmt(s.previousDownWave)}%</td><td><b>${fmt(score,1)}</b></td><td>${gapText}</td><td>${a.position}</td><td class="decision ${String(dec).toLowerCase()}">${dec}</td><td>${pos[a.symbol]?'פעיל':'—'}</td></tr>`;
+  }).join('');const ps=Object.values(pos);$('#positions').innerHTML=ps.length?ps.map(x=>`<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ₪ · כניסה $${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}</div>`).join(''):'<div class="mini">אין פוזיציות פעילות.</div>';$('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ₪</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>'}
 function actionLabel(x){return ({BUY:'קנייה',SELL:'מכירה',ROTATE_IN:'רוטציה פנימה',ROTATE_OUT:'רוטציה החוצה'})[x]||x||'פעולה'}
 async function loadActionJournal(currentMode){
   try{
