@@ -282,7 +282,7 @@ async function loadDecisionHistory(symbol){
     const recorded=d.recorded||[];
     const technical=d.technicalDaily||[];
 
-    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>Wave</div><div>ירידה קודמת</div><div>Score</div><div>Slots</div><div>סיבה</div></div>';
+    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>Wave</div><div>ירידה קודמת</div><div>Score</div><div>מקור</div><div>סיבה</div></div>';
 
     const renderRecorded=recorded.map(x=>{
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
@@ -293,7 +293,7 @@ async function loadDecisionHistory(symbol){
         <div>${fmt(x.currentWave,2)}%</div>
         <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
         <div>${fmt(x.score,1)}</div>
-        <div>${x.activeSlots}/${x.maxSlots}</div>
+        <div title="Slots: ${x.activeSlots}/${x.maxSlots}">${x.decisionPriceSource==='LIVE_PRICE'?'LIVE':'D1'}</div>
         <div>${decisionReasonLabel(x.reason||x.buyReason)}</div>
       </div>`;
     }).join('');
@@ -307,7 +307,7 @@ async function loadDecisionHistory(symbol){
         <div>${fmt(x.currentWave,2)}%</div>
         <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
         <div>—</div>
-        <div>—</div>
+        <div>D1</div>
         <div>${decisionReasonLabel(x.buyReason)}</div>
       </div>`;
     }).join('');
