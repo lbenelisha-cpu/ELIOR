@@ -31,6 +31,8 @@ const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
 const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
+const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
+const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
 // Rotation controls
@@ -175,10 +177,227 @@ async function signedBinanceGet(pathname,params={}){
   return body;
 }
 
+async function signedBinancePost(pathname,params={}){
+  if(!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
+
+  const timestamp=await binanceServerTime();
+  const query=new URLSearchParams({
+    ...Object.fromEntries(Object.entries(params).map(([k,v])=>[k,String(v)])),
+    timestamp:String(timestamp),
+    recvWindow:'5000'
+  });
+  const signature=createHmac('sha256',BINANCE_API_SECRET)
+    .update(query.toString())
+    .digest('hex');
+
+  const url='https://api.binance.com'+pathname+'?'+query.toString()+'&signature='+signature;
+  const r=await fetch(url,{
+    method:'POST',
+    headers:{'X-MBX-APIKEY':BINANCE_API_KEY},
+    cache:'no-store'
+  });
+
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(body?.msg||('Binance '+r.status));
+  return body;
+}
+
+async function getApiRestrictions(){
+  return signedBinanceGet('/sapi/v1/account/apiRestrictions');
+}
+
+function liveTradingGate(restrictions){
+  return {
+    keysConfigured:KEYS_CONFIGURED,
+    liveTradingEnabled:LIVE,
+        autoExecution:AUTO_EXECUTION,
+        liveMaxUsdt:LIVE_MAX_USDT,
+    autoExecution:AUTO_EXECUTION,
+    spotPermission:Boolean(restrictions?.enableSpotAndMarginTrading),
+    withdrawalsEnabled:Boolean(restrictions?.enableWithdrawals),
+    liveMaxUsdt:LIVE_MAX_USDT,
+    ready:Boolean(KEYS_CONFIGURED&&LIVE&&AUTO_EXECUTION&&restrictions?.enableSpotAndMarginTrading)
+  };
+}
+
+async function symbolExchangeInfo(symbol){
+  const info=await j('/api/v3/exchangeInfo?symbol='+encodeURIComponent(symbol));
+  return info?.symbols?.[0]||null;
+}
+
+function floorToStep(value,step){
+  value=Number(value); step=Number(step);
+  if(!Number.isFinite(value)||!Number.isFinite(step)||step<=0)return value;
+  const precision=Math.max(0,(String(step).split('.')[1]||'').replace(/0+$/,'').length);
+  const floored=Math.floor((value+1e-12)/step)*step;
+  return Number(floored.toFixed(Math.min(precision,12)));
+}
+
+async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
+  const restrictions=await getApiRestrictions();
+  const gate=liveTradingGate(restrictions);
+  if(!gate.ready)throw Error('LIVE trading gate is not enabled');
+  if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for this API key');
+
+  quoteUsdt=Math.min(Number(quoteUsdt)||0,LIVE_MAX_USDT);
+  if(!(quoteUsdt>0))throw Error('Invalid LIVE buy amount');
+
+  const order=await signedBinancePost('/api/v3/order',{
+    symbol,
+    side:'BUY',
+    type:'MARKET',
+    quoteOrderQty:quoteUsdt.toFixed(8),
+    newOrderRespType:'FULL'
+  });
+
+  const spent=Number(order.cummulativeQuoteQty||quoteUsdt);
+  const qty=Number(order.executedQty||0);
+  const avgPrice=qty>0?spent/qty:0;
+  pushLiveAction({
+    type:reason==='ROTATION_IN'?'ROTATE_IN':'BUY',
+    symbol,
+    price:avgPrice,
+    amountUsdt:spent,
+    qty,
+    reason,
+    orderId:order.orderId,
+    status:order.status,
+    at:new Date().toISOString(),
+    ...meta
+  });
+  return order;
+}
+
+async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
+  const restrictions=await getApiRestrictions();
+  const gate=liveTradingGate(restrictions);
+  if(!gate.ready)throw Error('LIVE trading gate is not enabled');
+  if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for this API key');
+
+  const base=symbol.endsWith('USDT')?symbol.slice(0,-4):symbol;
+  const acct=await getLiveAccountSnapshot();
+  const bal=acct.balances.find(x=>x.asset===base);
+  if(!bal||!(bal.free>0))throw Error('No free balance to sell for '+base);
+
+  const info=await symbolExchangeInfo(symbol);
+  const lot=info?.filters?.find(x=>x.filterType==='LOT_SIZE');
+  const qty=floorToStep(bal.free,Number(lot?.stepSize||0));
+  if(!(qty>0))throw Error('Sell quantity is below LOT_SIZE');
+
+  const order=await signedBinancePost('/api/v3/order',{
+    symbol,
+    side:'SELL',
+    type:'MARKET',
+    quantity:String(qty),
+    newOrderRespType:'FULL'
+  });
+
+  const proceeds=Number(order.cummulativeQuoteQty||0);
+  const executed=Number(order.executedQty||qty);
+  const avgPrice=executed>0?proceeds/executed:0;
+  pushLiveAction({
+    type:reason==='ROTATION_OUT'?'ROTATE_OUT':'SELL',
+    symbol,
+    price:avgPrice,
+    amountUsdt:proceeds,
+    qty:executed,
+    reason,
+    orderId:order.orderId,
+    status:order.status,
+    at:new Date().toISOString(),
+    ...meta
+  });
+  return order;
+}
+
+async function maybeExecuteLive(evals){
+  if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
+
+  const restrictions=await getApiRestrictions();
+  const gate=liveTradingGate(restrictions);
+  if(!gate.ready)return;
+  if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for LIVE auto execution');
+
+  let account=await getLiveAccountSnapshot();
+  const assetMap=new Map(account.balances.map(x=>[x.asset,x]));
+  const held=()=>evals.filter(ev=>{
+    if(!ev.ok)return false;
+    const base=ev.symbol.endsWith('USDT')?ev.symbol.slice(0,-4):ev.symbol;
+    const b=assetMap.get(base);
+    return b&&Number(b.valueUsdt||0)>=5;
+  });
+
+  // Normal SELL signals first.
+  for(const ev of held()){
+    if(decidePosition(ev.strategy,'LONG')==='SELL'){
+      await placeLiveMarketSell(ev.symbol,'STRATEGY_SELL',{score:ev.score});
+      account=await getLiveAccountSnapshot();
+      assetMap.clear();
+      for(const x of account.balances)assetMap.set(x.asset,x);
+    }
+  }
+
+  let heldNow=held();
+  const candidates=evals
+    .filter(ev=>ev.ok && decidePosition(ev.strategy,'CASH')==='BUY')
+    .filter(ev=>!heldNow.some(h=>h.symbol===ev.symbol))
+    .sort((a,b)=>b.score-a.score);
+
+  const portfolioCap=Math.min(
+    LIVE_MAX_USDT,
+    Math.max(account.totalValueUsdt||0,account.usdtFree||0)
+  );
+  const targetSlot=portfolioCap/MAX;
+
+  // Fill empty slots.
+  while(heldNow.length<MAX && candidates.length){
+    const ev=candidates.shift();
+    account=await getLiveAccountSnapshot();
+    const spend=Math.min(targetSlot,Number(account.usdtFree||0)*0.995);
+    if(spend<5)break;
+    await placeLiveMarketBuy(ev.symbol,spend,'BEST_AVAILABLE_BUY',{score:ev.score});
+    account=await getLiveAccountSnapshot();
+    assetMap.clear();
+    for(const x of account.balances)assetMap.set(x.asset,x);
+    heldNow=held();
+  }
+
+  // One smart rotation per cycle.
+  if(heldNow.length>=MAX && candidates.length && ROTATION_ENABLED){
+    const candidate=candidates[0];
+    const weakest=[...heldNow]
+      .map(x=>({...x,comparableScore:x.strategy?.buyConfirmed?x.score:0}))
+      .sort((a,b)=>a.comparableScore-b.comparableScore)[0];
+
+    if(weakest){
+      const gap=candidate.score-weakest.comparableScore;
+      if(candidate.score>=ROTATION_MIN_SCORE && gap>=ROTATION_SCORE_GAP){
+        await placeLiveMarketSell(weakest.symbol,'ROTATION_OUT',{
+          score:weakest.comparableScore,
+          rotatedTo:candidate.symbol,
+          candidateScore:candidate.score,
+          scoreGap:gap
+        });
+        account=await getLiveAccountSnapshot();
+        const spend=Math.min(targetSlot,Number(account.usdtFree||0)*0.995);
+        if(spend>=5){
+          await placeLiveMarketBuy(candidate.symbol,spend,'ROTATION_IN',{
+            score:candidate.score,
+            rotatedFrom:weakest.symbol,
+            previousScore:weakest.comparableScore,
+            scoreGap:gap
+          });
+        }
+      }
+    }
+  }
+}
+
 async function getLiveAccountSnapshot(){
-  const [acct,prices] = await Promise.all([
+  const [acct,prices,restrictions] = await Promise.all([
     signedBinanceGet('/api/v3/account',{omitZeroBalances:'true'}),
-    j('/api/v3/ticker/price')
+    j('/api/v3/ticker/price'),
+    getApiRestrictions()
   ]);
 
   const priceMap=new Map((prices||[]).map(x=>[String(x.symbol||''),Number(x.price||0)]));
@@ -223,6 +442,8 @@ async function getLiveAccountSnapshot(){
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,
     takerCommission:acct.takerCommission,
+    apiRestrictions:restrictions,
+    tradingGate:liveTradingGate(restrictions),
     updatedAt:new Date().toISOString()
   };
 }
@@ -742,6 +963,13 @@ async function evalAll(){
     }
   }
 
+  // LIVE execution is separately gated by API permission + LIVE flag + AUTO_EXECUTION.
+  try{
+    await maybeExecuteLive(evals);
+  }catch(e){
+    console.error('LIVE execution cycle failed',e.message);
+  }
+
   // Final UI reconciliation after any trades/rotations.
   for(const ev of evals){
     if(!ev.ok)continue;
@@ -835,9 +1063,10 @@ const server=http.createServer((req,res)=>{
     return send(res,{
       mode,
       liveTradingEnabled:LIVE,
-      autoExecution:false,
+      autoExecution:AUTO_EXECUTION,
       keysConfigured:KEYS_CONFIGURED,
-      liveReadOnly:KEYS_CONFIGURED&&!LIVE
+      liveReadOnly:KEYS_CONFIGURED&&(!LIVE||!AUTO_EXECUTION),
+      liveMaxUsdt:LIVE_MAX_USDT
     });
   }
 
@@ -853,6 +1082,37 @@ const server=http.createServer((req,res)=>{
       }catch(e){
         send(res,{ok:false,error:e.message},400);
       }
+    });
+    return;
+  }
+
+  if(u.pathname==='/api/binance-live/buy'&&req.method==='POST'){
+    let b='';
+    req.on('data',x=>b+=x);
+    req.on('end',async()=>{
+      try{
+        const body=JSON.parse(b||'{}');
+        const symbol=String(body.symbol||'').toUpperCase();
+        const quoteUsdt=Number(body.quoteUsdt||0);
+        if(!/^[A-Z0-9]+USDT$/.test(symbol))throw Error('Invalid symbol');
+        const order=await placeLiveMarketBuy(symbol,quoteUsdt,'MANUAL_BUY');
+        send(res,{ok:true,order});
+      }catch(e){send(res,{ok:false,error:e.message},400);}
+    });
+    return;
+  }
+
+  if(u.pathname==='/api/binance-live/sell'&&req.method==='POST'){
+    let b='';
+    req.on('data',x=>b+=x);
+    req.on('end',async()=>{
+      try{
+        const body=JSON.parse(b||'{}');
+        const symbol=String(body.symbol||'').toUpperCase();
+        if(!/^[A-Z0-9]+USDT$/.test(symbol))throw Error('Invalid symbol');
+        const order=await placeLiveMarketSell(symbol,'MANUAL_SELL');
+        send(res,{ok:true,order});
+      }catch(e){send(res,{ok:false,error:e.message},400);}
     });
     return;
   }
