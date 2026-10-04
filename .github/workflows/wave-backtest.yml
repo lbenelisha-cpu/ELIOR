@@ -25,3 +25,4 @@ jobs:
           git add backtest-results.json
           git commit -m "Update wave backtest results" || exit 0
           git push
+\n# rerun-data-vision-2\n
