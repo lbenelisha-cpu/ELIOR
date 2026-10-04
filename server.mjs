@@ -22,6 +22,7 @@ let universeError = null;
 const D=path.dirname(fileURLToPath(import.meta.url));
 const PORT=+(process.env.PORT||8080);
 const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
+const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.5);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=3;
 const INITIAL=5000;
@@ -587,7 +588,7 @@ async function fetchHistoricalDaily(symbol,startMs,endMs=Date.now()){
   return rows.filter(x=>Number.isFinite(x.close)&&Number.isFinite(x.closeTime));
 }
 
-function evalWaveWithWindow(candles,{minWave=4,maxWave=12,maPeriod=200}={}){
+function evalWaveWithWindow(candles,{minWave=4,maxWave=12,maPeriod=200,sellRetraceRatio=SELL_RETRACE_RATIO}={}){
   const closes=candles.map(c=>Number(c.close)).filter(Number.isFinite);
   if(closes.length<maPeriod+3)return null;
   const slice=closes.slice(-maPeriod);
@@ -614,17 +615,18 @@ function evalWaveWithWindow(candles,{minWave=4,maxWave=12,maPeriod=200}={}){
   return {
     price,ma,aboveMA,direction,currentWave,previousUpWave,previousDownWave,
     buyConfirmed:direction==='UP'&&previousDownWave!=null&&currentWave>=minWave&&currentWave<=maxWave&&currentWave>previousDownWave&&aboveMA,
-    sellConfirmed:direction==='DOWN'&&previousUpWave!=null&&currentWave>previousUpWave
+    sellThreshold:previousUpWave==null?null:previousUpWave*sellRetraceRatio,
+    sellConfirmed:direction==='DOWN'&&previousUpWave!=null&&currentWave>=previousUpWave*sellRetraceRatio
   };
 }
 
-function backtestWindow(candles,{minWave=4,maxWave=12,maPeriod=200,initial=5000}={}){
+function backtestWindow(candles,{minWave=4,maxWave=12,maPeriod=200,initial=5000,sellRetraceRatio=SELL_RETRACE_RATIO}={}){
   let cash=initial,qty=0,entryPrice=null;
   const trades=[];
   const equity=[];
   for(let i=maPeriod+3;i<candles.length;i++){
     const hist=candles.slice(0,i+1);
-    const st=evalWaveWithWindow(hist,{minWave,maxWave,maPeriod});
+    const st=evalWaveWithWindow(hist,{minWave,maxWave,maPeriod,sellRetraceRatio});
     if(!st)continue;
     const price=st.price;
 
@@ -883,7 +885,7 @@ function scoreStrategy(st){
 async function evaluateSymbol(s){
   try{
     const c=await candles(s);
-    const st=evaluateWaveStrategy(c,{minWave:MIN,maPeriod:MAP});
+    const st=evaluateWaveStrategy(c,{minWave:MIN,maPeriod:MAP,sellRetraceRatio:SELL_RETRACE_RATIO});
     const pos=paper.positions[s]?'LONG':'CASH';
     const rawDecision=decidePosition(st,pos);
     const score=scoreStrategy(st);
@@ -1196,6 +1198,8 @@ async function evalAll(){
       currentWave:Number(ev.strategy?.currentWave||0),
       previousDownWave:ev.strategy?.previousDownWave==null?null:Number(ev.strategy.previousDownWave),
       previousUpWave:ev.strategy?.previousUpWave==null?null:Number(ev.strategy.previousUpWave),
+      sellThreshold:ev.strategy?.sellThreshold==null?null:Number(ev.strategy.sellThreshold),
+      sellRetraceRatio:Number(ev.strategy?.sellRetraceRatio??SELL_RETRACE_RATIO),
       score:Number(ev.score||0),
       buyQualified:Boolean(ev.buyQualified),
       buyReason:ev.buyReason||null,
@@ -1213,7 +1217,7 @@ async function buildTechnicalDailyHistory(symbol,limit=30){
   for(let i=start;i<c.length;i++){
     try{
       const hist=c.slice(0,i+1);
-      const st=evaluateWaveStrategy(hist,{minWave:MIN,maxWave:8,maPeriod:MAP});
+      const st=evaluateWaveStrategy(hist,{minWave:MIN,maxWave:8,maPeriod:MAP,sellRetraceRatio:SELL_RETRACE_RATIO});
       const qualification=buyQualification(st);
       rows.push({
         at:new Date(c[i].closeTime).toISOString(),
