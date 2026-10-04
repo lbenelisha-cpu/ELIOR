@@ -792,32 +792,57 @@ function apply(s,d,price,at,meta={}){
 
   Important: a 30%-70% pump does NOT automatically win.
 */
+function buyQualification(st){
+  if(!st)return {qualified:false,reason:'NO_DATA'};
+  if(st.direction!=='UP')return {qualified:false,reason:'NOT_UP'};
+  if(!st.aboveMA)return {qualified:false,reason:'BELOW_MA200'};
+  if(st.previousDownWave==null)return {qualified:false,reason:'NO_PREVIOUS_DOWN'};
+  if(Number(st.currentWave)<4)return {qualified:false,reason:'WAVE_BELOW_4'};
+  if(Number(st.currentWave)>8)return {qualified:false,reason:'WAVE_ABOVE_8'};
+  if(Number(st.currentWave)<=Number(st.previousDownWave))return {qualified:false,reason:'NOT_STRONGER_THAN_PREVIOUS_DOWN'};
+  return {qualified:true,reason:'QUALIFIED'};
+}
+
 function scoreStrategy(st){
-  if(!st||!st.buyConfirmed||st.direction!=='UP'||!st.aboveMA)return 0;
+  if(!st)return 0;
 
-  const wave=Math.max(0,+st.currentWave||0);
-  const prevDown=Math.max(0.25,+st.previousDownWave||0.25);
-  const price=+st.price||0;
-  const ma=+st.ma||0;
+  const wave=Math.max(0,Number(st.currentWave)||0);
+  const prevDown=Math.max(0.25,Number(st.previousDownWave)||0.25);
+  const price=Number(st.price)||0;
+  const ma=Number(st.ma)||0;
 
-  const waveScore=Math.min(wave,12)/12*40;
+  // Strength score is informational for ALL assets, not a BUY permission.
+  const directionScore=st.direction==='UP'?15:0;
+
+  // Momentum: strongest around the intended entry zone, but still informative outside it.
+  let waveScore=0;
+  if(wave<=4){
+    waveScore=(wave/4)*20;
+  }else if(wave<=8){
+    waveScore=20+((wave-4)/4)*20;
+  }else if(wave<=20){
+    waveScore=40-Math.min(20,((wave-8)/12)*20);
+  }else{
+    waveScore=Math.max(5,20-Math.min(15,(wave-20)*0.5));
+  }
 
   const dominance=wave/prevDown;
-  const dominanceScore=Math.max(0,Math.min(1,(dominance-1)/2))*30;
+  const dominanceScore=Math.max(0,Math.min(1,(dominance-0.5)/2.5))*25;
 
-  const maDistancePct=ma>0?Math.max(0,(price/ma-1)*100):0;
-  const maScore=Math.min(maDistancePct,30)/30*20;
+  const maDistancePct=ma>0?(price/ma-1)*100:0;
+  const maScore=st.aboveMA
+    ? Math.min(Math.max(maDistancePct,0),30)/30*20
+    : Math.max(-10,maDistancePct/10*10);
 
-  const confirmationBonus=10;
-
-  const overextensionPenalty=
-    wave>20
-      ? Math.min(25,(wave-20)*1.25)
-      : 0;
+  const qualification=buyQualification(st);
+  const qualificationBonus=qualification.qualified?10:0;
 
   return Math.max(
     0,
-    Math.round((waveScore+dominanceScore+maScore+confirmationBonus-overextensionPenalty)*10)/10
+    Math.min(
+      100,
+      Math.round((directionScore+waveScore+dominanceScore+maScore+qualificationBonus)*10)/10
+    )
   );
 }
 
@@ -828,6 +853,7 @@ async function evaluateSymbol(s){
     const pos=paper.positions[s]?'LONG':'CASH';
     const rawDecision=decidePosition(st,pos);
     const score=scoreStrategy(st);
+    const qualification=buyQualification(st);
 
     return {
       ok:true,
@@ -837,6 +863,8 @@ async function evaluateSymbol(s){
       position:pos,
       rawDecision,
       score,
+      buyQualified:qualification.qualified,
+      buyReason:qualification.reason,
       at:new Date(c.at(-1).closeTime).toISOString()
     };
   }catch(e){
@@ -861,6 +889,8 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     decision,
     strategy:ev.strategy,
     score:ev.score,
+    buyQualified:ev.buyQualified,
+    buyReason:ev.buyReason,
     rotation:strategy,
     lastDecisionAt:new Date().toISOString(),
     lastError:null,
