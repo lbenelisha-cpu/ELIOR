@@ -6,6 +6,7 @@ const RESET=B+'/api/binance-paper/reset';
 const LIVEACC=B+'/api/binance-live-account';
 const ACTIONLOG=B+'/api/binance-action-log';
 const CHART=B+'/api/binance-chart';
+const DECISION_HISTORY=B+'/api/binance-decision-history';
 
 const $=s=>document.querySelector(s);
 const fmt=(v,d=2)=>Number.isFinite(+v)?(+v).toLocaleString('he-IL',{maximumFractionDigits:d}):'—';
@@ -190,7 +191,28 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',buyReasonLabel(a.buyReason));
 
-  await loadChart(a.symbol);
+  await Promise.all([loadChart(a.symbol),loadDecisionHistory(a.symbol)]);
+}
+
+function decisionReasonLabel(r){
+  return ({
+    BUY_EXECUTED:'BUY בוצע',
+    SELL_EXECUTED:'SELL בוצע',
+    ROTATE_IN:'רוטציה פנימה',
+    ROTATE_OUT:'רוטציה החוצה',
+    NO_SLOT:'אין Slot פנוי',
+    ROTATION_NOT_STRONG_ENOUGH:'לא חזק מספיק לרוטציה',
+    BUY_READY:'כשיר BUY',
+    QUALIFIED_BUT_HOLD:'כשיר אך HOLD',
+    WAVE_BELOW_4:'גל מתחת ל־4%',
+    WAVE_ABOVE_8:'גל מעל 8%',
+    NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
+    BELOW_MA200:'מתחת ל־MA200',
+    NOT_UP:'לא בגל עולה',
+    NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
+    HOLD:'HOLD',
+    ERROR:'שגיאה'
+  })[r]||r||'—';
 }
 
 function actionLabel(x){
@@ -235,6 +257,56 @@ async function loadLiveAccount(prefetched=null){
     put('#liveConnected','שגיאה');put('#liveTotalValue','—');put('#liveUsdt','—');put('#liveCanTrade','—');put('#liveAccountType','—');
     $('#liveBalances').innerHTML='<div class="mini">'+e.message+'</div>';
     return null;
+  }
+}
+
+async function loadDecisionHistory(symbol){
+  try{
+    put('#decisionHistorySymbol',symbol);
+    const d=await J(DECISION_HISTORY+'?symbol='+encodeURIComponent(symbol)+'&limit=20');
+    const recorded=d.recorded||[];
+    const technical=d.technicalDaily||[];
+
+    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>Wave</div><div>ירידה קודמת</div><div>Score</div><div>Slots</div><div>סיבה</div></div>';
+
+    const renderRecorded=recorded.map(x=>{
+      const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
+      const cls=x.decision==='BUY'||x.decision==='ROTATE_IN'?'good':x.decision==='SELL'||x.decision==='ROTATE_OUT'?'bad':'warn';
+      return `<div class="decision-row">
+        <div>${when}</div>
+        <div class="${cls}">${x.decision||'HOLD'}</div>
+        <div>${fmt(x.currentWave,2)}%</div>
+        <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
+        <div>${fmt(x.score,1)}</div>
+        <div>${x.activeSlots}/${x.maxSlots}</div>
+        <div>${decisionReasonLabel(x.reason||x.buyReason)}</div>
+      </div>`;
+    }).join('');
+
+    const renderTechnical=technical.map(x=>{
+      const when=x.at?new Date(x.at).toLocaleDateString('he-IL'):'—';
+      const cls=x.buyQualified?'good':'warn';
+      return `<div class="decision-row">
+        <div>${when}</div>
+        <div class="${cls}">${x.technicalDecision||'HOLD'}</div>
+        <div>${fmt(x.currentWave,2)}%</div>
+        <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
+        <div>—</div>
+        <div>—</div>
+        <div>${decisionReasonLabel(x.buyReason)}</div>
+      </div>`;
+    }).join('');
+
+    let out='';
+    if(recorded.length){
+      out+='<div class="decision-history-section-title">בדיקות אמיתיות שנרשמו במערכת</div>'+header+renderRecorded;
+    }
+    if(technical.length){
+      out+='<div class="decision-history-section-title">היסטוריה יומית טכנית</div>'+header+renderTechnical;
+    }
+    $('#decisionHistory').innerHTML=out||'<div class="mini">אין עדיין היסטוריית החלטות.</div>';
+  }catch(e){
+    $('#decisionHistory').innerHTML='<div class="mini">שגיאה בטעינת היסטוריית החלטות</div>';
   }
 }
 
