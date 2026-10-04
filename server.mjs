@@ -1263,6 +1263,20 @@ const server=http.createServer((req,res)=>{
     return send(res,{ok:true,paper:snap()});
   }
 
+  if(u.pathname==='/api/binance-chart'&&req.method==='GET'){
+    const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
+    if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
+    j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1d&limit=260')
+      .then(rows=>{
+        const candles=(rows||[]).map(x=>({
+          openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]
+        }));
+        send(res,{ok:true,symbol,candles});
+      })
+      .catch(e=>send(res,{ok:false,error:e.message},502));
+    return;
+  }
+
   if(u.pathname==='/api/binance-agent'&&req.method==='GET'){
     return send(res,{
       mode,
