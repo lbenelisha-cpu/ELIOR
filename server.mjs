@@ -24,7 +24,7 @@ let universeError = null;
 const D=path.dirname(fileURLToPath(import.meta.url));
 const PORT=+(process.env.PORT||8080);
 const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
-const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.2);
+const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.15);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=6;
 const INITIAL=5000;
@@ -303,14 +303,40 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   if(!gate.ready)throw Error('LIVE trading gate is not enabled');
   if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for this API key');
 
+  const info=await symbolExchangeInfo(symbol);
+  if(!info||info.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false){
+    throw Error('LIVE symbol is not available for Spot trading: '+symbol);
+  }
+  if(info.quoteOrderQtyMarketAllowed===false){
+    throw Error('LIVE quoteOrderQty market buy is not supported: '+symbol);
+  }
+
   quoteUsdt=Math.min(Number(quoteUsdt)||0,LIVE_MAX_USDT);
   if(!(quoteUsdt>0))throw Error('Invalid LIVE buy amount');
+
+  const minimum=Math.max(
+    0,
+    ...(info.filters||[])
+      .filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType))
+      .map(f=>Number(f.minNotional||0))
+  );
+  if(quoteUsdt<minimum){
+    const e=Error('LIVE buy amount below minimum notional for '+symbol);
+    e.code='BELOW_MIN_NOTIONAL';
+    e.minimum=minimum;
+    e.amount=quoteUsdt;
+    throw e;
+  }
+
+  const precision=Math.min(8,Number(info.quoteAssetPrecision??8));
+  const factor=10**precision;
+  const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
   const order=await signedBinancePost('/api/v3/order',{
     symbol,
     side:'BUY',
     type:'MARKET',
-    quoteOrderQty:quoteUsdt.toFixed(8),
+    quoteOrderQty:quoteText,
     newOrderRespType:'FULL'
   });
 
@@ -407,19 +433,39 @@ async function maybeExecuteLive(evals){
     .filter(ev=>!heldNow.some(h=>h.symbol===ev.symbol))
     .sort((a,b)=>b.score-a.score);
 
-  const portfolioCap=Math.min(
-    LIVE_MAX_USDT,
-    Math.max(account.totalValueUsdt||0,account.usdtFree||0)
-  );
-  const targetSlot=portfolioCap/MAX;
-
-  // Fill empty slots.
+  // Fill empty slots using the same principle as DEMO:
+  // divide currently available USDT across the remaining free slots.
+  // LIVE_MAX_USDT remains a hard per-order safety cap.
   while(heldNow.length<MAX && candidates.length){
     const ev=candidates.shift();
     account=await getLiveAccountSnapshot();
-    const spend=Math.min(targetSlot,Number(account.usdtFree||0)*0.995);
+
+    const freeSlots=Math.max(1,MAX-heldNow.length);
+    const availableUsdt=Math.max(0,Number(account.usdtFree||0));
+    const spend=Math.min(
+      LIVE_MAX_USDT,
+      (availableUsdt/freeSlots)*0.995
+    );
+
     if(spend<5)break;
-    await placeLiveMarketBuy(ev.symbol,spend,'BEST_AVAILABLE_BUY',{score:ev.score});
+
+    try{
+      await placeLiveMarketBuy(ev.symbol,spend,'BEST_AVAILABLE_BUY',{score:ev.score});
+    }catch(e){
+      pushLiveAction({
+        type:'BUY_REJECTED',
+        symbol:ev.symbol,
+        amountUsdt:spend,
+        reason:e.code||'BUY_ERROR',
+        error:e.message,
+        minimum:e.minimum??null,
+        score:ev.score,
+        at:new Date().toISOString()
+      });
+      // A symbol-specific rejection must not block stronger/next candidates.
+      continue;
+    }
+
     account=await getLiveAccountSnapshot();
     assetMap.clear();
     for(const x of account.balances)assetMap.set(x.asset,x);
@@ -443,7 +489,7 @@ async function maybeExecuteLive(evals){
           scoreGap:gap
         });
         account=await getLiveAccountSnapshot();
-        const spend=Math.min(targetSlot,Number(account.usdtFree||0)*0.995);
+        const spend=Math.min(LIVE_MAX_USDT,Number(account.usdtFree||0)*0.995);
         if(spend>=5){
           await placeLiveMarketBuy(candidate.symbol,spend,'ROTATION_IN',{
             score:candidate.score,
