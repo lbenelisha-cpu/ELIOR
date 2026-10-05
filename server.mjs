@@ -183,6 +183,29 @@ async function j(url){
   return r.json();
 }
 
+async function demoPublic(url){
+  const r=await fetch('https://demo-api.binance.com'+url,{signal:AbortSignal.timeout(15000)});
+  const body=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(body?.msg||('Binance Demo '+r.status));
+  return body;
+}
+
+let demoTradableCache={at:0,symbols:null};
+async function demoTradableSymbols(){
+  if(!DEMO_TRADING)return null;
+  if(demoTradableCache.symbols && Date.now()-demoTradableCache.at<600000){
+    return demoTradableCache.symbols;
+  }
+  const info=await demoPublic('/api/v3/exchangeInfo');
+  const symbols=new Set(
+    (info.symbols||[])
+      .filter(x=>x.status==='TRADING'&&x.quoteAsset==='USDT'&&x.isSpotTradingAllowed!==false&&x.orderTypes?.includes('MARKET'))
+      .map(x=>x.symbol)
+  );
+  demoTradableCache={at:Date.now(),symbols};
+  return symbols;
+}
+
 async function binanceServerTime(){
   try{
     const t=await j('/api/v3/time');
@@ -499,7 +522,13 @@ function isEligibleSymbol(x){
 }
 
 async function selectUniverse(){
-  if(MANUAL_SYMBOLS.length)return MANUAL_SYMBOLS.slice(0,UNIVERSE_SIZE);
+  const demoTradable=DEMO_TRADING?await demoTradableSymbols():null;
+
+  if(MANUAL_SYMBOLS.length){
+    return MANUAL_SYMBOLS
+      .filter(s=>!demoTradable||demoTradable.has(s))
+      .slice(0,UNIVERSE_SIZE);
+  }
 
   const [info,tickers]=await Promise.all([
     j('/api/v3/exchangeInfo'),
@@ -513,7 +542,12 @@ async function selectUniverse(){
   );
 
   const ranked=(tickers||[])
-    .filter(x=>tradable.has(x.symbol)&&isEligibleSymbol(x)&&Number.isFinite(+x.quoteVolume))
+    .filter(x=>
+      tradable.has(x.symbol) &&
+      (!demoTradable||demoTradable.has(x.symbol)) &&
+      isEligibleSymbol(x) &&
+      Number.isFinite(+x.quoteVolume)
+    )
     .sort((a,b)=>+b.quoteVolume-+a.quoteVolume);
 
   const selected=[];
@@ -528,13 +562,13 @@ async function selectUniverse(){
 }
 
 function initUniverse(symbols){
-  SYMBOLS=[...new Set([...symbols,...Object.keys(paper.positions)])];
+  SYMBOLS=[...new Set([...symbols,...Object.keys(tradingPositions())])];
   agents=Object.fromEntries(
     SYMBOLS.map(symbol=>[
       symbol,
       agents[symbol]||{
         symbol,
-        position:paper.positions[symbol]?'LONG':'CASH',
+        position:tradingPositions()[symbol]?'LONG':'CASH',
         decision:'HOLD',
         strategy:null,
         execution:'IDLE',
@@ -1140,7 +1174,24 @@ async function runEvaluation(){
       }else if(qualified){
         const snap=demoTrader.snapshot();
         const cash=Number(snap?.cashIls||0);
-        if(!(cash>0)){
+        const attempt=demoTrader.state.lastCycle?.attempts?.find(x=>x.symbol===ev.symbol);
+
+        if(attempt && !attempt.ok){
+          decision='WAIT_EXECUTION';
+          execution='BUY_REJECTED';
+          const reasonMap={
+            NO_CASH:'אין USDT פנוי לקנייה',
+            BELOW_MIN_NOTIONAL:'סכום הקנייה נמוך מהמינימום של Binance',
+            ALREADY_HELD:'הנכס כבר מוחזק בחשבון',
+            NO_SLOT:'אין Slot פנוי',
+            NOT_ADDED:'ההזמנה הסתיימה אך הפוזיציה לא נוספה',
+            ERROR:attempt.error||'שגיאת Binance Demo'
+          };
+          blocker={
+            code:'BUY_'+(attempt.reason||'REJECTED'),
+            text:'BUY לא בוצע · '+(reasonMap[attempt.reason]||attempt.reason||'סיבה לא ידועה')
+          };
+        }else if(!(cash>0)){
           decision='WAIT_EXECUTION';
           execution='NO_CASH';
           blocker={code:'NO_CASH',text:'אין USDT פנוי לקנייה'};
@@ -1706,6 +1757,7 @@ const server=http.createServer((req,res)=>{
           demoExecutionBusy:demoTrader.busy,
           demoExecutionError:demoTrader.error||null,
           demoLastCycle:demoTrader.state.lastCycle||null,
+          demoUniverseFiltered:DEMO_TRADING,
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
