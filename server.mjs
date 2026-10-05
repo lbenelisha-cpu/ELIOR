@@ -1,3 +1,4 @@
+import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
 import http from "node:http";
 import fs from "node:fs";
@@ -1392,6 +1393,13 @@ const server=http.createServer((req,res)=>{
         send(res,{ok:true,order});
       }catch(e){send(res,{ok:false,error:e.message},400);}
     });
+    return;
+  }
+
+  if(u.pathname==='/api/binance-demo-account'&&req.method==='GET'){
+    getDemoAccount({key:process.env.BINANCE_DEMO_API_KEY,secret:process.env.BINANCE_DEMO_API_SECRET})
+      .then(account=>send(res,{connected:true,account}))
+      .catch(e=>send(res,{connected:false,error:e.message},502));
     return;
   }
 

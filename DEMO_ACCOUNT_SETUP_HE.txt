@@ -1,0 +1,20 @@
+התקנת עדכון יתרות Binance Demo Spot
+
+העלה למאגר ELIOR את server.mjs, binance-agent.html, binance-agent.js,
+binance-demo-account.js ואת שני הקבצים lib/binance-demo-account.mjs ו-lib/binance-demo-account.test.mjs.
+
+בחשבון Binance Demo פתח API Key Management והכן מפתחות לקריאת חשבון הדמו.
+אין לשלוח מפתחות בצ'אט או להעלות ל-GitHub.
+ב-Render > Environment הגדר:
+BINANCE_DEMO_API_KEY
+BINANCE_DEMO_API_SECRET
+שמור והפעל Deploy מחדש. אין צורך להפעיל LIVE.
+אם התצוגה מתארחת ב-Netlify, העלה גם את קבצי התצוגה המעודכנים לשם.
+פתח binance-agent.html ורענן Ctrl+F5.
+
+תצוגת החשבון כוללת את כל הנכסים הזמינים והנעולים, במונחי USDT.
+רענון אוטומטי כל דקה. נכס ללא מחיר מסומן ומתקבל שווי חלקי.
+כשל חיבור אינו מציג 5,000 כתחליף ליתרה.
+הסימולציה הפנימית מסומנת בנפרד; אין שינוי בהיסטוריה או ברווחים הישנים.
+עדכון זה קורא יתרות בלבד ואינו מבצע עסקאות בבייננס דמו.
+חיבור לחשבון בפועל מחייב מפתחות דמו והתקנה; לא נבדק בסביבת הפיתוח.

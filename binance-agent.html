@@ -160,9 +160,17 @@
         </div>
       </section>
 
-      <aside class="panel action-panel">
+      <section class="panel" id="binanceDemoBalanceCard">
+<h2>חשבון Binance Demo · כל הנכסים</h2>
+<p id="demoAccountStatus">טוען יתרות מהחשבון…</p>
+<h3 id="demoAccountTotal">— USDT</h3>
+<p>שווי כולל במונחי USDT, כולל יתרות זמינות ונעולות.</p>
+<table><thead><tr><th>מטבע</th><th>זמין</th><th>נעול</th><th>שווי USDT</th></tr></thead><tbody id="demoAccountBalances"></tbody></table>
+<button id="refreshDemoAccount">רענן יתרות Binance Demo</button>
+</section>
+<aside class="panel action-panel">
         <div class="panel-title-row">
-          <h2 id="portfolioTitle">תיק DEMO · 5,000 ₪</h2>
+          <h2 id="portfolioTitle">סימולציה פנימית · נפרדת מ־Binance</h2>
         </div>
 
         <div class="action-card primary-card">
@@ -268,5 +276,6 @@
 
   <script src="binance-agent.js"></script>
   <script src="binance-agent-portfolio.js"></script>
+<script src="binance-demo-account.js"></script>
 </body>
 </html>
