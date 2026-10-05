@@ -26,7 +26,7 @@ const PORT=+(process.env.PORT||8080);
 const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
 const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.2);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
-const MAX=3;
+const MAX=6;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
 const UNIVERSE_SIZE=Math.min(60,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||60)));
@@ -47,7 +47,7 @@ const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_C
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
 const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
-const demoTrader=new DemoTrader({key:process.env.BINANCE_DEMO_API_KEY,secret:process.env.BINANCE_DEMO_API_SECRET,enabled:DEMO_TRADING,stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json'});
+const demoTrader=new DemoTrader({maxPositions:MAX,key:process.env.BINANCE_DEMO_API_KEY,secret:process.env.BINANCE_DEMO_API_SECRET,enabled:DEMO_TRADING,stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json'});
 const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
 
@@ -1613,3 +1613,4 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadDecisionHistory();
   await refreshUniverse();
 });
+

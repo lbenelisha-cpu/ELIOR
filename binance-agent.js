@@ -131,7 +131,7 @@ function render(d,currentMode='demo',liveAccount=null){
   const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   const paperPos=p.positions||{};
   const rotationGap=Number(d.config?.rotationScoreGap||20);
-  const maxPositions=Number(p.maxPositions||3);
+  const maxPositions=Number(p.maxPositions||6);
 
   renderMarketStrip(agents);
 
@@ -219,7 +219,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   if(!a) return;
   selectedSymbol=a.symbol;
   const {isHeld,activeAgents,weakestActive,p}=activeContext(d,currentModeArg,liveAccount);
-  const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(p.maxPositions||3),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live');
+  const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(p.maxPositions||6),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live');
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
@@ -296,8 +296,8 @@ async function loadLiveAccount(prefetched=null){
     put('#paperValue',fmt(a.totalValueUsdt)+' USDT');
     put('#paperCash',fmt(a.usdtFree)+' USDT');
     put('#paperPnl','—');
-    put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/3');
-    put('#slotValue',a.totalValueUsdt>0?fmt(Math.min(Number(a.tradingGate?.liveMaxUsdt||a.totalValueUsdt),a.totalValueUsdt)/3)+' USDT':'—');
+    put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/6');
+    put('#slotValue',a.totalValueUsdt>0?fmt(Math.min(Number(a.tradingGate?.liveMaxUsdt||a.totalValueUsdt),a.totalValueUsdt)/6)+' USDT':'—');
     put('#paperTradesCount','—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
@@ -518,3 +518,4 @@ if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).obse
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
 setInterval(load,30000);
+
