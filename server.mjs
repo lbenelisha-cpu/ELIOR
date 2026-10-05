@@ -1071,6 +1071,14 @@ function weakestHeldEvaluation(evals){
   return held[0]||null;
 }
 
+async function waitForDemoTraderIdle(timeoutMs=15000){
+  const started=Date.now();
+  while(demoTrader.busy && Date.now()-started<timeoutMs){
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  return !demoTrader.busy;
+}
+
 let evaluationInFlight=null;
 function evalAll(){
   if(evaluationInFlight)return evaluationInFlight;
@@ -1085,7 +1093,17 @@ async function runEvaluation(){
   }
 
   if(DEMO_TRADING&&mode==='demo'){
-    await demoTrader.cycle(evals,{rotationEnabled:ROTATION_ENABLED,minScore:ROTATION_MIN_SCORE,scoreGap:ROTATION_SCORE_GAP,maxRotations:ROTATION_MAX_PER_CYCLE});
+    const idle=await waitForDemoTraderIdle();
+    if(!idle){
+      demoTrader.error='BUY cycle blocked: Demo execution lock stayed busy for 15 seconds';
+    }else{
+      await demoTrader.cycle(evals,{
+        rotationEnabled:ROTATION_ENABLED,
+        minScore:ROTATION_MIN_SCORE,
+        scoreGap:ROTATION_SCORE_GAP,
+        maxRotations:ROTATION_MAX_PER_CYCLE
+      });
+    }
     const positions=demoTrader.state.positions;
     for(const ev of evals){
       const held=!!positions[ev.symbol];
@@ -1459,7 +1477,7 @@ async function refreshUniverse(){
   }
 }
 
-setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),300000).unref();
+setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),60000).unref();
 // Exit monitoring does not wait for the 60-symbol daily-candle scan.
 setInterval(async()=>{
   if(!DEMO_TRADING||mode!=='demo')return;
@@ -1686,6 +1704,7 @@ const server=http.createServer((req,res)=>{
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
+        decisionIntervalMs:60000,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
       }
