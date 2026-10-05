@@ -142,7 +142,10 @@ function render(d,currentMode='demo',liveAccount=null){
     const rotationState=activeAgents.length<maxPositions
       ? ' · מנוע החלטות: כל דקה · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
       : ' · מנוע החלטות: כל דקה · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
-    put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState);
+    const diag=d.config?.buyCandidateCount!=null
+      ? ' · מועמדי BUY: '+d.config.buyCandidateCount+(d.config.demoExecutionBusy?' · מנוע ביצוע עסוק':'')
+      : '';
+    put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState+diag);
   }
 
   if(!isLive){
