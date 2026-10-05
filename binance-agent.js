@@ -168,6 +168,7 @@ function render(d,currentMode='demo',liveAccount=null){
     const rowClasses=[
       a.symbol===selectedSymbol?'selected':'',
       held?'active-position':'',
+      held?(s.direction==='DOWN'?'active-down':'active-up'):'',
       (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
