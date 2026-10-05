@@ -233,3 +233,22 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
  .brand-mark{flex-shrink:0}.nav-pill{padding:9px 11px}.chart-wrap{height:340px}
  .selected-price strong{font-size:25px}.toolbar-group{width:100%}.time-pill{flex:1;padding:8px 6px}
 }
+
+/* Highlight holdings with a prominent, steady green pulse. */
+@keyframes activePositionPulse{
+  0%,100%{background-color:rgba(38,208,124,.10);box-shadow:inset 6px 0 0 #26d07c,inset 0 0 0 1px rgba(38,208,124,.25)}
+  50%{background-color:rgba(38,208,124,.34);box-shadow:inset 6px 0 0 #86ffbb,inset 0 0 0 2px rgba(122,242,177,.85),inset 0 0 24px rgba(38,208,124,.26)}
+}
+.asset-table tbody tr.active-position{
+  background-image:none;
+  animation:activePositionPulse 2s ease-in-out infinite;
+}
+.asset-table tbody tr.active-position td:first-child b{
+  color:#a3ffca;font-weight:900;
+}
+@media(prefers-reduced-motion:reduce){
+  .asset-table tbody tr.active-position{
+    animation:none;background-color:rgba(38,208,124,.26);
+    box-shadow:inset 6px 0 0 #86ffbb,inset 0 0 0 2px rgba(122,242,177,.7);
+  }
+}
