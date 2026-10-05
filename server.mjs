@@ -1705,6 +1705,7 @@ const server=http.createServer((req,res)=>{
           buyCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
           demoExecutionBusy:demoTrader.busy,
           demoExecutionError:demoTrader.error||null,
+          demoLastCycle:demoTrader.state.lastCycle||null,
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
