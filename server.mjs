@@ -1002,8 +1002,9 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:'ERROR',text:'שגיאת נתונים'};
 
-  const activeCount=Object.keys(paper.positions).length;
-  const isHeld=!!paper.positions[ev.symbol];
+  const positions=tradingPositions();
+  const activeCount=Object.keys(positions).length;
+  const isHeld=!!positions[ev.symbol];
 
   if(isHeld){
     return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
@@ -1059,7 +1060,7 @@ function candidateBlocker(ev,evals){
 
 function weakestHeldEvaluation(evals){
   const held=evals
-    .filter(x=>x.ok&&paper.positions[x.symbol])
+    .filter(x=>x.ok&&tradingPositions()[x.symbol])
     .map(x=>({
       ...x,
       // A held position that no longer has a current BUY setup is intentionally weak.
@@ -1090,9 +1091,70 @@ async function runEvaluation(){
       const held=!!positions[ev.symbol];
       const last=demoTrader.state.actionLog.find(a=>a.symbol===ev.symbol);
       const executed=last&&Date.parse(last.at)>=Date.parse(ev.at);
-      const decision=executed?last.type:held?'ACTIVE_LONG':ev.closedStrategy?.buyConfirmed?(Object.keys(positions).length>=MAX?'WAIT_NO_SLOT':'BUY_READY'):'HOLD';
-      setAgentFromEval(ev,decision,demoTrader.error?'ERROR':executed?'BINANCE_DEMO_EXECUTED':held?'HOLDING':'IDLE');
-      if(ev.ok)pushDecisionHistory(ev.symbol,{at:new Date().toISOString(),mode:'demo',source:'BINANCE_DEMO_SPOT',decision,execution:agents[ev.symbol].execution,reason:demoTrader.error||decision,position:held?'LONG':'CASH',price:ev.strategy.price,score:ev.score,activeSlots:Object.keys(positions).length,maxSlots:MAX});
+      const activeCount=Object.keys(positions).length;
+      const qualified=!!ev.closedStrategy?.buyConfirmed;
+
+      let decision='HOLD';
+      let blocker={code:'HOLD',text:'לא כשיר כרגע'};
+      let execution='IDLE';
+
+      if(executed){
+        decision=last.type;
+        execution='BINANCE_DEMO_EXECUTED';
+        blocker={code:last.type,text:last.type+' בוצע'};
+      }else if(held){
+        decision='ACTIVE_LONG';
+        execution='HOLDING';
+        blocker={code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
+      }else if(demoTrader.state.pending){
+        decision='WAIT_EXECUTION';
+        execution='PENDING_ORDER';
+        blocker={code:'PENDING_ORDER',text:'ממתין לסיום הזמנה קודמת'};
+      }else if(demoTrader.error){
+        decision='WAIT_EXECUTION';
+        execution='ERROR';
+        blocker={code:'DEMO_EXECUTION_ERROR',text:'חסם ביצוע: '+demoTrader.error};
+      }else if(qualified && activeCount>=MAX){
+        decision='WAIT_NO_SLOT';
+        execution='NO_SLOT';
+        blocker={code:'NO_SLOT',text:'אין Slot פנוי · '+activeCount+'/'+MAX};
+      }else if(qualified){
+        const snap=demoTrader.snapshot();
+        const cash=Number(snap?.cashIls||0);
+        if(!(cash>0)){
+          decision='WAIT_EXECUTION';
+          execution='NO_CASH';
+          blocker={code:'NO_CASH',text:'אין USDT פנוי לקנייה'};
+        }else{
+          decision='BUY_READY';
+          execution='READY';
+          blocker={code:'BUY_READY',text:'מוכן ל-BUY · יבוצע במחזור הקרוב'};
+        }
+      }else{
+        decision='HOLD';
+        execution='IDLE';
+        blocker={code:'WAIT_D1',text:'ממתין לאישור D1'};
+      }
+
+      setAgentFromEval(ev,decision,execution);
+      agents[ev.symbol].blocker=blocker;
+
+      if(ev.ok)pushDecisionHistory(ev.symbol,{
+        at:new Date().toISOString(),
+        mode:'demo',
+        source:'BINANCE_DEMO_SPOT',
+        decision,
+        execution,
+        reason:blocker.text,
+        blockerCode:blocker.code,
+        position:held?'LONG':'CASH',
+        price:ev.strategy.price,
+        score:ev.score,
+        activeSlots:activeCount,
+        maxSlots:MAX,
+        demoError:demoTrader.error||null,
+        pendingOrder:demoTrader.state.pending?.clientId||null
+      });
     }
     saveDecisionHistory();
     return;
