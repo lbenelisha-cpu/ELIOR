@@ -1334,6 +1334,17 @@ async function refreshUniverse(){
 }
 
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),300000).unref();
+// Exit monitoring does not wait for the 60-symbol daily-candle scan.
+setInterval(async()=>{
+  if(!DEMO_TRADING||mode!=='demo')return;
+  if(!await demoTrader.monitorExits())return;
+  for(const a of Object.values(agents)){
+    if(a.position==='LONG'&&!demoTrader.state.positions[a.symbol]){
+      a.position='CASH';a.decision='SELL';a.execution='BINANCE_DEMO_EXECUTED';
+      a.lastDecisionAt=demoTrader.state.actionLog.find(x=>x.symbol===a.symbol&&x.type==='SELL')?.at;
+    }
+  }
+},5000).unref();
 setInterval(refreshUniverse,21600000).unref();
 
 const send=(res,o,c=200)=>{
@@ -1548,6 +1559,7 @@ const server=http.createServer((req,res)=>{
         rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE,
         stateFile:STATE_FILE,
         persistentState:true,
+        demoExitMonitorIntervalMs:5000,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
       }
