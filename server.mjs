@@ -1071,7 +1071,7 @@ function weakestHeldEvaluation(evals){
   return held[0]||null;
 }
 
-async function waitForDemoTraderIdle(timeoutMs=15000){
+async function waitForDemoTraderIdle(timeoutMs=60000){
   const started=Date.now();
   while(demoTrader.busy && Date.now()-started<timeoutMs){
     await new Promise(resolve=>setTimeout(resolve,100));
@@ -1095,7 +1095,8 @@ async function runEvaluation(){
   if(DEMO_TRADING&&mode==='demo'){
     const idle=await waitForDemoTraderIdle();
     if(!idle){
-      demoTrader.error='BUY cycle blocked: Demo execution lock stayed busy for 15 seconds';
+      demoTrader.error='BUY cycle delayed: Demo execution lock stayed busy for 60 seconds';
+      setTimeout(()=>evalAll().catch(e=>console.error('Delayed evaluation failed',e.message)),1500).unref?.();
     }else{
       await demoTrader.cycle(evals,{
         rotationEnabled:ROTATION_ENABLED,
@@ -1701,6 +1702,9 @@ const server=http.createServer((req,res)=>{
         rotationMinScore:ROTATION_MIN_SCORE,
         rotationScoreGap:ROTATION_SCORE_GAP,
         rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE,
+          buyCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
+          demoExecutionBusy:demoTrader.busy,
+          demoExecutionError:demoTrader.error||null,
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
