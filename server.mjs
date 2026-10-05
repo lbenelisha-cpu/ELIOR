@@ -999,6 +999,64 @@ function decisionReasonFromAgent(agent,ev){
   return ev.buyReason||'HOLD_NOT_QUALIFIED';
 }
 
+function candidateBlocker(ev,evals){
+  if(!ev?.ok)return {code:'ERROR',text:'שגיאת נתונים'};
+
+  const activeCount=Object.keys(paper.positions).length;
+  const isHeld=!!paper.positions[ev.symbol];
+
+  if(isHeld){
+    return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
+  }
+
+  // BUY qualification is intentionally based on confirmed D1 candles.
+  if(!ev.buyQualified){
+    return {code:'WAIT_D1',text:'ממתין לאישור D1'};
+  }
+
+  if(activeCount<MAX){
+    return {code:'BUY_READY',text:'מוכן ל-BUY'};
+  }
+
+  const weakest=weakestHeldEvaluation(evals);
+  if(!weakest){
+    return {code:'NO_SLOT',text:'אין Slot פנוי'};
+  }
+
+  const weakScore=Number(weakest.comparableScore||0);
+  const gap=Number(ev.score||0)-weakScore;
+  const missing=Math.max(0,ROTATION_SCORE_GAP-gap);
+
+  if(Number(ev.score||0)<ROTATION_MIN_SCORE){
+    return {
+      code:'ROTATION_SCORE_LOW',
+      text:'Score נמוך מסף הרוטציה',
+      gap,
+      missing
+    };
+  }
+
+  if(gap<ROTATION_SCORE_GAP){
+    return {
+      code:'ROTATION_GAP',
+      text:'חסר '+missing.toFixed(1)+' נק׳ לרוטציה',
+      gap,
+      missing,
+      weakestSymbol:weakest.symbol,
+      weakestScore:weakScore
+    };
+  }
+
+  return {
+    code:'ROTATE_READY',
+    text:'מוכן לרוטציה',
+    gap,
+    missing:0,
+    weakestSymbol:weakest.symbol,
+    weakestScore:weakScore
+  };
+}
+
 function weakestHeldEvaluation(evals){
   const held=evals
     .filter(x=>x.ok&&paper.positions[x.symbol])
@@ -1249,6 +1307,12 @@ async function runEvaluation(){
       agents[ev.symbol].decision='HOLD';
       agents[ev.symbol].execution='IDLE';
     }
+  }
+
+  // Attach a human-readable blocker/readiness reason to every asset.
+  for(const ev of evals){
+    if(!ev.ok)continue;
+    agents[ev.symbol].blocker=candidateBlocker(ev,evals);
   }
 
   // Record the final decision context for every symbol after the cycle completes.
