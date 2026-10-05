@@ -265,3 +265,8 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 }
 .asset-table tbody tr.active-position .mini{color:inherit}
 /* The explicitly requested active-trade status pulse stays visible in all motion settings. */
+
+.asset-table .mini{margin-top:3px;color:#8296aa;font-size:10px;line-height:1.25}
+.asset-table tr.buy-alert .mini{color:#9fc3ff}
+.asset-table tr.rotate-alert .mini{color:#ffe39a}
+.asset-table tr.active-position .mini{color:#8cebb7}
