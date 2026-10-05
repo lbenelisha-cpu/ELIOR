@@ -40,7 +40,7 @@ function mode(s){
   $('#demoTradesSection')?.classList.toggle('hidden',!isDemo);
   $('#demoRealtimePositionsSection')?.classList.toggle('hidden',!isDemo);
   put('#refreshBtn',isDemo?'בדוק עכשיו':'רענן LIVE');
-  put('#portfolioTitle',isDemo?'תיק DEMO · 5,000 ₪':'חשבון LIVE · Binance');
+  put('#portfolioTitle',isDemo?'סימולציה פנימית · נפרדת מ־Binance':'חשבון LIVE · Binance');
   put('#positionsTitle',isDemo?'פוזיציות פעילות · DEMO':'פוזיציות פעילות · LIVE');
   put('#status',isDemo?'DEMO · PAPER':'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
 }
