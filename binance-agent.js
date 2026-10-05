@@ -140,8 +140,8 @@ function render(d,currentMode='demo',liveAccount=null){
   }else{
     const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · ציון '+fmt(weakestActive.score,1)):'';
     const rotationState=activeAgents.length<maxPositions
-      ? ' · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
-      : ' · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
+      ? ' · מנוע החלטות: כל דקה · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
+      : ' · מנוע החלטות: כל דקה · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
     put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState);
   }
 
@@ -173,7 +173,7 @@ function render(d,currentMode='demo',liveAccount=null){
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
-      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini">${buyReasonLabel(a.buyReason)}</div></td>
+      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini">${held?'פוזיציה פעילה':blockerLabel(a.blocker)}</div></td>
       <td>${fmt(s.price)}</td>
       <td><b>${fmt(score,1)}</b></td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
@@ -239,6 +239,12 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionQualification',buyReasonLabel(a.buyReason));
 
   await Promise.all([loadChart(a.symbol),loadDecisionHistory(a.symbol)]);
+}
+
+function blockerLabel(b){
+  if(!b)return '—';
+  if(typeof b==='string')return b;
+  return b.text||b.code||'—';
 }
 
 function decisionReasonLabel(r){
