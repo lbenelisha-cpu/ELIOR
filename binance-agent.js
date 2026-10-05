@@ -21,6 +21,26 @@ let selectedInterval='1d';
 let selectedRange='6M';
 let activeView='trade';
 
+function renderPortfolioView(){
+  const target=$('#portfolioViewContent');
+  const source=$('#positions');
+  if(target&&source)target.innerHTML=source.innerHTML;
+}
+
+function setDashboardView(view){
+  activeView=['trade','portfolio','scans','journal'].includes(view)?view:'trade';
+  document.querySelectorAll('.app-view').forEach(el=>{
+    el.hidden=!el.classList.contains(activeView+'-view');
+  });
+  const grid=$('.trading-grid');
+  if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
+  if(activeView==='portfolio')renderPortfolioView();
+  document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
+    const name=btn.dataset.view||['trade','portfolio','scans','journal'][i];
+    btn.classList.toggle('active',name===activeView);
+  });
+}
+
 async function J(u,o={}){
   const r=await fetch(u,{cache:'no-store',...o});
   if(!r.ok){
@@ -94,7 +114,6 @@ function activeContext(d,currentMode,liveAccount){
 
 function render(d,currentMode='demo',liveAccount=null){
   currentAgentData=d;
-    if(activeView==='portfolio')renderPortfolioView();
   currentLiveAccount=liveAccount;
   const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   const paperPos=p.positions||{};
@@ -167,6 +186,7 @@ function render(d,currentMode='demo',liveAccount=null){
     $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ₪</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
+  if(activeView==='portfolio')renderPortfolioView();
   updateSelectedAsset(d,currentMode,liveAccount);
 }
 
@@ -458,8 +478,8 @@ $('#resetPaperBtn').onclick=async()=>{
   }
 };
 
-document.querySelectorAll('.nav-btn[data-view]').forEach(btn=>{
-  btn.onclick=()=>setDashboardView(btn.dataset.view||'trade');
+document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
+  btn.onclick=()=>setDashboardView(btn.dataset.view||['trade','portfolio','scans','journal'][i]||'trade');
 });
 setDashboardView('trade');
 
