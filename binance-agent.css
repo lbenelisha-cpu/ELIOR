@@ -234,21 +234,45 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
  .selected-price strong{font-size:25px}.toolbar-group{width:100%}.time-pill{flex:1;padding:8px 6px}
 }
 
-/* Highlight holdings with a prominent, steady green pulse. */
-@keyframes activePositionPulse{
-  0%,100%{background-color:rgba(38,208,124,.10);box-shadow:inset 6px 0 0 #26d07c,inset 0 0 0 1px rgba(38,208,124,.25)}
-  50%{background-color:rgba(38,208,124,.34);box-shadow:inset 6px 0 0 #86ffbb,inset 0 0 0 2px rgba(122,242,177,.85),inset 0 0 24px rgba(38,208,124,.26)}
+/* Strong breathing light across every cell of an active position. */
+@keyframes activePositionLight{
+  0%,100%{
+    background-color:#102d24;
+    box-shadow:inset 0 1px 0 #25b86d,inset 0 -1px 0 #25b86d;
+    color:#dcffeb;
+    text-shadow:none;
+  }
+  50%{
+    background-color:#169f52;
+    box-shadow:inset 0 3px 0 #b9ffd1,inset 0 -3px 0 #b9ffd1,inset 0 0 30px rgba(141,255,181,.9);
+    color:#fff;
+    text-shadow:0 0 8px #bcffd6;
+  }
+}
+@keyframes activePositionNameLight{
+  0%,100%{color:#9bffc4;text-shadow:none}
+  50%{color:#fff;text-shadow:0 0 6px #fff,0 0 16px #baffcf}
 }
 .asset-table tbody tr.active-position{
-  background-image:none;
-  animation:activePositionPulse 2s ease-in-out infinite;
+  background:none;animation:none;
+  box-shadow:inset 7px 0 0 #92ffba;
+}
+.asset-table tbody tr.active-position td{
+  animation:activePositionLight 2.2s ease-in-out infinite;
+}
+.asset-table tbody tr.active-position td:first-child{
+  border-right:6px solid #a0ffc0;
 }
 .asset-table tbody tr.active-position td:first-child b{
-  color:#a3ffca;font-weight:900;
+  font-weight:900;animation:activePositionNameLight 2.2s ease-in-out infinite;
 }
+.asset-table tbody tr.active-position .mini{color:#d9ffea}
 @media(prefers-reduced-motion:reduce){
-  .asset-table tbody tr.active-position{
-    animation:none;background-color:rgba(38,208,124,.26);
-    box-shadow:inset 6px 0 0 #86ffbb,inset 0 0 0 2px rgba(122,242,177,.7);
+  .asset-table tbody tr.active-position td{
+    animation:none;background-color:#167e43;color:#fff;
+    box-shadow:inset 0 3px 0 #b9ffd1,inset 0 -3px 0 #b9ffd1;
+  }
+  .asset-table tbody tr.active-position td:first-child b{
+    animation:none;color:#fff;
   }
 }
