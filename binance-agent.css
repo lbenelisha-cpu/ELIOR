@@ -264,9 +264,4 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
   font-weight:900;color:inherit;animation:none;text-shadow:none;
 }
 .asset-table tbody tr.active-position .mini{color:inherit}
-@media(prefers-reduced-motion:reduce){
-  .asset-table tbody tr.active-position td{
-    animation:none;background-color:var(--active-light);color:#08110b;
-    border-color:var(--active-light);box-shadow:none;
-  }
-}
+/* The explicitly requested active-trade status pulse stays visible in all motion settings. */
