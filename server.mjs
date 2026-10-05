@@ -1,3 +1,4 @@
+import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
 import http from "node:http";
@@ -45,6 +46,10 @@ const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_C
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
+const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
+const demoTrader=new DemoTrader({key:process.env.BINANCE_DEMO_API_KEY,secret:process.env.BINANCE_DEMO_API_SECRET,enabled:DEMO_TRADING,stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json'});
+const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
+const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
 
 function ensureStateDir(){
   try{ fs.mkdirSync(path.dirname(STATE_FILE),{recursive:true}); }catch{}
@@ -894,7 +899,7 @@ async function evaluateSymbol(s){
       sellRetraceRatio:SELL_RETRACE_RATIO
     });
 
-    const pos=paper.positions[s]?'LONG':'CASH';
+    const pos=tradingPositions()[s]?'LONG':'CASH';
     let st=closedStrategy;
     let decisionPriceSource='CLOSED_D1';
 
@@ -967,7 +972,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
   agents[ev.symbol]={
     ...agents[ev.symbol],
     symbol:ev.symbol,
-    position:paper.positions[ev.symbol]?'LONG':'CASH',
+    position:tradingPositions()[ev.symbol]?'LONG':'CASH',
     decision,
     strategy:ev.strategy,
     score:ev.score,
@@ -1007,11 +1012,32 @@ function weakestHeldEvaluation(evals){
   return held[0]||null;
 }
 
-async function evalAll(){
+let evaluationInFlight=null;
+function evalAll(){
+  if(evaluationInFlight)return evaluationInFlight;
+  evaluationInFlight=runEvaluation().finally(()=>{evaluationInFlight=null;});
+  return evaluationInFlight;
+}
+async function runEvaluation(){
   // Phase 1: evaluate ALL symbols first.
   const evals=[];
-  for(const s of SYMBOLS){
+  for(const s of new Set([...SYMBOLS,...Object.keys(tradingPositions())])){
     evals.push(await evaluateSymbol(s));
+  }
+
+  if(DEMO_TRADING&&mode==='demo'){
+    await demoTrader.cycle(evals,{rotationEnabled:ROTATION_ENABLED,minScore:ROTATION_MIN_SCORE,scoreGap:ROTATION_SCORE_GAP,maxRotations:ROTATION_MAX_PER_CYCLE});
+    const positions=demoTrader.state.positions;
+    for(const ev of evals){
+      const held=!!positions[ev.symbol];
+      const last=demoTrader.state.actionLog.find(a=>a.symbol===ev.symbol);
+      const executed=last&&Date.parse(last.at)>=Date.parse(ev.at);
+      const decision=executed?last.type:held?'ACTIVE_LONG':ev.closedStrategy?.buyConfirmed?(Object.keys(positions).length>=MAX?'WAIT_NO_SLOT':'BUY_READY'):'HOLD';
+      setAgentFromEval(ev,decision,demoTrader.error?'ERROR':executed?'BINANCE_DEMO_EXECUTED':held?'HOLDING':'IDLE');
+      if(ev.ok)pushDecisionHistory(ev.symbol,{at:new Date().toISOString(),mode:'demo',source:'BINANCE_DEMO_SPOT',decision,execution:agents[ev.symbol].execution,reason:demoTrader.error||decision,position:held?'LONG':'CASH',price:ev.strategy.price,score:ev.score,activeSlots:Object.keys(positions).length,maxSlots:MAX});
+    }
+    saveDecisionHistory();
+    return;
   }
 
   // Default UI state.
@@ -1307,7 +1333,7 @@ async function refreshUniverse(){
   }
 }
 
-setInterval(evalAll,300000).unref();
+setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),300000).unref();
 setInterval(refreshUniverse,21600000).unref();
 
 const send=(res,o,c=200)=>{
@@ -1329,7 +1355,9 @@ const server=http.createServer((req,res)=>{
   const sf={
     '/binance-agent.html':['binance-agent.html','text/html'],
     '/binance-agent.js':['binance-agent.js','text/javascript'],
-    '/binance-agent.css':['binance-agent.css','text/css']
+    '/binance-agent.css':['binance-agent.css','text/css'],
+    '/binance-demo-account.js':['binance-demo-account.js','text/javascript'],
+    '/binance-agent-portfolio.js':['binance-agent-portfolio.js','text/javascript']
   };
 
   if(req.method==='GET'&&sf[u.pathname]){
@@ -1341,6 +1369,8 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-mode'&&req.method==='GET'){
     return send(res,{
       mode,
+      demoTradingEnabled:DEMO_TRADING,
+      demoTradingError:demoTrader.error,
       liveTradingEnabled:LIVE,
       autoExecution:AUTO_EXECUTION,
       keysConfigured:KEYS_CONFIGURED,
@@ -1355,6 +1385,7 @@ const server=http.createServer((req,res)=>{
     req.on('end',()=>{
       try{
         const m=JSON.parse(b).mode;
+        if(!['demo','live'].includes(m))throw Error('Invalid mode');
         if(m==='live'&&!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
         mode=m;
         send(res,{ok:true,mode});
@@ -1416,14 +1447,15 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{
       mode,
-      demo:(paper.actionLog||[]).slice(0,100),
+      demo:(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).slice(0,100),
       live:(liveActionLog||[]).slice(0,100)
     });
   }
 
   if(u.pathname==='/api/binance-paper/reset'&&req.method==='POST'){
+    if(DEMO_TRADING)return send(res,{error:'Binance Demo account cannot be reset here'},409);
     reset();
-    return send(res,{ok:true,paper:snap()});
+    return send(res,{ok:true,paper:accountSnapshot()});
   }
 
   if(u.pathname==='/api/binance-decision-history'&&req.method==='GET'){
@@ -1499,7 +1531,7 @@ const server=http.createServer((req,res)=>{
       symbols:SYMBOLS,
       streams,
       agents:Object.values(agents),
-      paper:snap(),
+      paper:accountSnapshot(),
       universeStatus,
       universeError,
       config:{
@@ -1526,8 +1558,8 @@ const server=http.createServer((req,res)=>{
     evalAll().then(()=>send(res,{
       ok:true,
       agents:Object.values(agents),
-      paper:snap()
-    }));
+      paper:accountSnapshot()
+    })).catch(e=>send(res,{ok:false,error:e.message},502));
     return;
   }
 
@@ -1553,7 +1585,7 @@ const server=http.createServer((req,res)=>{
       ok:true,
       mode,
       symbols:SYMBOLS,
-      paper:snap(),
+      paper:accountSnapshot(),
       universeStatus,
       universeError
     });

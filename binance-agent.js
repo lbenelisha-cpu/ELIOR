@@ -20,6 +20,8 @@ let currentVisibleAgents=[];
 let selectedInterval='1d';
 let selectedRange='6M';
 let activeView='trade';
+let demoTradingEnabled=false;
+let moneyUnit='₪';
 
 function renderPortfolioView(){
   const target=$('#portfolioViewContent');
@@ -52,17 +54,19 @@ async function J(u,o={}){
 
 function mode(s){
   const isDemo=s.mode==='demo';
+  demoTradingEnabled=!!s.demoTradingEnabled;
+  moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   currentMode=s.mode;
   $('#demoBtn')?.classList.toggle('active',isDemo);
   $('#liveBtn')?.classList.toggle('active',!isDemo);
   $('#liveAccountCard')?.classList.toggle('hidden',isDemo);
-  $('#resetPaperBtn')?.classList.toggle('hidden',!isDemo);
+  $('#resetPaperBtn')?.classList.toggle('hidden',!isDemo||demoTradingEnabled);
   $('#demoTradesSection')?.classList.toggle('hidden',!isDemo);
   $('#demoRealtimePositionsSection')?.classList.toggle('hidden',!isDemo);
   put('#refreshBtn',isDemo?'בדוק עכשיו':'רענן LIVE');
-  put('#portfolioTitle',isDemo?'סימולציה פנימית · נפרדת מ־Binance':'חשבון LIVE · Binance');
+  put('#portfolioTitle',isDemo?(demoTradingEnabled?'חשבון Binance Demo · USDT':'סימולציה פנימית · נפרדת מ־Binance'):'חשבון LIVE · Binance');
   put('#positionsTitle',isDemo?'פוזיציות פעילות · DEMO':'פוזיציות פעילות · LIVE');
-  put('#status',isDemo?'DEMO · PAPER':'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
+  put('#status',isDemo?(demoTradingEnabled?'BINANCE DEMO · מסחר אוטומטי':'DEMO · PAPER'):'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
 }
 
 function buyReasonLabel(r){
@@ -114,6 +118,11 @@ function activeContext(d,currentMode,liveAccount){
 
 function render(d,currentMode='demo',liveAccount=null){
   currentAgentData=d;
+  if(d.paper?.source==='BINANCE_DEMO_SPOT'){
+    put('#portfolioTitle','חשבון Binance Demo · USDT');
+    if(d.paper.error)put('#status','מסחר דמו מושהה · '+d.paper.error);
+    else if(!d.paper.connected)put('#status','ממתין לחיבור לחשבון הדמו');
+  }
   currentLiveAccount=liveAccount;
   const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   const paperPos=p.positions||{};
@@ -133,11 +142,11 @@ function render(d,currentMode='demo',liveAccount=null){
   }
 
   if(!isLive){
-    put('#paperValue',fmt(p.valueIls)+' ₪');
-    put('#paperCash',fmt(p.cashIls)+' ₪');
-    put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ₪ (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);
+    put('#paperValue',fmt(p.valueIls)+' '+moneyUnit);
+    put('#paperCash',fmt(p.cashIls)+' '+moneyUnit);
+    put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ${moneyUnit} (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);
     put('#slots',`${p.activePositions||0}/${maxPositions}`);
-    put('#slotValue',fmt(p.slotIls)+' ₪');
+    put('#slotValue',fmt(p.slotIls)+' '+moneyUnit);
     put('#paperTradesCount',(p.trades||[]).length);
   }
 
@@ -181,9 +190,9 @@ function render(d,currentMode='demo',liveAccount=null){
   }else{
     const ps=Object.values(paperPos);
     $('#positions').innerHTML=ps.length
-      ? ps.map(x=>`<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ₪ · כניסה $${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}</div>`).join('')
+      ? ps.map(x=>`<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה $${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}</div>`).join('')
       : '<div class="mini">אין פוזיציות פעילות.</div>';
-    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ₪</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
+    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
   if(activeView==='portfolio')renderPortfolioView();
@@ -261,8 +270,8 @@ async function loadActionJournal(currentModeArg){
     put('#actionJournalTitle','יומן פעולות · '+(currentModeArg==='live'?'LIVE':'DEMO'));
     $('#actionJournal').innerHTML=list.length?list.slice(0,30).map(x=>{
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
-      const amount=Number.isFinite(+x.amountIls)?' · סכום '+fmt(x.amountIls)+' ₪':Number.isFinite(+x.amountUsdt)?' · סכום '+fmt(x.amountUsdt)+' USDT':'';
-      const pnl=Number.isFinite(+x.pnlIls)?' · P/L '+(+x.pnlIls>=0?'+':'')+fmt(x.pnlIls)+' ₪':'';
+      const amount=Number.isFinite(+x.amountIls)?' · סכום '+fmt(x.amountIls)+' '+moneyUnit:Number.isFinite(+x.amountUsdt)?' · סכום '+fmt(x.amountUsdt)+' USDT':'';
+      const pnl=Number.isFinite(+x.pnlIls)?' · P/L '+(+x.pnlIls>=0?'+':'')+fmt(x.pnlIls)+' '+moneyUnit:'';
       const reason=x.reason?' · '+x.reason:'';
       return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${reason} · ${when}</div>`;
     }).join(''):'<div class="mini">'+(currentModeArg==='live'?'עדיין אין פעולות LIVE.':'עדיין אין פעולות DEMO.')+'</div>';
