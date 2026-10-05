@@ -13,7 +13,7 @@
         <div class="brand-mark">◈</div>
         <div>
           <div class="brand-title">LEVI · BINANCE WAVE</div>
-          <div class="brand-sub">60 ASSETS · D1 · MA200 · WAVE 3%–8%</div>
+          <div class="brand-sub">60 ASSETS · נרות יומיים · ממוצע 200 · גל 3%–8%</div>
         </div>
       </div>
 
@@ -55,11 +55,11 @@
         <strong id="paperPnl">—</strong>
       </article>
       <article>
-        <span>Slots</span>
+        <span>פוזיציות פעילות</span>
         <strong id="slots">—</strong>
       </article>
       <article>
-        <span>הקצאה ל־Slot</span>
+        <span>יעד הקצאה לפוזיציה</span>
         <strong id="slotValue">—</strong>
       </article>
       <article>
@@ -88,7 +88,7 @@
         <div class="panel-title-row">
           <div>
             <h2>סריקת שוק</h2>
-            <p>עד 60 נכסים · מוצגים Score 65+ ופוזיציות פעילות</p>
+            <p>עד 60 נכסים · מוצגים נכסים בציון 65 ומעלה ופוזיציות פעילות</p>
           </div>
           <button id="refreshBtn" class="refresh">בדוק עכשיו</button>
         </div>
@@ -101,7 +101,7 @@
               <tr>
                 <th>נכס</th>
                 <th>מחיר</th>
-                <th>Score</th>
+                <th>ציון הסוכן</th>
                 <th>החלטה</th>
               </tr>
             </thead>
@@ -115,19 +115,19 @@
           <div>
             <div class="selected-symbol-row">
               <h2 id="chartSymbol">BTCUSDT</h2>
-              <span id="chartDecisionBadge" class="decision-badge">HOLD</span>
+              <span id="chartDecisionBadge" class="decision-badge">ממתין</span>
             </div>
             <div id="chartMeta" class="chart-meta">טוען נתונים…</div>
           </div>
           <div class="selected-price">
             <strong id="chartPrice">—</strong>
-            <span id="chartScore">Score —</span>
+            <span id="chartScore">ציון —</span>
           </div>
         </div>
 
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
-            <span class="toolbar-label">נר</span>
+            <span class="toolbar-label">משך נר</span>
             <button class="time-pill timeframe-btn" data-interval="1h">1H</button>
             <button class="time-pill timeframe-btn" data-interval="4h">4H</button>
             <button class="time-pill timeframe-btn active" data-interval="1d">1D</button>
@@ -156,18 +156,10 @@
           <div><span>MA200</span><strong id="chartMA">—</strong></div>
           <div><span>גל נוכחי</span><strong id="chartWave">—</strong></div>
           <div><span>גל ירידה קודם</span><strong id="chartPrevDown">—</strong></div>
-          <div><span>כשירות BUY</span><strong id="chartQualification">—</strong></div>
+          <div><span>תנאי קנייה</span><strong id="chartQualification">—</strong></div>
         </div>
       </section>
 
-      <section class="panel" id="binanceDemoBalanceCard">
-<h2>חשבון Binance Demo · כל הנכסים</h2>
-<p id="demoAccountStatus">טוען יתרות מהחשבון…</p>
-<h3 id="demoAccountTotal">— USDT</h3>
-<p>שווי כולל במונחי USDT, כולל יתרות זמינות ונעולות.</p>
-<table><thead><tr><th>מטבע</th><th>זמין</th><th>נעול</th><th>שווי USDT</th></tr></thead><tbody id="demoAccountBalances"></tbody></table>
-<button id="refreshDemoAccount">רענן יתרות Binance Demo</button>
-</section>
 <aside class="panel action-panel">
         <div class="panel-title-row">
           <h2 id="portfolioTitle">סימולציה פנימית · נפרדת מ־Binance</h2>
@@ -176,11 +168,11 @@
         <div class="action-card primary-card">
           <span>נכס נבחר</span>
           <strong id="actionSelectedSymbol">BTCUSDT</strong>
-          <small id="actionSelectedDecision">HOLD</small>
+          <small id="actionSelectedDecision">ממתין</small>
         </div>
 
         <div class="action-card">
-          <span>Score</span>
+          <span>ציון הסוכן</span>
           <strong id="actionSelectedScore">—</strong>
         </div>
 
@@ -198,11 +190,20 @@
 
         <div class="rules-box">
           <h3>כללי מסחר</h3>
-          <p><b>BUY:</b> מעל MA200 + גל 3%–8% + חזק מהגל היורד הקודם.</p>
-          <p><b>SELL:</b> גל הירידה החדש גדול מהגל העולה הקודם.</p>
+          <p><b>קנייה:</b> מעל MA200 + גל 3%–8% + חזק מהגל היורד הקודם.</p>
+          <p><b>מכירה:</b> גל הירידה מגיע לסף המכירה שהוגדר.</p>
         </div>
       </aside>
     </section>
+
+      <section class="panel" id="binanceDemoBalanceCard">
+<h2>יתרות חשבון הדמו ב־Binance</h2>
+<p id="demoAccountStatus">טוען יתרות מהחשבון…</p>
+<h3 id="demoAccountTotal">— USDT</h3>
+<p>שווי כל הנכסים ב־USDT · כולל סכומים זמינים ונעולים.</p>
+<div class="demo-balances-wrap"><table class="asset-table demo-balances-table"><thead><tr><th>מטבע</th><th>זמין</th><th>נעול</th><th>שווי USDT</th></tr></thead><tbody id="demoAccountBalances"></tbody></table></div>
+<button id="refreshDemoAccount" class="refresh">רענן יתרות Binance Demo</button>
+</section>
 
     <section id="portfolioViewPanel" class="panel app-view portfolio-view" hidden>
       <div class="panel-title-row">
@@ -262,8 +263,8 @@
               <th>מחיר נוכחי</th>
               <th>סכום כניסה</th>
               <th>שווי נוכחי</th>
-              <th>P/L ₪</th>
-              <th>P/L %</th>
+              <th>רווח / הפסד</th>
+              <th>רווח / הפסד (%)</th>
             </tr>
           </thead>
           <tbody id="activePositionsBody">

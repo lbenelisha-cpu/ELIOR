@@ -22,6 +22,8 @@ let selectedRange='6M';
 let activeView='trade';
 let demoTradingEnabled=false;
 let moneyUnit='₪';
+let chartCandles=[];
+function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
 function renderPortfolioView(){
   const target=$('#portfolioViewContent');
@@ -66,17 +68,17 @@ function mode(s){
   put('#refreshBtn',isDemo?'בדוק עכשיו':'רענן LIVE');
   put('#portfolioTitle',isDemo?(demoTradingEnabled?'חשבון Binance Demo · USDT':'סימולציה פנימית · נפרדת מ־Binance'):'חשבון LIVE · Binance');
   put('#positionsTitle',isDemo?'פוזיציות פעילות · DEMO':'פוזיציות פעילות · LIVE');
-  put('#status',isDemo?(demoTradingEnabled?'BINANCE DEMO · מסחר אוטומטי':'DEMO · PAPER'):'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
+  put('#status',isDemo?(demoTradingEnabled?'דמו Binance · מסחר אוטומטי':'סימולציה פנימית'):'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
 }
 
 function buyReasonLabel(r){
   return ({
-    QUALIFIED:'כשיר BUY',
+    QUALIFIED:'מתאים לקנייה',
     NOT_UP:'לא בגל עולה',
     BELOW_MA200:'מתחת ל־MA200',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
-    WAVE_BELOW_3:'גל מתחת ל־3%',
-    WAVE_ABOVE_8:'גל מעל 8%',
+    WAVE_BELOW_3:'גל קטן מ־3%',
+    WAVE_ABOVE_8:'גל גדול מ־8%',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'חלש מהירידה הקודמת',
     NO_DATA:'אין נתונים'
   })[r]||r||'—';
@@ -118,6 +120,8 @@ function activeContext(d,currentMode,liveAccount){
 
 function render(d,currentMode='demo',liveAccount=null){
   currentAgentData=d;
+  if(d.paper?.currency)moneyUnit=d.paper.currency;
+  if(d.paper?.source==='BINANCE_DEMO_SPOT'){demoTradingEnabled=true;$('#resetPaperBtn')?.classList.add('hidden');if(!d.paper.error)put('#status','דמו Binance · מסחר אוטומטי');}
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){
     put('#portfolioTitle','חשבון Binance Demo · USDT');
     if(d.paper.error)put('#status','מסחר דמו מושהה · '+d.paper.error);
@@ -134,7 +138,7 @@ function render(d,currentMode='demo',liveAccount=null){
   if(!activeAgents.length){
     put('#scanStatusMessage','אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
   }else{
-    const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · Score '+fmt(weakestActive.score,1)):'';
+    const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · ציון '+fmt(weakestActive.score,1)):'';
     const rotationState=activeAgents.length<maxPositions
       ? ' · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
       : ' · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
@@ -171,7 +175,7 @@ function render(d,currentMode='demo',liveAccount=null){
       <td><b>${a.symbol.replace('USDT','')}</b><div class="mini">${buyReasonLabel(a.buyReason)}</div></td>
       <td>${fmt(s.price)}</td>
       <td><b>${fmt(score,1)}</b></td>
-      <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${dec}</td>
+      <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
     </tr>`;
   }).join('');
 
@@ -203,7 +207,7 @@ function rotationGapText(a,d,currentMode,liveAccount){
   const {isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   if(isHeld(a)) return 'פעיל';
   if(!a.buyQualified) return 'לא כשיר לרוטציה';
-  if(!weakestActive) return 'כשיר BUY';
+  if(!weakestActive) return 'מתאים לקנייה';
   const gap=Number(a.score||0)-weakestActive.score;
   return (gap>=0?'+':'')+fmt(gap,1)+' / נדרש +'+fmt(Number(d.config?.rotationScoreGap||20),0);
 }
@@ -219,16 +223,16 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
 
   put('#chartSymbol',a.symbol);
   put('#chartPrice',s.price?'$'+fmt(s.price):'—');
-  put('#chartScore','Score '+fmt(a.score,1));
+  put('#chartScore','ציון '+fmt(a.score,1));
   put('#chartMA',s.ma?'$'+fmt(s.ma):'—');
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
-  put('#chartDecisionBadge',dec);
-  put('#chartMeta',(s.aboveMA?'מעל MA200':'מתחת MA200')+' · '+(s.direction||'—')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartDecisionBadge',decisionLabel(dec));
+  put('#chartMeta',(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
-  put('#actionSelectedDecision',dec);
+  put('#actionSelectedDecision',decisionLabel(dec));
   put('#actionSelectedScore',fmt(a.score,1));
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',buyReasonLabel(a.buyReason));
@@ -244,12 +248,12 @@ function decisionReasonLabel(r){
     ROTATE_OUT:'רוטציה החוצה',
     NO_SLOT:'אין Slot פנוי',
     ROTATION_NOT_STRONG_ENOUGH:'לא חזק מספיק לרוטציה',
-    BUY_READY:'כשיר BUY',
-    QUALIFIED_BUT_HOLD:'כשיר BUY אך ממתין',
+    BUY_READY:'מתאים לקנייה',
+    QUALIFIED_BUT_HOLD:'מתאים לקנייה אך ממתין',
     ACTIVE_LONG:'פוזיציה פעילה · ממשיך להחזיק',
     HOLD_NOT_QUALIFIED:'HOLD · לא כשיר לכניסה',
-    WAVE_BELOW_3:'גל מתחת ל־3%',
-    WAVE_ABOVE_8:'גל מעל 8%',
+    WAVE_BELOW_3:'גל קטן מ־3%',
+    WAVE_ABOVE_8:'גל גדול מ־8%',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
     BELOW_MA200:'מתחת ל־MA200',
     NOT_UP:'לא בגל עולה',
@@ -311,14 +315,14 @@ async function loadDecisionHistory(symbol){
     const recorded=d.recorded||[];
     const technical=d.technicalDaily||[];
 
-    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>Wave</div><div>ירידה קודמת</div><div>Score</div><div>מקור</div><div>סיבה</div></div>';
+    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>גל</div><div>ירידה קודמת</div><div>ציון</div><div>מקור</div><div>סיבה</div></div>';
 
     const renderRecorded=recorded.map(x=>{
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
       const cls=x.decision==='BUY'||x.decision==='ROTATE_IN'?'good':x.decision==='SELL'||x.decision==='ROTATE_OUT'?'bad':'warn';
       return `<div class="decision-row">
         <div>${when}</div>
-        <div class="${cls}">${x.decision||'HOLD'}</div>
+        <div class="${cls}">${decisionLabel(x.decision||'HOLD')}</div>
         <div>${fmt(x.currentWave,2)}%</div>
         <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
         <div>${fmt(x.score,1)}</div>
@@ -359,7 +363,8 @@ async function loadChart(symbol){
     $('#chartEmpty')?.classList.add('hidden');
     const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
     put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · טווח '+selectedRange+' · MA200');
-    drawCandles(d.candles||[]);
+    chartCandles=d.candles||[];
+    drawCandles(chartCandles);
   }catch(e){
     $('#chartEmpty')?.classList.remove('hidden');
   }
@@ -370,8 +375,8 @@ function drawCandles(candles){
   if(!canvas||!candles.length)return;
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
-  canvas.width=Math.max(600,Math.floor(rect.width*ratio));
-  canvas.height=Math.max(300,Math.floor(rect.height*ratio));
+  canvas.width=Math.max(1,Math.round(rect.width*ratio));
+  canvas.height=Math.max(1,Math.round(rect.height*ratio));
   const ctx=canvas.getContext('2d');
   ctx.setTransform(ratio,0,0,ratio,0,0);
   const W=rect.width,H=rect.height;
@@ -508,6 +513,7 @@ document.querySelectorAll('.range-btn').forEach(btn=>{
   };
 });
 
-window.addEventListener('resize',()=>{if(selectedSymbol)loadChart(selectedSymbol)});
+if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).observe($('#priceChart').parentElement);}
+window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
 setInterval(load,30000);

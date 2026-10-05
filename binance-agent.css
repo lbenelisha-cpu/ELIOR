@@ -176,3 +176,60 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .portfolio-card-grid b{display:block;color:#e8f0f8;margin-top:2px}
 .status-badge.active{color:#7af2b1;background:rgba(38,208,124,.12);border:1px solid rgba(38,208,124,.3);padding:4px 7px;border-radius:999px;font-size:10px}
 .empty-state{padding:24px;text-align:center;color:#8194a8}
+
+/* Flexible layout and clear Hebrew labels at every viewport size. */
+.app-shell{width:100%;max-width:2200px;padding:clamp(10px,1.2vw,24px)}
+.topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px}
+.topbar>*{min-width:0}.top-actions{justify-content:flex-end;flex-wrap:wrap}
+.topnav{display:flex;flex-wrap:wrap}.nav-pill{white-space:nowrap}
+.brand-title{font-size:clamp(15px,1.2vw,21px)}
+.brand-sub{line-height:1.6}.status{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.trading-grid{grid-template-columns:minmax(230px,.85fr) minmax(0,2.5fr) minmax(220px,.8fr);align-items:start}
+.trading-grid>*{min-width:0}.panel{min-width:0;line-height:1.5}
+.panel h2{font-size:clamp(17px,1.25vw,22px);margin-top:0;overflow-wrap:anywhere}
+.panel-title-row{flex-wrap:wrap}.scanner-panel .panel-title-row{flex-wrap:nowrap;align-items:start}
+.refresh{white-space:normal;min-width:90px}.scan-status{line-height:1.7}
+.account-strip{grid-template-columns:repeat(6,minmax(0,1fr))}
+.account-strip article{padding:clamp(10px,1vw,18px);min-width:0}
+.account-strip span{display:block;line-height:1.5;font-size:12px}
+.account-strip strong{font-size:clamp(16px,1.3vw,25px);direction:ltr;unicode-bidi:isolate;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.market-strip>div{min-width:0;gap:8px;padding:12px}.market-strip strong{direction:ltr;unicode-bidi:isolate}
+.selected-asset-head{flex-wrap:wrap;gap:12px}.selected-symbol-row{flex-wrap:wrap}
+.selected-symbol-row h2{direction:ltr;font-size:clamp(23px,1.9vw,34px)}
+.decision-badge{white-space:normal;line-height:1.5}.selected-price{direction:ltr}
+.chart-wrap{height:clamp(330px,52vh,680px)}
+.multi-toolbar{gap:8px}.toolbar-group{flex-wrap:wrap;max-width:100%;gap:3px}
+.time-pill{padding:8px 10px}.chart-legend{width:100%;line-height:1.6}
+.chart-footer{grid-template-columns:repeat(4,minmax(0,1fr))}.chart-footer>div{min-width:0;overflow-wrap:anywhere}
+.action-panel{display:flex}.action-card strong{font-size:clamp(17px,1.2vw,23px);overflow-wrap:anywhere}
+.asset-table{table-layout:fixed}.asset-table th,.asset-table td{overflow-wrap:anywhere;line-height:1.5}
+.asset-table td:nth-child(2),.asset-table td:nth-child(3){font-variant-numeric:tabular-nums}
+.scanner-list{max-height:clamp(350px,65vh,760px)}
+#binanceDemoBalanceCard{margin-top:16px}
+#demoAccountStatus{color:var(--muted);font-size:13px;line-height:1.7}
+#demoAccountTotal{direction:ltr;unicode-bidi:isolate;text-align:right;font-size:clamp(22px,2vw,32px);font-variant-numeric:tabular-nums}
+.demo-balances-wrap{width:100%;overflow:auto;margin:14px 0}
+.demo-balances-table{min-width:460px}.demo-balances-table td{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.demo-balances-table th:first-child{width:24%}
+.decision-history{overflow:auto}.decision-row{min-width:760px}
+.portfolio-view-content{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+@media(max-width:1400px){
+ .topbar{grid-template-columns:1fr auto}.topnav{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+ .account-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .trading-grid{grid-template-columns:minmax(230px,.8fr) minmax(0,2fr)}
+ .action-panel{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+ .action-panel>.panel-title-row,.rules-box{grid-column:1/-1}.danger-btn{grid-column:auto}
+}
+@media(max-width:900px){
+ .topbar{grid-template-columns:1fr}.topnav{grid-row:auto}.top-actions{justify-content:flex-start}
+ .trading-grid{grid-template-columns:minmax(0,1fr)}
+ .chart-panel{order:0}.scanner-panel{order:1}.action-panel{order:2}
+ .chart-footer{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .lower-grid{grid-template-columns:minmax(0,1fr)}
+ .action-panel{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+ .market-strip,.account-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .brand-mark{flex-shrink:0}.nav-pill{padding:9px 11px}.chart-wrap{height:340px}
+ .selected-price strong{font-size:25px}.toolbar-group{width:100%}.time-pill{flex:1;padding:8px 6px}
+}
