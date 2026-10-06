@@ -1,0 +1,274 @@
+:root{
+  color-scheme:dark;
+  --bg:#07111d;
+  --panel:#0d1928;
+  --panel2:#101f31;
+  --border:#20354d;
+  --text:#eef6ff;
+  --muted:#8ea2ba;
+  --blue:#2f7cff;
+  --green:#26d07c;
+  --red:#ff5b6e;
+  --amber:#f5c451;
+}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#06101b 0%,#091522 100%);color:var(--text);font-family:Arial,sans-serif}
+button{font:inherit}
+.app-shell{max-width:1760px;margin:0 auto;padding:16px}
+.topbar{display:grid;grid-template-columns:1.2fr 1fr auto;gap:18px;align-items:center;padding:10px 0 14px;border-bottom:1px solid #17293c}
+.brand-block{display:flex;align-items:center;gap:12px}
+.brand-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1d5cff,#3bb7ff);display:grid;place-items:center;font-size:22px;font-weight:900}
+.brand-title{font-weight:900;letter-spacing:.5px}
+.brand-sub{color:var(--muted);font-size:12px;margin-top:4px}
+.topnav{display:flex;gap:8px;justify-content:center}
+.nav-pill,.time-pill{border:0;background:transparent;color:#9cb0c7;padding:10px 14px;border-radius:10px;cursor:pointer}
+.nav-pill.active,.time-pill.active{background:#173252;color:#fff}
+.top-actions{display:flex;gap:10px;align-items:center}
+.status{padding:9px 13px;border:1px solid var(--border);border-radius:999px;background:#0b1724;color:#b9c9da;font-weight:700}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:#07101c;padding:4px;border-radius:12px;min-width:180px}
+.seg.compact{min-width:150px}
+.seg button{padding:10px 12px;border:0;border-radius:9px;background:transparent;color:#9fb1c6;font-weight:800;cursor:pointer}
+.seg button.active{background:#21466f;color:#fff}
+.market-strip,.account-strip{display:grid;gap:1px;background:#172a3f;border:1px solid #1d3046;border-radius:14px;overflow:hidden;margin-top:12px}
+.market-strip{grid-template-columns:repeat(5,1fr)}
+.market-strip>div{background:#0b1725;padding:12px 18px;display:flex;justify-content:space-between}
+.market-strip span,.account-strip span,.action-card span,.chart-footer span,.live-stats span{color:var(--muted);font-size:12px}
+.market-strip strong{color:#dce9f8}
+.account-strip{grid-template-columns:repeat(6,1fr)}
+.account-strip article{background:#0d1a29;padding:16px}
+.account-strip strong{display:block;font-size:20px;margin-top:7px}
+.panel{background:linear-gradient(180deg,#0f1c2b,#0b1724);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 12px 32px rgba(0,0,0,.18)}
+.panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.panel-title-row h2{font-size:18px;margin:0}
+.panel-title-row p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.trading-grid{display:grid;grid-template-columns:310px minmax(0,1fr) 300px;gap:14px;margin-top:14px}
+.scanner-panel{padding:0;overflow:hidden}
+.scanner-panel .panel-title-row{padding:16px}
+.scan-status{padding:10px 16px;color:#9eb1c8;border-top:1px solid #172b40;border-bottom:1px solid #172b40;font-size:12px}
+.scanner-list{max-height:620px;overflow:auto}
+.asset-table{width:100%;border-collapse:collapse}
+.asset-table th,.asset-table td{padding:10px 9px;border-bottom:1px solid #1a2d41;text-align:right;font-size:13px}
+.asset-table th{position:sticky;top:0;background:#0b1724;color:#89a0b8;z-index:2}
+.asset-table tbody tr{cursor:pointer;transition:.15s}
+.asset-table tbody tr:hover{background:#13263a}
+.asset-table tbody tr.selected{background:#163357}
+.chart-panel{min-width:0}
+.selected-asset-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.selected-symbol-row{display:flex;align-items:center;gap:10px}
+.selected-symbol-row h2{font-size:28px;margin:0}
+.decision-badge{padding:5px 9px;border-radius:999px;background:#203148;color:#c8d7e8;font-size:12px;font-weight:900}
+.chart-meta{color:var(--muted);font-size:13px;margin-top:6px}
+.selected-price{text-align:left}
+.selected-price strong{display:block;font-size:30px}
+.selected-price span{color:#8ea2ba}
+.chart-toolbar{display:flex;gap:6px;align-items:center;margin:14px 0 8px;border-top:1px solid #192d42;padding-top:10px}
+.chart-legend{margin-right:auto;color:#7f94aa;font-size:12px}
+.chart-wrap{position:relative;height:500px;border:1px solid #1e3248;border-radius:12px;overflow:hidden;background:
+linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),
+linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
+#081522;background-size:100% 50px,80px 100%}
+#priceChart{width:100%;height:100%;display:block}
+.chart-empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.chart-footer{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.chart-footer>div{background:#0b1724;border:1px solid #1c3046;border-radius:10px;padding:10px}
+.chart-footer strong{display:block;margin-top:5px}
+.action-panel{display:flex;flex-direction:column;gap:10px}
+.action-card{background:#0b1724;border:1px solid #20344b;border-radius:12px;padding:14px}
+.primary-card{border-color:#2b5d94;background:#10233a}
+.action-card strong{display:block;font-size:22px;margin-top:6px}
+.action-card small{color:#9eb1c8}
+.rules-box{margin-top:auto;border-top:1px solid #20344b;padding-top:12px;color:#9eb1c8}
+.rules-box h3{color:#e7f0fa}
+.rules-box p{font-size:13px;line-height:1.5}
+.refresh,.danger-btn{border:1px solid #2c5680;background:#17385b;color:#fff;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer}
+.danger-btn{border-color:#6c3340;background:#3b1b23}
+.lower-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.paper-history{display:grid;gap:8px;margin-top:12px}
+.paper-history>div{background:#0a1522;border:1px solid #1d3147;border-radius:10px;padding:10px 12px;color:#afc0d3}
+.live-panel{margin-top:14px}
+.live-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}
+.live-stats>div{background:#0b1724;border:1px solid #1f3349;border-radius:10px;padding:12px}
+.live-stats strong{display:block;margin-top:5px}
+.live-dot{color:var(--green)}
+.balances-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:10px}
+.wide-table{min-width:900px}
+.asset-table-wrap{overflow:auto}
+.mini{color:#7f94aa;font-size:11px;margin-top:3px}
+.hidden{display:none!important}
+.decision.buy,.decision.buy-ready{color:var(--green)}
+.decision.sell{color:var(--red)}
+.decision.hold{color:var(--amber)}
+.decision.wait_no_rotation{color:#9db0c4}
+@media(max-width:1200px){
+  .topbar{grid-template-columns:1fr auto}.topnav{display:none}
+  .trading-grid{grid-template-columns:280px 1fr}
+  .action-panel{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,1fr)}
+  .rules-box,.danger-btn{grid-column:span 2}
+}
+@media(max-width:800px){
+  .app-shell{padding:8px}
+  .topbar{grid-template-columns:1fr}
+  .top-actions{justify-content:space-between}
+  .market-strip{grid-template-columns:repeat(2,1fr)}
+  .account-strip{grid-template-columns:repeat(2,1fr)}
+  .trading-grid{grid-template-columns:1fr}
+  .scanner-panel{order:2}
+  .chart-panel{order:1}
+  .action-panel{order:3;display:block}
+  .lower-grid{grid-template-columns:1fr}
+  .chart-wrap{height:360px}
+  .chart-footer{grid-template-columns:repeat(2,1fr)}
+  .live-stats{grid-template-columns:repeat(2,1fr)}
+}
+.decision-history{margin-top:12px;display:grid;gap:8px}
+.decision-row{display:grid;grid-template-columns:150px 110px 110px 110px 110px 110px 1fr;gap:10px;align-items:center;background:#0a1522;border:1px solid #1d3147;border-radius:10px;padding:10px 12px;font-size:12px}
+.decision-row.header{background:#0f2032;color:#8fa4bb;font-weight:700}
+.decision-row .good{color:var(--green);font-weight:800}
+.decision-row .bad{color:var(--red);font-weight:800}
+.decision-row .warn{color:var(--amber);font-weight:800}
+.decision-history-section-title{margin-top:14px;color:#c7d7e8;font-weight:800}
+@media(max-width:1000px){.decision-row{grid-template-columns:120px 90px 90px 90px 90px 1fr}.decision-row>div:nth-child(5){display:none}}
+
+.asset-table tbody tr.active-position{
+  background:linear-gradient(90deg,rgba(38,208,124,.16),rgba(38,208,124,.05));
+  box-shadow:inset 4px 0 0 #26d07c;
+}
+.asset-table tbody tr.active-position td:first-child b{color:#7af2b1}
+@keyframes buyPulse{
+  0%,100%{box-shadow:inset 4px 0 0 #2f7cff,0 0 0 rgba(47,124,255,0)}
+  50%{box-shadow:inset 4px 0 0 #2f7cff,0 0 18px rgba(47,124,255,.45)}
+}
+.asset-table tbody tr.buy-alert{
+  background:linear-gradient(90deg,rgba(47,124,255,.18),rgba(47,124,255,.05));
+  animation:buyPulse 1.6s ease-in-out infinite;
+}
+.asset-table tbody tr.buy-alert td:first-child b{color:#7fb2ff}
+@keyframes rotatePulse{
+  0%,100%{box-shadow:inset 4px 0 0 #f5c451,0 0 0 rgba(245,196,81,0)}
+  50%{box-shadow:inset 4px 0 0 #f5c451,0 0 18px rgba(245,196,81,.38)}
+}
+.asset-table tbody tr.rotate-alert{
+  background:linear-gradient(90deg,rgba(245,196,81,.18),rgba(245,196,81,.05));
+  animation:rotatePulse 1.8s ease-in-out infinite;
+}
+.asset-table tbody tr.rotate-alert td:first-child b{color:#ffd978}
+
+.multi-toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.toolbar-group{display:flex;align-items:center;gap:5px;background:#0a1623;border:1px solid #1b3046;border-radius:10px;padding:4px}
+.toolbar-label{color:#8095ab;font-size:11px;font-weight:800;padding:0 6px}
+.multi-toolbar .chart-legend{margin-right:auto}
+@media(max-width:800px){.multi-toolbar .chart-legend{width:100%;margin-right:0}}
+
+.decision.active-long{color:#7af2b1;font-weight:900}
+.decision.wait-no-slot{color:#f5c451;font-weight:900}
+.decision.wait-no-rotation{color:#ffd978;font-weight:900}
+
+[hidden]{display:none!important}
+.top-nav .nav-btn{position:relative;transition:.2s ease}
+.top-nav .nav-btn.active:after{
+  content:"";position:absolute;left:18%;right:18%;bottom:-8px;height:2px;border-radius:2px;
+  background:currentColor;opacity:.9
+}
+.portfolio-view-content{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px}
+.portfolio-card{background:#0a1522;border:1px solid #1d3147;border-radius:12px;padding:14px}
+.portfolio-card>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.portfolio-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#91a6bc}
+.portfolio-card-grid b{display:block;color:#e8f0f8;margin-top:2px}
+.status-badge.active{color:#7af2b1;background:rgba(38,208,124,.12);border:1px solid rgba(38,208,124,.3);padding:4px 7px;border-radius:999px;font-size:10px}
+.empty-state{padding:24px;text-align:center;color:#8194a8}
+
+/* Flexible layout and clear Hebrew labels at every viewport size. */
+.app-shell{width:100%;max-width:2200px;padding:clamp(10px,1.2vw,24px)}
+.topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px}
+.topbar>*{min-width:0}.top-actions{justify-content:flex-end;flex-wrap:wrap}
+.topnav{display:flex;flex-wrap:wrap}.nav-pill{white-space:nowrap}
+.brand-title{font-size:clamp(15px,1.2vw,21px)}
+.brand-sub{line-height:1.6}.status{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.trading-grid{grid-template-columns:minmax(230px,.85fr) minmax(0,2.5fr) minmax(220px,.8fr);align-items:start}
+.trading-grid>*{min-width:0}.panel{min-width:0;line-height:1.5}
+.panel h2{font-size:clamp(17px,1.25vw,22px);margin-top:0;overflow-wrap:anywhere}
+.panel-title-row{flex-wrap:wrap}.scanner-panel .panel-title-row{flex-wrap:nowrap;align-items:start}
+.refresh{white-space:normal;min-width:90px}.scan-status{line-height:1.7}
+.account-strip{grid-template-columns:repeat(6,minmax(0,1fr))}
+.account-strip article{padding:clamp(10px,1vw,18px);min-width:0}
+.account-strip span{display:block;line-height:1.5;font-size:12px}
+.account-strip strong{font-size:clamp(16px,1.3vw,25px);direction:ltr;unicode-bidi:isolate;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.market-strip>div{min-width:0;gap:8px;padding:12px}.market-strip strong{direction:ltr;unicode-bidi:isolate}
+.selected-asset-head{flex-wrap:wrap;gap:12px}.selected-symbol-row{flex-wrap:wrap}
+.selected-symbol-row h2{direction:ltr;font-size:clamp(23px,1.9vw,34px)}
+.decision-badge{white-space:normal;line-height:1.5}.selected-price{direction:ltr}
+.chart-wrap{height:clamp(330px,52vh,680px)}
+.multi-toolbar{gap:8px}.toolbar-group{flex-wrap:wrap;max-width:100%;gap:3px}
+.time-pill{padding:8px 10px}.chart-legend{width:100%;line-height:1.6}
+.chart-footer{grid-template-columns:repeat(4,minmax(0,1fr))}.chart-footer>div{min-width:0;overflow-wrap:anywhere}
+.action-panel{display:flex}.action-card strong{font-size:clamp(17px,1.2vw,23px);overflow-wrap:anywhere}
+.asset-table{table-layout:fixed}.asset-table th,.asset-table td{overflow-wrap:anywhere;line-height:1.5}
+.asset-table td:nth-child(2),.asset-table td:nth-child(3){font-variant-numeric:tabular-nums}
+.scanner-list{max-height:clamp(350px,65vh,760px)}
+#binanceDemoBalanceCard{margin-top:16px}
+#demoAccountStatus{color:var(--muted);font-size:13px;line-height:1.7}
+#demoAccountTotal{direction:ltr;unicode-bidi:isolate;text-align:right;font-size:clamp(22px,2vw,32px);font-variant-numeric:tabular-nums}
+.demo-balances-wrap{width:100%;overflow:auto;margin:14px 0}
+.demo-balances-table{min-width:460px}.demo-balances-table td{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.demo-balances-table th:first-child{width:24%}
+.decision-history{overflow:auto}.decision-row{min-width:760px}
+.portfolio-view-content{grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr))}
+@media(max-width:1400px){
+ .topbar{grid-template-columns:1fr auto}.topnav{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+ .account-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .trading-grid{grid-template-columns:minmax(230px,.8fr) minmax(0,2fr)}
+ .action-panel{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+ .action-panel>.panel-title-row,.rules-box{grid-column:1/-1}.danger-btn{grid-column:auto}
+}
+@media(max-width:900px){
+ .topbar{grid-template-columns:1fr}.topnav{grid-row:auto}.top-actions{justify-content:flex-start}
+ .trading-grid{grid-template-columns:minmax(0,1fr)}
+ .chart-panel{order:0}.scanner-panel{order:1}.action-panel{order:2}
+ .chart-footer{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .lower-grid{grid-template-columns:minmax(0,1fr)}
+ .action-panel{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:520px){
+ .market-strip,.account-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .brand-mark{flex-shrink:0}.nav-pill{padding:9px 11px}.chart-wrap{height:340px}
+ .selected-price strong{font-size:25px}.toolbar-group{width:100%}.time-pill{flex:1;padding:8px 6px}
+}
+
+/* Active positions pulse from black to their wave direction color. */
+@keyframes activePositionLight{
+  0%,15%,85%,100%{
+    background-color:#000;
+    color:#fff;
+    box-shadow:none;
+    border-color:#000;
+  }
+  45%,55%{
+    background-color:var(--active-light);
+    color:#08110b;
+    box-shadow:inset 0 2px 0 var(--active-light),inset 0 -2px 0 var(--active-light),inset 0 0 24px var(--active-light);
+    border-color:var(--active-light);
+  }
+}
+.asset-table tbody tr.active-position{
+  --active-light:#a4ffb8;
+  background:none;animation:none;box-shadow:none;
+}
+.asset-table tbody tr.active-position.active-down{--active-light:#ff5050}
+.asset-table tbody tr.active-position td{
+  animation:activePositionLight 2.2s ease-in-out infinite;
+}
+.asset-table tbody tr.active-position td:first-child{
+  border-right:6px solid;
+}
+.asset-table tbody tr.active-position td:first-child b{
+  font-weight:900;color:inherit;animation:none;text-shadow:none;
+}
+.asset-table tbody tr.active-position .mini{color:inherit}
+/* The explicitly requested active-trade status pulse stays visible in all motion settings. */
+
+.asset-table .mini{margin-top:3px;color:#8296aa;font-size:10px;line-height:1.25}
+.asset-table tr.buy-alert .mini{color:#9fc3ff}
+.asset-table tr.rotate-alert .mini{color:#ffe39a}
+.asset-table tr.active-position .mini{color:#8cebb7}
+
+.meitav-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;padding:20px;margin:16px 0}.meitav-controls label{display:grid;gap:6px}.meitav-controls input,.meitav-controls select{background:#102336;color:white;border:1px solid #38536d;border-radius:8px;padding:10px;width:150px}.meitav-controls button{padding:12px;border-radius:10px;border:1px solid #426688;background:#173b59;color:white;cursor:pointer}.meitav-note{padding:16px;line-height:1.8;color:#bad0e5}.meitav-chart{width:100%;height:360px}.meitav-table-wrap{overflow:auto}.meitav-table-wrap table{width:100%}button:disabled{opacity:.5;cursor:wait}
