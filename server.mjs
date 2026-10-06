@@ -44,6 +44,15 @@ const ROTATION_MIN_SCORE=+(process.env.BINANCE_ROTATION_MIN_SCORE||65);
 const ROTATION_SCORE_GAP=+(process.env.BINANCE_ROTATION_SCORE_GAP||20);
 const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_CYCLE||1));
 
+// Profit engine v7 controls
+const ENTRY_CONFIRM_REQUIRED=Math.max(1,+(process.env.BINANCE_ENTRY_CONFIRM_REQUIRED||2));
+const ENTRY_MAX_LIVE_EXTENSION_PCT=Math.max(0,+(process.env.BINANCE_ENTRY_MAX_LIVE_EXTENSION_PCT||2.5));
+const ENTRY_MAX_LIVE_DIP_PCT=Math.max(0,+(process.env.BINANCE_ENTRY_MAX_LIVE_DIP_PCT||0.2));
+const LIVE_TRAIL_ACTIVATE_PCT=Math.max(0,+(process.env.BINANCE_LIVE_TRAIL_ACTIVATE_PCT||1.2));
+const LIVE_TRAIL_LOCK_PCT=Math.max(0,+(process.env.BINANCE_LIVE_TRAIL_LOCK_PCT||0.2));
+const entryConfirmationState=new Map();
+const livePeakState=new Map();
+
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
 const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
@@ -451,8 +460,70 @@ async function maybeExecuteLive(evals){
   }
 
   let heldNow=held();
+
+  // Dynamic LIVE trailing profit. It activates only after a real profit peak,
+  // then tightens as the peak grows. Existing positions without a recorded
+  // strategy BUY are initialized conservatively from the current price.
+  for(const ev of [...heldNow]){
+    const base=ev.symbol.endsWith('USDT')?ev.symbol.slice(0,-4):ev.symbol;
+    const bal=assetMap.get(base);
+    const current=Number(bal?.usdtPrice||streams[ev.symbol]?.lastPrice||0);
+    if(!(current>0))continue;
+
+    let state=livePeakState.get(ev.symbol);
+    if(!state){
+      const lastBuy=liveActionLog.find(a=>
+        a.symbol===ev.symbol &&
+        ['BUY','ROTATE_IN'].includes(a.type) &&
+        Number(a.price)>0
+      );
+      const entry=Number(lastBuy?.price||current);
+      state={entryPrice:entry,peakPrice:Math.max(entry,current),entryAt:lastBuy?.at||new Date().toISOString()};
+    }
+    state.peakPrice=Math.max(Number(state.peakPrice)||current,current);
+    livePeakState.set(ev.symbol,state);
+
+    const peakGainPct=(state.peakPrice/state.entryPrice-1)*100;
+    if(peakGainPct<LIVE_TRAIL_ACTIVATE_PCT)continue;
+
+    const trailPct=peakGainPct>=5?0.5:peakGainPct>=3?0.6:0.8;
+    const trailingStop=state.peakPrice*(1-trailPct/100);
+    const lockedFloor=state.entryPrice*(1+LIVE_TRAIL_LOCK_PCT/100);
+    const stopPrice=Math.max(trailingStop,lockedFloor);
+
+    if(current<=stopPrice){
+      try{
+        await placeLiveMarketSell(ev.symbol,'SMART_TRAILING_PROFIT',{
+          score:ev.score,
+          entryPrice:state.entryPrice,
+          peakPrice:state.peakPrice,
+          peakGainPct,
+          trailPct,
+          stopPrice,
+          currentPrice:current
+        });
+        livePeakState.delete(ev.symbol);
+        account=await getLiveAccountSnapshot();
+        assetMap.clear();
+        for(const x of account.balances)assetMap.set(x.asset,x);
+      }catch(e){
+        pushLiveAction({
+          type:'SELL_REJECTED',
+          symbol:ev.symbol,
+          reason:'SMART_TRAILING_PROFIT',
+          error:e.message,
+          code:e.code??null,
+          status:e.status??null,
+          score:ev.score,
+          at:new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  heldNow=held();
   const candidates=evals
-    .filter(ev=>ev.ok && decidePosition(ev.strategy,'CASH')==='BUY')
+    .filter(ev=>ev.ok && ev.rawDecision==='BUY')
     .filter(ev=>!heldNow.some(h=>h.symbol===ev.symbol))
     .sort((a,b)=>b.score-a.score);
 
@@ -1037,11 +1108,30 @@ async function evaluateSymbol(s){
       }
     }
 
-    const rawDecision=decidePosition(st,pos);
-
     // Score/BUY qualification stay based on confirmed D1 candles.
     const score=scoreStrategy(closedStrategy);
     const qualification=buyQualification(closedStrategy);
+
+    // Entry confirmation: require the closed D1 signal to remain valid while
+    // the live price is not still falling and is not excessively extended.
+    const liveEntryPrice=Number(streams[s]?.lastPrice);
+    const closedPrice=Number(closedStrategy?.price||0);
+    const liveVsClosedPct=(
+      Number.isFinite(liveEntryPrice)&&liveEntryPrice>0&&closedPrice>0
+    ) ? (liveEntryPrice/closedPrice-1)*100 : 0;
+    const entryEligible=
+      qualification.qualified &&
+      (!Number.isFinite(liveEntryPrice) || liveEntryPrice<=0 || (
+        liveVsClosedPct>=-ENTRY_MAX_LIVE_DIP_PCT &&
+        liveVsClosedPct<=ENTRY_MAX_LIVE_EXTENSION_PCT
+      ));
+    const previousConfirm=entryConfirmationState.get(s)||0;
+    const entryConfirmCount=entryEligible?Math.min(ENTRY_CONFIRM_REQUIRED,previousConfirm+1):0;
+    entryConfirmationState.set(s,entryConfirmCount);
+    const entryConfirmed=entryEligible&&entryConfirmCount>=ENTRY_CONFIRM_REQUIRED;
+
+    let rawDecision=decidePosition(st,pos);
+    if(pos==='CASH'&&rawDecision==='BUY'&&!entryConfirmed)rawDecision='HOLD';
 
     return {
       ok:true,
@@ -1054,6 +1144,11 @@ async function evaluateSymbol(s){
       score,
       buyQualified:qualification.qualified,
       buyReason:qualification.reason,
+      entryEligible,
+      entryConfirmed,
+      entryConfirmCount,
+      entryConfirmRequired:ENTRY_CONFIRM_REQUIRED,
+      liveVsClosedPct,
       decisionPriceSource,
       at:new Date().toISOString()
     };
@@ -1081,6 +1176,11 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     score:ev.score,
     buyQualified:ev.buyQualified,
     buyReason:ev.buyReason,
+    entryEligible:ev.entryEligible,
+    entryConfirmed:ev.entryConfirmed,
+    entryConfirmCount:ev.entryConfirmCount,
+    entryConfirmRequired:ev.entryConfirmRequired,
+    liveVsClosedPct:ev.liveVsClosedPct,
     rotation:strategy,
     lastDecisionAt:new Date().toISOString(),
     lastError:null,
@@ -1098,6 +1198,7 @@ function decisionReasonFromAgent(agent,ev){
   if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
   if(agent?.decision==='BUY_READY')return 'BUY_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
+  if(ev.buyQualified&&!ev.entryConfirmed)return 'WAIT_ENTRY_CONFIRMATION';
   if(ev.buyQualified)return 'QUALIFIED_BUT_HOLD';
   return ev.buyReason||'HOLD_NOT_QUALIFIED';
 }
@@ -1116,6 +1217,13 @@ function candidateBlocker(ev,evals){
   // BUY qualification is intentionally based on confirmed D1 candles.
   if(!ev.buyQualified){
     return {code:'WAIT_D1',text:'ממתין לאישור D1'};
+  }
+
+  if(!ev.entryConfirmed){
+    return {
+      code:'WAIT_ENTRY_CONFIRMATION',
+      text:'ממתין לאישור כניסה · '+Number(ev.entryConfirmCount||0)+'/'+ENTRY_CONFIRM_REQUIRED
+    };
   }
 
   if(activeCount<MAX){
@@ -1214,7 +1322,7 @@ async function runEvaluation(){
       const last=demoTrader.state.actionLog.find(a=>a.symbol===ev.symbol);
       const executed=last&&Date.parse(last.at)>=Date.parse(ev.at);
       const activeCount=Object.keys(positions).length;
-      const qualified=!!ev.closedStrategy?.buyConfirmed;
+      const qualified=!!ev.entryConfirmed;
 
       let decision='HOLD';
       let blocker={code:'HOLD',text:'לא כשיר כרגע'};
@@ -1345,7 +1453,8 @@ async function runEvaluation(){
       .filter(ev=>
         ev.ok &&
         !paper.positions[ev.symbol] &&
-        ev.rawDecision==='BUY'
+        ev.rawDecision==='BUY' &&
+        ev.entryConfirmed
       )
       .sort((a,b)=>b.score-a.score);
 
