@@ -1283,6 +1283,10 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     entryTargetPrice:ev.entryTargetPrice,
     entryGainPct:ev.entryGainPct,
     entryTriggerPct:ev.entryTriggerPct,
+    entryMinScore:ev.entryMinScore,
+    entryMaxRunPct:ev.entryMaxRunPct,
+    stopLossPct:ev.stopLossPct,
+    trailActivatePct:ev.trailActivatePct,
     exitTrailPct:ev.exitTrailPct,
     peakPrice:ev.peakPrice,
     trailingStopPrice:ev.trailingStopPrice,
@@ -1304,6 +1308,8 @@ function decisionReasonFromAgent(agent,ev){
   if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
   if(agent?.decision==='BUY_READY')return 'BUY_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
+  if(ev.buyQualified&&Number(ev.score||0)<ENTRY_MIN_SCORE)return 'WAIT_SCORE';
+  if(ev.buyQualified&&Number(ev.entryGainPct||0)>ENTRY_MAX_RUN_PCT)return 'ANTI_CHASE';
   if(ev.buyQualified&&!ev.entryConfirmed)return 'WAIT_PLUS_2';
   if(ev.entryConfirmed)return 'BUY_READY';
   return ev.buyReason||'HOLD_NOT_QUALIFIED';
@@ -1327,8 +1333,22 @@ function candidateBlocker(ev,evals){
     };
   }
 
+  const gain=Number(ev.entryGainPct||0);
+  if(Number(ev.score||0)<ENTRY_MIN_SCORE){
+    return {
+      code:'WAIT_SCORE',
+      text:'מגמת UP · Score '+Number(ev.score||0).toFixed(1)+' · נדרש '+ENTRY_MIN_SCORE.toFixed(0)
+    };
+  }
+
+  if(gain>ENTRY_MAX_RUN_PCT){
+    return {
+      code:'ANTI_CHASE',
+      text:'לא רודף אחרי העלייה · +'+gain.toFixed(2)+'% מעל נקודת הבסיס · מקסימום '+ENTRY_MAX_RUN_PCT.toFixed(1)+'%'
+    };
+  }
+
   if(!ev.entryConfirmed){
-    const gain=Number(ev.entryGainPct||0);
     return {
       code:'WAIT_PLUS_2',
       text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'% · כרגע '+gain.toFixed(2)+'%'
