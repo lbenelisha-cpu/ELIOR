@@ -789,14 +789,22 @@ function initUniverse(symbols){
 }
 
 function startMarketStream(){
-  try{marketSocket?.close()}catch{}
   if(!SYMBOLS.length)return;
-
   const names=SYMBOLS.map(s=>`${s.toLowerCase()}@trade`).join('/');
-  marketSocket=new WebSocket(`wss://stream.binance.com:9443/stream?streams=${names}`);
-
-  marketSocket.on('open',()=>SYMBOLS.forEach(s=>streams[s].status='connected'));
-  marketSocket.on('message',raw=>{
+  const url=`wss://stream.binance.com:9443/stream?streams=${names}`;
+  // Reuse a healthy subscription; universe refresh must not interrupt every scan.
+  if(marketSocket?.url===url&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketSocket.readyState))return;
+  const previous=marketSocket;
+  const socket=new WebSocket(url);
+  marketSocket=socket;
+  try{previous?.close()}catch{}
+  SYMBOLS.forEach(s=>{streams[s].status='connecting';});
+  socket.on('open',()=>{
+    if(marketSocket!==socket)return;
+    SYMBOLS.forEach(s=>{streams[s].status='connected';});
+  });
+  socket.on('message',raw=>{
+    if(marketSocket!==socket)return;
     try{
       const msg=JSON.parse(raw),m=msg.data||msg,s=String(m.s||'');
       if(streams[s]){
@@ -806,11 +814,12 @@ function startMarketStream(){
       }
     }catch{}
   });
-  marketSocket.on('close',()=>{
-    SYMBOLS.forEach(s=>streams[s].status='disconnected');
-    setTimeout(startMarketStream,5000).unref?.();
+  socket.on('close',()=>{
+    if(marketSocket!==socket)return;
+    SYMBOLS.forEach(s=>{streams[s].status='disconnected';});
+    setTimeout(()=>{if(marketSocket===socket)startMarketStream();},5000).unref?.();
   });
-  marketSocket.on('error',()=>{});
+  socket.on('error',()=>{});
 }
 
 async function fetchHistoricalDaily(symbol,startMs,endMs=Date.now()){
@@ -1265,7 +1274,13 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     agents[ev.symbol]={
       ...(agents[ev.symbol]||{symbol:ev.symbol,position:'CASH',decision:'HOLD'}),
       lastError:ev.error,
-      execution:'ERROR'
+      execution:'ERROR',
+      decision:'WAIT_DATA',
+      entryConfirmed:false,
+      entryEligible:false,
+      buyQualified:false,
+      staleData:true,
+      lastDecisionAt:new Date().toISOString()
     };
     return;
   }
@@ -1296,6 +1311,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     rotation:strategy,
     lastDecisionAt:new Date().toISOString(),
     lastError:null,
+    staleData:false,
     execution
   };
 }
@@ -1318,7 +1334,9 @@ function decisionReasonFromAgent(agent,ev){
 }
 
 function candidateBlocker(ev,evals){
-  if(!ev?.ok)return {code:'ERROR',text:'שגיאת נתונים'};
+  if(!ev?.ok)return ev?.error?.includes('Fresh connected Binance price')
+    ? {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי עדכני; הקנייה מושהית'}
+    : {code:'ERROR',text:'שגיאת נתונים'};
 
   const positions=tradingPositions();
   const activeCount=Object.keys(positions).length;
