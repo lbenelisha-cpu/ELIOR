@@ -1,4 +1,5 @@
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
+import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
 import http from "node:http";
@@ -1138,9 +1139,8 @@ async function evaluateSymbol(s){
 
     const positions=tradingPositions();
     const pos=positions[s]?'LONG':'CASH';
-    const streamPrice=Number(streams[s]?.lastPrice);
     const closedPrice=Number(closedStrategy?.price||0);
-    const livePrice=Number.isFinite(streamPrice)&&streamPrice>0?streamPrice:closedPrice;
+    const livePrice=requireLivePrice(streams[s]);
 
     // Trend filter: direction comes from confirmed D1 structure; MA200 stays
     // anchored to confirmed history, while the live price must be above it.
