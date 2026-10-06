@@ -278,3 +278,6 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .experiment-table{min-width:1050px}.experiment-table .chosen{background:#153b54}.experiment-table td{font-variant-numeric:tabular-nums}
 #experiments select{background:#0c2035;color:#fff;border:1px solid #335779;padding:8px;border-radius:8px;max-width:100%}
 #experiments h3{font-size:15px;line-height:1.6}
+
+.research-toolbar{margin-top:14px}.research-toolbar label{display:inline-flex;gap:8px;align-items:center;margin:8px}.research-toolbar input{max-width:85px;padding:8px;background:#10223a;color:#fff;border:1px solid #335779}
+#researchPanel{margin-top:16px}#researchPanel[hidden]{display:none}.research-table{min-width:1150px}#researchPanel .chosen{background:#153b54}#researchPanel label{display:flex;align-items:center;gap:8px}#researchPanel select{background:#0c2035;color:#fff;border:1px solid #335779;padding:8px;border-radius:8px;max-width:100%}#researchPanel a{color:#8ec5ff}#researchPanel details{line-height:1.7}#researchPanel h3{font-size:15px}

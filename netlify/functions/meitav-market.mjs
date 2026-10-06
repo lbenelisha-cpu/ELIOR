@@ -5,8 +5,9 @@ export async function handler(event){
  if(event.httpMethod!=='GET')return reply(405,{error:'Method not allowed'});
  const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase();
  if(!/^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol))return reply(400,{error:'סימול מניה לא תקין'});
+ const history=Number(event.queryStringParameters?.history||800);if(![800,1250,2500].includes(history))return reply(400,{error:'אורך היסטוריה לא תקין'});
  try{
-  const data=await td('time_series',{symbol,interval:'1day',outputsize:800,order:'ASC',adjust:'splits'});
+  const data=await td('time_series',{symbol,interval:'1day',outputsize:history,order:'ASC',adjust:'splits'});
   if(!['Common Stock','ETF'].includes(data.meta?.type))return reply(422,{error:'מקור הנתונים אינו מניה רגילה או ETF'});
   const currency=data.meta?.currency;if(!['USD','ILS'].includes(currency))return reply(422,{error:'מטבע הנתונים אינו USD או ILS'});
   const timeZone=data.meta?.exchange_timezone;if(!timeZone)throw Error('Missing exchange timezone');
