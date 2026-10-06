@@ -270,3 +270,20 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .asset-table tr.buy-alert .mini{color:#9fc3ff}
 .asset-table tr.rotate-alert .mini{color:#ffe39a}
 .asset-table tr.active-position .mini{color:#8cebb7}
+
+/* Position colors describe unrealized P/L; trend has a separate neutral label. */
+.pnl-profit{color:#7af2b1}
+.pnl-loss{color:#ff7b86}
+.pnl-flat,.pnl-unknown{color:#b6c8db}
+.asset-table tbody tr.active-position.pnl-profit{--active-light:#a4ffb8}
+.asset-table tbody tr.active-position.pnl-loss{--active-light:#ff7b86}
+.asset-table tbody tr.active-position.pnl-flat,
+.asset-table tbody tr.active-position.pnl-unknown{--active-light:#b6c8db}
+.asset-table tbody tr.active-position.pnl-profit .mini.pnl-profit{color:#7af2b1}
+.asset-table tbody tr.active-position.pnl-loss .mini.pnl-loss{color:#ff7b86}
+.asset-table tbody tr.active-position.pnl-flat .mini,
+.asset-table tbody tr.active-position.pnl-unknown .mini{color:#b6c8db}
+.asset-table tbody tr.active-position .mini.trend-note{color:#b6c8db}
+.decision-badge.pnl-profit{color:#7af2b1}
+.decision-badge.pnl-loss{color:#ff7b86}
+.decision-badge.pnl-flat,.decision-badge.pnl-unknown{color:#b6c8db}

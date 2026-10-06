@@ -25,6 +25,20 @@ let moneyUnit='₪';
 let chartCandles=[];
 function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
+function positionPnlDisplay(position,currency=moneyUnit){
+  const raw=position?.pnlIls;
+  if(raw===null||raw===undefined||raw===''||!Number.isFinite(Number(raw))){
+    return {kind:'unknown',className:'pnl-unknown',text:'רווח / הפסד: אין נתוני כניסה'};
+  }
+  const value=Number(raw),kind=value>0?'profit':value<0?'loss':'flat';
+  const label=value>0?'רווח לא ממומש':value<0?'הפסד לא ממומש':'ללא שינוי';
+  const rawPct=position.pnlPct;
+  const pct=rawPct!==null&&rawPct!==undefined&&rawPct!==''&&Number.isFinite(Number(rawPct))
+    ?Number(rawPct):Number(position.allocationIls)>0?value/Number(position.allocationIls)*100:null;
+  const amount=(value>0?'+':'')+fmt(value)+' '+currency;
+  return {kind,className:'pnl-'+kind,text:label+': '+amount+(pct===null?'':' ('+(pct>0?'+':'')+fmt(pct)+'%)')};
+}
+
 function renderPortfolioView(){
   const target=$('#portfolioViewContent');
   const source=$('#positions');
@@ -168,16 +182,18 @@ function render(d,currentMode='demo',liveAccount=null){
     const s=a.strategy||{};
     const held=isHeld(a);
     const score=Number(a.score||0);
+    const pnl=positionPnlDisplay(isLive?null:paperPos[a.symbol]);
+    const trendLabel=({UP:'עולה',DOWN:'יורדת'}[s.direction]||'לא ידועה');
     const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive);
     const rowClasses=[
       a.symbol===selectedSymbol?'selected':'',
       held?'active-position':'',
-      held?(s.direction==='DOWN'?'active-down':'active-up'):'',
+      held?pnl.className:'',
       (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
-      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini">${held?'פוזיציה פעילה':blockerLabel(a.blocker)}</div></td>
+      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:blockerLabel(a.blocker)}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
       <td>${fmt(s.price)}</td>
       <td><b>${fmt(score,1)}</b></td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
@@ -199,7 +215,7 @@ function render(d,currentMode='demo',liveAccount=null){
   }else{
     const ps=Object.values(paperPos);
     $('#positions').innerHTML=ps.length
-      ? ps.map(x=>`<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה $${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}</div>`).join('')
+      ? ps.map(x=>{const pnl=positionPnlDisplay(x);return `<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה ${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}<div class="${pnl.className}">${pnl.text}</div></div>`;}).join('')
       : '<div class="mini">אין פוזיציות פעילות.</div>';
     $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}</div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
@@ -233,7 +249,10 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
-  put('#chartDecisionBadge',decisionLabel(dec));
+  const selectedPnl=positionPnlDisplay(currentModeArg==='live'?null:p.positions?.[a.symbol]);
+  const badge=$('#chartDecisionBadge');
+  put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
+  if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
   put('#chartMeta',(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
