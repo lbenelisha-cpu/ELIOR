@@ -272,3 +272,9 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .asset-table tr.active-position .mini{color:#8cebb7}
 
 .meitav-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;padding:20px;margin:16px 0}.meitav-controls label{display:grid;gap:6px}.meitav-controls input,.meitav-controls select{background:#102336;color:white;border:1px solid #38536d;border-radius:8px;padding:10px;width:150px}.meitav-controls button{padding:12px;border-radius:10px;border:1px solid #426688;background:#173b59;color:white;cursor:pointer}.meitav-note{padding:16px;line-height:1.8;color:#bad0e5}.meitav-chart{width:100%;height:360px}.meitav-table-wrap{overflow:auto}.meitav-table-wrap table{width:100%}button:disabled{opacity:.5;cursor:wait}
+
+.experiment-actions{display:flex;flex-wrap:wrap;gap:8px}
+#experiments{margin-top:16px}#experiments[hidden]{display:none}
+.experiment-table{min-width:1050px}.experiment-table .chosen{background:#153b54}.experiment-table td{font-variant-numeric:tabular-nums}
+#experiments select{background:#0c2035;color:#fff;border:1px solid #335779;padding:8px;border-radius:8px;max-width:100%}
+#experiments h3{font-size:15px;line-height:1.6}
