@@ -29,6 +29,7 @@ const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=6;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
+const DECISION_INTERVAL_MS=Math.max(5000,+(process.env.BINANCE_DECISION_INTERVAL_MS||5000));
 const UNIVERSE_SIZE=Math.min(60,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||60)));
 const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
@@ -136,6 +137,50 @@ function pushDecisionHistory(symbol,row){
   arr.unshift(row);
   decisionHistory[symbol]=arr.slice(0,30);
 }
+const EXPERIMENT_RESET_VERSION='2026-10-06-5s-v1';
+const EXPERIMENT_RESET_FILE=process.env.BINANCE_EXPERIMENT_RESET_FILE||'/var/data/binance-experiment-reset.json';
+
+function resetExperimentStateOnce(){
+  try{
+    ensureStateDir();
+    let previous=null;
+    if(fs.existsSync(EXPERIMENT_RESET_FILE)){
+      try{
+        previous=JSON.parse(fs.readFileSync(EXPERIMENT_RESET_FILE,'utf8'))?.version||null;
+      }catch{}
+    }
+    if(previous===EXPERIMENT_RESET_VERSION)return false;
+
+    // Reset strategy/diagnostic state for a clean 5-second experiment.
+    entryConfirmationState.clear();
+    livePeakState.clear();
+    decisionHistory={};
+    saveDecisionHistory();
+
+    // Internal paper trading can be reset safely. Never orphan real Binance Demo positions.
+    if(!DEMO_TRADING){
+      reset();
+    }
+
+    fs.writeFileSync(EXPERIMENT_RESET_FILE,JSON.stringify({
+      version:EXPERIMENT_RESET_VERSION,
+      at:new Date().toISOString(),
+      paperReset:!DEMO_TRADING,
+      externalDemoPositionsPreserved:DEMO_TRADING
+    },null,2),'utf8');
+
+    console.log(
+      'Experiment state reset',
+      EXPERIMENT_RESET_VERSION,
+      DEMO_TRADING?'Binance Demo positions preserved':'paper portfolio reset'
+    );
+    return true;
+  }catch(e){
+    console.error('Experiment reset failed',e.message);
+    return false;
+  }
+}
+
 let liveActionLog=[];
 
 function saveLiveActionLog(){
@@ -1707,7 +1752,7 @@ async function refreshUniverse(){
   }
 }
 
-setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),60000).unref();
+setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
 // Exit monitoring does not wait for the 60-symbol daily-candle scan.
 setInterval(async()=>{
   if(!DEMO_TRADING||mode!=='demo')return;
@@ -1939,7 +1984,7 @@ const server=http.createServer((req,res)=>{
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
-        decisionIntervalMs:60000,
+        decisionIntervalMs:DECISION_INTERVAL_MS,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
       }
@@ -1991,6 +2036,7 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadPaperState();
   loadLiveActionLog();
   loadDecisionHistory();
+  resetExperimentStateOnce();
   await refreshUniverse();
 });
 
