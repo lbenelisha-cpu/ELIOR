@@ -45,9 +45,15 @@ const ROTATION_MIN_SCORE=+(process.env.BINANCE_ROTATION_MIN_SCORE||65);
 const ROTATION_SCORE_GAP=+(process.env.BINANCE_ROTATION_SCORE_GAP||20);
 const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_CYCLE||1));
 
-// Profit engine v7 controls
+// Profit engine v8 controls
+// Entry: require a live continuation, a strong enough score, and avoid chasing an already-extended move.
+// Exit: use a wider initial loss stop; only activate the tighter trailing-profit stop after real profit exists.
 const ENTRY_TRIGGER_PCT=Math.max(0.1,+(process.env.BINANCE_ENTRY_TRIGGER_PCT||2));
-const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1.5));
+const ENTRY_MIN_SCORE=Math.max(0,Math.min(100,+(process.env.BINANCE_ENTRY_MIN_SCORE||72)));
+const ENTRY_MAX_RUN_PCT=Math.max(ENTRY_TRIGGER_PCT,+(process.env.BINANCE_ENTRY_MAX_RUN_PCT||4.5));
+const STOP_LOSS_PCT=Math.max(0.1,+(process.env.BINANCE_STOP_LOSS_PCT||2.5));
+const TRAIL_ACTIVATE_PCT=Math.max(0.1,+(process.env.BINANCE_TRAIL_ACTIVATE_PCT||2));
+const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1));
 const entryTrackingState=new Map();
 const livePeakState=new Map();
 const dailyCandleCache=new Map();
@@ -56,7 +62,16 @@ const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||30
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
 const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
-const demoTrader=new DemoTrader({maxPositions:MAX,key:process.env.BINANCE_DEMO_API_KEY,secret:process.env.BINANCE_DEMO_API_SECRET,enabled:DEMO_TRADING,stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json'});
+const demoTrader=new DemoTrader({
+  maxPositions:MAX,
+  key:process.env.BINANCE_DEMO_API_KEY,
+  secret:process.env.BINANCE_DEMO_API_SECRET,
+  enabled:DEMO_TRADING,
+  stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json',
+  trailingStopPct:EXIT_TRAIL_PCT,
+  stopLossPct:STOP_LOSS_PCT,
+  trailActivatePct:TRAIL_ACTIVATE_PCT
+});
 const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
 
@@ -528,21 +543,23 @@ async function maybeExecuteLive(evals){
     livePeakState.set(ev.symbol,state);
 
     const peakGainPct=(state.peakPrice/state.entryPrice-1)*100;
-    if(peakGainPct<LIVE_TRAIL_ACTIVATE_PCT)continue;
-
-    const trailPct=peakGainPct>=5?0.5:peakGainPct>=3?0.6:0.8;
-    const trailingStop=state.peakPrice*(1-trailPct/100);
-    const lockedFloor=state.entryPrice*(1+LIVE_TRAIL_LOCK_PCT/100);
-    const stopPrice=Math.max(trailingStop,lockedFloor);
+    const initialStop=state.entryPrice*(1-STOP_LOSS_PCT/100);
+    const trailingActive=peakGainPct>=TRAIL_ACTIVATE_PCT;
+    const trailPct=EXIT_TRAIL_PCT;
+    const trailingStop=trailingActive?state.peakPrice*(1-trailPct/100):null;
+    const stopPrice=trailingActive?Math.max(initialStop,trailingStop):initialStop;
+    const exitReason=trailingActive?'TRAILING_PROFIT':'STOP_LOSS';
 
     if(current<=stopPrice){
       try{
-        await placeLiveMarketSell(ev.symbol,'SMART_TRAILING_PROFIT',{
+        await placeLiveMarketSell(ev.symbol,exitReason,{
           score:ev.score,
           entryPrice:state.entryPrice,
           peakPrice:state.peakPrice,
           peakGainPct,
+          trailActivatePct:TRAIL_ACTIVATE_PCT,
           trailPct,
+          stopLossPct:STOP_LOSS_PCT,
           stopPrice,
           currentPrice:current
         });
@@ -1161,9 +1178,17 @@ async function evaluateSymbol(s){
         entryBasePrice=Number(track.basePrice);
         entryTargetPrice=entryBasePrice*(1+ENTRY_TRIGGER_PCT/100);
         entryGainPct=entryBasePrice>0?(livePrice/entryBasePrice-1)*100:0;
-        entryEligible=true;
-        entryConfirmed=livePrice>=entryTargetPrice;
+        const scoreQualified=score>=ENTRY_MIN_SCORE;
+        const antiChaseBlocked=entryGainPct>ENTRY_MAX_RUN_PCT;
+        entryEligible=scoreQualified&&!antiChaseBlocked;
+        entryConfirmed=
+          entryEligible &&
+          livePrice>=entryTargetPrice;
 
+        st.entryMinScore=ENTRY_MIN_SCORE;
+        st.entryMaxRunPct=ENTRY_MAX_RUN_PCT;
+        st.scoreQualified=scoreQualified;
+        st.antiChaseBlocked=antiChaseBlocked;
         st.buyConfirmed=entryConfirmed;
         st.sellConfirmed=false;
         rawDecision=entryConfirmed?'BUY':'HOLD';
@@ -1178,13 +1203,24 @@ async function evaluateSymbol(s){
       peakPrice=Math.max(entryPrice,rememberedPeak>0?rememberedPeak:0,livePrice);
       livePeakState.set(s,peakPrice);
 
-      trailingStopPrice=peakPrice*(1-EXIT_TRAIL_PCT/100);
+      const peakGainPct=entryPrice>0?(peakPrice/entryPrice-1)*100:0;
+      const initialStopPrice=entryPrice*(1-STOP_LOSS_PCT/100);
+      const trailingActive=peakGainPct>=TRAIL_ACTIVATE_PCT;
+      trailingStopPrice=trailingActive?peakPrice*(1-EXIT_TRAIL_PCT/100):null;
+      const effectiveStopPrice=trailingActive
+        ? Math.max(initialStopPrice,trailingStopPrice)
+        : initialStopPrice;
       drawdownFromPeakPct=peakPrice>0?(peakPrice-livePrice)/peakPrice*100:0;
 
       st.peakPrice=peakPrice;
+      st.peakGainPct=peakGainPct;
+      st.initialStopPrice=initialStopPrice;
+      st.trailingActive=trailingActive;
       st.trailingStopPrice=trailingStopPrice;
+      st.effectiveStopPrice=effectiveStopPrice;
       st.drawdownFromPeakPct=drawdownFromPeakPct;
-      st.sellConfirmed=livePrice<=trailingStopPrice;
+      st.sellConfirmed=livePrice<=effectiveStopPrice;
+      st.exitReason=st.sellConfirmed?(trailingActive?'TRAILING_PROFIT':'STOP_LOSS'):null;
       st.buyConfirmed=false;
       rawDecision=st.sellConfirmed?'SELL':'HOLD';
     }
@@ -1206,6 +1242,10 @@ async function evaluateSymbol(s){
       entryTargetPrice,
       entryGainPct,
       entryTriggerPct:ENTRY_TRIGGER_PCT,
+      entryMinScore:ENTRY_MIN_SCORE,
+      entryMaxRunPct:ENTRY_MAX_RUN_PCT,
+      stopLossPct:STOP_LOSS_PCT,
+      trailActivatePct:TRAIL_ACTIVATE_PCT,
       exitTrailPct:EXIT_TRAIL_PCT,
       peakPrice,
       trailingStopPrice,
@@ -1510,7 +1550,7 @@ async function runEvaluation(){
           'SELL',
           ev.strategy.price,
           ev.at,
-          {reason:'STRATEGY_SELL',score:ev.score}
+          {reason:ev.strategy?.exitReason||'STRATEGY_SELL',score:ev.score}
         );
         setAgentFromEval(ev,'SELL','PAPER_EXECUTED');
       }
