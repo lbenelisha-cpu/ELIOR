@@ -262,7 +262,12 @@ async function signedBinancePost(pathname,params={}){
   });
 
   const body=await r.json().catch(()=>({}));
-  if(!r.ok)throw Error(body?.msg||('Binance '+r.status));
+  if(!r.ok){
+    const e=Error(body?.msg||('Binance '+r.status));
+    e.status=r.status;
+    e.code=body?.code??null;
+    throw e;
+  }
   return body;
 }
 
@@ -417,13 +422,31 @@ async function maybeExecuteLive(evals){
     return b&&Number(b.valueUsdt||0)>=5;
   });
 
-  // Normal SELL signals first.
+  // Normal SELL signals first. A definitive symbol/filter rejection must
+  // not block BUY execution for every other free slot in the same cycle.
   for(const ev of held()){
     if(decidePosition(ev.strategy,'LONG')==='SELL'){
-      await placeLiveMarketSell(ev.symbol,'STRATEGY_SELL',{score:ev.score});
-      account=await getLiveAccountSnapshot();
-      assetMap.clear();
-      for(const x of account.balances)assetMap.set(x.asset,x);
+      try{
+        await placeLiveMarketSell(ev.symbol,'STRATEGY_SELL',{score:ev.score});
+        account=await getLiveAccountSnapshot();
+        assetMap.clear();
+        for(const x of account.balances)assetMap.set(x.asset,x);
+      }catch(e){
+        pushLiveAction({
+          type:'SELL_REJECTED',
+          symbol:ev.symbol,
+          reason:'STRATEGY_SELL',
+          error:e.message,
+          code:e.code??null,
+          status:e.status??null,
+          score:ev.score,
+          at:new Date().toISOString()
+        });
+
+        const definitive=Number(e.status)>=400&&Number(e.status)<500&&![-1006,-1007,-1001].includes(Number(e.code));
+        if(!definitive)throw e;
+        // Keep the position held and continue to evaluate/fill other free slots.
+      }
     }
   }
 
