@@ -1,4 +1,5 @@
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
+import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
@@ -56,6 +57,21 @@ const ENTRY_MAX_RUN_PCT=Math.max(ENTRY_TRIGGER_PCT,+(process.env.BINANCE_ENTRY_M
 const STOP_LOSS_PCT=Math.max(0.1,+(process.env.BINANCE_STOP_LOSS_PCT||2.5));
 const TRAIL_ACTIVATE_PCT=Math.max(0.1,+(process.env.BINANCE_TRAIL_ACTIVATE_PCT||2));
 const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1));
+const ENTRY_COST_OPTIONS={
+  feePct:Number(process.env.BINANCE_ENTRY_FEE_PCT??0.1),
+  bufferPct:Number(process.env.BINANCE_ENTRY_COST_BUFFER_PCT??0.1),
+  maxSpreadPct:Number(process.env.BINANCE_ENTRY_MAX_SPREAD_PCT??0.2),
+  maxImpactPct:Number(process.env.BINANCE_ENTRY_MAX_IMPACT_PCT??0.1),
+  trailActivatePct:TRAIL_ACTIVATE_PCT,exitTrailPct:EXIT_TRAIL_PCT
+};
+async function checkEntryCost(symbol,amount){
+  try{
+    const origin=DEMO_TRADING&&mode==='demo'?'https://demo-api.binance.com':'https://api.binance.com';
+    const r=await fetch(origin+'/api/v3/depth?symbol='+encodeURIComponent(symbol)+'&limit=100',{signal:AbortSignal.timeout(5000)});
+    if(!r.ok)throw Error('Depth HTTP '+r.status);
+    return {...assessEntryCost(await r.json(),amount,ENTRY_COST_OPTIONS),checkedAt:new Date().toISOString()};
+  }catch{return {ok:false,code:'WAIT_COST_DATA',text:'ממתין לנתוני עומק; הקנייה מושהית'};}
+}
 const entryTrackingState=new Map();
 const livePeakState=new Map();
 const dailyCandleCache=new Map();
@@ -66,6 +82,7 @@ const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.
 const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
 const demoTrader=new DemoTrader({
   maxPositions:MAX,
+  entryCostGuard:checkEntryCost,
   key:process.env.BINANCE_DEMO_API_KEY,
   secret:process.env.BINANCE_DEMO_API_SECRET,
   enabled:DEMO_TRADING,
@@ -1169,6 +1186,7 @@ async function evaluateSymbol(s){
     let entryBasePrice=null;
     let entryTargetPrice=null;
     let entryGainPct=null;
+    let entryCost=null;
     let peakPrice=null;
     let trailingStopPrice=null;
     let drawdownFromPeakPct=null;
@@ -1194,6 +1212,14 @@ async function evaluateSymbol(s){
         entryConfirmed=
           entryEligible &&
           livePrice>=entryTargetPrice;
+        if(entryConfirmed){
+          const snapshot=accountSnapshot();
+          const freeSlots=MAX-Object.keys(positions).length;
+          const amount=Number(snapshot.cashIls||0)/Math.max(1,freeSlots)*0.998;
+          entryCost=await checkEntryCost(s,amount);
+          entryConfirmed=entryCost.ok;
+          entryEligible=entryEligible&&entryCost.ok;
+        }
 
         st.entryMinScore=ENTRY_MIN_SCORE;
         st.entryMaxRunPct=ENTRY_MAX_RUN_PCT;
@@ -1252,6 +1278,7 @@ async function evaluateSymbol(s){
       entryBasePrice,
       entryTargetPrice,
       entryGainPct,
+      entryCost,
       entryTriggerPct:ENTRY_TRIGGER_PCT,
       entryMinScore:ENTRY_MIN_SCORE,
       entryMaxRunPct:ENTRY_MAX_RUN_PCT,
@@ -1299,6 +1326,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     entryBasePrice:ev.entryBasePrice,
     entryTargetPrice:ev.entryTargetPrice,
     entryGainPct:ev.entryGainPct,
+    entryCost:ev.entryCost,
     entryTriggerPct:ev.entryTriggerPct,
     entryMinScore:ev.entryMinScore,
     entryMaxRunPct:ev.entryMaxRunPct,
@@ -1369,6 +1397,7 @@ function candidateBlocker(ev,evals){
   }
 
   if(!ev.entryConfirmed){
+    if(ev.entryCost&&!ev.entryCost.ok)return {code:ev.entryCost.code,text:ev.entryCost.text};
     return {
       code:'WAIT_PLUS_2',
       text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'% · כרגע '+gain.toFixed(2)+'%'
@@ -1513,6 +1542,7 @@ async function runEvaluation(){
             NOT_ADDED:'ההזמנה הסתיימה אך הפוזיציה לא נוספה',
             ERROR:attempt.error||'שגיאת Binance Demo',
             STALE_EVALUATION:'המחיר שעליו התבססה ההחלטה התיישן; נדרשת סריקה חדשה'
+            ,WAIT_COST_DATA:'ממתין לנתוני עומק עדכניים',WAIT_LIQUIDITY:'אין עומק מספיק לעסקה',WAIT_SPREAD:'מרווח קנייה ומכירה רחב מדי',WAIT_COST:'עלות העסקה גבוהה מדי'
           };
           blocker={
             code:'BUY_'+(attempt.reason||'REJECTED'),
@@ -2091,6 +2121,7 @@ const server=http.createServer((req,res)=>{
         entryTriggerPct:ENTRY_TRIGGER_PCT,
         entryMinScore:ENTRY_MIN_SCORE,
         entryMaxRunPct:ENTRY_MAX_RUN_PCT,
+        entryCostFilter:{enabled:true,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
         stopLossPct:STOP_LOSS_PCT,
         trailActivatePct:TRAIL_ACTIVATE_PCT,
         exitTrailPct:EXIT_TRAIL_PCT,

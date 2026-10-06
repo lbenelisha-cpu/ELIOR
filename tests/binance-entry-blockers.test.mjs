@@ -12,6 +12,7 @@ test('trend qualification does not bypass score, confirmation or anti-chase',()=
  assert.equal(context.candidateBlocker(ev,[]).code,'WAIT_PLUS_2');
  assert.equal(context.candidateBlocker({...ev,entryGainPct:5},[]).code,'ANTI_CHASE');
  assert.equal(context.candidateBlocker({...ev,entryGainPct:2,entryConfirmed:true},[]).code,'BUY_READY');
+ assert.equal(context.candidateBlocker({...ev,entryGainPct:2,entryCost:{ok:false,code:'WAIT_SPREAD',text:'wide'}},[]).code,'WAIT_SPREAD');
 });
 test('full portfolio never advertises rotation when rotation is disabled',()=>{
  context.tradingPositions=()=>Object.fromEntries(Array.from({length:10},(_,i)=>['S'+i,{}]));
