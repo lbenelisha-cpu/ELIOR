@@ -26,11 +26,11 @@ const PORT=+(process.env.PORT||8080);
 const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
 const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.15);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
-const MAX=6;
+const MAX=10;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
 const DECISION_INTERVAL_MS=Math.max(5000,+(process.env.BINANCE_DECISION_INTERVAL_MS||5000));
-const UNIVERSE_SIZE=Math.min(60,Math.max(5,+(process.env.BINANCE_UNIVERSE_SIZE||60)));
+const UNIVERSE_SIZE=Math.min(100,Math.max(10,+(process.env.BINANCE_UNIVERSE_SIZE||100)));
 const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
@@ -1778,7 +1778,7 @@ async function refreshUniverse(){
 }
 
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
-// Exit monitoring does not wait for the 60-symbol daily-candle scan.
+// Exit monitoring does not wait for the 100-symbol daily-candle scan.
 setInterval(async()=>{
   if(!DEMO_TRADING||mode!=='demo')return;
   if(!await demoTrader.monitorExits())return;
