@@ -46,12 +46,9 @@ const ROTATION_SCORE_GAP=+(process.env.BINANCE_ROTATION_SCORE_GAP||20);
 const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_CYCLE||1));
 
 // Profit engine v7 controls
-const ENTRY_CONFIRM_REQUIRED=Math.max(1,+(process.env.BINANCE_ENTRY_CONFIRM_REQUIRED||2));
-const ENTRY_MAX_LIVE_EXTENSION_PCT=Math.max(0,+(process.env.BINANCE_ENTRY_MAX_LIVE_EXTENSION_PCT||2.5));
-const ENTRY_MAX_LIVE_DIP_PCT=Math.max(0,+(process.env.BINANCE_ENTRY_MAX_LIVE_DIP_PCT||0.2));
-const LIVE_TRAIL_ACTIVATE_PCT=Math.max(0,+(process.env.BINANCE_LIVE_TRAIL_ACTIVATE_PCT||1.2));
-const LIVE_TRAIL_LOCK_PCT=Math.max(0,+(process.env.BINANCE_LIVE_TRAIL_LOCK_PCT||0.2));
-const entryConfirmationState=new Map();
+const ENTRY_TRIGGER_PCT=Math.max(0.1,+(process.env.BINANCE_ENTRY_TRIGGER_PCT||2));
+const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1.5));
+const entryTrackingState=new Map();
 const livePeakState=new Map();
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
@@ -152,7 +149,7 @@ function resetExperimentStateOnce(){
     if(previous===EXPERIMENT_RESET_VERSION)return false;
 
     // Reset strategy/diagnostic state for a clean 5-second experiment.
-    entryConfirmationState.clear();
+    entryTrackingState.clear();
     livePeakState.clear();
     decisionHistory={};
     saveDecisionHistory();
@@ -1057,11 +1054,7 @@ function buyQualification(st){
   if(!st)return {qualified:false,reason:'NO_DATA'};
   if(st.direction!=='UP')return {qualified:false,reason:'NOT_UP'};
   if(!st.aboveMA)return {qualified:false,reason:'BELOW_MA200'};
-  if(st.previousDownWave==null)return {qualified:false,reason:'NO_PREVIOUS_DOWN'};
-  if(Number(st.currentWave)<3)return {qualified:false,reason:'WAVE_BELOW_3'};
-  if(Number(st.currentWave)>8)return {qualified:false,reason:'WAVE_ABOVE_8'};
-  if(Number(st.currentWave)<=Number(st.previousDownWave))return {qualified:false,reason:'NOT_STRONGER_THAN_PREVIOUS_DOWN'};
-  return {qualified:true,reason:'QUALIFIED'};
+  return {qualified:true,reason:'UP_TREND'};
 }
 
 function scoreStrategy(st){
@@ -1110,73 +1103,81 @@ function scoreStrategy(st){
 async function evaluateSymbol(s){
   try{
     const c=await candles(s);
-
-    // BUY remains conservative: only confirmed, closed D1 candles.
     const closedStrategy=evaluateWaveStrategy(c,{
       minWave:MIN,
       maPeriod:MAP,
       sellRetraceRatio:SELL_RETRACE_RATIO
     });
 
-    const pos=tradingPositions()[s]?'LONG':'CASH';
-    let st=closedStrategy;
-    let decisionPriceSource='CLOSED_D1';
-
-    // For an already-open position, evaluate SELL using the live Binance price
-    // as a synthetic current point. This avoids waiting for the daily candle
-    // to close before recognizing a meaningful DOWN wave.
-    if(pos==='LONG'){
-      const livePrice=Number(streams[s]?.lastPrice);
-      const lastClosed=Number(c.at(-1)?.close);
-
-      if(Number.isFinite(livePrice)&&livePrice>0&&Number.isFinite(lastClosed)&&lastClosed>0){
-        const liveCandles=[
-          ...c,
-          {closeTime:Date.now(),close:livePrice}
-        ];
-
-        const liveStrategy=evaluateWaveStrategy(liveCandles,{
-          minWave:MIN,
-          maPeriod:MAP,
-          sellRetraceRatio:SELL_RETRACE_RATIO
-        });
-
-        // MA200 remains anchored to confirmed D1 history.
-        liveStrategy.ma=closedStrategy.ma;
-        liveStrategy.aboveMA=livePrice>closedStrategy.ma;
-        liveStrategy.livePrice=livePrice;
-        liveStrategy.closedPrice=lastClosed;
-        liveStrategy.isLiveEvaluation=true;
-
-        st=liveStrategy;
-        decisionPriceSource='LIVE_PRICE';
-      }
-    }
-
-    // Score/BUY qualification stay based on confirmed D1 candles.
-    const score=scoreStrategy(closedStrategy);
-    const qualification=buyQualification(closedStrategy);
-
-    // Entry confirmation: require the closed D1 signal to remain valid while
-    // the live price is not still falling and is not excessively extended.
-    const liveEntryPrice=Number(streams[s]?.lastPrice);
+    const positions=tradingPositions();
+    const pos=positions[s]?'LONG':'CASH';
+    const streamPrice=Number(streams[s]?.lastPrice);
     const closedPrice=Number(closedStrategy?.price||0);
-    const liveVsClosedPct=(
-      Number.isFinite(liveEntryPrice)&&liveEntryPrice>0&&closedPrice>0
-    ) ? (liveEntryPrice/closedPrice-1)*100 : 0;
-    const entryEligible=
-      qualification.qualified &&
-      (!Number.isFinite(liveEntryPrice) || liveEntryPrice<=0 || (
-        liveVsClosedPct>=-ENTRY_MAX_LIVE_DIP_PCT &&
-        liveVsClosedPct<=ENTRY_MAX_LIVE_EXTENSION_PCT
-      ));
-    const previousConfirm=entryConfirmationState.get(s)||0;
-    const entryConfirmCount=entryEligible?Math.min(ENTRY_CONFIRM_REQUIRED,previousConfirm+1):0;
-    entryConfirmationState.set(s,entryConfirmCount);
-    const entryConfirmed=entryEligible&&entryConfirmCount>=ENTRY_CONFIRM_REQUIRED;
+    const livePrice=Number.isFinite(streamPrice)&&streamPrice>0?streamPrice:closedPrice;
 
-    let rawDecision=decidePosition(st,pos);
-    if(pos==='CASH'&&rawDecision==='BUY'&&!entryConfirmed)rawDecision='HOLD';
+    // Trend filter: direction comes from confirmed D1 structure; MA200 stays
+    // anchored to confirmed history, while the live price must be above it.
+    const trendState={
+      ...closedStrategy,
+      price:livePrice,
+      aboveMA:Number.isFinite(closedStrategy.ma)&&livePrice>Number(closedStrategy.ma)
+    };
+    const qualification=buyQualification(trendState);
+    const score=scoreStrategy(trendState);
+
+    let st={...trendState,livePrice,closedPrice,isLiveEvaluation:true};
+    let rawDecision='HOLD';
+    let entryEligible=false;
+    let entryConfirmed=false;
+    let entryBasePrice=null;
+    let entryTargetPrice=null;
+    let entryGainPct=null;
+    let peakPrice=null;
+    let trailingStopPrice=null;
+    let drawdownFromPeakPct=null;
+
+    if(pos==='CASH'){
+      livePeakState.delete(s);
+
+      if(!qualification.qualified){
+        entryTrackingState.delete(s);
+      }else{
+        let track=entryTrackingState.get(s);
+        if(!track||!(Number(track.basePrice)>0)){
+          track={basePrice:livePrice,startedAt:new Date().toISOString()};
+          entryTrackingState.set(s,track);
+        }
+
+        entryBasePrice=Number(track.basePrice);
+        entryTargetPrice=entryBasePrice*(1+ENTRY_TRIGGER_PCT/100);
+        entryGainPct=entryBasePrice>0?(livePrice/entryBasePrice-1)*100:0;
+        entryEligible=true;
+        entryConfirmed=livePrice>=entryTargetPrice;
+
+        st.buyConfirmed=entryConfirmed;
+        st.sellConfirmed=false;
+        rawDecision=entryConfirmed?'BUY':'HOLD';
+      }
+    }else{
+      // Once a position exists, the entry tracker is no longer relevant.
+      entryTrackingState.delete(s);
+
+      const p=positions[s]||{};
+      const entryPrice=Number(p.entryPrice||livePrice);
+      const rememberedPeak=Number(livePeakState.get(s)||0);
+      peakPrice=Math.max(entryPrice,rememberedPeak>0?rememberedPeak:0,livePrice);
+      livePeakState.set(s,peakPrice);
+
+      trailingStopPrice=peakPrice*(1-EXIT_TRAIL_PCT/100);
+      drawdownFromPeakPct=peakPrice>0?(peakPrice-livePrice)/peakPrice*100:0;
+
+      st.peakPrice=peakPrice;
+      st.trailingStopPrice=trailingStopPrice;
+      st.drawdownFromPeakPct=drawdownFromPeakPct;
+      st.sellConfirmed=livePrice<=trailingStopPrice;
+      st.buyConfirmed=false;
+      rawDecision=st.sellConfirmed?'SELL':'HOLD';
+    }
 
     return {
       ok:true,
@@ -1191,10 +1192,15 @@ async function evaluateSymbol(s){
       buyReason:qualification.reason,
       entryEligible,
       entryConfirmed,
-      entryConfirmCount,
-      entryConfirmRequired:ENTRY_CONFIRM_REQUIRED,
-      liveVsClosedPct,
-      decisionPriceSource,
+      entryBasePrice,
+      entryTargetPrice,
+      entryGainPct,
+      entryTriggerPct:ENTRY_TRIGGER_PCT,
+      exitTrailPct:EXIT_TRAIL_PCT,
+      peakPrice,
+      trailingStopPrice,
+      drawdownFromPeakPct,
+      decisionPriceSource:'LIVE_PRICE',
       at:new Date().toISOString()
     };
   }catch(e){
@@ -1223,9 +1229,14 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     buyReason:ev.buyReason,
     entryEligible:ev.entryEligible,
     entryConfirmed:ev.entryConfirmed,
-    entryConfirmCount:ev.entryConfirmCount,
-    entryConfirmRequired:ev.entryConfirmRequired,
-    liveVsClosedPct:ev.liveVsClosedPct,
+    entryBasePrice:ev.entryBasePrice,
+    entryTargetPrice:ev.entryTargetPrice,
+    entryGainPct:ev.entryGainPct,
+    entryTriggerPct:ev.entryTriggerPct,
+    exitTrailPct:ev.exitTrailPct,
+    peakPrice:ev.peakPrice,
+    trailingStopPrice:ev.trailingStopPrice,
+    drawdownFromPeakPct:ev.drawdownFromPeakPct,
     rotation:strategy,
     lastDecisionAt:new Date().toISOString(),
     lastError:null,
@@ -1243,8 +1254,8 @@ function decisionReasonFromAgent(agent,ev){
   if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
   if(agent?.decision==='BUY_READY')return 'BUY_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
-  if(ev.buyQualified&&!ev.entryConfirmed)return 'WAIT_ENTRY_CONFIRMATION';
-  if(ev.buyQualified)return 'QUALIFIED_BUT_HOLD';
+  if(ev.buyQualified&&!ev.entryConfirmed)return 'WAIT_PLUS_2';
+  if(ev.entryConfirmed)return 'BUY_READY';
   return ev.buyReason||'HOLD_NOT_QUALIFIED';
 }
 
@@ -1259,15 +1270,18 @@ function candidateBlocker(ev,evals){
     return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
   }
 
-  // BUY qualification is intentionally based on confirmed D1 candles.
   if(!ev.buyQualified){
-    return {code:'WAIT_D1',text:'ממתין לאישור D1'};
+    return {
+      code:ev.buyReason==='BELOW_MA200'?'BELOW_MA200':'WAIT_UP_TREND',
+      text:ev.buyReason==='BELOW_MA200'?'מתחת ל-MA200':'ממתין למגמת UP'
+    };
   }
 
   if(!ev.entryConfirmed){
+    const gain=Number(ev.entryGainPct||0);
     return {
-      code:'WAIT_ENTRY_CONFIRMATION',
-      text:'ממתין לאישור כניסה · '+Number(ev.entryConfirmCount||0)+'/'+ENTRY_CONFIRM_REQUIRED
+      code:'WAIT_PLUS_2',
+      text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'% · כרגע '+gain.toFixed(2)+'%'
     };
   }
 
@@ -1425,7 +1439,9 @@ async function runEvaluation(){
       }else{
         decision='HOLD';
         execution='IDLE';
-        blocker={code:'WAIT_D1',text:'ממתין לאישור D1'};
+        blocker=ev.buyQualified
+          ? {code:'WAIT_PLUS_2',text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'%'}
+          : {code:ev.buyReason==='BELOW_MA200'?'BELOW_MA200':'WAIT_UP_TREND',text:ev.buyReason==='BELOW_MA200'?'מתחת ל-MA200':'ממתין למגמת UP'};
       }
 
       setAgentFromEval(ev,decision,execution);
