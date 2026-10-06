@@ -139,11 +139,12 @@ function render(d,currentMode='demo',liveAccount=null){
     put('#scanStatusMessage','אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
   }else{
     const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · ציון '+fmt(weakestActive.score,1)):'';
+    const interval=Number(d.config?.decisionIntervalMs||60000)/1000;
     const rotationState=activeAgents.length<maxPositions
-      ? ' · מנוע החלטות: כל דקה · רוטציה לא פעילה כרגע — '+activeAgents.length+'/'+maxPositions+' Slots תפוסים'
-      : ' · מנוע החלטות: כל דקה · רוטציה פעילה — ממתין למועמד עם יתרון +'+fmt(rotationGap,0);
+      ? ' · בדיקה כל '+fmt(interval,0)+' שניות · '+activeAgents.length+'/'+maxPositions+' מקומות תפוסים'
+      : ' · בדיקה כל '+fmt(interval,0)+' שניות · '+(d.config?.rotationEnabled?'רוטציה פעילה — נדרש יתרון +'+fmt(rotationGap,0):'רוטציה כבויה');
     const diag=d.config?.buyCandidateCount!=null
-      ? ' · מועמדי BUY: '+d.config.buyCandidateCount+(d.config.demoExecutionBusy?' · מנוע ביצוע עסוק':'')
+      ? ' · עברו תנאי כניסה: '+d.config.buyCandidateCount+' · מתאימים למגמה: '+(d.config.trendCandidateCount??'—')+(d.config.demoExecutionBusy?' · מנוע ביצוע עסוק':'')
       : '';
     put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState+diag);
   }
@@ -527,4 +528,3 @@ if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).obse
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
 setInterval(load,5000);
-

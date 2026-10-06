@@ -1,5 +1,6 @@
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
+import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
 import http from "node:http";
@@ -1238,6 +1239,7 @@ async function evaluateSymbol(s){
       buyReason:qualification.reason,
       entryEligible,
       entryConfirmed,
+      priceAsOf:streams[s]?.lastEventAt,
       entryBasePrice,
       entryTargetPrice,
       entryGainPct,
@@ -1359,6 +1361,7 @@ function candidateBlocker(ev,evals){
     return {code:'BUY_READY',text:'מוכן ל-BUY'};
   }
 
+  if(!ROTATION_ENABLED)return {code:'NO_SLOT',text:'אין מקום פנוי; רוטציה כבויה'};
   const weakest=weakestHeldEvaluation(evals);
   if(!weakest){
     return {code:'NO_SLOT',text:'אין Slot פנוי'};
@@ -1490,7 +1493,8 @@ async function runEvaluation(){
             ALREADY_HELD:'הנכס כבר מוחזק בחשבון',
             NO_SLOT:'אין Slot פנוי',
             NOT_ADDED:'ההזמנה הסתיימה אך הפוזיציה לא נוספה',
-            ERROR:attempt.error||'שגיאת Binance Demo'
+            ERROR:attempt.error||'שגיאת Binance Demo',
+            STALE_EVALUATION:'המחיר שעליו התבססה ההחלטה התיישן; נדרשת סריקה חדשה'
           };
           blocker={
             code:'BUY_'+(attempt.reason||'REJECTED'),
@@ -1508,9 +1512,7 @@ async function runEvaluation(){
       }else{
         decision='HOLD';
         execution='IDLE';
-        blocker=ev.buyQualified
-          ? {code:'WAIT_PLUS_2',text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'%'}
-          : {code:ev.buyReason==='BELOW_MA200'?'BELOW_MA200':'WAIT_UP_TREND',text:ev.buyReason==='BELOW_MA200'?'מתחת ל-MA200':'ממתין למגמת UP'};
+        blocker=candidateBlocker(ev,evals);
       }
 
       setAgentFromEval(ev,decision,execution);
@@ -1855,7 +1857,7 @@ const send=(res,o,c=200)=>{
   res.writeHead(c,{
     'Content-Type':'application/json; charset=utf-8',
     'Access-Control-Allow-Origin':'*',
-    'Access-Control-Allow-Headers':'Content-Type',
+    'Access-Control-Allow-Headers':'Content-Type, Authorization',
     'Access-Control-Allow-Methods':'GET,POST,OPTIONS',
     'Cache-Control':'no-store'
   });
@@ -1866,6 +1868,13 @@ const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
   if(req.method==='OPTIONS')return send(res,{},204);
+  const protectedControl=req.method==='POST'&&(
+    u.pathname==='/api/binance-mode'||u.pathname.startsWith('/api/binance-live/')||
+    (mode==='live'&&u.pathname==='/api/binance-agent/evaluate')
+  );
+  if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)){
+    return send(res,{ok:false,error:'Authenticated control required: configure BINANCE_CONTROL_TOKEN (at least 32 characters) and send a Bearer token'},401);
+  }
 
   const sf={
     '/binance-agent.html':['binance-agent.html','text/html'],
@@ -2067,7 +2076,8 @@ const server=http.createServer((req,res)=>{
         stopLossPct:STOP_LOSS_PCT,
         trailActivatePct:TRAIL_ACTIVATE_PCT,
         exitTrailPct:EXIT_TRAIL_PCT,
-          buyCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
+          buyCandidateCount:Object.values(agents).filter(a=>a?.entryConfirmed&&a?.position!=='LONG').length,
+          trendCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
           demoExecutionBusy:demoTrader.busy,
           demoExecutionError:demoTrader.error||null,
           demoLastCycle:demoTrader.state.lastCycle||null,
@@ -2130,4 +2140,3 @@ server.listen(PORT,'0.0.0.0',async()=>{
   resetExperimentStateOnce();
   await refreshUniverse();
 });
-
