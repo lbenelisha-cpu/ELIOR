@@ -50,6 +50,8 @@ const ENTRY_TRIGGER_PCT=Math.max(0.1,+(process.env.BINANCE_ENTRY_TRIGGER_PCT||2)
 const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1.5));
 const entryTrackingState=new Map();
 const livePeakState=new Map();
+const dailyCandleCache=new Map();
+const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||300000));
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
@@ -886,12 +888,20 @@ function backtestWindow(candles,{minWave=4,maxWave=12,maPeriod=200,initial=5000,
   };
 }
 
-async function candles(s){
+async function candles(s,{force=false}={}){
+  const cached=dailyCandleCache.get(s);
+  if(!force && cached && Date.now()-cached.at<DAILY_CANDLE_CACHE_MS){
+    return cached.rows;
+  }
+
   const r=await j(`/api/v3/klines?symbol=${s}&interval=1d&limit=${Math.max(250,MAP+30)}`);
   const now=Date.now();
-  return r
+  const rows=r
     .filter(x=>+x[6]<now)
     .map(x=>({closeTime:+x[6],close:+x[4]}));
+
+  dailyCandleCache.set(s,{at:Date.now(),rows});
+  return rows;
 }
 
 function markPaperToMarket(){
@@ -1333,8 +1343,7 @@ function weakestHeldEvaluation(evals){
     .filter(x=>x.ok&&tradingPositions()[x.symbol])
     .map(x=>({
       ...x,
-      // A held position that no longer has a current BUY setup is intentionally weak.
-      comparableScore:x.strategy?.buyConfirmed?x.score:0
+      comparableScore:Number(x.score||0)
     }))
     .sort((a,b)=>a.comparableScore-b.comparableScore);
 
@@ -1780,7 +1789,7 @@ setInterval(async()=>{
     }
   }
 },5000).unref();
-setInterval(refreshUniverse,21600000).unref();
+setInterval(refreshUniverse,300000).unref();
 
 const send=(res,o,c=200)=>{
   res.writeHead(c,{
