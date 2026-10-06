@@ -526,5 +526,5 @@ document.querySelectorAll('.range-btn').forEach(btn=>{
 if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).observe($('#priceChart').parentElement);}
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
-setInterval(load,30000);
+setInterval(load,5000);
 
