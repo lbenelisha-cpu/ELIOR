@@ -77,8 +77,8 @@ function buyReasonLabel(r){
     NOT_UP:'לא בגל עולה',
     BELOW_MA200:'מתחת ל־MA200',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
-    WAVE_BELOW_3:'גל קטן מ־3%',
-    WAVE_ABOVE_8:'גל גדול מ־8%',
+    WAVE_BELOW_3:'לוגיקה ישנה',
+    WAVE_ABOVE_8:'לוגיקה ישנה',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'חלש מהירידה הקודמת',
     NO_DATA:'אין נתונים'
   })[r]||r||'—';
@@ -262,8 +262,8 @@ function decisionReasonLabel(r){
     QUALIFIED_BUT_HOLD:'מתאים לקנייה אך ממתין',
     ACTIVE_LONG:'פוזיציה פעילה · ממשיך להחזיק',
     HOLD_NOT_QUALIFIED:'HOLD · לא כשיר לכניסה',
-    WAVE_BELOW_3:'גל קטן מ־3%',
-    WAVE_ABOVE_8:'גל גדול מ־8%',
+    WAVE_BELOW_3:'לוגיקה ישנה',
+    WAVE_ABOVE_8:'לוגיקה ישנה',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
     BELOW_MA200:'מתחת ל־MA200',
     NOT_UP:'לא בגל עולה',
