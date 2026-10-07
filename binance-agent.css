@@ -204,7 +204,7 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .action-panel{display:flex}.action-card strong{font-size:clamp(17px,1.2vw,23px);overflow-wrap:anywhere}
 .asset-table{table-layout:fixed}.asset-table th,.asset-table td{overflow-wrap:anywhere;line-height:1.5}
 .asset-table td:nth-child(2),.asset-table td:nth-child(3){font-variant-numeric:tabular-nums}
-.scanner-list{max-height:clamp(350px,65vh,760px)}
+.scanner-list{max-height:none!important;height:auto;flex:1 1 auto;min-height:0;overflow:auto}
 #binanceDemoBalanceCard{margin-top:16px}
 #demoAccountStatus{color:var(--muted);font-size:13px;line-height:1.7}
 #demoAccountTotal{direction:ltr;unicode-bidi:isolate;text-align:right;font-size:clamp(22px,2vw,32px);font-variant-numeric:tabular-nums}
@@ -339,4 +339,18 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
   .scanner-panel .asset-table th,.scanner-panel .asset-table td{padding:5px 6px;font-size:11px}
   .scanner-panel .asset-table tbody tr{height:36px}
   .scanner-panel .mini{font-size:8.5px}
+}
+
+/* Scanner list must fill the entire enlarged column */
+.scanner-panel{display:flex;flex-direction:column}
+.scanner-panel .scanner-list{
+  flex:1 1 0;
+  min-height:0;
+  height:100%;
+  max-height:none!important;
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+@media(min-width:801px){
+  .scanner-panel .scanner-list{max-height:none!important}
 }
