@@ -129,9 +129,9 @@ const demoTrader=new DemoTrader({
   secret:process.env.BINANCE_DEMO_API_SECRET,
   enabled:DEMO_TRADING,
   stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json',
-  trailingStopPct:EXIT_TRAIL_PCT,
-  stopLossPct:null,
-  trailActivatePct:TRAIL_ACTIVATE_PCT
+  trailingStopPct:1.5,
+  stopLossPct:1.5,
+  trailActivatePct:0
 });
 const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
