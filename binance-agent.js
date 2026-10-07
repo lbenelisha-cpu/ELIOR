@@ -154,14 +154,15 @@ function render(d,currentMode='demo',liveAccount=null){
   const nearest=(sd.nearestToTarget||[])[0];
   put('#strategyDiagnostics',
     '1m מוכנים '+(sd.minuteReady??0)+'/'+(sd.evaluated??0)+
-    ' · 7/3 קונים '+(sd.buyers73??0)+
-    ' · מעקב בסיס '+(sd.armed??0)+
-    ' · הגיעו +2% '+(sd.reachedPlus2??0)+
+    ' · דשדוש '+(sd.consolidation??0)+
+    ' · פריצות חזקות '+(sd.strongBreakouts??0)+
+    ' · שלב 1 מוכן '+(sd.stage1Ready??0)+
+    ' · שלב 2 מוכן '+(sd.stage2Ready??0)+
     ' · מועמדי ביצוע '+(sd.executionCandidates??0)+
     ' · ניסיונות BUY '+(sd.demoAttempts??0)+
     ' · בוצעו '+(sd.demoFilled??0)+
     ' · נדחו '+(sd.demoRejected??0)+
-    (nearest?' · הכי קרוב: '+nearest.symbol+' '+fmt(nearest.gainPct,2)+'%':'')
+    (nearest?' · שלב 2 קרוב: '+nearest.symbol+' · חסר '+fmt(nearest.remainingPct,2)+'%':'')
   );
 
   if(!activeAgents.length){
