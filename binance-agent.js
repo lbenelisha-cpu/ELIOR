@@ -150,6 +150,20 @@ function render(d,currentMode='demo',liveAccount=null){
 
   renderMarketStrip(agents);
 
+  const sd=d.config?.strategyDiagnostics||{};
+  const nearest=(sd.nearestToTarget||[])[0];
+  put('#strategyDiagnostics',
+    '1m מוכנים '+(sd.minuteReady??0)+'/'+(sd.evaluated??0)+
+    ' · 7/3 קונים '+(sd.buyers73??0)+
+    ' · מעקב בסיס '+(sd.armed??0)+
+    ' · הגיעו +2% '+(sd.reachedPlus2??0)+
+    ' · מועמדי ביצוע '+(sd.executionCandidates??0)+
+    ' · ניסיונות BUY '+(sd.demoAttempts??0)+
+    ' · בוצעו '+(sd.demoFilled??0)+
+    ' · נדחו '+(sd.demoRejected??0)+
+    (nearest?' · הכי קרוב: '+nearest.symbol+' '+fmt(nearest.gainPct,2)+'%':'')
+  );
+
   if(!activeAgents.length){
     put('#scanStatusMessage','נסרקו '+agents.length+' · מוצגים '+agents.length+' · אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
   }else{
