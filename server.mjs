@@ -1234,18 +1234,27 @@ async function evaluateSymbol(s){
     if(pos==='CASH'){
       livePeakState.delete(s);
 
-      if(!buyersControl){
-        entryTrackingState.delete(s);
-      }else{
-        let track=entryTrackingState.get(s);
-        if(!track||!(Number(track.basePrice)>0)){
-          track={basePrice:livePrice,startedAt:new Date().toISOString()};
-          entryTrackingState.set(s,track);
-        }
+      let track=entryTrackingState.get(s);
 
+      // Arm the entry once buyers control 7 of the last 10 micro-candles.
+      // Keep that base price through BALANCED periods; cancel only when
+      // sellers clearly take control 7:3 before entry.
+      if(!track && buyersControl){
+        track={
+          basePrice:livePrice,
+          startedAt:new Date().toISOString(),
+          armedBy:'BUYERS_7_OF_10'
+        };
+        entryTrackingState.set(s,track);
+      }else if(track && trend.control==='SELLERS'){
+        entryTrackingState.delete(s);
+        track=null;
+      }
+
+      if(track&&Number(track.basePrice)>0){
         entryBasePrice=Number(track.basePrice);
         entryTargetPrice=entryBasePrice*1.02;
-        entryGainPct=entryBasePrice>0?(livePrice/entryBasePrice-1)*100:0;
+        entryGainPct=(livePrice/entryBasePrice-1)*100;
         entryEligible=true;
         entryConfirmed=livePrice>=entryTargetPrice;
 
@@ -1257,8 +1266,15 @@ async function evaluateSymbol(s){
           entryConfirmed=Boolean(entryCost.ok);
         }
 
+        st.entryArmed=true;
+        st.entryBasePrice=entryBasePrice;
+        st.entryTargetPrice=entryTargetPrice;
         st.buyConfirmed=entryConfirmed;
         rawDecision=entryConfirmed?'BUY':'HOLD';
+      }else{
+        st.entryArmed=false;
+        st.buyConfirmed=false;
+        rawDecision='HOLD';
       }
     }else{
       entryTrackingState.delete(s);
@@ -1374,6 +1390,7 @@ function decisionReasonFromAgent(agent,ev){
   if(agent?.decision==='SELL')return 'SELL_EXECUTED';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
   if(ev.entryConfirmed)return 'BUY_READY';
+  if(ev.entryBasePrice&&Number(ev.entryBasePrice)>0)return 'ENTRY_ARMED';
   if(ev.buyQualified)return 'WAIT_PLUS_2';
   return 'WAIT_BUYERS_7_OF_10';
 }
@@ -1393,11 +1410,20 @@ function candidateBlocker(ev,evals){
   if(positions[ev.symbol])return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
 
   const t=ev.microTrend||{};
+  if(ev.entryBasePrice&&Number(ev.entryBasePrice)>0&&!ev.entryConfirmed){
+    return {
+      code:'ENTRY_ARMED',
+      text:'מעקב קנייה פעיל · בסיס '+Number(ev.entryBasePrice).toFixed(6)+
+        ' · יעד +2% '+Number(ev.entryTargetPrice||0).toFixed(6)+
+        ' · כרגע '+Number(ev.entryGainPct||0).toFixed(2)+'%'+
+        ' · קונים '+Number(t.buyers||0)+' / מוכרים '+Number(t.sellers||0)
+    };
+  }
   if(!ev.buyQualified){
     return {code:'WAIT_BUYERS_7_OF_10',text:'קונים '+Number(t.buyers||0)+' | מוכרים '+Number(t.sellers||0)+' · נדרש 7 מול 3'};
   }
   if(!ev.entryConfirmed){
-    return {code:'WAIT_PLUS_2',text:'קונים שולטים '+Number(t.buyers||0)+':'+Number(t.sellers||0)+' · ממתין ל-+2% · כרגע '+Number(ev.entryGainPct||0).toFixed(2)+'%'};
+    return {code:'WAIT_PLUS_2',text:'מגמת קונים זוהתה · ממתין ל-+2%'};
   }
   if(activeCount>=MAX)return {code:'NO_SLOT',text:'אין Slot פנוי · '+activeCount+'/'+MAX};
   if(ev.entryCost&&!ev.entryCost.ok)return {code:ev.entryCost.code,text:ev.entryCost.text};
