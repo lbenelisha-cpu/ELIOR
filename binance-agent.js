@@ -404,6 +404,12 @@ function renderCandlePower(a){
     ' · LH '+(a.lowerHighs??0)+
     ' · LL '+(a.lowerLows??0)
   );
+  put('#candleCount',
+    'קונים '+(a.buyerCandles??0)+
+    ' | מוכרים '+(a.sellerCandles??0)+
+    ' | מאוזנים '+(a.neutralCandles??0)+
+    ' · כלל שליטה: 7 מול 3'
+  );
 
   const stateLabel={
     BUYERS_STRONG:'קונים שולטים',
