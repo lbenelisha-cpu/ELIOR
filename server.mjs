@@ -1314,9 +1314,9 @@ async function evaluateSymbol(s){
 
       let track=entryTrackingState.get(s);
 
-      // Arm the entry once buyers control 7 of the last 10 micro-candles.
-      // Keep that base price through BALANCED periods; cancel only when
-      // sellers clearly take control 7:3 before entry.
+      // Arm once buyers control 7 of the last 10 one-minute candles.
+      // Once armed, keep the same base while the move develops.
+      // Reset only if price falls 1.5% below that base before BUY.
       if(!track && buyersControl){
         track={
           basePrice:livePrice,
@@ -1324,9 +1324,14 @@ async function evaluateSymbol(s){
           armedBy:'BUYERS_7_OF_10'
         };
         entryTrackingState.set(s,track);
-      }else if(track && trend.control==='SELLERS'){
-        entryTrackingState.delete(s);
-        track=null;
+      }
+
+      if(track&&Number(track.basePrice)>0){
+        const trackedBase=Number(track.basePrice);
+        if(livePrice<=trackedBase*0.985){
+          entryTrackingState.delete(s);
+          track=null;
+        }
       }
 
       if(track&&Number(track.basePrice)>0){
@@ -1488,7 +1493,8 @@ function candidateBlocker(ev,evals){
       text:'מעקב קנייה פעיל · בסיס '+Number(ev.entryBasePrice).toFixed(6)+
         ' · יעד +2% '+Number(ev.entryTargetPrice||0).toFixed(6)+
         ' · כרגע '+Number(ev.entryGainPct||0).toFixed(2)+'%'+
-        ' · קונים '+Number(t.buyers||0)+' / מוכרים '+Number(t.sellers||0)
+        ' · קונים '+Number(t.buyers||0)+' / מוכרים '+Number(t.sellers||0)+
+        ' · איפוס רק בירידה 1.5% מהבסיס'
     };
   }
   if(!ev.buyQualified){
