@@ -23,6 +23,20 @@ const FALLBACK_USDT_SYMBOLS = [
 
 let universeStatus = 'STARTING';
 let universeError = null;
+let strategyDiagnostics={
+  evaluated:0,
+  minuteReady:0,
+  buyers73:0,
+  sellers73:0,
+  armed:0,
+  reachedPlus2:0,
+  executionCandidates:0,
+  demoAttempts:0,
+  demoFilled:0,
+  demoRejected:0,
+  nearestToTarget:[],
+  updatedAt:null
+};
 
 const D=path.dirname(fileURLToPath(import.meta.url));
 const PORT=+(process.env.PORT||8080);
@@ -1521,6 +1535,30 @@ async function runEvaluation(){
     evals.push(await evaluateSymbol(s));
   }
 
+  const valid=evals.filter(e=>e.ok);
+  const armed=valid.filter(e=>Number(e.entryBasePrice)>0&&!tradingPositions()[e.symbol]);
+  strategyDiagnostics={
+    ...strategyDiagnostics,
+    evaluated:evals.length,
+    minuteReady:valid.length,
+    buyers73:valid.filter(e=>e.microTrend?.control==='BUYERS').length,
+    sellers73:valid.filter(e=>e.microTrend?.control==='SELLERS').length,
+    armed:armed.length,
+    reachedPlus2:valid.filter(e=>e.entryConfirmed).length,
+    executionCandidates:valid.filter(e=>e.entryConfirmed&&!tradingPositions()[e.symbol]).length,
+    nearestToTarget:armed
+      .map(e=>({
+        symbol:e.symbol,
+        buyers:Number(e.microTrend?.buyers||0),
+        sellers:Number(e.microTrend?.sellers||0),
+        gainPct:Number(e.entryGainPct||0),
+        remainingPct:Math.max(0,2-Number(e.entryGainPct||0))
+      }))
+      .sort((a,b)=>a.remainingPct-b.remainingPct)
+      .slice(0,8),
+    updatedAt:new Date().toISOString()
+  };
+
   if(DEMO_TRADING&&mode==='demo'){
     const idle=await waitForDemoTraderIdle();
     if(!idle){
@@ -1533,6 +1571,11 @@ async function runEvaluation(){
         scoreGap:0,
         maxRotations:0
       });
+      const diagAttempts=demoTrader.state.lastCycle?.attempts||[];
+      strategyDiagnostics.demoAttempts=diagAttempts.length;
+      strategyDiagnostics.demoFilled=diagAttempts.filter(x=>x.ok).length;
+      strategyDiagnostics.demoRejected=diagAttempts.filter(x=>!x.ok).length;
+      strategyDiagnostics.lastDemoAttempts=diagAttempts.slice(0,10);
     }
     const positions=demoTrader.state.positions;
     for(const ev of evals){
@@ -2277,6 +2320,7 @@ const server=http.createServer((req,res)=>{
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
         decisionIntervalMs:DECISION_INTERVAL_MS,
+        strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
       }
