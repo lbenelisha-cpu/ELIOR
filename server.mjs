@@ -52,17 +52,17 @@ const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_C
 // Entry: require a live continuation, a strong enough score, and avoid chasing an already-extended move.
 // Exit: use a wider initial loss stop; only activate the tighter trailing-profit stop after real profit exists.
 const ENTRY_TRIGGER_PCT=Math.max(0.1,+(process.env.BINANCE_ENTRY_TRIGGER_PCT||2));
-const ENTRY_MIN_SCORE=Math.max(0,Math.min(100,+(process.env.BINANCE_ENTRY_MIN_SCORE||72)));
-const ENTRY_MAX_RUN_PCT=Math.max(ENTRY_TRIGGER_PCT,+(process.env.BINANCE_ENTRY_MAX_RUN_PCT||4.5));
-const STOP_LOSS_PCT=Math.max(0.1,+(process.env.BINANCE_STOP_LOSS_PCT||2.5));
-const TRAIL_ACTIVATE_PCT=Math.max(0.1,+(process.env.BINANCE_TRAIL_ACTIVATE_PCT||2));
-const EXIT_TRAIL_PCT=Math.max(0.1,+(process.env.BINANCE_EXIT_TRAIL_PCT||1));
+const ENTRY_MIN_SCORE=0; // legacy score filter disabled
+const ENTRY_MAX_RUN_PCT=Infinity; // legacy anti-chase filter disabled
+const STOP_LOSS_PCT=1.5;
+const TRAIL_ACTIVATE_PCT=0;
+const EXIT_TRAIL_PCT=1.5;
 const ENTRY_COST_OPTIONS={
   feePct:Number(process.env.BINANCE_ENTRY_FEE_PCT??0.1),
   bufferPct:Number(process.env.BINANCE_ENTRY_COST_BUFFER_PCT??0.1),
   maxSpreadPct:Number(process.env.BINANCE_ENTRY_MAX_SPREAD_PCT??0.2),
   maxImpactPct:Number(process.env.BINANCE_ENTRY_MAX_IMPACT_PCT??0.1),
-  trailActivatePct:TRAIL_ACTIVATE_PCT,exitTrailPct:EXIT_TRAIL_PCT
+  trailActivatePct:0,exitTrailPct:EXIT_TRAIL_PCT
 };
 async function checkEntryCost(symbol,amount){
   try{
@@ -74,6 +74,48 @@ async function checkEntryCost(symbol,amount){
 }
 const entryTrackingState=new Map();
 const livePeakState=new Map();
+const microCandleState=new Map();
+
+function updateMicroCandle(symbol,price,eventTime=Date.now()){
+  price=Number(price);
+  if(!(price>0))return;
+  const bucketMs=5000;
+  const bucket=Math.floor(Number(eventTime)/bucketMs)*bucketMs;
+  const state=microCandleState.get(symbol)||{closed:[],current:null};
+  let c=state.current;
+
+  if(!c||c.openTime!==bucket){
+    if(c){
+      state.closed.push({...c,closeTime:c.openTime+bucketMs-1});
+      state.closed=state.closed.slice(-10);
+    }
+    c={openTime:bucket,open:price,high:price,low:price,close:price};
+  }else{
+    c.high=Math.max(c.high,price);
+    c.low=Math.min(c.low,price);
+    c.close=price;
+  }
+  state.current=c;
+  microCandleState.set(symbol,state);
+}
+
+function microTrend(symbol){
+  const state=microCandleState.get(symbol);
+  if(!state)return {ready:false,buyers:0,sellers:0,neutral:0,control:'WAIT'};
+  const rows=[...(state.closed||[])];
+  if(state.current)rows.push(state.current);
+  const last=rows.slice(-10);
+  if(last.length<10)return {ready:false,buyers:0,sellers:0,neutral:last.length,control:'WAIT'};
+
+  let buyers=0,sellers=0,neutral=0;
+  for(const c of last){
+    if(Number(c.close)>Number(c.open))buyers++;
+    else if(Number(c.close)<Number(c.open))sellers++;
+    else neutral++;
+  }
+  const control=buyers>=7&&sellers<=3?'BUYERS':sellers>=7&&buyers<=3?'SELLERS':'BALANCED';
+  return {ready:true,buyers,sellers,neutral,control};
+}
 const dailyCandleCache=new Map();
 const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||300000));
 
@@ -88,7 +130,7 @@ const demoTrader=new DemoTrader({
   enabled:DEMO_TRADING,
   stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json',
   trailingStopPct:EXIT_TRAIL_PCT,
-  stopLossPct:STOP_LOSS_PCT,
+  stopLossPct:null,
   trailActivatePct:TRAIL_ACTIVATE_PCT
 });
 const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
@@ -576,9 +618,9 @@ async function maybeExecuteLive(evals){
           entryPrice:state.entryPrice,
           peakPrice:state.peakPrice,
           peakGainPct,
-          trailActivatePct:TRAIL_ACTIVATE_PCT,
+          trailActivatePct:0,
           trailPct,
-          stopLossPct:STOP_LOSS_PCT,
+          stopLossPct:null,
           stopPrice,
           currentPrice:current
         });
@@ -825,6 +867,7 @@ function startMarketStream(){
         streams[s].lastPrice=+m.p;
         streams[s].lastEventAt=new Date(m.E).toISOString();
         streams[s].status='connected';
+        updateMicroCandle(s,+m.p,m.E);
       }
     }catch{}
   });
@@ -1154,29 +1197,16 @@ function scoreStrategy(st){
 
 async function evaluateSymbol(s){
   try{
-    const c=await candles(s);
-    const closedStrategy=evaluateWaveStrategy(c,{
-      minWave:MIN,
-      maPeriod:MAP,
-      sellRetraceRatio:SELL_RETRACE_RATIO
-    });
-
     const positions=tradingPositions();
     const pos=positions[s]?'LONG':'CASH';
-    const closedPrice=Number(closedStrategy?.price||0);
     const livePrice=requireLivePrice(streams[s]);
+    const trend=microTrend(s);
 
-    // Trend filter: direction comes from confirmed D1 structure; MA200 stays
-    // anchored to confirmed history, while the live price must be above it.
-    const trendState={
-      ...closedStrategy,
-      price:livePrice,
-      aboveMA:Number.isFinite(closedStrategy.ma)&&livePrice>Number(closedStrategy.ma)
-    };
-    const qualification=buyQualification(trendState);
-    const score=scoreStrategy(trendState);
+    if(!trend.ready)return {ok:false,symbol:s,error:'WAIT_MICRO_CANDLES'};
 
-    let st={...trendState,livePrice,closedPrice,isLiveEvaluation:true};
+    const buyersControl=trend.control==='BUYERS';
+    const score=trend.buyers*10;
+
     let rawDecision='HOLD';
     let entryEligible=false;
     let entryConfirmed=false;
@@ -1188,10 +1218,23 @@ async function evaluateSymbol(s){
     let trailingStopPrice=null;
     let drawdownFromPeakPct=null;
 
+    const st={
+      price:livePrice,
+      livePrice,
+      direction:buyersControl?'UP':trend.control==='SELLERS'?'DOWN':'SIDEWAYS',
+      candleControl:trend.control,
+      buyerCandles:trend.buyers,
+      sellerCandles:trend.sellers,
+      neutralCandles:trend.neutral,
+      buyConfirmed:false,
+      sellConfirmed:false,
+      isLiveEvaluation:true
+    };
+
     if(pos==='CASH'){
       livePeakState.delete(s);
 
-      if(!qualification.qualified){
+      if(!buyersControl){
         entryTrackingState.delete(s);
       }else{
         let track=entryTrackingState.get(s);
@@ -1201,33 +1244,23 @@ async function evaluateSymbol(s){
         }
 
         entryBasePrice=Number(track.basePrice);
-        entryTargetPrice=entryBasePrice*(1+ENTRY_TRIGGER_PCT/100);
+        entryTargetPrice=entryBasePrice*1.02;
         entryGainPct=entryBasePrice>0?(livePrice/entryBasePrice-1)*100:0;
-        const scoreQualified=score>=ENTRY_MIN_SCORE;
-        const antiChaseBlocked=entryGainPct>ENTRY_MAX_RUN_PCT;
-        entryEligible=scoreQualified&&!antiChaseBlocked;
-        entryConfirmed=
-          entryEligible &&
-          livePrice>=entryTargetPrice;
+        entryEligible=true;
+        entryConfirmed=livePrice>=entryTargetPrice;
+
         if(entryConfirmed){
           const snapshot=accountSnapshot();
-          const freeSlots=MAX-Object.keys(positions).length;
-          const amount=Number(snapshot.cashIls||0)/Math.max(1,freeSlots)*0.998;
+          const freeSlots=Math.max(1,MAX-Object.keys(positions).length);
+          const amount=Number(snapshot.cashIls||0)/freeSlots*0.998;
           entryCost=await checkEntryCost(s,amount);
-          entryConfirmed=entryCost.ok;
-          entryEligible=entryEligible&&entryCost.ok;
+          entryConfirmed=Boolean(entryCost.ok);
         }
 
-        st.entryMinScore=ENTRY_MIN_SCORE;
-        st.entryMaxRunPct=ENTRY_MAX_RUN_PCT;
-        st.scoreQualified=scoreQualified;
-        st.antiChaseBlocked=antiChaseBlocked;
         st.buyConfirmed=entryConfirmed;
-        st.sellConfirmed=false;
         rawDecision=entryConfirmed?'BUY':'HOLD';
       }
     }else{
-      // Once a position exists, the entry tracker is no longer relevant.
       entryTrackingState.delete(s);
 
       const p=positions[s]||{};
@@ -1236,39 +1269,31 @@ async function evaluateSymbol(s){
       peakPrice=Math.max(entryPrice,rememberedPeak>0?rememberedPeak:0,livePrice);
       livePeakState.set(s,peakPrice);
 
-      const peakGainPct=entryPrice>0?(peakPrice/entryPrice-1)*100:0;
-      const initialStopPrice=entryPrice*(1-STOP_LOSS_PCT/100);
-      const trailingActive=peakGainPct>=TRAIL_ACTIVATE_PCT;
-      trailingStopPrice=trailingActive?peakPrice*(1-EXIT_TRAIL_PCT/100):null;
-      const effectiveStopPrice=trailingActive
-        ? Math.max(initialStopPrice,trailingStopPrice)
-        : initialStopPrice;
+      trailingStopPrice=peakPrice*0.985;
       drawdownFromPeakPct=peakPrice>0?(peakPrice-livePrice)/peakPrice*100:0;
 
+      st.entryPrice=entryPrice;
       st.peakPrice=peakPrice;
-      st.peakGainPct=peakGainPct;
-      st.initialStopPrice=initialStopPrice;
-      st.trailingActive=trailingActive;
+      st.trailingActive=true;
       st.trailingStopPrice=trailingStopPrice;
-      st.effectiveStopPrice=effectiveStopPrice;
+      st.effectiveStopPrice=trailingStopPrice;
       st.drawdownFromPeakPct=drawdownFromPeakPct;
-      st.sellConfirmed=livePrice<=effectiveStopPrice;
-      st.exitReason=st.sellConfirmed?(trailingActive?'TRAILING_PROFIT':'STOP_LOSS'):null;
-      st.buyConfirmed=false;
+      st.sellConfirmed=livePrice<=trailingStopPrice;
+      st.exitReason=st.sellConfirmed?'TRAILING_1_5_FROM_PEAK':null;
       rawDecision=st.sellConfirmed?'SELL':'HOLD';
     }
+
+    const demoTradable=DEMO_TRADING ? (await demoTradableSymbols()).has(s) : true;
 
     return {
       ok:true,
       symbol:s,
-      candles:c,
       strategy:st,
-      closedStrategy,
       position:pos,
       rawDecision,
       score,
-      buyQualified:qualification.qualified,
-      buyReason:qualification.reason,
+      buyQualified:buyersControl,
+      buyReason:buyersControl?'BUYERS_7_OF_10':'WAIT_BUYERS_7_OF_10',
       entryEligible,
       entryConfirmed,
       priceAsOf:streams[s]?.lastEventAt,
@@ -1276,15 +1301,17 @@ async function evaluateSymbol(s){
       entryTargetPrice,
       entryGainPct,
       entryCost,
-      entryTriggerPct:ENTRY_TRIGGER_PCT,
-      entryMinScore:ENTRY_MIN_SCORE,
-      entryMaxRunPct:ENTRY_MAX_RUN_PCT,
-      stopLossPct:STOP_LOSS_PCT,
-      trailActivatePct:TRAIL_ACTIVATE_PCT,
-      exitTrailPct:EXIT_TRAIL_PCT,
+      entryTriggerPct:2,
+      entryMinScore:null,
+      entryMaxRunPct:null,
+      stopLossPct:null,
+      trailActivatePct:0,
+      exitTrailPct:1.5,
       peakPrice,
       trailingStopPrice,
       drawdownFromPeakPct,
+      microTrend:trend,
+      demoTradable,
       decisionPriceSource:'LIVE_PRICE',
       at:new Date().toISOString()
     };
@@ -1342,108 +1369,39 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
 }
 
 function decisionReasonFromAgent(agent,ev){
-  if(!ev?.ok)return 'ERROR';
+  if(!ev?.ok)return ev?.error==='WAIT_MICRO_CANDLES'?'WAIT_MICRO_CANDLES':'ERROR';
   if(agent?.decision==='BUY')return 'BUY_EXECUTED';
   if(agent?.decision==='SELL')return 'SELL_EXECUTED';
-  if(agent?.decision==='ROTATE_IN')return 'ROTATE_IN';
-  if(agent?.decision==='ROTATE_OUT')return 'ROTATE_OUT';
-  if(agent?.decision==='WAIT_NO_SLOT')return 'NO_SLOT';
-  if(agent?.decision==='WAIT_NO_ROTATION')return 'ROTATION_NOT_STRONG_ENOUGH';
-  if(agent?.decision==='BUY_READY')return 'BUY_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
-  if(ev.buyQualified&&Number(ev.score||0)<ENTRY_MIN_SCORE)return 'WAIT_SCORE';
-  if(ev.buyQualified&&Number(ev.entryGainPct||0)>ENTRY_MAX_RUN_PCT)return 'ANTI_CHASE';
-  if(ev.buyQualified&&!ev.entryConfirmed)return 'WAIT_PLUS_2';
   if(ev.entryConfirmed)return 'BUY_READY';
-  return ev.buyReason||'HOLD_NOT_QUALIFIED';
+  if(ev.buyQualified)return 'WAIT_PLUS_2';
+  return 'WAIT_BUYERS_7_OF_10';
 }
 
 function candidateBlocker(ev,evals){
-  if(DEMO_TRADING&&mode==='demo'&&ev?.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
-  if(!ev?.ok)return ev?.error?.includes('Fresh connected Binance price')
-    ? {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי עדכני; הקנייה מושהית'}
-    : {code:'ERROR',text:'שגיאת נתונים'};
+  if(DEMO_TRADING&&mode==='demo'&&ev?.demoTradable===false){
+    return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
+  }
+  if(!ev?.ok){
+    return ev?.error==='WAIT_MICRO_CANDLES'
+      ? {code:'WAIT_MICRO_CANDLES',text:'אוסף 10 נרות של 5 שניות'}
+      : {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי'};
+  }
 
   const positions=tradingPositions();
   const activeCount=Object.keys(positions).length;
-  const isHeld=!!positions[ev.symbol];
+  if(positions[ev.symbol])return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
 
-  if(isHeld){
-    return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
-  }
-
+  const t=ev.microTrend||{};
   if(!ev.buyQualified){
-    return {
-      code:ev.buyReason==='BELOW_MA200'?'BELOW_MA200':'WAIT_UP_TREND',
-      text:ev.buyReason==='BELOW_MA200'?'מתחת ל-MA200':'ממתין למגמת UP'
-    };
+    return {code:'WAIT_BUYERS_7_OF_10',text:'קונים '+Number(t.buyers||0)+' | מוכרים '+Number(t.sellers||0)+' · נדרש 7 מול 3'};
   }
-
-  const gain=Number(ev.entryGainPct||0);
-  if(Number(ev.score||0)<ENTRY_MIN_SCORE){
-    return {
-      code:'WAIT_SCORE',
-      text:'מגמת UP · Score '+Number(ev.score||0).toFixed(1)+' · נדרש '+ENTRY_MIN_SCORE.toFixed(0)
-    };
-  }
-
-  if(gain>ENTRY_MAX_RUN_PCT){
-    return {
-      code:'ANTI_CHASE',
-      text:'לא רודף אחרי העלייה · +'+gain.toFixed(2)+'% מעל נקודת הבסיס · מקסימום '+ENTRY_MAX_RUN_PCT.toFixed(1)+'%'
-    };
-  }
-
   if(!ev.entryConfirmed){
-    if(ev.entryCost&&!ev.entryCost.ok)return {code:ev.entryCost.code,text:ev.entryCost.text};
-    return {
-      code:'WAIT_PLUS_2',
-      text:'מגמת UP · ממתין ל-+'+ENTRY_TRIGGER_PCT.toFixed(1)+'% · כרגע '+gain.toFixed(2)+'%'
-    };
+    return {code:'WAIT_PLUS_2',text:'קונים שולטים '+Number(t.buyers||0)+':'+Number(t.sellers||0)+' · ממתין ל-+2% · כרגע '+Number(ev.entryGainPct||0).toFixed(2)+'%'};
   }
-
-  if(activeCount<MAX){
-    return {code:'BUY_READY',text:'מוכן ל-BUY'};
-  }
-
-  if(!ROTATION_ENABLED)return {code:'NO_SLOT',text:'אין מקום פנוי; רוטציה כבויה'};
-  const weakest=weakestHeldEvaluation(evals);
-  if(!weakest){
-    return {code:'NO_SLOT',text:'אין Slot פנוי'};
-  }
-
-  const weakScore=Number(weakest.comparableScore||0);
-  const gap=Number(ev.score||0)-weakScore;
-  const missing=Math.max(0,ROTATION_SCORE_GAP-gap);
-
-  if(Number(ev.score||0)<ROTATION_MIN_SCORE){
-    return {
-      code:'ROTATION_SCORE_LOW',
-      text:'Score נמוך מסף הרוטציה',
-      gap,
-      missing
-    };
-  }
-
-  if(gap<ROTATION_SCORE_GAP){
-    return {
-      code:'ROTATION_GAP',
-      text:'חסר '+missing.toFixed(1)+' נק׳ לרוטציה',
-      gap,
-      missing,
-      weakestSymbol:weakest.symbol,
-      weakestScore:weakScore
-    };
-  }
-
-  return {
-    code:'ROTATE_READY',
-    text:'מוכן לרוטציה',
-    gap,
-    missing:0,
-    weakestSymbol:weakest.symbol,
-    weakestScore:weakScore
-  };
+  if(activeCount>=MAX)return {code:'NO_SLOT',text:'אין Slot פנוי · '+activeCount+'/'+MAX};
+  if(ev.entryCost&&!ev.entryCost.ok)return {code:ev.entryCost.code,text:ev.entryCost.text};
+  return {code:'BUY_READY',text:'מוכן ל-BUY'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1486,10 +1444,10 @@ async function runEvaluation(){
       setTimeout(()=>evalAll().catch(e=>console.error('Delayed evaluation failed',e.message)),1500).unref?.();
     }else{
       await demoTrader.cycle(evals,{
-        rotationEnabled:ROTATION_ENABLED,
-        minScore:ROTATION_MIN_SCORE,
-        scoreGap:ROTATION_SCORE_GAP,
-        maxRotations:ROTATION_MAX_PER_CYCLE
+        rotationEnabled:false,
+        minScore:0,
+        scoreGap:0,
+        maxRotations:0
       });
     }
     const positions=demoTrader.state.positions;
@@ -2217,11 +2175,11 @@ const server=http.createServer((req,res)=>{
         rotationScoreGap:ROTATION_SCORE_GAP,
         rotationMaxPerCycle:ROTATION_MAX_PER_CYCLE,
         entryTriggerPct:ENTRY_TRIGGER_PCT,
-        entryMinScore:ENTRY_MIN_SCORE,
-        entryMaxRunPct:ENTRY_MAX_RUN_PCT,
+        entryMinScore:null,
+        entryMaxRunPct:null,
         entryCostFilter:{enabled:true,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
-        stopLossPct:STOP_LOSS_PCT,
-        trailActivatePct:TRAIL_ACTIVATE_PCT,
+        stopLossPct:null,
+        trailActivatePct:0,
         exitTrailPct:EXIT_TRAIL_PCT,
           buyCandidateCount:Object.values(agents).filter(a=>a?.entryConfirmed&&a?.position!=='LONG').length,
           trendCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
