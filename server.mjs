@@ -137,7 +137,7 @@ async function seedMinuteCandles(symbols){
   for(let i=0;i<symbols.length;i+=batchSize){
     await Promise.all(symbols.slice(i,i+batchSize).map(async symbol=>{
       try{
-        const r=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1m&limit=11');
+        const r=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1m&limit=21');
         const now=Date.now();
         const closed=(Array.isArray(r)?r:[])
           .filter(x=>+x[6]<now)
@@ -145,7 +145,7 @@ async function seedMinuteCandles(symbols){
             openTime:+x[0],closeTime:+x[6],
             open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closed:true
           }))
-          .slice(-10);
+          .slice(-20);
         const state=minuteCandleState.get(symbol)||{closed:[],current:null};
         state.closed=closed;
         minuteCandleState.set(symbol,state);
@@ -170,6 +170,48 @@ function minuteTrend(symbol){
   }
   const control=buyers>=7&&sellers<=3?'BUYERS':sellers>=7&&buyers<=3?'SELLERS':'BALANCED';
   return {ready:true,buyers,sellers,neutral,control,candles:last};
+}
+
+function consolidationBreakout(symbol){
+  const state=minuteCandleState.get(symbol);
+  const closed=(state?.closed||[]).slice(-16);
+  if(closed.length<16)return {ready:false,reason:'WAIT_16_CANDLES'};
+
+  const box=closed.slice(0,15);
+  const breakout=closed[15];
+  const high=Math.max(...box.map(c=>Number(c.high)));
+  const low=Math.min(...box.map(c=>Number(c.low)));
+  if(!(high>0&&low>0))return {ready:false,reason:'BAD_RANGE'};
+
+  const rangePct=(high/low-1)*100;
+  const rangeOk=rangePct<=1.2;
+
+  const open=Number(breakout.open),close=Number(breakout.close);
+  const bh=Number(breakout.high),bl=Number(breakout.low);
+  const candleRange=Math.max(Number.EPSILON,bh-bl);
+  const bodyRatio=Math.abs(close-open)/candleRange;
+  const closeLocation=(close-bl)/candleRange;
+  const breakoutPct=(close/high-1)*100;
+
+  const strongBreakout=
+    rangeOk &&
+    close>open &&
+    close>high*1.001 &&
+    bodyRatio>=0.55 &&
+    closeLocation>=0.72;
+
+  return {
+    ready:true,
+    rangeOk,
+    rangeHigh:high,
+    rangeLow:low,
+    rangePct,
+    breakout,
+    breakoutPct,
+    bodyRatio,
+    closeLocation,
+    strongBreakout
+  };
 }
 
 const dailyCandleCache=new Map();
@@ -940,7 +982,7 @@ function startMarketStream(){
         if(candle.closed){
           const rows=state.closed.filter(x=>x.openTime!==candle.openTime);
           rows.push(candle);
-          state.closed=rows.sort((a,b)=>a.openTime-b.openTime).slice(-10);
+          state.closed=rows.sort((a,b)=>a.openTime-b.openTime).slice(-20);
           state.current=null;
         }else{
           state.current=candle;
@@ -1276,34 +1318,34 @@ function scoreStrategy(st){
 async function evaluateSymbol(s){
   try{
     const positions=tradingPositions();
-    const pos=positions[s]?'LONG':'CASH';
+    const p=positions[s]||null;
+    const pos=p?'LONG':'CASH';
     const livePrice=requireLivePrice(streams[s]);
-    const trend=minuteTrend(s);
+    const setup=consolidationBreakout(s);
 
-    if(!trend.ready)return {ok:false,symbol:s,error:'WAIT_1M_CANDLES'};
-
-    const buyersControl=trend.control==='BUYERS';
-    const score=trend.buyers*10;
+    if(!setup.ready)return {ok:false,symbol:s,error:'WAIT_BREAKOUT_CANDLES'};
 
     let rawDecision='HOLD';
     let entryEligible=false;
     let entryConfirmed=false;
+    let entryStage=null;
+    let orderFraction=null;
     let entryBasePrice=null;
     let entryTargetPrice=null;
     let entryGainPct=null;
-    let entryCost=null;
     let peakPrice=null;
     let trailingStopPrice=null;
     let drawdownFromPeakPct=null;
 
+    const score=setup.strongBreakout
+      ? Math.min(100,70+Math.min(15,setup.breakoutPct*20)+Math.min(15,setup.bodyRatio*15))
+      : 0;
+
     const st={
       price:livePrice,
       livePrice,
-      direction:buyersControl?'UP':trend.control==='SELLERS'?'DOWN':'SIDEWAYS',
-      candleControl:trend.control,
-      buyerCandles:trend.buyers,
-      sellerCandles:trend.sellers,
-      neutralCandles:trend.neutral,
+      direction:setup.strongBreakout?'UP':'SIDEWAYS',
+      consolidation:setup,
       buyConfirmed:false,
       sellConfirmed:false,
       isLiveEvaluation:true
@@ -1312,52 +1354,39 @@ async function evaluateSymbol(s){
     if(pos==='CASH'){
       livePeakState.delete(s);
 
-      let track=entryTrackingState.get(s);
+      entryEligible=setup.strongBreakout;
+      entryConfirmed=setup.strongBreakout;
+      entryStage=entryConfirmed?1:null;
+      orderFraction=entryConfirmed?0.5:null;
+      entryBasePrice=setup.rangeHigh;
+      entryTargetPrice=setup.rangeHigh*1.001;
+      entryGainPct=(livePrice/setup.rangeHigh-1)*100;
 
-      // Arm once buyers control 7 of the last 10 one-minute candles.
-      // Once armed, keep the same base while the move develops.
-      // Reset only if price falls 1.5% below that base before BUY.
-      if(!track && buyersControl){
-        track={
-          basePrice:livePrice,
-          startedAt:new Date().toISOString(),
-          armedBy:'BUYERS_7_OF_10'
-        };
-        entryTrackingState.set(s,track);
-      }
-
-      if(track&&Number(track.basePrice)>0){
-        const trackedBase=Number(track.basePrice);
-        if(livePrice<=trackedBase*0.985){
-          entryTrackingState.delete(s);
-          track=null;
-        }
-      }
-
-      if(track&&Number(track.basePrice)>0){
-        entryBasePrice=Number(track.basePrice);
-        entryTargetPrice=entryBasePrice*1.02;
-        entryGainPct=(livePrice/entryBasePrice-1)*100;
-        entryEligible=true;
-        entryConfirmed=livePrice>=entryTargetPrice;
-
-        // Execution-cost validation is intentionally deferred to DemoTrader.buy(),
-        // after the Demo account has been refreshed and the real order amount is known.
-        st.entryArmed=true;
-        st.entryBasePrice=entryBasePrice;
-        st.entryTargetPrice=entryTargetPrice;
-        st.buyConfirmed=entryConfirmed;
-        rawDecision=entryConfirmed?'BUY':'HOLD';
-      }else{
-        st.entryArmed=false;
-        st.buyConfirmed=false;
-        rawDecision='HOLD';
-      }
+      st.entryStage=entryStage;
+      st.breakoutLevel=setup.rangeHigh;
+      st.buyConfirmed=entryConfirmed;
+      rawDecision=entryConfirmed?'BUY':'HOLD';
     }else{
       entryTrackingState.delete(s);
 
-      const p=positions[s]||{};
+      const riskStage=Number(p.riskStage||1);
       const entryPrice=Number(p.entryPrice||livePrice);
+      const breakoutLevel=Number(p.breakoutLevel||setup.rangeHigh||entryPrice);
+
+      // Stage 2: add the second 50% only after continuation proves itself.
+      if(riskStage===1 && livePrice>=entryPrice*1.006 && livePrice>=breakoutLevel){
+        entryEligible=true;
+        entryConfirmed=true;
+        entryStage=2;
+        orderFraction=0.5;
+        entryBasePrice=entryPrice;
+        entryTargetPrice=entryPrice*1.006;
+        entryGainPct=(livePrice/entryPrice-1)*100;
+        st.addConfirmed=true;
+        st.entryStage=2;
+        rawDecision='BUY';
+      }
+
       const rememberedPeak=Number(livePeakState.get(s)||0);
       peakPrice=Math.max(entryPrice,rememberedPeak>0?rememberedPeak:0,livePrice);
       livePeakState.set(s,peakPrice);
@@ -1366,6 +1395,8 @@ async function evaluateSymbol(s){
       drawdownFromPeakPct=peakPrice>0?(peakPrice-livePrice)/peakPrice*100:0;
 
       st.entryPrice=entryPrice;
+      st.riskStage=riskStage;
+      st.breakoutLevel=breakoutLevel;
       st.peakPrice=peakPrice;
       st.trailingActive=true;
       st.trailingStopPrice=trailingStopPrice;
@@ -1373,7 +1404,11 @@ async function evaluateSymbol(s){
       st.drawdownFromPeakPct=drawdownFromPeakPct;
       st.sellConfirmed=livePrice<=trailingStopPrice;
       st.exitReason=st.sellConfirmed?'TRAILING_1_5_FROM_PEAK':null;
-      rawDecision=st.sellConfirmed?'SELL':'HOLD';
+
+      if(st.sellConfirmed){
+        entryConfirmed=false;
+        rawDecision='SELL';
+      }
     }
 
     const demoTradable=DEMO_TRADING ? (await demoTradableSymbols()).has(s) : true;
@@ -1385,16 +1420,19 @@ async function evaluateSymbol(s){
       position:pos,
       rawDecision,
       score,
-      buyQualified:buyersControl,
-      buyReason:buyersControl?'BUYERS_7_OF_10':'WAIT_BUYERS_7_OF_10',
+      buyQualified:setup.strongBreakout||entryStage===2,
+      buyReason:setup.strongBreakout?'BREAKOUT_STAGE_1':entryStage===2?'BREAKOUT_STAGE_2':'WAIT_CONSOLIDATION_BREAKOUT',
       entryEligible,
       entryConfirmed,
+      entryStage,
+      orderFraction,
+      breakoutLevel:Number(p?.breakoutLevel||setup.rangeHigh||0),
       priceAsOf:streams[s]?.lastEventAt,
       entryBasePrice,
       entryTargetPrice,
       entryGainPct,
-      entryCost,
-      entryTriggerPct:2,
+      entryCost:null,
+      entryTriggerPct:null,
       entryMinScore:null,
       entryMaxRunPct:null,
       stopLossPct:null,
@@ -1403,7 +1441,7 @@ async function evaluateSymbol(s){
       peakPrice,
       trailingStopPrice,
       drawdownFromPeakPct,
-      microTrend:trend,
+      breakoutSetup:setup,
       demoTradable,
       decisionPriceSource:'LIVE_PRICE',
       at:new Date().toISOString()
@@ -1462,14 +1500,13 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
 }
 
 function decisionReasonFromAgent(agent,ev){
-  if(!ev?.ok)return ev?.error==='WAIT_1M_CANDLES'?'WAIT_1M_CANDLES':'ERROR';
-  if(agent?.decision==='BUY')return 'BUY_EXECUTED';
+  if(!ev?.ok)return ev?.error==='WAIT_BREAKOUT_CANDLES'?'WAIT_BREAKOUT_CANDLES':'ERROR';
+  if(agent?.decision==='BUY')return ev.entryStage===2?'BREAKOUT_STAGE_2_BUY':'BREAKOUT_STAGE_1_BUY';
   if(agent?.decision==='SELL')return 'SELL_EXECUTED';
+  if(ev.entryConfirmed&&ev.entryStage===2)return 'STAGE_2_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
-  if(ev.entryConfirmed)return 'BUY_READY';
-  if(ev.entryBasePrice&&Number(ev.entryBasePrice)>0)return 'ENTRY_ARMED';
-  if(ev.buyQualified)return 'WAIT_PLUS_2';
-  return 'WAIT_BUYERS_7_OF_10';
+  if(ev.entryConfirmed)return 'STAGE_1_READY';
+  return 'WAIT_CONSOLIDATION_BREAKOUT';
 }
 
 function candidateBlocker(ev,evals){
@@ -1477,35 +1514,37 @@ function candidateBlocker(ev,evals){
     return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
   }
   if(!ev?.ok){
-    return ev?.error==='WAIT_1M_CANDLES'
-      ? {code:'WAIT_1M_CANDLES',text:'אוסף 10 נרות של דקה'}
+    return ev?.error==='WAIT_BREAKOUT_CANDLES'
+      ? {code:'WAIT_BREAKOUT_CANDLES',text:'אוסף 16 נרות של דקה לזיהוי דשדוש ופריצה'}
       : {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי'};
   }
 
   const positions=tradingPositions();
   const activeCount=Object.keys(positions).length;
-  if(positions[ev.symbol])return {code:'ACTIVE_LONG',text:'פוזיציה פעילה'};
+  const p=positions[ev.symbol];
 
-  const t=ev.microTrend||{};
-  if(ev.entryBasePrice&&Number(ev.entryBasePrice)>0&&!ev.entryConfirmed){
-    return {
-      code:'ENTRY_ARMED',
-      text:'מעקב קנייה פעיל · בסיס '+Number(ev.entryBasePrice).toFixed(6)+
-        ' · יעד +2% '+Number(ev.entryTargetPrice||0).toFixed(6)+
-        ' · כרגע '+Number(ev.entryGainPct||0).toFixed(2)+'%'+
-        ' · קונים '+Number(t.buyers||0)+' / מוכרים '+Number(t.sellers||0)+
-        ' · איפוס רק בירידה 1.5% מהבסיס'
-    };
+  if(p){
+    const stage=Number(p.riskStage||1);
+    if(stage===1){
+      return {
+        code:ev.entryConfirmed&&ev.entryStage===2?'STAGE_2_READY':'STAGE_1_ACTIVE',
+        text:ev.entryConfirmed&&ev.entryStage===2
+          ? 'שלב 2 מוכן · המשך +0.6% אושר'
+          : 'שלב 1 פעיל · ממתין לאישור המשך +0.6% לשלב 2'
+      };
+    }
+    return {code:'ACTIVE_LONG',text:'פוזיציה מלאה · שלב 2 פעיל'};
   }
-  if(!ev.buyQualified){
-    return {code:'WAIT_BUYERS_7_OF_10',text:'קונים '+Number(t.buyers||0)+' | מוכרים '+Number(t.sellers||0)+' · נדרש 7 מול 3'};
+
+  const b=ev.breakoutSetup||{};
+  if(!b.rangeOk){
+    return {code:'WAIT_CONSOLIDATION',text:'אין דשדוש צר · טווח '+Number(b.rangePct||0).toFixed(2)+'% · נדרש עד 1.20%'};
   }
-  if(!ev.entryConfirmed){
-    return {code:'WAIT_PLUS_2',text:'מגמת קונים זוהתה · ממתין ל-+2%'};
+  if(!b.strongBreakout){
+    return {code:'WAIT_BREAKOUT',text:'דשדוש זוהה · ממתין לנר פריצה חזק מעל '+Number(b.rangeHigh||0).toFixed(6)};
   }
   if(activeCount>=MAX)return {code:'NO_SLOT',text:'אין Slot פנוי · '+activeCount+'/'+MAX};
-  if(ev.entryCost&&!ev.entryCost.ok)return {code:ev.entryCost.code,text:ev.entryCost.text};
-  return {code:'BUY_READY',text:'מוכן ל-BUY'};
+  return {code:'STAGE_1_READY',text:'פריצה אושרה · BUY שלב 1 · 50% מה-Slot'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1542,23 +1581,23 @@ async function runEvaluation(){
   }
 
   const valid=evals.filter(e=>e.ok);
-  const armed=valid.filter(e=>Number(e.entryBasePrice)>0&&!tradingPositions()[e.symbol]);
+  const stage1Ready=valid.filter(e=>e.entryConfirmed&&e.entryStage===1);
+  const stage2Ready=valid.filter(e=>e.entryConfirmed&&e.entryStage===2);
   strategyDiagnostics={
     ...strategyDiagnostics,
     evaluated:evals.length,
     minuteReady:valid.length,
-    buyers73:valid.filter(e=>e.microTrend?.control==='BUYERS').length,
-    sellers73:valid.filter(e=>e.microTrend?.control==='SELLERS').length,
-    armed:armed.length,
-    reachedPlus2:valid.filter(e=>e.entryConfirmed).length,
-    executionCandidates:valid.filter(e=>e.entryConfirmed&&!tradingPositions()[e.symbol]).length,
-    nearestToTarget:armed
+    consolidation:valid.filter(e=>e.breakoutSetup?.rangeOk).length,
+    strongBreakouts:valid.filter(e=>e.breakoutSetup?.strongBreakout).length,
+    stage1Ready:stage1Ready.length,
+    stage2Ready:stage2Ready.length,
+    executionCandidates:stage1Ready.length+stage2Ready.length,
+    nearestToTarget:valid
+      .filter(e=>tradingPositions()[e.symbol]&&Number(tradingPositions()[e.symbol]?.riskStage||1)===1)
       .map(e=>({
         symbol:e.symbol,
-        buyers:Number(e.microTrend?.buyers||0),
-        sellers:Number(e.microTrend?.sellers||0),
         gainPct:Number(e.entryGainPct||0),
-        remainingPct:Math.max(0,2-Number(e.entryGainPct||0))
+        remainingPct:Math.max(0,0.6-Number(e.entryGainPct||0))
       }))
       .sort((a,b)=>a.remainingPct-b.remainingPct)
       .slice(0,8),
