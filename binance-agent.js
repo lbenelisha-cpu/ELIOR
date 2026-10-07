@@ -94,7 +94,8 @@ function buyReasonLabel(r){
     WAVE_BELOW_3:'לוגיקה ישנה',
     WAVE_ABOVE_8:'לוגיקה ישנה',
     NOT_STRONGER_THAN_PREVIOUS_DOWN:'חלש מהירידה הקודמת',
-    NO_DATA:'אין נתונים'
+    NO_DATA:'אין נתונים',
+    NOT_DEMO_TRADABLE:'נסרק בלבד · לא זמין בדמו'
   })[r]||r||'—';
 }
 
@@ -205,7 +206,7 @@ function render(d,currentMode='demo',liveAccount=null){
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
-      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:blockerLabel(a.blocker)}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
+      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(a.blocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
       <td>${fmt(s.price)}</td>
       <td><b>${fmt(score,1)}</b></td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
