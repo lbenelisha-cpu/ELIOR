@@ -1973,16 +1973,21 @@ function analyzeCandlePower(candles,lookback=10){
   if(structureUp>=structureDown+3 && buyerScore>sellerScore)trend='UP';
   else if(structureDown>=structureUp+3 && sellerScore>buyerScore)trend='DOWN';
 
+  const buyerCandles=analyzed.filter(x=>x.state.startsWith('BUYERS')).length;
+  const sellerCandles=analyzed.filter(x=>x.state.startsWith('SELLERS')).length;
+  const neutralCandles=Math.max(0,analyzed.length-buyerCandles-sellerCandles);
+
   let control='BALANCED';
-  const diff=buyerScore-sellerScore;
-  const total=Math.max(1,buyerScore+sellerScore);
-  const edge=Math.abs(diff)/total;
-  if(edge>=0.08)control=diff>0?'BUYERS':'SELLERS';
+  if(buyerCandles>=7 && sellerCandles<=3)control='BUYERS';
+  else if(sellerCandles>=7 && buyerCandles<=3)control='SELLERS';
 
   return {
     lookback:analyzed.length,
     trend,
     control,
+    buyerCandles,
+    sellerCandles,
+    neutralCandles,
     buyerScore:Math.round(buyerScore*10)/10,
     sellerScore:Math.round(sellerScore*10)/10,
     higherHighs,higherLows,lowerHighs,lowerLows,
