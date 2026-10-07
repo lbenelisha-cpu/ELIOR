@@ -388,6 +388,51 @@ async function loadDecisionHistory(symbol){
   }
 }
 
+
+function renderCandlePower(a){
+  if(!a)return;
+  const trendLabel=({UP:'מגמת עלייה',DOWN:'מגמת ירידה',SIDEWAYS:'דשדוש / לא ברור'})[a.trend]||'—';
+  const controlLabel=({BUYERS:'קונים חזקים יותר',SELLERS:'מוכרים חזקים יותר',BALANCED:'כוחות מאוזנים'})[a.control]||'—';
+  put('#candleTrend',trendLabel);
+  put('#candleControl',controlLabel);
+  put('#buyerPower',fmt(a.buyerScore,1));
+  put('#sellerPower',fmt(a.sellerScore,1));
+  put('#candleStructure',
+    (a.explanation||'')+
+    ' · HH '+(a.higherHighs??0)+
+    ' · HL '+(a.higherLows??0)+
+    ' · LH '+(a.lowerHighs??0)+
+    ' · LL '+(a.lowerLows??0)
+  );
+
+  const stateLabel={
+    BUYERS_STRONG:'קונים שולטים',
+    SELLERS_STRONG:'מוכרים שולטים',
+    BUYERS_REJECTION:'קונים דחו ירידה',
+    SELLERS_REJECTION:'מוכרים דחו עלייה',
+    BUYERS_EDGE:'יתרון לקונים',
+    SELLERS_EDGE:'יתרון למוכרים',
+    NEUTRAL:'מאוזן'
+  };
+
+  const rows=(a.candles||[]).slice().reverse();
+  const el=$('#candlePowerRows');
+  if(!el)return;
+  el.innerHTML=rows.map((x,i)=>{
+    const cls=x.state.startsWith('BUYERS')?'buyers':x.state.startsWith('SELLERS')?'sellers':'neutral';
+    const when=x.closeTime?new Date(x.closeTime).toLocaleString('he-IL'):'—';
+    return '<div class="candle-power-row '+cls+'">'+
+      '<div><b>#'+(rows.length-i)+'</b><small>'+when+'</small></div>'+
+      '<div><span>O</span><b>'+fmt(x.open,x.open<1?5:2)+'</b></div>'+
+      '<div><span>H</span><b>'+fmt(x.high,x.high<1?5:2)+'</b></div>'+
+      '<div><span>L</span><b>'+fmt(x.low,x.low<1?5:2)+'</b></div>'+
+      '<div><span>C</span><b>'+fmt(x.close,x.close<1?5:2)+'</b></div>'+
+      '<div><span>גוף</span><b>'+fmt(x.bodyPct,0)+'%</b></div>'+
+      '<div class="candle-state"><b>'+stateLabel[x.state]+'</b><small>'+x.reason+'</small></div>'+
+    '</div>';
+  }).join('');
+}
+
 async function loadChart(symbol){
   try{
     $('#chartEmpty')?.classList.add('hidden');
@@ -395,6 +440,7 @@ async function loadChart(symbol){
     put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · טווח '+selectedRange+' · MA200');
     chartCandles=d.candles||[];
     drawCandles(chartCandles);
+    renderCandlePower(d.candleAnalysis);
   }catch(e){
     $('#chartEmpty')?.classList.remove('hidden');
   }
