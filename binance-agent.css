@@ -287,3 +287,25 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .decision-badge.pnl-profit{color:#7af2b1}
 .decision-badge.pnl-loss{color:#ff7b86}
 .decision-badge.pnl-flat,.decision-badge.pnl-unknown{color:#b6c8db}
+
+.candle-power-panel{margin-top:12px;border:1px solid #20384f;border-radius:12px;background:#081522;padding:12px}
+.candle-power-head{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.candle-power-head>div{background:#0d1d2d;border:1px solid #1d344b;border-radius:10px;padding:10px}
+.candle-power-head span,.candle-power-row span{display:block;color:#8197ad;font-size:11px}
+.candle-power-head strong{display:block;margin-top:5px;font-size:15px}
+.candle-structure{margin:10px 0;color:#a9bdd0;font-size:12px;line-height:1.6}
+.candle-power-rows{display:grid;gap:5px;max-height:360px;overflow:auto}
+.candle-power-row{display:grid;grid-template-columns:145px repeat(5,74px) minmax(190px,1fr);gap:7px;align-items:center;border:1px solid #1c3146;border-radius:8px;padding:7px 9px;background:#0a1724;font-size:11px}
+.candle-power-row>div:first-child small,.candle-state small{display:block;color:#7890a7;margin-top:3px}
+.candle-power-row.buyers{box-shadow:inset 3px 0 0 #26d07c}
+.candle-power-row.sellers{box-shadow:inset 3px 0 0 #ff5b6e}
+.candle-power-row.neutral{box-shadow:inset 3px 0 0 #6f8499}
+.candle-state b{font-size:12px}
+.candle-power-row.buyers .candle-state b{color:#7af2b1}
+.candle-power-row.sellers .candle-state b{color:#ff8794}
+.candle-learning-note{margin-top:9px;color:#f5c451;font-size:11px}
+@media(max-width:900px){
+  .candle-power-head{grid-template-columns:repeat(2,1fr)}
+  .candle-power-row{grid-template-columns:110px repeat(2,1fr)}
+  .candle-power-row>div:nth-child(4),.candle-power-row>div:nth-child(5),.candle-power-row>div:nth-child(6){display:none}
+}
