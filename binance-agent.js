@@ -150,7 +150,7 @@ function render(d,currentMode='demo',liveAccount=null){
   renderMarketStrip(agents);
 
   if(!activeAgents.length){
-    put('#scanStatusMessage','אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
+    put('#scanStatusMessage','נסרקו '+agents.length+' · מוצגים '+agents.length+' · אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
   }else{
     const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · ציון '+fmt(weakestActive.score,1)):'';
     const interval=Number(d.config?.decisionIntervalMs||60000)/1000;
@@ -160,7 +160,10 @@ function render(d,currentMode='demo',liveAccount=null){
     const diag=d.config?.buyCandidateCount!=null
       ? ' · עברו תנאי כניסה: '+d.config.buyCandidateCount+' · מתאימים למגמה: '+(d.config.trendCandidateCount??'—')+(d.config.demoExecutionBusy?' · מנוע ביצוע עסוק':'')
       : '';
-    put('#scanStatusMessage',activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState+diag);
+    put('#scanStatusMessage',
+      'נסרקו '+agents.length+' · מוצגים '+currentVisibleAgents.length+
+      ' · '+activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState+diag
+    );
   }
 
   if(!isLive){
@@ -173,7 +176,16 @@ function render(d,currentMode='demo',liveAccount=null){
   }
 
   const displayScoreMin=Number(d.config?.rotationMinScore||65);
-  currentVisibleAgents=agents.filter(a=>isHeld(a)||Number(a.score||0)>=displayScoreMin);
+  currentVisibleAgents=[...agents].sort((a,b)=>{
+    const aHeld=isHeld(a)?1:0,bHeld=isHeld(b)?1:0;
+    if(aHeld!==bHeld)return bHeld-aHeld;
+
+    const aBuy=(a.decision==='BUY'||a.decision==='BUY_READY'||a.decision==='BUY READY'||a.buyQualified)?1:0;
+    const bBuy=(b.decision==='BUY'||b.decision==='BUY_READY'||b.decision==='BUY READY'||b.buyQualified)?1:0;
+    if(aBuy!==bBuy)return bBuy-aBuy;
+
+    return Number(b.score||0)-Number(a.score||0);
+  });
   if(!currentVisibleAgents.some(a=>a.symbol===selectedSymbol)){
     selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
   }
