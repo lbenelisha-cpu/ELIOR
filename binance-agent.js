@@ -91,9 +91,9 @@ function buyReasonLabel(r){
     NOT_UP:'לא בגל עולה',
     BELOW_MA200:'מתחת ל־MA200',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
-    WAVE_BELOW_3:'לוגיקה ישנה',
-    WAVE_ABOVE_8:'לוגיקה ישנה',
-    NOT_STRONGER_THAN_PREVIOUS_DOWN:'חלש מהירידה הקודמת',
+    BUYERS_7_OF_10:'7 מתוך 10 לטובת הקונים',
+    WAIT_BUYERS_7_OF_10:'ממתין ל-7 קונים מול 3 מוכרים',
+    WAIT_MICRO_CANDLES:'אוסף 10 נרות של 5 שניות',
     NO_DATA:'אין נתונים',
     NOT_DEMO_TRADABLE:'נסרק בלבד · לא זמין בדמו'
   })[r]||r||'—';
