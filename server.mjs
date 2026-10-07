@@ -742,12 +742,10 @@ function isEligibleSymbol(x){
 }
 
 async function selectUniverse(){
-  const demoTradable=DEMO_TRADING?await demoTradableSymbols():null;
-
+  // Scan the real Binance Spot market independently from what the Demo account
+  // currently supports. Execution compatibility is handled separately.
   if(MANUAL_SYMBOLS.length){
-    return MANUAL_SYMBOLS
-      .filter(s=>!demoTradable||demoTradable.has(s))
-      .slice(0,UNIVERSE_SIZE);
+    return MANUAL_SYMBOLS.slice(0,UNIVERSE_SIZE);
   }
 
   const [info,tickers]=await Promise.all([
@@ -764,7 +762,6 @@ async function selectUniverse(){
   const ranked=(tickers||[])
     .filter(x=>
       tradable.has(x.symbol) &&
-      (!demoTradable||demoTradable.has(x.symbol)) &&
       isEligibleSymbol(x) &&
       Number.isFinite(+x.quoteVolume)
     )
@@ -1362,6 +1359,7 @@ function decisionReasonFromAgent(agent,ev){
 }
 
 function candidateBlocker(ev,evals){
+  if(DEMO_TRADING&&mode==='demo'&&ev?.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
   if(!ev?.ok)return ev?.error?.includes('Fresh connected Binance price')
     ? {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי עדכני; הקנייה מושהית'}
     : {code:'ERROR',text:'שגיאת נתונים'};
@@ -1632,6 +1630,7 @@ async function runEvaluation(){
     const candidates=evals
       .filter(ev=>
         ev.ok &&
+        (!DEMO_TRADING || mode!=='demo' || ev.demoTradable!==false) &&
         !paper.positions[ev.symbol] &&
         ev.rawDecision==='BUY' &&
         ev.entryConfirmed
@@ -1661,6 +1660,7 @@ async function runEvaluation(){
     const outsideCandidates=evals
       .filter(ev=>
         ev.ok &&
+        (!DEMO_TRADING || mode!=='demo' || ev.demoTradable!==false) &&
         !paper.positions[ev.symbol] &&
         ev.rawDecision==='BUY'
       )
@@ -2228,7 +2228,8 @@ const server=http.createServer((req,res)=>{
           demoExecutionBusy:demoTrader.busy,
           demoExecutionError:demoTrader.error||null,
           demoLastCycle:demoTrader.state.lastCycle||null,
-          demoUniverseFiltered:DEMO_TRADING,
+          demoUniverseFiltered:false,
+          demoTradableCount:Object.values(agents).filter(a=>a?.demoTradable!==false).length,
         stateFile:STATE_FILE,
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
