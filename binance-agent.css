@@ -47,7 +47,7 @@ button{font:inherit}
 .scan-status{padding:10px 16px;color:#9eb1c8;border-top:1px solid #172b40;border-bottom:1px solid #172b40;font-size:12px}
 .scanner-list{max-height:none;overflow:auto;flex:1;min-height:0}
 .asset-table{width:100%;border-collapse:collapse}
-.asset-table th,.asset-table td{padding:10px 9px;border-bottom:1px solid #1a2d41;text-align:right;font-size:13px}
+.asset-table th,.asset-table td{padding:7px 8px;border-bottom:1px solid #1a2d41;text-align:right;font-size:12px;line-height:1.25}
 .asset-table th{position:sticky;top:0;background:#0b1724;color:#89a0b8;z-index:2}
 .asset-table tbody tr{cursor:pointer;transition:.15s}
 .asset-table tbody tr:hover{background:#13263a}
@@ -322,4 +322,21 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 @media(max-width:800px){
   .scanner-panel{min-height:560px;height:auto}
   .scanner-list{max-height:560px}
+}
+
+/* Compact market scanner so more assets are visible with less scrolling */
+.scanner-panel .asset-table th{padding-top:7px;padding-bottom:7px;font-size:11px}
+.scanner-panel .asset-table td{padding-top:5px;padding-bottom:5px;vertical-align:middle}
+.scanner-panel .asset-table td:first-child b{font-size:12px;line-height:1.1}
+.scanner-panel .mini{font-size:9px;line-height:1.15;margin-top:1px}
+.scanner-panel .trend-note{display:inline;margin-inline-start:5px}
+.scanner-panel .decision{font-size:10px;font-weight:800;white-space:nowrap}
+.scanner-panel .asset-table tbody tr{height:38px}
+.scanner-panel .asset-table tbody tr.active-position,
+.scanner-panel .asset-table tbody tr.buy-alert,
+.scanner-panel .asset-table tbody tr.rotate-alert{min-height:38px}
+@media(max-width:800px){
+  .scanner-panel .asset-table th,.scanner-panel .asset-table td{padding:5px 6px;font-size:11px}
+  .scanner-panel .asset-table tbody tr{height:36px}
+  .scanner-panel .mini{font-size:8.5px}
 }
