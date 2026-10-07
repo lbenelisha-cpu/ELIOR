@@ -41,11 +41,11 @@ button{font:inherit}
 .panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .panel-title-row h2{font-size:18px;margin:0}
 .panel-title-row p{margin:4px 0 0;color:var(--muted);font-size:12px}
-.trading-grid{display:grid;grid-template-columns:310px minmax(0,1fr) 300px;gap:14px;margin-top:14px}
-.scanner-panel{padding:0;overflow:hidden}
+.trading-grid{display:grid;grid-template-columns:310px minmax(0,1fr) 300px;gap:14px;margin-top:14px;align-items:stretch}
+.scanner-panel{padding:0;overflow:hidden;display:flex;flex-direction:column;height:100%;min-height:760px}
 .scanner-panel .panel-title-row{padding:16px}
 .scan-status{padding:10px 16px;color:#9eb1c8;border-top:1px solid #172b40;border-bottom:1px solid #172b40;font-size:12px}
-.scanner-list{max-height:620px;overflow:auto}
+.scanner-list{max-height:none;overflow:auto;flex:1;min-height:0}
 .asset-table{width:100%;border-collapse:collapse}
 .asset-table th,.asset-table td{padding:10px 9px;border-bottom:1px solid #1a2d41;text-align:right;font-size:13px}
 .asset-table th{position:sticky;top:0;background:#0b1724;color:#89a0b8;z-index:2}
@@ -184,7 +184,7 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .topnav{display:flex;flex-wrap:wrap}.nav-pill{white-space:nowrap}
 .brand-title{font-size:clamp(15px,1.2vw,21px)}
 .brand-sub{line-height:1.6}.status{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
-.trading-grid{grid-template-columns:minmax(230px,.85fr) minmax(0,2.5fr) minmax(220px,.8fr);align-items:start}
+.trading-grid{grid-template-columns:minmax(260px,.95fr) minmax(0,2.35fr) minmax(220px,.8fr);align-items:stretch}
 .trading-grid>*{min-width:0}.panel{min-width:0;line-height:1.5}
 .panel h2{font-size:clamp(17px,1.25vw,22px);margin-top:0;overflow-wrap:anywhere}
 .panel-title-row{flex-wrap:wrap}.scanner-panel .panel-title-row{flex-wrap:nowrap;align-items:start}
@@ -311,3 +311,15 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 }
 
 .candle-count{margin:-2px 0 10px;padding:8px 10px;border:1px solid #1d344b;border-radius:9px;background:#0c1a28;color:#c6d7e8;font-size:12px;font-weight:800}
+
+.scanner-panel .asset-table-wrap{flex:1;min-height:0;overflow:auto}
+@media(min-width:1201px){
+  .scanner-panel{min-height:900px}
+}
+@media(max-width:1200px){
+  .scanner-panel{min-height:680px}
+}
+@media(max-width:800px){
+  .scanner-panel{min-height:560px;height:auto}
+  .scanner-list{max-height:560px}
+}
