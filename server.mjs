@@ -62,7 +62,8 @@ const ENTRY_COST_OPTIONS={
   bufferPct:Number(process.env.BINANCE_ENTRY_COST_BUFFER_PCT??0.1),
   maxSpreadPct:Number(process.env.BINANCE_ENTRY_MAX_SPREAD_PCT??0.2),
   maxImpactPct:Number(process.env.BINANCE_ENTRY_MAX_IMPACT_PCT??0.1),
-  trailActivatePct:0,exitTrailPct:EXIT_TRAIL_PCT
+  trailActivatePct:0,exitTrailPct:EXIT_TRAIL_PCT,
+  maxCostPctOverride:Number(process.env.BINANCE_ENTRY_MAX_COST_PCT??0.5)
 };
 async function checkEntryCost(symbol,amount){
   try{
@@ -1321,14 +1322,8 @@ async function evaluateSymbol(s){
         entryEligible=true;
         entryConfirmed=livePrice>=entryTargetPrice;
 
-        if(entryConfirmed){
-          const snapshot=accountSnapshot();
-          const freeSlots=Math.max(1,MAX-Object.keys(positions).length);
-          const amount=Number(snapshot.cashIls||0)/freeSlots*0.998;
-          entryCost=await checkEntryCost(s,amount);
-          entryConfirmed=Boolean(entryCost.ok);
-        }
-
+        // Execution-cost validation is intentionally deferred to DemoTrader.buy(),
+        // after the Demo account has been refreshed and the real order amount is known.
         st.entryArmed=true;
         st.entryBasePrice=entryBasePrice;
         st.entryTargetPrice=entryTargetPrice;
