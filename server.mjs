@@ -75,6 +75,7 @@ async function checkEntryCost(symbol,amount){
 const entryTrackingState=new Map();
 const livePeakState=new Map();
 const microCandleState=new Map();
+const minuteCandleState=new Map();
 
 function updateMicroCandle(symbol,price,eventTime=Date.now()){
   price=Number(price);
@@ -116,6 +117,46 @@ function microTrend(symbol){
   const control=buyers>=7&&sellers<=3?'BUYERS':sellers>=7&&buyers<=3?'SELLERS':'BALANCED';
   return {ready:true,buyers,sellers,neutral,control};
 }
+async function seedMinuteCandles(symbols){
+  const batchSize=10;
+  for(let i=0;i<symbols.length;i+=batchSize){
+    await Promise.all(symbols.slice(i,i+batchSize).map(async symbol=>{
+      try{
+        const r=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1m&limit=11');
+        const now=Date.now();
+        const closed=(Array.isArray(r)?r:[])
+          .filter(x=>+x[6]<now)
+          .map(x=>({
+            openTime:+x[0],closeTime:+x[6],
+            open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closed:true
+          }))
+          .slice(-10);
+        const state=minuteCandleState.get(symbol)||{closed:[],current:null};
+        state.closed=closed;
+        minuteCandleState.set(symbol,state);
+      }catch{}
+    }));
+  }
+}
+
+function minuteTrend(symbol){
+  const state=minuteCandleState.get(symbol);
+  if(!state)return {ready:false,buyers:0,sellers:0,neutral:0,control:'WAIT'};
+  const rows=[...(state.closed||[])];
+  if(state.current)rows.push(state.current);
+  const last=rows.slice(-10);
+  if(last.length<10)return {ready:false,buyers:0,sellers:0,neutral:last.length,control:'WAIT'};
+
+  let buyers=0,sellers=0,neutral=0;
+  for(const c of last){
+    if(Number(c.close)>Number(c.open))buyers++;
+    else if(Number(c.close)<Number(c.open))sellers++;
+    else neutral++;
+  }
+  const control=buyers>=7&&sellers<=3?'BUYERS':sellers>=7&&buyers<=3?'SELLERS':'BALANCED';
+  return {ready:true,buyers,sellers,neutral,control,candles:last};
+}
+
 const dailyCandleCache=new Map();
 const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||300000));
 
@@ -846,7 +887,7 @@ function initUniverse(symbols){
 
 function startMarketStream(){
   if(!SYMBOLS.length)return;
-  const names=SYMBOLS.map(s=>`${s.toLowerCase()}@trade`).join('/');
+  const names=SYMBOLS.flatMap(s=>[`${s.toLowerCase()}@trade`,`${s.toLowerCase()}@kline_1m`]).join('/');
   const url=`wss://stream.binance.com:9443/stream?streams=${names}`;
   // Reuse a healthy subscription; universe refresh must not interrupt every scan.
   if(marketSocket?.url===url&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketSocket.readyState))return;
@@ -863,11 +904,33 @@ function startMarketStream(){
     if(marketSocket!==socket)return;
     try{
       const msg=JSON.parse(raw),m=msg.data||msg,s=String(m.s||'');
-      if(streams[s]){
+      if(m.e==='trade'&&streams[s]){
         streams[s].lastPrice=+m.p;
         streams[s].lastEventAt=new Date(m.E).toISOString();
         streams[s].status='connected';
-        updateMicroCandle(s,+m.p,m.E);
+      }
+      if(m.e==='kline'&&m.k){
+        const k=m.k;
+        const candle={
+          openTime:+k.t,
+          closeTime:+k.T,
+          open:+k.o,
+          high:+k.h,
+          low:+k.l,
+          close:+k.c,
+          volume:+k.v,
+          closed:Boolean(k.x)
+        };
+        const state=minuteCandleState.get(s)||{closed:[],current:null};
+        if(candle.closed){
+          const rows=state.closed.filter(x=>x.openTime!==candle.openTime);
+          rows.push(candle);
+          state.closed=rows.sort((a,b)=>a.openTime-b.openTime).slice(-10);
+          state.current=null;
+        }else{
+          state.current=candle;
+        }
+        minuteCandleState.set(s,state);
       }
     }catch{}
   });
@@ -1200,9 +1263,9 @@ async function evaluateSymbol(s){
     const positions=tradingPositions();
     const pos=positions[s]?'LONG':'CASH';
     const livePrice=requireLivePrice(streams[s]);
-    const trend=microTrend(s);
+    const trend=minuteTrend(s);
 
-    if(!trend.ready)return {ok:false,symbol:s,error:'WAIT_MICRO_CANDLES'};
+    if(!trend.ready)return {ok:false,symbol:s,error:'WAIT_1M_CANDLES'};
 
     const buyersControl=trend.control==='BUYERS';
     const score=trend.buyers*10;
@@ -1385,7 +1448,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
 }
 
 function decisionReasonFromAgent(agent,ev){
-  if(!ev?.ok)return ev?.error==='WAIT_MICRO_CANDLES'?'WAIT_MICRO_CANDLES':'ERROR';
+  if(!ev?.ok)return ev?.error==='WAIT_1M_CANDLES'?'WAIT_1M_CANDLES':'ERROR';
   if(agent?.decision==='BUY')return 'BUY_EXECUTED';
   if(agent?.decision==='SELL')return 'SELL_EXECUTED';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
@@ -1400,8 +1463,8 @@ function candidateBlocker(ev,evals){
     return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
   }
   if(!ev?.ok){
-    return ev?.error==='WAIT_MICRO_CANDLES'
-      ? {code:'WAIT_MICRO_CANDLES',text:'אוסף 10 נרות של 5 שניות'}
+    return ev?.error==='WAIT_1M_CANDLES'
+      ? {code:'WAIT_1M_CANDLES',text:'אוסף 10 נרות של דקה'}
       : {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי'};
   }
 
@@ -1859,6 +1922,7 @@ async function refreshUniverse(){
 
     if(selected.length){
       initUniverse(selected);
+      await seedMinuteCandles(SYMBOLS);
       startMarketStream();
       await evalAll();
       universeStatus='READY';
