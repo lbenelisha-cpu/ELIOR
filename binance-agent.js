@@ -1,5 +1,6 @@
 const B='https://binance-wave-agent.onrender.com';
 const MODE=B+'/api/binance-mode';
+const TRADE_CONTROL=B+'/api/binance-trade-control';
 const AGENT=B+'/api/binance-agent';
 const EVAL=B+'/api/binance-agent/evaluate';
 const RESET=B+'/api/binance-paper/reset';
@@ -21,6 +22,8 @@ let selectedInterval='1d';
 let selectedRange='6M';
 let activeView='trade';
 let demoTradingEnabled=false;
+let tradeControlToken=null;
+let tradeControlWorking=false;
 let moneyUnit='₪';
 let chartCandles=[];
 function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
@@ -73,6 +76,11 @@ function mode(s){
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   currentMode=s.mode;
+  const paused=s.tradeControl?.paused===true;
+  put('#tradeControlStatus',paused?'מסחר עצור · אין קניות חדשות':'מסחר אוטומטי פעיל');
+  const stopButton=$('#stopTradingBtn'),startButton=$('#startTradingBtn');
+  if(stopButton){stopButton.hidden=paused;stopButton.disabled=tradeControlWorking;}
+  if(startButton){startButton.hidden=!paused;startButton.disabled=tradeControlWorking;}
   $('#demoBtn')?.classList.toggle('active',isDemo);
   $('#liveBtn')?.classList.toggle('active',!isDemo);
   $('#liveAccountCard')?.classList.toggle('hidden',isDemo);
@@ -579,6 +587,42 @@ async function setMode(m){
     load();
   }catch(e){alert(e.message)}
 }
+
+async function sendTradeControl(action){
+  if(tradeControlWorking)return;
+  if(action==='stop'&&!confirm('עצירת המסחר תשלח פקודות מכירה לכל הפוזיציות של הסוכן במצב הנבחר (DEMO או LIVE). אין אפשרות להבטיח את מחיר הביצוע. להמשיך?'))return;
+  if(action==='start'&&!confirm('לחדש את המסחר האוטומטי? כניסות חדשות יחכו לאות וויקוף חדש.'))return;
+  if(!tradeControlToken){
+    const token=prompt('הזן את קוד בקרת המסחר (BINANCE_CONTROL_TOKEN) המוגדר בשרת:');
+    if(!token)return;
+    tradeControlToken=token.trim();
+  }
+  tradeControlWorking=true;
+  $('#stopTradingBtn').disabled=true;
+  $('#startTradingBtn').disabled=true;
+  put('#tradeControlStatus',action==='stop'?'מבצע עצירה וסגירת פוזיציות…':'מחדש מסחר…');
+  try{
+    const r=await J(TRADE_CONTROL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tradeControlToken},
+      body:JSON.stringify({action})
+    });
+    if(!r.ok){
+      const details=(r.failed||[]).map(x=>x.symbol+': '+x.error).join('; ');
+      alert('המסחר נשאר עצור. '+(r.error||details||'חלק מהפוזיציות לא נסגרו'));
+    }else if(action==='stop'){
+      alert('המסחר נעצר. נסגרו '+(r.sold||[]).length+' פוזיציות. אין קניות חדשות.');
+    }
+  }catch(e){
+    if(/401|Authenticated control required/i.test(e.message))tradeControlToken=null;
+    alert('הפעולה לא הושלמה: '+e.message);
+  }finally{
+    tradeControlWorking=false;
+    await load();
+  }
+}
+$('#stopTradingBtn').onclick=()=>sendTradeControl('stop');
+$('#startTradingBtn').onclick=()=>sendTradeControl('start');
 
 $('#demoBtn').onclick=()=>setMode('demo');
 $('#liveBtn').onclick=()=>setMode('live');
