@@ -136,6 +136,10 @@ function activeContext(d,currentMode,liveAccount){
 
 function render(d,currentMode='demo',liveAccount=null){
   currentAgentData=d;
+  const wx=d.wyckoffStats||{};
+  put('#wyckoffBuys',wx.buys??0);
+  put('#wyckoffSells',wx.sells??0);
+  put('#wyckoffClosed',wx.closed??0);
   if(d.paper?.currency)moneyUnit=d.paper.currency;
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){demoTradingEnabled=true;$('#resetPaperBtn')?.classList.add('hidden');if(!d.paper.error)put('#status','דמו Binance · מסחר אוטומטי');}
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){
