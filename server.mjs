@@ -224,6 +224,27 @@ const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||30
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
+const TRADE_CONTROL_FILE=process.env.BINANCE_TRADE_CONTROL_FILE||'/var/data/binance-trade-control.json';
+let tradeControl={paused:false,resumedAt:null,pausedAt:null,lastStop:null};
+function saveTradeControl(){
+  fs.mkdirSync(path.dirname(TRADE_CONTROL_FILE),{recursive:true});
+  const temp=TRADE_CONTROL_FILE+'.tmp';
+  fs.writeFileSync(temp,JSON.stringify(tradeControl),'utf8');
+  fs.renameSync(temp,TRADE_CONTROL_FILE);
+}
+function loadTradeControl(){
+  try{
+    if(fs.existsSync(TRADE_CONTROL_FILE)){
+      const c=JSON.parse(fs.readFileSync(TRADE_CONTROL_FILE,'utf8'));
+      tradeControl={paused:c.paused===true,resumedAt:c.resumedAt||null,pausedAt:c.pausedAt||null,lastStop:c.lastStop||null};
+    }
+  }catch(e){
+    // Fail closed if the persisted stop switch is unreadable.
+    tradeControl.paused=true;
+    console.error('TRADE_CONTROL_READ_ERROR',e.message);
+  }
+}
+
 const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
 const demoTrader=new DemoTrader({
   maxPositions:MAX,
@@ -625,6 +646,7 @@ async function executeLiveCycle(evals){
     const exit=wyckoffExit(saved,ev.strategy.price);
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
+  if(tradeControl.paused)return;
   for(const ev of evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade)){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
@@ -1112,6 +1134,15 @@ async function evaluateSymbol(s){
     }
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used});
+    if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
+      ev.entryConfirmed=false;
+      ev.entryEligible=false;
+      ev.rawDecision='HOLD';
+      ev.buyQualified=false;
+      ev.wyckoffTrade=null;
+      ev.buyReason=tradeControl.paused?'TRADING_PAUSED':'WAIT_NEW_WYCKOFF_SIGNAL';
+      if(ev.strategy)ev.strategy.buyConfirmed=false;
+    }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource='D1_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
@@ -1248,7 +1279,7 @@ async function runEvaluation(){
       demoTrader.error='BUY cycle delayed: Demo execution lock stayed busy for 60 seconds';
       setTimeout(()=>evalAll().catch(e=>console.error('Delayed evaluation failed',e.message)),1500).unref?.();
     }else{
-      await demoTrader.cycle(evals,{
+      await demoTrader.cycle(tradeControl.paused?evals.map(ev=>({...ev,entryConfirmed:false})):evals,{
         rotationEnabled:false,
         minScore:0,
         scoreGap:0,
@@ -1772,7 +1803,7 @@ const server=http.createServer((req,res)=>{
 
   if(req.method==='OPTIONS')return send(res,{},204);
   const protectedControl=req.method==='POST'&&(
-    u.pathname==='/api/binance-mode'||u.pathname.startsWith('/api/binance-live/')||
+    u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname.startsWith('/api/binance-live/')||
     (mode==='live'&&u.pathname==='/api/binance-agent/evaluate')
   );
   if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)){
@@ -1793,9 +1824,62 @@ const server=http.createServer((req,res)=>{
     return res.end(fs.readFileSync(path.join(D,f)));
   }
 
+  if(u.pathname==='/api/binance-trade-control'&&req.method==='POST'){
+    let body='';
+    req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy();});
+    req.on('end',async()=>{
+      try{
+        const action=JSON.parse(body||'{}').action;
+        if(!['stop','start'].includes(action))return send(res,{ok:false,error:'Invalid action'},400);
+        if(action==='start'){
+          // Remain stopped until previous positions are actually closed.
+          if(DEMO_TRADING && Object.keys(demoTrader.state.positions).length)
+            return send(res,{ok:false,error:'יש פוזיציות דמו שלא נסגרו. יש להשלים עצירה לפני התחלה.'},409);
+          if(mode==='live'&&Object.keys(trackedLivePositions(liveActionLog)).length)
+            return send(res,{ok:false,error:'יש פוזיציות LIVE שלא נסגרו. יש להשלים עצירה לפני התחלה.'},409);
+          tradeControl={...tradeControl,paused:false,resumedAt:new Date().toISOString(),lastStop:null};
+          saveTradeControl();
+          return send(res,{ok:true,tradeControl});
+        }
+        tradeControl.paused=true;
+        tradeControl.pausedAt=new Date().toISOString();
+        saveTradeControl();
+        // Wait for in-flight evaluation and order cycles to finish before liquidating.
+        if(evaluationInFlight)await evaluationInFlight;
+        const sold=[],failed=[];
+        if(mode==='live'){
+          if(!LIVE || !AUTO_EXECUTION)return send(res,{ok:false,tradeControl,error:'LIVE execution is not enabled; no liquidation was attempted'},409);
+          const gate=liveTradingGate(await getApiRestrictions());
+          if(!gate.ready||gate.withdrawalsEnabled)return send(res,{ok:false,tradeControl,error:'LIVE trading gate is not ready'},409);
+          await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+          const tracked=Object.keys(trackedLivePositions(liveActionLog));
+          for(const symbol of tracked){
+            try{await placeLiveMarketSell(symbol,'MANUAL_STOP_ALL');sold.push(symbol);}
+            catch(e){failed.push({symbol,error:e.message});}
+          }
+        }else if(DEMO_TRADING){
+          const result=await demoTrader.closeTrackedPositions('MANUAL_STOP_ALL');
+          sold.push(...result.sold);failed.push(...result.failed);
+        }else{
+          for(const symbol of Object.keys(paper.positions)){
+            const price=Number(streams[symbol]?.lastPrice);
+            if(!(price>0)){failed.push({symbol,error:'No fresh price'});continue;}
+            if(apply(symbol,'SELL',price,new Date().toISOString(),{reason:'MANUAL_STOP_ALL'}))sold.push(symbol);
+            else failed.push({symbol,error:'SELL not applied'});
+          }
+        }
+        tradeControl.lastStop={at:new Date().toISOString(),sold,failed};
+        saveTradeControl();
+        return send(res,{ok:failed.length===0,tradeControl,sold,failed},failed.length?207:200);
+      }catch(e){return send(res,{ok:false,tradeControl,error:e.message},500);}
+    });
+    return;
+  }
+
   if(u.pathname==='/api/binance-mode'&&req.method==='GET'){
     return send(res,{
       mode,
+      tradeControl,
       demoTradingEnabled:DEMO_TRADING,
       demoTradingError:demoTrader.error,
       liveTradingEnabled:LIVE,
@@ -1972,6 +2056,7 @@ const server=http.createServer((req,res)=>{
     return send(res,{
       wyckoffStats,
       mode,
+      tradeControl,
       symbols:SYMBOLS,
       streams,
       agents:Object.values(agents),
@@ -2061,6 +2146,7 @@ const server=http.createServer((req,res)=>{
 
 server.listen(PORT,'0.0.0.0',async()=>{
   console.log('Server',PORT);
+  loadTradeControl();
   loadPaperState();
   loadLiveActionLog();
   loadDecisionHistory();
