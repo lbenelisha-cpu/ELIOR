@@ -356,3 +356,13 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 }
 
 .scan-diagnostics{padding:7px 16px;border-bottom:1px solid #172b40;background:#081522;color:#83b8e8;font-size:10px;line-height:1.5;font-weight:700}
+
+/* Trading pause/resume — hidden buttons must stay hidden on mobile. */
+.trade-control-buttons{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.trade-control-buttons .status{white-space:normal;font-size:12px}
+.trade-control-buttons button{min-height:36px;padding:7px 12px;font-size:12px}
+.trade-control-buttons [hidden]{display:none!important}
+@media(max-width:680px){
+  .top-actions{flex-wrap:wrap}
+  .trade-control-buttons{width:100%;justify-content:flex-start}
+}
