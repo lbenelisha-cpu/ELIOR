@@ -1953,7 +1953,24 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-agent'&&req.method==='GET'){
+    const isWyckoffFill=a=>a?.strategyId==='WYCKOFF_D1_V1'||a?.wyckoffTrade?.strategyId==='WYCKOFF_D1_V1';
+    const wyckoffStats=mode==='live'
+      ? {
+          buys:liveActionLog.filter(a=>a.type==='BUY'&&isWyckoffFill(a)).length,
+          sells:liveActionLog.filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
+          closed:liveActionLog.filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
+          scope:'recent_live_log'
+        }
+      : DEMO_TRADING
+        ? {...demoTrader.wyckoffStats(),scope:'demo_persistent'}
+        : {
+            buys:(paper.actionLog||[]).filter(a=>a.type==='BUY'&&isWyckoffFill(a)).length,
+            sells:(paper.actionLog||[]).filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
+            closed:(paper.actionLog||[]).filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
+            scope:'paper_log'
+          };
     return send(res,{
+      wyckoffStats,
       mode,
       symbols:SYMBOLS,
       streams,
