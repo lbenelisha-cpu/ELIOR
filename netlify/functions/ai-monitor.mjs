@@ -4,6 +4,8 @@ export default async function monitor(){
  const errors=[];let symbols=[],checks=0,result=null,previous={},open=marketOpen(),completed=false;
  const diagnostics={waiting_assets:[]};
  try{
+  const policy=await db('rpc/paper_wyckoff_policy',{method:'POST',body:'{}'});
+  if(policy?.strategyId!=='WYCKOFF_D1_V1')throw Error('WYCKOFF_SQL_MIGRATION_REQUIRED');
   const [rows,status]=await Promise.all([db('paper_portfolio?select=symbol,units&status=eq.open'),db('agent_monitor_status?select=*&id=eq.1&limit=1')]);
   previous=status?.[0]||{};symbols=rows.map(p=>p.symbol);checks=Number(previous.checks||0)+1;
   diagnostics.last_success_at=previous.diagnostics?.last_success_at||null;

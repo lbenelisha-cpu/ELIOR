@@ -802,3 +802,9 @@ end $$;
 revoke all on function public.manage_paper_portfolio_legacy(text,jsonb,jsonb,numeric) from public,anon,authenticated,service_role;
 revoke all on function public.apply_paper_decision(text,timestamptz,numeric,numeric,numeric,timestamp,jsonb),public.apply_paper_cycle(timestamptz,numeric,jsonb),public.manage_paper_portfolio(text,jsonb,jsonb,numeric) from public,anon,authenticated;
 grant execute on function public.apply_paper_decision(text,timestamptz,numeric,numeric,numeric,timestamp,jsonb),public.apply_paper_cycle(timestamptz,numeric,jsonb),public.manage_paper_portfolio(text,jsonb,jsonb,numeric) to service_role;
+-- Published last: cloud callers fail closed until the complete migration is installed.
+create or replace function public.paper_wyckoff_policy() returns jsonb language sql security definer set search_path=public as $$
+ select jsonb_build_object('strategyId','WYCKOFF_D1_V1','timeframe','1d','targetMultiplier',1.07,'stopLossPct',6);
+$$;
+revoke all on function public.paper_wyckoff_policy() from public,anon,authenticated;
+grant execute on function public.paper_wyckoff_policy() to service_role;

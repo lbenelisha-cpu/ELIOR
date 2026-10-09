@@ -31,18 +31,18 @@
     {
       "file": "004-automation-plans.sql",
       "lines": 275,
-      "bytes": 22673,
-      "sha256": "7c609ee64a5fb36668df5ddb3077b7129e15902c577558ed23010eda9b4ea4da",
-      "changed": false,
+      "bytes": 22947,
+      "sha256": "f9dc71aa400c36e67751f7abd4c78dea5f37850f4dc55f460b61c1fbc09fd728",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "agent.mjs",
       "lines": 44,
-      "bytes": 3013,
-      "sha256": "f77d943fa0cca18fcdf80ca1e4c56ea539e826b4454bd61764e6674d64118d13",
-      "changed": false,
+      "bytes": 3056,
+      "sha256": "c3e6f51b70fa095b434e09f6578bda35b4f01e11a7ededb8fcf6a025ca61802c",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -58,18 +58,18 @@
     {
       "file": "ai-monitor (1).mjs",
       "lines": 2,
-      "bytes": 67,
-      "sha256": "f3f5a316fa62d62be61212a817e2d59d1b504602c087e0ed0a65e2eceaabcf3d",
-      "changed": false,
+      "bytes": 68,
+      "sha256": "9f1f695d36ab5da47fe032c159dc005e579a97c626fef58f50dfcdb14fce76b4",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "ai-monitor (2).mjs",
       "lines": 2,
-      "bytes": 67,
-      "sha256": "f3f5a316fa62d62be61212a817e2d59d1b504602c087e0ed0a65e2eceaabcf3d",
-      "changed": false,
+      "bytes": 68,
+      "sha256": "9f1f695d36ab5da47fe032c159dc005e579a97c626fef58f50dfcdb14fce76b4",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -94,9 +94,9 @@
     {
       "file": "atrade-market.html",
       "lines": 12,
-      "bytes": 2861,
-      "sha256": "40237c8dc59ec3fe0afc8b6ba1edeb7fee7547be1bbd85f13bd82705db00750a",
-      "changed": false,
+      "bytes": 2872,
+      "sha256": "0483ef412d5530aaa1e9ed0e557c004ffd9355fab783105a47f253ba69f6b8aa",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -112,36 +112,36 @@
     {
       "file": "atrade-panel.js",
       "lines": 49,
-      "bytes": 7085,
-      "sha256": "93bfc3545a06342b82d32d27d4a500cc96dd1c2d6c8bce6156f2749cf30e49fc",
-      "changed": false,
+      "bytes": 7133,
+      "sha256": "28136a627575891d83b4e04cae3001292aa5f3e727d835f76ea79b48896d8448",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "backtest-results.json",
       "lines": 6324,
-      "bytes": 210746,
-      "sha256": "7351a9ddb274908bdb174479639565327a19f8c33f2f74929b8f9d9f7b284626",
-      "changed": false,
+      "bytes": 217069,
+      "sha256": "8f0c79d0b2a9bff91190c9d988b37de2cb04da93d78b71434713f14cbc3a3598",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "binance-agent-portfolio.js",
       "lines": 24,
-      "bytes": 1527,
-      "sha256": "7255801ac87206d28edbbafd450490b04bda7b626c29f78417f06001327378fb",
-      "changed": false,
+      "bytes": 1550,
+      "sha256": "f1faa1f6749f9fa1aaf59447a388b9ea48034c8f81ea1e4dacde14278376494b",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "binance-agent.css",
       "lines": 359,
-      "bytes": 20524,
-      "sha256": "5ea7f404b76b550d841765f3bf63df6a431576f2698d24b64f729c0589f5a0fc",
-      "changed": false,
+      "bytes": 20882,
+      "sha256": "0b6735dd8d97e366f505b1e0b5f0778f6fa05ab0bf65635c540ddf356cfc1e8c",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -166,45 +166,45 @@
     {
       "file": "binance-demo-account.js",
       "lines": 21,
-      "bytes": 1612,
-      "sha256": "b580739ec5bb558bc84a0983256bf9ecaf2bb309bcf12e7b38a67ceb6c4c51e4",
-      "changed": false,
+      "bytes": 1632,
+      "sha256": "1aec1362d541fb8e5574d080b38b2194354c32d5f002060b74428bb828458589",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "binance-research-worker.mjs",
       "lines": 3,
-      "bytes": 250,
-      "sha256": "e53a7d4710f6f449a24a2ec68e4ab96974b1152d73a0b740325ec2ef621651ca",
-      "changed": false,
+      "bytes": 252,
+      "sha256": "effe3c0191b2295badd1eae8bd589dbaf5ab9aa4210e36a2c46510baa6e344d8",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "binance-research.css",
       "lines": 2,
-      "bytes": 786,
-      "sha256": "f39cfff75688b17439b3f0c7a3f0d65fbba796674da41c4597677969905dd9aa",
-      "changed": false,
+      "bytes": 787,
+      "sha256": "03a3a2c59ad4ee4df360df665c07775a13a9af4f26ccf5134806370b14e7b74a",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "binance-research.html",
       "lines": 10,
-      "bytes": 7476,
-      "sha256": "2224fed3f79fef342d41e5e8a22407159bcb30c212b484b6da02ed35591baa2f",
-      "changed": false,
+      "bytes": 7485,
+      "sha256": "d9ff4f0dcb62d329a23af7775c2e59e255dd15b77b394075d4c5b2e9b1257c0b",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "binance-research.js",
       "lines": 34,
-      "bytes": 9127,
-      "sha256": "4c782be568b42ae36a63dab81514d2d92b56d5e7dd0602227c772638c5613d08",
-      "changed": false,
+      "bytes": 9160,
+      "sha256": "466c7625eee968aecdfecbc584f1e3877d910e84d2344464bcfcb3d6d8d58bd2",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -220,45 +220,45 @@
     {
       "file": "BINANCE_ENTRY_COST_HE.md",
       "lines": 12,
-      "bytes": 2057,
-      "sha256": "99b4531fa44496d92a6412995661c9f390f197ab88762cca54b7137ec7a8ce7e",
-      "changed": false,
+      "bytes": 2068,
+      "sha256": "216a7477cc72c2b22e66d978a29c4eaad80c497f52f75fe9e447c87e5f86fba0",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "BINANCE_RESEARCH_HE.md",
       "lines": 27,
-      "bytes": 6320,
-      "sha256": "3e6822d882640228b57767958295d79455407fd5d5de1577b613fd08ba4faf0f",
-      "changed": false,
+      "bytes": 6346,
+      "sha256": "f177b320bd585724bd829c9944ce142957a32e693bfd40837ac22bd7b747b002",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "BINANCE_REVIEW_HE.txt",
       "lines": 16,
-      "bytes": 2718,
-      "sha256": "592f93ec70f5e8a0c48933cdfeda9c6191a1ae0945777381a13db2514816eec9",
-      "changed": false,
+      "bytes": 2733,
+      "sha256": "b531b0be4dfca62304e601735259d76fbf1e9a9b8d59615e262b8ac44d912a37",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "BINANCE_WAVE_SETUP_HE.txt",
       "lines": 37,
-      "bytes": 1576,
-      "sha256": "616a629d894369ed2e237bdbfd379448cd483f0cda7dc92b9f795c9cc529722c",
-      "changed": false,
+      "bytes": 1612,
+      "sha256": "39af8b5c34693b20599646a338b6c4747573671b4bec1f73744867eeb62f5690",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "cloud-state (3).js",
       "lines": 2,
-      "bytes": 60,
-      "sha256": "a920313f13db996c1d50583bff5b91051d94b58ebba02a2370d860fc5fae5ec3",
-      "changed": false,
+      "bytes": 61,
+      "sha256": "3e5690b5248c63e6c58a491c39d0c6225c5b0cb6a648e1869a9a90e7a70e9ced",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -283,8 +283,8 @@
     {
       "file": "colmex-execution-panel.js",
       "lines": 45,
-      "bytes": 11702,
-      "sha256": "acce283afc5a823c48a136f79aba59a4055e4f095f10ba7bcaf36796632bb291",
+      "bytes": 11701,
+      "sha256": "8a7bb20c103aa40dae0162afa4eaba63cc4dd5fab7aa674a0ed350ac6cad975a",
       "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
@@ -292,9 +292,9 @@
     {
       "file": "colmex-market.html",
       "lines": 12,
-      "bytes": 2816,
-      "sha256": "b95b6f952095535c966ea8881300dd0eedb5724132474e418ce89e2f93c42fd2",
-      "changed": false,
+      "bytes": 2827,
+      "sha256": "fcbee726fa351ac55a7f5e5e5007e7eb2fe7061827e0f4575b50dc1c720af2e2",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -319,9 +319,9 @@
     {
       "file": "config.js",
       "lines": 6,
-      "bytes": 233,
-      "sha256": "30dfd228befa088a505f06cae2b467abba38c2eaef0397a62a3fc1d9676ad634",
-      "changed": false,
+      "bytes": 238,
+      "sha256": "bbe45221b19d7a47fa3413b4f2420b4c22f11b83b85c49533678106928b32ed8",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -337,36 +337,36 @@
     {
       "file": "DEMO_ACCOUNT_SETUP_HE.txt",
       "lines": 21,
-      "bytes": 1373,
-      "sha256": "07a2016f107b0c186579af60aac92b9a46519feb5bbb32a8ed843ad53640ef18",
-      "changed": false,
+      "bytes": 1393,
+      "sha256": "9b55582e8602204f88a482410be2bfe118ba3e89fbf3daa08b4d91df9ce24c18",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "DEMO_TRADING_SETUP_HE.txt",
       "lines": 37,
-      "bytes": 4080,
-      "sha256": "41001eb2150ad61f98b95a2448c082ea5e0cee8e4e49e314f33c75b0e893a3aa",
-      "changed": false,
+      "bytes": 4116,
+      "sha256": "11ce4634f748cfee3291aa79f0067fca244ae60589c775f8e9918ef5aa4efd44",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "fx-rate (4).js",
       "lines": 2,
-      "bytes": 56,
-      "sha256": "3510ab09fa50efdc26b27b35ee219cd6ee8af52a0b9b80415960a7b4469bdc4e",
-      "changed": false,
+      "bytes": 57,
+      "sha256": "4ca503f9d78d522c880f9286ea9c539d922280c00b3e20c89234655c8aa66f1d",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "fx-rate.js",
       "lines": 25,
-      "bytes": 1200,
-      "sha256": "b816b5d610f6d106fcffb13c685c1a03855d7c48acea988de8bb83cd242efb60",
-      "changed": false,
+      "bytes": 1224,
+      "sha256": "bb6ffef3e83abfce5de376ee29a5a58dcc47bb038d17a4545bdded47a015f7ca",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -381,9 +381,9 @@
     },
     {
       "file": "INSTALL_ALL.sql",
-      "lines": 805,
-      "bytes": 63635,
-      "sha256": "2ec9b71dc6a47c3116fff7906bb8fbc50914ec33c7ebc2cbbe4987471b832459",
+      "lines": 811,
+      "bytes": 64130,
+      "sha256": "0984cd7bd7abd7f02b5bc81cfa3705a714ecf1110c1cb476acaa11a23ae9266e",
       "changed": true,
       "syntax": null,
       "missingRelativeImports": []
@@ -436,9 +436,9 @@
     {
       "file": "lib/atrade-contracts.mjs",
       "lines": 24,
-      "bytes": 2797,
-      "sha256": "0411fe41fc622d8d5d910e18ad656e4ecb2210710e18101c6419d7c36f5ee8b7",
-      "changed": false,
+      "bytes": 2820,
+      "sha256": "eb021e0f468e677d9b232b30932bcc38e70b02c9588f6a55b43635080aecf9c5",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -454,36 +454,36 @@
     {
       "file": "lib/benchmark.mjs",
       "lines": 10,
-      "bytes": 1054,
-      "sha256": "f2c50c0b6f38fbce03b83d0d2ff2d937a8c0e07fd405813331c528c5c1f04680",
-      "changed": false,
+      "bytes": 1063,
+      "sha256": "3438369e0ab7e0ee7df688efac3ff8c5d2ff7cd40513495eec735e840d818b0f",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-control-auth.mjs",
       "lines": 7,
-      "bytes": 370,
-      "sha256": "d6e0e22a114955b233b9abb51d5f510bbb5405c91b6de91aefdf06c864470dce",
-      "changed": false,
+      "bytes": 376,
+      "sha256": "2510c223dbc45a615ad210116e0f6f487f834b612b2ecd803db328fa2d88ae7c",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-demo-account.mjs",
       "lines": 42,
-      "bytes": 2432,
-      "sha256": "f7bd2feb1efda44c89ec92aed4d9667cd6624cb319986f398464b38a817a56a0",
-      "changed": false,
+      "bytes": 2473,
+      "sha256": "be23e56dd36e4c4d288836f740f86b1b8a58ab4a7689c339bdee3008e200d265",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-demo-account.test.mjs",
       "lines": 21,
-      "bytes": 1755,
-      "sha256": "321eb12f7115f7872c2dfef6bffc65033c6d7f32b671ffc697664eed6fa5264c",
-      "changed": false,
+      "bytes": 1775,
+      "sha256": "362987be39d73c9074e09537488729edccdd60e0ae6fc4d5783e4cd755bd8b32",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -499,54 +499,54 @@
     {
       "file": "lib/binance-demo-trader.test.mjs",
       "lines": 193,
-      "bytes": 13636,
-      "sha256": "1f8701d7924c82e9547f0327e62b2f0ae8f72c870b7c9292de35b6a41f318363",
-      "changed": false,
+      "bytes": 13828,
+      "sha256": "6d1057c651d4d5516c3db4ffaca8cb3aa1b3a39fff11b79fb71bb2a0714bd6ea",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-entry-cost.mjs",
       "lines": 35,
-      "bytes": 3124,
-      "sha256": "0f96363556004feb25f44579e4d250c94e58d1d900287712b35b2f3ec9e575ce",
-      "changed": false,
+      "bytes": 3158,
+      "sha256": "367327b62ab164756699af45b15e313d9f4e313f2320b8409855012824169d9d",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-live-price.mjs",
       "lines": 11,
-      "bytes": 457,
-      "sha256": "c359621119a7b22df72e27435772135387527059ff10f60ae0bce10c930dc3a4",
-      "changed": false,
+      "bytes": 467,
+      "sha256": "dc6344f39cf6f25c19df56e972df72ef9b00b42ebb22a93e0202c7aa2a57d3f4",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-research-data.mjs",
       "lines": 28,
-      "bytes": 2914,
-      "sha256": "8902ff752608818866a1c8d3a36384fa4d5febb9011e1694a11bd5dac4df7cf0",
-      "changed": false,
+      "bytes": 2941,
+      "sha256": "1744e97420ae143d951c1ab6d7fd6b6f595939cd02b7dee52d50f1254f288d35",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-research-engine.mjs",
       "lines": 67,
-      "bytes": 7119,
-      "sha256": "d21db797f31b2df3b3138e1138ae5f7d243fa132c5ed5b8e8fd199ca77e0bb63",
-      "changed": false,
+      "bytes": 7185,
+      "sha256": "f8ec53737013666e98b2f9faeaa0c387f0df50fd18abc3078aca519a0afc1d3c",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/binance-wave-agent.mjs",
       "lines": 34,
-      "bytes": 2168,
-      "sha256": "c9e5c146e3d3335b4d744587b7d14f7b1f907a806a9490142c1913e2e96b77c3",
-      "changed": false,
+      "bytes": 2201,
+      "sha256": "707e7c1e3de472df6024149878bc0989354b48f0e31ef09d51b003488323beca",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -562,9 +562,9 @@
     {
       "file": "lib/colmex-contracts.mjs",
       "lines": 24,
-      "bytes": 2797,
-      "sha256": "effdd5f28508e03676dc0e7bd00194924aa561caeb3106a241f51bce9c3e3d16",
-      "changed": false,
+      "bytes": 2820,
+      "sha256": "2b157d389d525c2a37967d2cfd7ff4082a86ebbdf101db62af246c99e2e36661",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -580,9 +580,9 @@
     {
       "file": "lib/colmex-fx.mjs",
       "lines": 19,
-      "bytes": 1452,
-      "sha256": "53c1457d2f0abffdb6d67a464306ef78d9f075fec5ce05683d87b8150e32ed85",
-      "changed": false,
+      "bytes": 1470,
+      "sha256": "367921d08552e6203d212b6d476a94f17e160ab438aca5818967156b08cee40f",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -625,9 +625,9 @@
     {
       "file": "lib/meitav-experiments.mjs",
       "lines": 42,
-      "bytes": 3822,
-      "sha256": "90e65c9a5680cc8fcb3ebe7364d992f087aea5906997fab272613e13fd38c1a2",
-      "changed": false,
+      "bytes": 3863,
+      "sha256": "7f22eb486c02253d183a5b7bdfbf3a018267cbc10324b8a825b20773346c4f13",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -643,18 +643,18 @@
     {
       "file": "lib/meitav-research.mjs",
       "lines": 59,
-      "bytes": 6244,
-      "sha256": "c8d805c89fd6b45660503bef5f9422164078463b6c24803f88631bf5b9ed848e",
-      "changed": false,
+      "bytes": 6302,
+      "sha256": "9aea4c429cfc6170399d079bedc1b6433c77b24623af47a5847467f8df2648f1",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "lib/meitav-wave-strategy.mjs",
       "lines": 35,
-      "bytes": 2169,
-      "sha256": "c218fc04f1eb3f1e92f976a6b0e6f4e5d00930050ac6b435aca7c4123d3171c5",
-      "changed": false,
+      "bytes": 2203,
+      "sha256": "87aae23b2e67c656141135858c8b4b6b1c96347a3a9d35076e8e75d2872896a3",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -670,9 +670,9 @@
     {
       "file": "lib/scan-history.mjs",
       "lines": 14,
-      "bytes": 1040,
-      "sha256": "d2c0a9d6f476717f9fb0a5cb29ad3b2a236d7d2dfeb6cf2d9ffbbafe36100cc1",
-      "changed": false,
+      "bytes": 1053,
+      "sha256": "1e5aac9fac8ae8b8391e974faf9ef7e49b70922cd2bb193b293378c9f1531b4f",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -715,27 +715,27 @@
     {
       "file": "market-data (1).js",
       "lines": 54,
-      "bytes": 2319,
-      "sha256": "8e7e2834309c73f82cd37b19d2fa25f0e5a9b81d21ae9e3243a1f82fff9d272f",
-      "changed": false,
+      "bytes": 2372,
+      "sha256": "249faa0c6cb95c47b366c1a27c8324d67ef1ba9a3b9f1eec9ce169972ec5528a",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "market-data.js",
       "lines": 54,
-      "bytes": 2319,
-      "sha256": "8e7e2834309c73f82cd37b19d2fa25f0e5a9b81d21ae9e3243a1f82fff9d272f",
-      "changed": false,
+      "bytes": 2372,
+      "sha256": "249faa0c6cb95c47b366c1a27c8324d67ef1ba9a3b9f1eec9ce169972ec5528a",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "market-scanner.js",
       "lines": 2,
-      "bytes": 64,
-      "sha256": "0723b373da3221040485203ff68c166e0c94a76d6ad8046ad065f966b466e154",
-      "changed": false,
+      "bytes": 65,
+      "sha256": "f4dfc63d483c0b5d75f86d07e88cb4aeb9bb523c479c88c1c5bb1c44449e6090",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -751,9 +751,9 @@
     {
       "file": "meitav-agent.css",
       "lines": 284,
-      "bytes": 17613,
-      "sha256": "2f77daf8cec26280ed2fc80c3fbdd377f0b708ba0d6aee27f18a9561a69790cf",
-      "changed": false,
+      "bytes": 17896,
+      "sha256": "cb672e0c04fc4132a88f979268113d9cebc742ae8fddd30e5a274178a33ec83b",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -778,27 +778,27 @@
     {
       "file": "meitav-research-worker.mjs",
       "lines": 6,
-      "bytes": 229,
-      "sha256": "b4eabca06795ca3de1da0163f8f104bbb312cdb07943bb76572502896a49362e",
-      "changed": false,
+      "bytes": 234,
+      "sha256": "2fe5ed5daf1b64d8327eb245cbee3b8e4869a44af78a24bb2d171dd9e642d899",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "MEITAV_SETUP_HE.md",
       "lines": 51,
-      "bytes": 9601,
-      "sha256": "05a978a6fc53ff0602c95cd5cfbc8a9c92fe89826fd9d7564f83320e7ace24c2",
-      "changed": false,
+      "bytes": 9651,
+      "sha256": "62e72abfa6e26c375c017c5d5ad638ae38d25cc6433dac3d73354c6f9f84b3ba",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "mt4/buying-power.mjs",
       "lines": 14,
-      "bytes": 1243,
-      "sha256": "07684106382ece84aed3487a474aebd1ffd714c56cc08640f04bccd000619143",
-      "changed": false,
+      "bytes": 1256,
+      "sha256": "92a153223f380bbdd5cbf2b125c218d3f4ed6a71d886e5235fd11eda73f6a41a",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -859,9 +859,9 @@
     {
       "file": "mt4/orders.mjs",
       "lines": 42,
-      "bytes": 3176,
-      "sha256": "5a84645d5ef57020818e7b592cbd773e23ce19ca558e1da935248d13848bfe4d",
-      "changed": false,
+      "bytes": 3217,
+      "sha256": "9bf84c1a977d6dd09bcc068e0bd838d20001c33ecfbce125c910afd24a6f66b1",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -895,9 +895,9 @@
     {
       "file": "mt4-demo.html",
       "lines": 9,
-      "bytes": 3712,
-      "sha256": "caf5f36955c0dfd9f2397caed80cd3d106bd02002cf4037ead22d5d7096aabf1",
-      "changed": false,
+      "bytes": 3720,
+      "sha256": "18ad4a8997128678ac1ee06ba0a088915b18d8fae5c79905b941c4d92a4404f0",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -958,9 +958,9 @@
     {
       "file": "mt5/Start-MT5.ps1",
       "lines": 16,
-      "bytes": 1196,
-      "sha256": "80331b37eeb779373188a0119261328f5ce0f761b44ccbe1dc53c4fc800faed4",
-      "changed": false,
+      "bytes": 1211,
+      "sha256": "8815b89932b362c7ff095923009828eb105441142b4c0f30ff06c54ef6574eef",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -976,9 +976,9 @@
     {
       "file": "mt5.css",
       "lines": 2,
-      "bytes": 585,
-      "sha256": "4ea217843da5706bb5ad741a85a40b4fe2bc6d99669f035826036561a6743de3",
-      "changed": false,
+      "bytes": 586,
+      "sha256": "baadd98106ea88c6311ce66bb28df2110c775a9f2554f245411fe8fc1a2574db",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -993,9 +993,9 @@
     },
     {
       "file": "netlify/functions/ai-monitor.mjs",
-      "lines": 43,
-      "bytes": 3784,
-      "sha256": "2166bde3395c9b0ab5023a22fd5020679dc8950aa478a97ab8d1f39f9ed3d591",
+      "lines": 45,
+      "bytes": 3952,
+      "sha256": "ee3f39d56f41161f62a84b719f540d3c01d7a5e8c15018927d592bb1a93e80a3",
       "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
@@ -1012,17 +1012,17 @@
     {
       "file": "netlify/functions/binance-research-market.mjs",
       "lines": 11,
-      "bytes": 1115,
-      "sha256": "beba774f6dd6c0f5e0ca365310bda350fa4a847055eee824a6fbc93e2c72064c",
-      "changed": false,
+      "bytes": 1125,
+      "sha256": "0901e442f6fcb440703abe1d1a79564a9eb9704c673604626fe70bbda9491119",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "netlify/functions/cloud-state.js",
-      "lines": 38,
-      "bytes": 3382,
-      "sha256": "b36c12cffb46096571fa1ba16ae586e9fd4f29eb6eaaa60085ac6cdc757c23f8",
+      "lines": 40,
+      "bytes": 3551,
+      "sha256": "50c90e39599ed192c634404f26f95d3b8dad1f9f9379d75fa46557189b6d0228",
       "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
@@ -1057,18 +1057,18 @@
     {
       "file": "netlify/functions/fx-rate.js",
       "lines": 19,
-      "bytes": 873,
-      "sha256": "a138375edb9ff5bcb6ec9980958659b18b464ef5a6cef78795b7c6376041afd9",
-      "changed": false,
+      "bytes": 891,
+      "sha256": "5bcaeef1a5eef57368a321e655fa7ea06ccc8ce2356fe7293f79bff4ea70de64",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "netlify/functions/market-data.js",
       "lines": 44,
-      "bytes": 1836,
-      "sha256": "952c81f0d6d34c53873e1048758938dd39ffc48dedd601d2460b99b2edd02554",
-      "changed": false,
+      "bytes": 1879,
+      "sha256": "01db39899947f159bc5e299e37e8efa2a060df33b3548047fc8b02b9dbe5ccba",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1084,9 +1084,9 @@
     {
       "file": "netlify/functions/meitav-market.mjs",
       "lines": 20,
-      "bytes": 1971,
-      "sha256": "db8b923d96eddd3d02dcd4b48d9bedd135b6815f6202aa2368ec1125e17c5e74",
-      "changed": false,
+      "bytes": 1990,
+      "sha256": "c00a718cccd7c867df76c3820dc8ca46190a47f8ed6c3055a6c67002c54bb61d",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1102,9 +1102,9 @@
     {
       "file": "netlify/functions/nvda-breakout-backtest.mjs",
       "lines": 224,
-      "bytes": 6483,
-      "sha256": "6931ae6d3a3305522cbf47206b81054f361babbab4f0273ed326705451e043b5",
-      "changed": false,
+      "bytes": 6706,
+      "sha256": "e085354c23896b5081e8c4d2995240b1fa79ce2b19d022c469a6408dcbfa4bb0",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1129,9 +1129,9 @@
     {
       "file": "package-lock.json",
       "lines": 734,
-      "bytes": 27626,
-      "sha256": "3b4eec2fbcc0e1f16c37e14e3fe74c3d9efa1baca3d66a6ba8452c2ee626378c",
-      "changed": false,
+      "bytes": 28359,
+      "sha256": "83a3a811c645a2da9322e5380392624e984e85a6b5acb7bbac84296106000e84",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -1264,35 +1264,35 @@
     {
       "file": "sql/004-automation-plans.sql",
       "lines": 275,
-      "bytes": 22673,
-      "sha256": "7c609ee64a5fb36668df5ddb3077b7129e15902c577558ed23010eda9b4ea4da",
-      "changed": false,
+      "bytes": 22947,
+      "sha256": "f9dc71aa400c36e67751f7abd4c78dea5f37850f4dc55f460b61c1fbc09fd728",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "sql/005-market-cache.sql",
       "lines": 25,
-      "bytes": 2003,
-      "sha256": "a4ad14e412a18b2aef39efe142023b5b14d2db9a33d26620699259e88d09d48c",
-      "changed": false,
+      "bytes": 2027,
+      "sha256": "8f49da6ba17062cb227da5f6916292e702f6169b20b3a91d8c7464e369be384c",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "sql/006-wyckoff-daily.sql",
-      "lines": 97,
-      "bytes": 8240,
-      "sha256": "a5e98d83cdf8a32814b127058ff98f2d0e57fb6730f545f15352529e6e674d97",
+      "lines": 103,
+      "bytes": 8735,
+      "sha256": "9e55a416c175ca9bb1edfd58856782e38e4320c00294ac947a867b5d5bb9c2db",
       "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
     {
       "file": "sql/INSTALL_ALL.sql",
-      "lines": 829,
-      "bytes": 65566,
-      "sha256": "af8609d53a3bd3e4ae3983447aab802a88520d3d3c7b6cb64f1d7c1f3948ddbb",
+      "lines": 835,
+      "bytes": 66061,
+      "sha256": "48f86f731b42865c2b526032c85b06cc03f3b8f05f5aa5118e50720c3abf4fd4",
       "changed": true,
       "syntax": null,
       "missingRelativeImports": []
@@ -1318,9 +1318,9 @@
     {
       "file": "tests/binance-control-auth.test.mjs",
       "lines": 9,
-      "bytes": 537,
-      "sha256": "706404e544d0ca3d53e4e744e0d27602c923b71be38c030bf34eb13ff7e43e10",
-      "changed": false,
+      "bytes": 545,
+      "sha256": "03aaede4c8318be0faae2bcfb55ba0be54fc013298126dede21c2a6117f21ae5",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1336,63 +1336,63 @@
     {
       "file": "tests/binance-entry-cost.test.mjs",
       "lines": 21,
-      "bytes": 1242,
-      "sha256": "24f5145fa402145d48f1ed012b4261e2b7835171ea1fad3ef83a79f563b40337",
-      "changed": false,
+      "bytes": 1262,
+      "sha256": "6af1cc097057e4677753daaae9456dbe6892e1b757cbdc4f394b3951d7bea0f5",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/binance-live-price.test.mjs",
       "lines": 15,
-      "bytes": 829,
-      "sha256": "da626f2d615c70275d7de9f85832df0661c8f830cccc8155be6960dc54f0a142",
-      "changed": false,
+      "bytes": 843,
+      "sha256": "1639e7d21db0d922757589233b65a9c140a77744f97adcd3fe96817996685d73",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/binance-pnl-ui.test.mjs",
       "lines": 30,
-      "bytes": 2793,
-      "sha256": "5a513612fc5e7ed448060373162fb6d85336ba62c9906cf169e80002a4800b09",
-      "changed": false,
+      "bytes": 2822,
+      "sha256": "0785fdc2ca65bcdedf4c35bfa37792783cdf7f440ddfc3c042cc75c96f7f0228",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/binance-research.test.mjs",
       "lines": 41,
-      "bytes": 4820,
-      "sha256": "85abd46005c867fb5f9bba272511b13cfed4a80a376809deb62170d94bf26cd7",
-      "changed": false,
+      "bytes": 4860,
+      "sha256": "d677648ce592951942874eac66b1270fa94acac2e2a365d663b3cbade66782eb",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/binance-stream-lifecycle.test.mjs",
       "lines": 42,
-      "bytes": 3066,
-      "sha256": "efb0547ead514da641f4d680fa219c6a5875909e2847b17bebdab203fc1d10ba",
-      "changed": false,
+      "bytes": 3107,
+      "sha256": "0ee001269384697d394d7db1d14217d8096d4858a0f61940587c004cbf05cab4",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/binance-wave-agent.test.mjs",
       "lines": 6,
-      "bytes": 936,
-      "sha256": "1145a3b5d928b0677663dd82b37c938a6837ed29604d1eb643ee1f2693f46c44",
-      "changed": false,
+      "bytes": 941,
+      "sha256": "9865f54c6f3d6ee0cd2c58984729f5abdbbe138d59b7538b67fe1e01f56a248a",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
     {
       "file": "tests/bridge-security.test.mjs",
       "lines": 12,
-      "bytes": 837,
-      "sha256": "605555717903662d7a243f2fe13dd7cbbe446c160b3413949dff4b487203ab9f",
-      "changed": false,
+      "bytes": 848,
+      "sha256": "9d6c7877808ce643bcff88275bbd7f9382a5c78da279b561d315199bbb509746",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1408,9 +1408,9 @@
     {
       "file": "tests/cache.test.mjs",
       "lines": 22,
-      "bytes": 1267,
-      "sha256": "cbba5c6b4aedf624f4947d3ce8a679cda37942d2c7344ecb48044e5ea694e3fa",
-      "changed": false,
+      "bytes": 1288,
+      "sha256": "b972aa3e98f833903b63dd81e4c886ec339ecc70b5c7bdbc7103fc8bd7262dd9",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1435,9 +1435,9 @@
     {
       "file": "tests/meitav-research.test.mjs",
       "lines": 30,
-      "bytes": 3232,
-      "sha256": "2c4d9b93f22eac7fb9a833ebcba3d508da150336ccacec0d4251ba22e96aa2af",
-      "changed": false,
+      "bytes": 3261,
+      "sha256": "a46e242d3e9a938fea1f61b243462aeb9fb2c14a10da0095a7939aa789e22731",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1452,9 +1452,9 @@
     },
     {
       "file": "tests/monitor.test.mjs",
-      "lines": 29,
-      "bytes": 3216,
-      "sha256": "c15987d604b815a8bee63863fcd949f974fdbf972608475b77c4df6d8f65d2d3",
+      "lines": 41,
+      "bytes": 4089,
+      "sha256": "1590abc79f2c56f729376cf4f6bfd7f05133fdbe731eb68834199f0a8ded0f6a",
       "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
@@ -1462,9 +1462,9 @@
     {
       "file": "tests/mt4-live.test.mjs",
       "lines": 7,
-      "bytes": 1024,
-      "sha256": "fa257e5407fd41938f9557fbd72a31b3b4b13833acf158e42b70f390af175d8c",
-      "changed": false,
+      "bytes": 1030,
+      "sha256": "4545751928d4c3525d1b8bb55729c8380b4c3518e4523dfeba847156ee5d4945",
+      "changed": true,
       "syntax": "PASS",
       "missingRelativeImports": []
     },
@@ -1624,9 +1624,9 @@
     {
       "file": "UPGRADE_V63_HE.txt",
       "lines": 10,
-      "bytes": 1161,
-      "sha256": "ad9b6d48a2e6df41aeaece6fb59db3d932bf235a4542e67591b6354fb2f778d5",
-      "changed": false,
+      "bytes": 1170,
+      "sha256": "79745a217f49f950ec3fe873a3d92563ae3e5ce11d73660831a064bbdc360e04",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     },
@@ -1642,9 +1642,9 @@
     {
       "file": "הסבר תצוגת גרף.html",
       "lines": 359,
-      "bytes": 908023,
-      "sha256": "e0c4df9b6fccfc85350781b3f7f6dc061b3e9882b54e5aaa2a154fedaadcf560",
-      "changed": false,
+      "bytes": 908381,
+      "sha256": "42b579e1b5e5421164cf3720a6e703ec47233798efcb14768e0cc783fe7fd504",
+      "changed": true,
       "syntax": null,
       "missingRelativeImports": []
     }

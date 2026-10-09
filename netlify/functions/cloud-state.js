@@ -23,9 +23,11 @@ export async function handler(event){
   if(action==='get')return {statusCode:200,headers,body:JSON.stringify(await state())};
   if(event.httpMethod!=='POST')return {statusCode:405,headers,body:JSON.stringify({error:'POST required'})};
   if(!['save_portfolio','close_portfolio','update_plan','reset','account_snapshot'].includes(action))throw Error('Unknown action');
+  const policy=await db('rpc/paper_wyckoff_policy',{method:'POST',body:'{}'});
+  if(policy?.strategyId!=='WYCKOFF_D1_V1')throw Error('WYCKOFF_SQL_MIGRATION_REQUIRED');
   let quotes={},fx=null;
   if(['save_portfolio','close_portfolio','account_snapshot'].includes(action)){
-   const rows=await db('paper_portfolio?select=symbol&status=eq.open');
+    const rows=await db('paper_portfolio?select=symbol&status=eq.open');
    const symbols=[...new Set([...rows.map(p=>p.symbol),...(action==='save_portfolio'?[String(body.symbol||'').toUpperCase()]:[])])];
    if(symbols.some(s=>!/^[A-Z.\-]{1,12}$/.test(s)))throw Error('Invalid symbol');
    const [rate,values]=await Promise.all([td('price',{symbol:'USD/ILS'}),Promise.all(symbols.map(async symbol=>[symbol,await dailyWyckoffQuote(symbol)]))]);
