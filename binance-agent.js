@@ -578,13 +578,37 @@ async function load(){
   }
 }
 
+async function authenticatedControl(url,body){
+  if(!tradeControlToken){
+    const token=prompt('הזן את קוד בקרת המסחר (BINANCE_CONTROL_TOKEN) המוגדר בשרת — לפחות 32 תווים:');
+    if(!token)return null;
+    const trimmed=token.trim();
+    if(trimmed.length<32)throw Error('קוד בקרת המסחר חייב להכיל לפחות 32 תווים.');
+    tradeControlToken=trimmed;
+  }
+  try{
+    return await J(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tradeControlToken},
+      body:JSON.stringify(body)
+    });
+  }catch(e){
+    if(/401|Authenticated control required/i.test(e.message)){
+      tradeControlToken=null;
+      throw Error('האימות נכשל. יש להגדיר בשרת BINANCE_CONTROL_TOKEN באורך 32 תווים לפחות ולהזין כאן את אותו הקוד.');
+    }
+    throw e;
+  }
+}
+
 async function setMode(m){
   try{
     const cur=await J(MODE);
     if(cur.mode===m)return load();
     if(m==='live'&&!confirm('לעבור ל-LIVE?'))return;
-    await J(MODE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:m})});
-    load();
+    const result=await authenticatedControl(MODE,{mode:m});
+    if(result===null)return;
+    await load();
   }catch(e){alert(e.message)}
 }
 
@@ -592,21 +616,13 @@ async function sendTradeControl(action){
   if(tradeControlWorking)return;
   if(action==='stop'&&!confirm('עצירת המסחר תשלח פקודות מכירה לכל הפוזיציות של הסוכן במצב הנבחר (DEMO או LIVE). אין אפשרות להבטיח את מחיר הביצוע. להמשיך?'))return;
   if(action==='start'&&!confirm('לחדש את המסחר האוטומטי? כניסות חדשות יחכו לאות וויקוף חדש.'))return;
-  if(!tradeControlToken){
-    const token=prompt('הזן את קוד בקרת המסחר (BINANCE_CONTROL_TOKEN) המוגדר בשרת:');
-    if(!token)return;
-    tradeControlToken=token.trim();
-  }
   tradeControlWorking=true;
   $('#stopTradingBtn').disabled=true;
   $('#startTradingBtn').disabled=true;
   put('#tradeControlStatus',action==='stop'?'מבצע עצירה וסגירת פוזיציות…':'מחדש מסחר…');
   try{
-    const r=await J(TRADE_CONTROL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tradeControlToken},
-      body:JSON.stringify({action})
-    });
+    const r=await authenticatedControl(TRADE_CONTROL,{action});
+    if(r===null)return;
     if(!r.ok){
       const details=(r.failed||[]).map(x=>x.symbol+': '+x.error).join('; ');
       alert('המסחר נשאר עצור. '+(r.error||details||'חלק מהפוזיציות לא נסגרו'));
