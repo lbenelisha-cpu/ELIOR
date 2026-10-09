@@ -78,6 +78,6 @@ test('opening account balance is not plotted as a stock loss; journal is retaine
 test('old monitor cannot report new agent success and budget wait is explicit',()=>{
  const u=ui();u.accept(data([pos(1,'SPY')],{monitor:{status:'ok',checked_at:new Date().toISOString(),note:'old agent'}}));
  assert.match(u.el('monitorStatus').textContent,/ממתין לסוכן המעודכן/);
- u.accept(data([pos(1,'SPY')],{monitor:{status:'waiting',checked_at:new Date().toISOString(),note:'V6.3 · wait'}}));
+ u.accept(data([pos(1,'SPY')],{monitor:{status:'waiting',checked_at:new Date().toISOString(),note:'V6.3 · ממתין למכסת נתונים'}}));
  assert.match(u.el('monitorStatus').textContent,/ממתין למכסת/);
 });

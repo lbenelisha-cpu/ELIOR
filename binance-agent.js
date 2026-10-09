@@ -104,6 +104,7 @@ function decisionFor(a,isHeld,activeCount,maxPositions,weakestActive,rotationGap
   if(!isLive) return a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
   if(isHeld) return s.sellConfirmed?'SELL':'HOLD';
   if(s.buyConfirmed){
+    if(activeCount>=maxPositions)return 'WAIT · NO SLOT';
     if(activeCount<maxPositions) return 'BUY READY';
     const gap=weakestActive?Number(a.score||0)-weakestActive.score:-999;
     return (Number(a.score||0)>=Number(currentAgentData?.config?.rotationMinScore||65)&&gap>=rotationGap)
@@ -152,18 +153,7 @@ function render(d,currentMode='demo',liveAccount=null){
 
   const sd=d.config?.strategyDiagnostics||{};
   const nearest=(sd.nearestToTarget||[])[0];
-  put('#strategyDiagnostics',
-    '1m מוכנים '+(sd.minuteReady??0)+'/'+(sd.evaluated??0)+
-    ' · דשדוש '+(sd.consolidation??0)+
-    ' · פריצות חזקות '+(sd.strongBreakouts??0)+
-    ' · שלב 1 מוכן '+(sd.stage1Ready??0)+
-    ' · שלב 2 מוכן '+(sd.stage2Ready??0)+
-    ' · מועמדי ביצוע '+(sd.executionCandidates??0)+
-    ' · ניסיונות BUY '+(sd.demoAttempts??0)+
-    ' · בוצעו '+(sd.demoFilled??0)+
-    ' · נדחו '+(sd.demoRejected??0)+
-    (nearest?' · שלב 2 קרוב: '+nearest.symbol+' · חסר '+fmt(nearest.remainingPct,2)+'%':'')
-  );
+  put('#strategyDiagnostics','D1 מוכנים '+(sd.dailyReady??0)+'/'+(sd.evaluated??0)+' · דשדוש '+(sd.consolidation??0)+' · Spring '+(sd.spring??0)+' · מועמדים '+(sd.executionCandidates??0)+' · בוצעו '+(sd.demoFilled??0)+' · נדחו '+(sd.demoRejected??0));
 
   if(!activeAgents.length){
     put('#scanStatusMessage','נסרקו '+agents.length+' · מוצגים '+agents.length+' · אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');

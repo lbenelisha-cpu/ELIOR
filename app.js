@@ -56,7 +56,7 @@ function renderMonitor(){
   const st=$("monitorStatus"),last=$("monitorLast"),checks=$("monitorChecks"),detail=$("monitorDetail");if(!st)return;
   const m=cloudMonitor||monitorFallback();
   if(!m){st.textContent="ממתין";st.className="big yellow";last.textContent="—";checks.textContent="0";detail.textContent="ממתין לבדיקה האוטומטית הראשונה";return}
-  const modern=/^V6\.[34]/.test(String(m.note||""));
+  const modern=/^(V6\.[34]|V7\.0)/.test(String(m.note||""));
   const ok=modern&&m.status==="ok"&&Date.now()-Date.parse(m.checked_at)<40*60000,err=m.status==="error";st.textContent=ok?"מחזור אחרון הצליח":err?"שגיאה":!modern?"ממתין לסוכן המעודכן":m.status==="waiting"?(String(m.note).includes("מסונכרנים")?"ממתין לסנכרון נתונים":(String(m.note).includes("מכסת")?"ממתין למכסת נתונים":"ממתין לנתונים")):"ממתין";st.className="big "+(ok?"green":err?"red":"yellow");
   last.textContent=m.checked_at?new Date(m.checked_at).toLocaleString("he-IL"):"—";checks.textContent=Number(m.checks||0).toLocaleString("he-IL");
   const syms=Array.isArray(m.symbols)?m.symbols.join(" + "):"";
@@ -104,7 +104,7 @@ function renderScanner(){
   if(!body)return;
   const rows=scannerData?.candidates||[];
   const history=(scannerData?.history||[]).slice(0,10),historyBody=$("scanHistory"),explanation=$("scanExplanation");
-  if(explanation)explanation.textContent='מוצגות עד 10 סריקות סוכן שמורות. תצוגות ביניים מנתונים חלקיים אינן נשמרות כסריקת סוכן, ולכן לא תמיד ניתן לשחזר שינוי שנראה לפני דקות אחדות. מעבר אוטומטי דורש גם 3 אישורים רצופים, ציון של לפחות 60 ויתרון של 10 נקודות, בהתאם להגדרות התיק.';
+  if(explanation)explanation.textContent='מוצגות עד 10 סריקות סוכן שמורות. תצוגות ביניים מנתונים חלקיים אינן נשמרות כסריקת סוכן, ולכן לא תמיד ניתן לשחזר שינוי שנראה לפני דקות אחדות. החלטות חדשות משתמשות בתבנית וויקוף מנרות יומיים סגורים כולל פתילים. יעד: 7% מעל השיא הראשוני; עצירה: 6% מתחת למחיר הקנייה.';
   if(historyBody)historyBody.innerHTML=history.length?history.map(x=>'<tr><td>'+escapeHTML(new Date(x.time).toLocaleString('he-IL'))+'</td><td>'+escapeHTML(x.symbol)+'</td><td>'+escapeHTML(x.score)+'/100</td><td>'+['market','trend','risk','momentum'].map(k=>k+': '+(x[k]??'—')).map(escapeHTML).join(' · ')+'</td><td style="white-space:normal;min-width:260px">'+escapeHTML(x.reason)+'</td></tr>').join(''):'<tr><td colspan="5">אין עדיין סריקות שמורות להסבר. לא ניתן לקבוע בדיעבד מדוע השתנתה תצוגה שלא נשמרה.</td></tr>';
   if(!rows.length){
     body.innerHTML='<tr><td colspan="9" class="muted">ממתין לסריקת מועמדים.</td></tr>';
@@ -114,7 +114,7 @@ function renderScanner(){
   }
   if(best){
     const top=rows[0],lead=scannerData?.leader;
-    const verify=lead?` · ${lead.consecutive}/${lead.required} ${lead.verified?"✓ מאומת":"ממתין"}`:"";
+    const verify=lead?` · ${lead.status||"וויקוף יומי"} ${lead.verified?"✓ מאומת":"ממתין"}`:"";
     best.innerHTML=`${escapeHTML(top.symbol)} · ${top.master}/100${verify}`;
     best.className="big "+(lead?.verified?"green":scannerSignalClass(top.master));
     const st=$("scannerVerifyStatus");

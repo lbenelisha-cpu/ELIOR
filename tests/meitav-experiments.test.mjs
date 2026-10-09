@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {compareScenarios,SCENARIOS} from '../lib/meitav-experiments.mjs';
-import {backtestDaily} from '../lib/meitav-paper.mjs';
+import {backtestLegacyWave as backtestDaily} from '../lib/legacy-wave-backtest.mjs';
 const rows=(n=350)=>Array.from({length:n},(_,i)=>({date:new Date(Date.UTC(2020,0,1+i)).toISOString().slice(0,10),close:i<200?90:[100,98,102,103,110,100,103,104,105,104][(i-200)%10]}));
 test('nine fixed scenarios share dates, fees and benchmark without mutating input',()=>{
  const b=rows(),copy=JSON.stringify(b),r=compareScenarios(b,.1);assert.equal(r.results.length,9);assert.equal(new Set(SCENARIOS.map(s=>s.id)).size,9);assert.equal(JSON.stringify(b),copy);
  assert.equal(r.selectedId,r.results[0].scenario.id);assert.equal(r.trainDays+r.validationDays,b.length-202);
  for(const x of r.results){assert.ok(Number.isFinite(x.train.returnPct));assert.ok(Number.isFinite(x.validation.returnPct));assert.equal(x.validation.holdReturnPct,r.results[0].validation.holdReturnPct);assert.ok(x.train.endDate<x.validation.startDate);assert.ok(x.validation.maxDrawdown>=0);assert.ok(x.validation.journal.every(j=>j.signalDate<j.date&&j.signalDate>=x.validation.startDate));}
 });
-test('base scenario reproduces existing daily backtest on first period',()=>{
+test('base scenario reproduces archived wave backtest on first period',()=>{
  const b=rows(),r=compareScenarios(b),base=r.results.find(x=>x.scenario.id==='base'),expected=backtestDaily(b.slice(0,202+r.trainDays));
  assert.equal(base.train.returnPct,expected.returnPct);assert.equal(base.train.maxDrawdown,expected.maxDrawdown);assert.equal(base.train.actions,expected.trades);
 });

@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {analyzeQuotes,prepareOrder,trackRisk} from '../mt4/monitor.mjs';
+import {analyzeLegacyQuotes as analyzeQuotes,prepareOrder,trackRisk} from '../mt4/monitor.mjs';
 const now=1800000000,target=Math.floor(now/300)*300-300;
 const quote=()=>({symbol:'nvda#',description:'CFD NVIDIA',profitMode:1,contractSize:1,profitCurrency:'USD',minLot:.1,lotStep:.1,bid:10,ask:10.01,tickTime:now,bars:Array.from({length:27},(_,i)=>({time:target-i*300,close:100-i}))});
 test('positive and negative signals require 3 closed bars',()=>{let q=quote(),a=analyzeQuotes([q],now)[0];assert.equal(a.kind,'positive');assert.equal(a.confirmed,true);q.bars.forEach((b,i)=>b.close=100+i);a=analyzeQuotes([q],now)[0];assert.equal(a.kind,'negative');assert.equal(a.confirmed,true);});

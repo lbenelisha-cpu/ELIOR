@@ -1,0 +1,393 @@
+✔ includes USDT, USDC, locked funds and bridged assets; reports unknown prices (3.222ms)
+✔ uses demo origin exclusively and signs account GET (5.0925ms)
+✔ missing demo keys does not fall back to live credentials (0.8096ms)
+✔ malformed account data cannot be interpreted as an empty reset account (0.7009ms)
+Binance Demo execution: Timed out
+✖ cost guard blocks buying and USDC conversion; exits remain independent (33.4537ms)
+✖ cost guard rechecks actual allocation immediately before order (10.8637ms)
+✔ equal allocation includes realized gains; reserves fees; cap three (0.5693ms)
+✖ three demo buys consume available cash, no repeats or live endpoints (16.2419ms)
+✖ SELL realizes profit and next allocation increases (14.1961ms)
+✖ USDC is converted in Demo to fund equal USDT positions (12.1848ms)
+✔ uncertain accepted order persists and restart queries it without resubmitting (15.0005ms)
+✔ disabled execution sends no orders; unmanaged holdings are never sold (13.2344ms)
+✔ concurrent cycles only execute one buy (6.7836ms)
+✖ live peak exit sells despite daily UP, survives restart, and does not rebuy the same cycle (25.8944ms)
+✖ existing positions initialize peak from entry and exit below entry without a wave signal (10.3321ms)
+✖ small dip after entry is tolerated but the initial 2.5% stop still limits loss (16.7488ms)
+✔ missing ticker does not create a trailing exit or overwrite the peak (9.0921ms)
+✖ independent exit monitor sells without a scan, records execution accuracy, and prevents stale rebuy (9.4793ms)
+✔ exit monitor shares order lock with execution and respects disabled mode (18.4273ms)
+✖ six slots divide all available cash and never open a seventh position (16.8686ms)
+✔ last free slot receives all cash even when it exceeds one sixth of capital (0.1662ms)
+✔ external reset releases stale slots and archives costs without sales or fake losses (24.9562ms)
+✔ pending recovery never discards a holding based on a missing balance (7.2934ms)
+✔ expired scan cannot buy even when entry conditions were previously confirmed (4.3273ms)
+✖ a rejected stop for one symbol does not skip stops on other symbols (9.6562ms)
+✔ scores valid bars and rejects invalid prices (1.6937ms)
+✔ sell can liquidate and exposure is bounded (1.0299ms)
+✔ freshness rejects stale and future data (1.446ms)
+✔ deployed handlers import as ESM (6.4864ms)
+✔ scanner reads cached data without provider calls (57.2456ms)
+✔ live controls deny absent configuration, missing or incorrect bearer credentials (1.4806ms)
+✔ only completed Wyckoff sequence can advertise entry readiness (1.0736ms)
+✔ full portfolio never advertises rotation when rotation is disabled (0.2818ms)
+✔ liquid quote passes with both-side fee in percentage points (1.5626ms)
+✔ wide spread, missing depth and large order impact block entry (0.3937ms)
+✔ fees can block narrow spread; invalid and crossed books fail closed (0.3247ms)
+✔ accepts a fresh connected price without rounding (1.312ms)
+✔ rejects absent, disconnected, stale, invalid and future prices (0.7414ms)
+✔ an UP trend with a losing position is red and labels trend separately (7.0929ms)
+✔ a DOWN trend with a profitable position is green; no profit is guessed for missing cost data (1.7536ms)
+✔ real-time portfolio colors the P/L cells using actual signed P/L (39.5123ms)
+✔ six equal slots include both cost components and seventh waits (57.2484ms)
+✔ next-open execution is used, sales precede buys, proceeds fund equal new slots (6.0752ms)
+✔ three eligible assets retain cash for the three remaining slots (12.4798ms)
+✔ ranking and strategy choice use no future prices; input remains intact (120.4804ms)
+✔ each chronological period begins in cash and signals precede execution (30.8731ms)
+✔ invalid costs, duplicate universe, candle gaps and insufficient overlap fail (25.5845ms)
+✔ public history paginates backwards with <=1000 limit and omits current UTC day (15.8117ms)
+✔ rate limit stops fetching; stale or malformed responses are rejected (2.6104ms)
+✔ unchanged universe reuses both connecting and connected subscriptions (5.6803ms)
+✔ old close, open and message callbacks cannot poison a replacement stream (3.6745ms)
+✔ only the current disconnected socket schedules one reconnect (1.2338ms)
+✔ failed evaluation clears old buy eligibility instead of advertising stale candidates (1.2273ms)
+✔ BUY requires MA, 4% and wave reversal (3.2883ms)
+✔ position state prevents duplicate BUY (0.3361ms)
+✔ SELL only closes LONG (0.2128ms)
+✔ bridge rejects foreign hosts, cross-origin API requests and cross-site resource reads (1.127ms)
+✔ cash, full notional and portfolio target are distinct (1.1371ms)
+✔ sufficient cash does not override a 120 dollar exposure target (0.2616ms)
+✔ small affordable minimum fits and stale data cannot claim buying power (0.2281ms)
+✔ rolling budget, duplicate lease, cache hit and recovery (44.406ms)
+✔ nine fixed scenarios share dates, fees and benchmark without mutating input (50.0016ms)
+✔ base scenario reproduces archived wave backtest on first period (16.2333ms)
+✔ future prices cannot change the chosen scenario or training metrics (32.4198ms)
+✔ validation starts fresh and never carries training holdings or pending signals (11.959ms)
+✔ short samples and invalid fees fail clearly (10.1521ms)
+✔ six equal funded slots include entry fees and leave seventh unbought (47.3235ms)
+✔ repeated close does not duplicate trades; later stop sells without immediate rebuy (6.5329ms)
+✔ invalid and duplicate dates, short histories and nonpositive prices are rejected (3.2831ms)
+✔ wrong currency is excluded and unsorted histories are normalized (3.439ms)
+✔ historical signal is executed only on subsequent close (123.9516ms)
+✔ saved state survives JSON roundtrip and rejects corrupt funds (5.5059ms)
+✔ four methods use common date ranges and preserve all input (221.3908ms)
+✔ later prices cannot alter training scores or chosen method (381.9853ms)
+✔ signals are causal and momentum decides only on month boundary (23.0757ms)
+✔ entry at next close includes fee and execution costs and does not force final sale (3.5679ms)
+✔ missing overlap, duplicate symbols, mixed currencies and invalid costs rejected (32.084ms)
+✔ aggregate values are simple means of separate stock experiments (216.6468ms)
+✔ positive and negative signals require 3 closed bars (1.9827ms)
+✔ old prices and missing bars cannot yield signals (0.2593ms)
+✔ draft enforces contract size, 120 dollar target, no shorts and lot step (0.7791ms)
+✔ 15 percent drawdown tracks only assigned profit change and remains halted after recovery (0.2253ms)
+✔ buy budget includes other holdings and blocks unverifiable exposure (0.3597ms)
+✔ fresh manual orders do not require a technical signal; stale ones are blocked (0.3185ms)
+✔ uniform tick-clock jitter is tolerated but incomplete or duplicate bars remain blocked (0.3275ms)
+✔ incomplete cycle waits, next cycle completes, duplicate run makes no provider requests (81.3102ms)
+✔ cloud held position checks exit using fresh price without requesting history or unrelated assets (3.8861ms)
+✔ account balance does not become strategy capital (3.0163ms)
+✔ stale or wrong accounts cannot be displayed as current (0.4785ms)
+✔ disconnected financial values are hidden (0.3013ms)
+✔ local request checks reject remote hosts and origins (1.1664ms)
+✔ disconnected account does not expose stale balances or positions (1.4403ms)
+✔ trading tools cannot pass through the bridge (0.8133ms)
+✔ account requests require a session and reject mutations (112.7795ms)
+✔ cross-site page navigation is allowed but account reads are blocked (0.6683ms)
+✔ execution opt-in and exact long ticket are required; short orders rejected (2.2633ms)
+✔ file publishing is exclusive and retains a durable lock (46.4852ms)
+✔ HTTP confirmation is separate, single use, fresh and authenticated; fake broker only (151.1297ms)
+✔ installed cloud dependencies load and generate an encrypted Apple push request offline (74.3976ms)
+✔ cloud handler refuses use without deployment secrets (35.623ms)
+✔ push endpoint cannot target arbitrary or private hosts (2.0502ms)
+✔ relay authorization is independent of pairing and missing secrets fail closed (28.6489ms)
+✔ push contains only allowlisted event metadata and rejects expired events (1.4449ms)
+✔ expired subscriptions are removed and accepted requests are counted separately from delivery (1.4272ms)
+✔ headless relay avoids startup flood and only sends signal transitions (1.0407ms)
+✔ relay without configuration does not read MT4 or contact cloud (0.1839ms)
+✔ rotation creates a new row, preserves profit and total equity, journals both legs (61.2883ms)
+✔ realized loss stays in account after rotation (20.1737ms)
+✔ fixed program and unconfirmed leader do not rotate (44.9438ms)
+✔ advantage must reach ten points, ties do not cause churn (22.0311ms)
+✔ existing leader position is not duplicated or merged (30.2923ms)
+✔ partial or stale market data cannot sell the old position (42.0664ms)
+✔ failed buy journal rolls back sale, new row, scan vote and account snapshots (22.9562ms)
+✔ manual close after rotation preserves both generations of realized profit (16.2445ms)
+✔ dynamic opening starts with cash and account capital cannot be changed by another program (20.7328ms)
+✔ reset clears votes, cycles and account history as one transaction (16.3331ms)
+✔ archived rotation SQL sections can be rerun without losing positions or realized profits (33.9692ms)
+✔ legacy holdings are valued before the first account snapshot without writing data (10.4164ms)
+✔ absent old quote uses entry-price estimate and never fabricates all-cash account (9.6351ms)
+✔ all fixed plans automatically BUY to their own target, independent of AI score target (48.0756ms)
+✔ all fixed plans automatically SELL excess exposure without switching assets (52.0779ms)
+✔ both controls work independently for all four combinations (56.6871ms)
+✔ rotation preserves fixed plan, allocation target, settings version and controls (42.8096ms)
+✔ changing plan preserves enabled automation and starts new confirmations instead of trading immediately (19.5335ms)
+✔ paused AI dynamic programs do not rebalance or rotate even with prior confirmations (13.398ms)
+✔ new fixed automatic program starts without a manual purchase and rejects invalid flags (12.6134ms)
+✔ page renews expired session after service restart (39.0354ms)
+✔ sound activation, freshness, duplicate suppression and risk beep (9.7006ms)
+✔ transaction buys after 3 decisions, conserves P/L and retries exactly once (44.042ms)
+✔ sell to zero preserves accumulated simulated profit (11.8527ms)
+✔ fixed plan and repeated bar confirmations do not execute (11.3321ms)
+✔ cash exhaustion prevents overspending (10.9377ms)
+✔ snapshot failure rolls back position changes (17.8602ms)
+✔ stale quotes are rejected (8.4767ms)
+✔ selected asset and active row follow rotation; top total preserves realized gains (53.5443ms)
+✔ account performance includes both symbols across rotation, independent of selection (6.1742ms)
+✔ multiple missed rotations follow predecessor chain without rewriting old histories (4.3476ms)
+✔ screenshot regression: old cloud payload retains holdings, zero cash and the existing loss (4.679ms)
+✔ a legitimate zero realized PnL does not hide open positions before first account update (3.2926ms)
+✔ changing to a fixed plan keeps both automation controls selected and preserves unsaved draft during sync (4.3884ms)
+✔ saved settings apply independently per active program (3.4308ms)
+✔ saving sends the selected plan and both boolean controls; server values are shown after save (5.2934ms)
+✔ old backend cannot silently accept settings it does not support (5.9347ms)
+✔ opening account balance is not plotted as a stock loss; journal is retained (8.9233ms)
+✔ old monitor cannot report new agent success and budget wait is explicit (5.6665ms)
+Binance Demo execution: Timed out
+✔ actual fill fixes 6% stop; original peak target persists; used patterns survive journal truncation (38.2605ms)
+✔ stop monitor exits at 94 without a daily scan (17.4028ms)
+✔ unknown accepted order recovers after restart with frozen levels and no duplicate buy (11.2683ms)
+✔ parallel scans cannot submit two orders for one pattern (6.6889ms)
+✔ legacy holding cannot silently use old trailing rules or a guessed initial peak (16.7461ms)
+✔ daily signal authorizes one full entry; cannot reuse consumed pattern or chase above target (2.8272ms)
+✔ held exit works when daily history is unavailable and never adds stage two (0.4481ms)
+✔ stale live prices cannot authorize entries or exits (0.3369ms)
+✔ intraday-only broker data is explicitly blocked, not treated as D1 (1.0063ms)
+✔ broker target and stop survive restart; bid quote triggers exact target sale (0.7687ms)
+✔ broker enters only from daily OHLC and remembers consumed pattern after old commands expire (0.6197ms)
+✔ base commission and partial sale retain correct tracked quantity and frozen target (2.3681ms)
+✔ live intent persists before submission; restart queries unknown order without posting again (30.798ms)
+✔ partial live order keeps intent until terminal status; fill journal failure keeps it for recovery (2.9805ms)
+✔ migration compiles and reruns; transaction saves original peak, 107 target and 6% stop (34.2628ms)
+✔ exit books realized P/L atomically and replacement waits for a new pattern (15.885ms)
+✔ failed journal rolls back purchase and pattern consumption (18.1829ms)
+✔ intraday quotes and legacy holdings cannot bypass daily rules or receive guessed targets (24.7654ms)
+✔ complete installer reruns without changing saved Wyckoff trade or realized value (29.908ms)
+✔ missing spring or consolidation and stale execution prices are rejected atomically (26.525ms)
+✔ complete ordered pattern buys strictly above first low, not at equality (7.5385ms)
+✔ sell target is 7% above ORIGINAL peak and stop is 6% below execution (4.5245ms)
+✔ insufficient consolidation, missing secondary test or no lower low never buy (1.5097ms)
+✔ future bars do not modify previously observed signal; later bars do not repeat buy (1.491ms)
+✔ replay after restart preserves frozen trade identity and exits (0.4673ms)
+✔ malformed, duplicate, unsorted, nonpositive, future and open bars are rejected (0.7405ms)
+✔ entry cannot be created without confirmation or at target; unknown holdings are not assigned invented targets (0.3471ms)
+✔ wick highs and lows set original peak and support; wick Spring requires the following closed candle (0.294ms)
+✔ close-only histories and intraday observations cannot masquerade as daily OHLC (3.0173ms)
+ℹ tests 174
+ℹ suites 0
+ℹ pass 163
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4941.4995
+
+✖ failing tests:
+
+test at lib\binance-demo-trader.test.mjs:32:1
+✖ cost guard blocks buying and USDC conversion; exits remain independent (33.4537ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(x.trader.state.positions.BTCUSDT)
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:37:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:43:1
+✖ cost guard rechecks actual allocation immediately before order (10.8637ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 2
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:46:48)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:52:1
+✖ three demo buys consume available cash, no repeats or live endpoints (16.2419ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(Number(o.cummulativeQuoteQty)>=2994&&Number(o.cummulativeQuoteQty)<3007)
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:53:165)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:55:1
+✖ SELL realizes profit and next allocation increases (14.1961ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(x.trader.snapshot().profitIls>299)
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:56:185)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:58:1
+✖ USDC is converted in Demo to fund equal USDT positions (12.1848ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:59:176)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:77:1
+✖ live peak exit sells despite daily UP, survives restart, and does not rebuy the same cycle (25.8944ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   allocationIls: 1500,
+  +   asset: 'BTC',
+  +   breakoutLevel: 0,
+  +   drawdownPct: 0.9999999999999948,
+  +   effectiveStopPrice: null,
+  +   entryAt: '2026-10-09T08:45:53.930Z',
+  +   entryPrice: 100,
+  +   exitTriggerReason: null,
+  +   peakAt: '2026-10-09T08:45:53.935Z',
+  +   peakGainPct: 10.000000000000009,
+  +   peakPrice: 110,
+  +   qty: 15,
+  +   reviewRequired: 'LEGACY_POSITION_REQUIRES_REVIEW',
+  +   riskStage: 1,
+  +   symbol: 'BTCUSDT',
+  +   trailingActive: false,
+  +   trailingStopPrice: null
+  + }
+  - undefined
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:86:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { symbol: 'BTCUSDT', asset: 'BTC', qty: 15, entryPrice: 100, peakPrice: 110, peakAt: '2026-10-09T08:45:53.935Z', allocationIls: 1500, entryAt: '2026-10-09T08:45:53.930Z', riskStage: 1, breakoutLevel: 0, drawdownPct: 0.9999999999999948, peakGainPct: 10.000000000000009, trailingActive: false, trailingStopPrice: null, effectiveStopPrice: null, exitTriggerReason: null, reviewRequired: 'LEGACY_POSITION_REQUIRES_REVIEW' },
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:93:1
+✖ existing positions initialize peak from entry and exit below entry without a wave signal (10.3321ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:97:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:101:1
+✖ small dip after entry is tolerated but the initial 2.5% stop still limits loss (16.7488ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:108:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:119:1
+✖ independent exit monitor sells without a scan, records execution accuracy, and prevents stale rebuy (9.4793ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:124:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:140:1
+✖ six slots divide all available cash and never open a seventh position (16.8686ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1000 !== 1996
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:145:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1000,
+    expected: 1996,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib\binance-demo-trader.test.mjs:183:1
+✖ a rejected stop for one symbol does not skip stops on other symbols (9.6562ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/user/Documents/ChatGPT/ADAMA%20PRO/wyckoff-review/ELIOR-main/lib/binance-demo-trader.test.mjs:188:10)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

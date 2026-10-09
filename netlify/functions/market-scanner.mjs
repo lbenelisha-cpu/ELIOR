@@ -1,29 +1,21 @@
-import {scanHistory} from '../../lib/scan-history.mjs';
-import {WATCHLIST,db,fresh,score} from '../../lib/agent.mjs';
+import {WATCHLIST,db} from '../../lib/agent.mjs';
+import {dailyWyckoffQuote} from '../../lib/daily-wyckoff-quotes.mjs';
+// Cache-only view: no orders or provider calls.
 export async function handler(){
  const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'};
  try{
-  // Reuse the scheduled scan: viewing recommendations never counts as a new vote.
-  const saved=await db('paper_rotation_scans?select=*&order=slot.desc&limit=24').catch(()=>[]);
-  if(saved.length&&WATCHLIST.every(symbol=>Number.isFinite(saved[0].candidates?.[symbol]?.master))&&Date.now()-Date.parse(saved[0].slot)<35*60000){
-   const row=saved[0],candidates=WATCHLIST.map(symbol=>({symbol,name:symbol,...row.candidates[symbol]})).sort((a,b)=>b.master-a.master||a.symbol.localeCompare(b.symbol));
-   let count=0;const seen=new Set();
-   for(let i=0;i<Math.min(3,saved.length);i++){
-    const h=saved[i];if(h.symbol!==row.symbol||h.score<60||Date.parse(row.slot)-Date.parse(h.slot)!==i*1800000||seen.has(h.bar_time))break;
-    seen.add(h.bar_time);count++;
-   }
-   return {statusCode:200,headers,body:JSON.stringify({history:scanHistory(saved),generated_at:row.slot,candidates,warnings:[],leader:{symbol:row.symbol,score:row.score,consecutive:count,required:3,verified:count===3,status:count===3?'מועמד מאומת; מעבר דורש יתרון של 10 נקודות על תוכנית שמאפשרת מעבר':'ממתין ל־3 סריקות סוכן רצופות'}})};
-  }
-  const warnings=[],candidates=[];
-  const cached=await db('paper_market_cache?select=key,payload,expires_at&order=expires_at.desc&limit=100');
+  const cached=await db('paper_market_cache?select=key,payload,expires_at&order=expires_at.desc&limit=1000');
+  const candidates=[],warnings=[];
   for(const symbol of WATCHLIST){
-   const row=cached.find(x=>x.key.startsWith('time_series:')&&x.key.includes(JSON.stringify(['symbol',symbol]))&&x.key.includes(JSON.stringify(['interval','30min']))&&x.payload?.values?.length);
-   if(!row){warnings.push(symbol+': ממתין לאיסוף נתונים בסוכן');continue;}
-   const q={...score(row.payload.values),updated_at:row.payload.values[0].datetime};
-   candidates.push({symbol,name:symbol,...q,stale:!fresh(q.updated_at)});
+   const loader=async(endpoint,params)=>{
+    const row=cached.find(x=>x.key.startsWith(endpoint+':')&&x.key.includes(JSON.stringify(['symbol',symbol]))&&(endpoint!=='time_series'||x.key.includes(JSON.stringify(['interval','1day']))));
+    if(!row)throw Error('WAIT_DAILY_CACHE');return row.payload;
+   };
+   try{candidates.push({symbol,name:symbol,...await dailyWyckoffQuote(symbol,{loader})});}
+   catch(e){warnings.push(symbol+': '+e.message);}
   }
-  if(!candidates.length)throw Error('ממתין לאיסוף נתונים בהרצת הסוכן. רענון הסריקה אינו שולח בקשות לספק.');
   candidates.sort((a,b)=>b.master-a.master||a.symbol.localeCompare(b.symbol));
-  return {statusCode:200,headers,body:JSON.stringify({history:scanHistory(saved),generated_at:new Date().toISOString(),candidates,warnings,leader:{symbol:candidates[0].symbol,score:candidates[0].master,consecutive:0,required:3,verified:false,status:'תצוגת מועמדים; אימות וביצוע נעשים בהרצות הסוכן בלבד'}})};
+  const leader=candidates[0];
+  return {statusCode:200,headers,body:JSON.stringify({history:[],generated_at:new Date().toISOString(),candidates,warnings,leader:leader?{symbol:leader.symbol,score:leader.master,verified:leader.wyckoff.buyConfirmed,status:'וויקוף יומי: '+leader.wyckoff.phase}:null,strategyId:'WYCKOFF_D1_V1'})};
  }catch(e){return {statusCode:503,headers,body:JSON.stringify({error:e.message})};}
 }

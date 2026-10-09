@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {score,target,fresh,slot} from '../lib/agent.mjs';
+import {score,target,fresh,slot} from './lib/agent.mjs';
 const values=Array.from({length:80},(_,i)=>({close:100-i*.1}));
 test('scores valid bars and rejects invalid prices',()=>{
   assert.ok(score(values).master>=60);

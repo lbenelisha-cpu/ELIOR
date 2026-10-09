@@ -1,10 +1,11 @@
+import {brokerDailyQuotes} from '../lib/broker-daily-wyckoff.mjs';
 import {score} from '../lib/agent.mjs';
 export function trackRisk(state,profit){
  if(!state||![state.startProfit,state.high,profit].every(Number.isFinite))throw Error('Invalid risk tracking');
  const equity=150+profit-state.startProfit,high=Math.max(state.high,equity);
  return {...state,equity,high,halted:state.halted===true||equity<=high*.85};
 }
-export function analyzeQuotes(symbols,now=Date.now()/1000){
+export function analyzeLegacyQuotes(symbols,now=Date.now()/1000){
  const target=Math.floor(now/300)*300-300;
  return symbols.map(x=>{
   const base={symbol:x.symbol,description:x.description,bid:x.bid,ask:x.ask,contractSize:x.contractSize,minLot:x.minLot,lotStep:x.lotStep,currency:x.profitCurrency,source:'MT4 / TGLColmex-Live',tickTime:x.tickTime};
@@ -45,3 +46,8 @@ export function prepareOrder(quote,side,lots,positions,now=Date.now()/1000,quote
  return {symbol:quote.symbol,side,lots,price,estimatedNotional:notional,currency:'USD',executionEnabled:false};
 }
 
+
+export function analyzeQuotes(symbols,now=Date.now()/1000){
+ const legacy=analyzeLegacyQuotes(symbols,now),daily=brokerDailyQuotes(Object.fromEntries(symbols.map(x=>[x.symbol,x])),now*1000);
+ return legacy.map(q=>{const s=daily.quotes[q.symbol]?.wyckoff;return {...q,status:s?'current':q.status==='stale'?'stale':'waiting',kind:s?.buyConfirmed?'positive':'neutral',confirmed:!!s?.buyConfirmed,score:s?.buyConfirmed?100:0,wyckoff:s||null,reason:s?'וויקוף יומי: '+s.phase:'WAIT_DAILY_BARS — נדרשים נרות יומיים מהמחבר'};});
+}

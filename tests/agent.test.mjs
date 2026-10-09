@@ -28,7 +28,7 @@ test('scanner reads cached data without provider calls',async()=>{
  process.env.SUPABASE_URL='https://db.test';process.env.SUPABASE_SERVICE_ROLE_KEY='test';
  const original=global.fetch;let calls=0;
  global.fetch=async url=>{calls++;assert.ok(String(url).startsWith('https://db.test'));
- if(String(url).includes('paper_rotation_scans'))return Response.json([]);
- return Response.json([{key:'time_series:'+JSON.stringify([['interval','30min'],['symbol','SPY']]),payload:{values:values.map(v=>({...v,datetime:'2026-09-16 13:30:00'}))}}]);};
- try{const r=await (await import('../netlify/functions/market-scanner.mjs')).handler();assert.equal(r.statusCode,200);assert.equal(JSON.parse(r.body).candidates.length,1);assert.equal(calls,2);}finally{global.fetch=original;}
+ const now=Date.now();
+ return Response.json([{key:'time_series:'+JSON.stringify([['interval','1day'],['symbol','SPY']]),payload:{values:Array.from({length:5},(_,i)=>({datetime:new Date(now-(6-i)*86400000).toISOString().slice(0,10),open:100,high:102,low:98,close:100}))}},{key:'price:'+JSON.stringify([['symbol','SPY']]),payload:{price:'100',cached_at:new Date(now).toISOString()}}]);};
+ try{const r=await (await import('../netlify/functions/market-scanner.mjs')).handler();assert.equal(r.statusCode,200);assert.equal(JSON.parse(r.body).candidates.length,1);assert.equal(calls,1);}finally{global.fetch=original;}
 });

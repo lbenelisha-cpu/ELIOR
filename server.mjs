@@ -1,3 +1,8 @@
+import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
+import {trackedLivePositions,liveFillAction} from './lib/wyckoff-live-positions.mjs';
+import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
+import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
+import {wyckoffExit} from './lib/wyckoff-strategy.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
@@ -57,7 +62,7 @@ const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
 // Rotation controls
-const ROTATION_ENABLED=String(process.env.BINANCE_ROTATION_ENABLED||'true')==='true';
+const ROTATION_ENABLED=false; // Wyckoff exits are target/stop only.
 const ROTATION_MIN_SCORE=+(process.env.BINANCE_ROTATION_MIN_SCORE||65);
 const ROTATION_SCORE_GAP=+(process.env.BINANCE_ROTATION_SCORE_GAP||20);
 const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_CYCLE||1));
@@ -68,9 +73,9 @@ const ROTATION_MAX_PER_CYCLE=Math.max(0,+(process.env.BINANCE_ROTATION_MAX_PER_C
 const ENTRY_TRIGGER_PCT=Math.max(0.1,+(process.env.BINANCE_ENTRY_TRIGGER_PCT||2));
 const ENTRY_MIN_SCORE=0; // legacy score filter disabled
 const ENTRY_MAX_RUN_PCT=Infinity; // legacy anti-chase filter disabled
-const STOP_LOSS_PCT=1.5;
+const STOP_LOSS_PCT=6;
 const TRAIL_ACTIVATE_PCT=0;
-const EXIT_TRAIL_PCT=1.5;
+const EXIT_TRAIL_PCT=6;
 const ENTRY_COST_OPTIONS={
   feePct:Number(process.env.BINANCE_ENTRY_FEE_PCT??0.1),
   bufferPct:Number(process.env.BINANCE_ENTRY_COST_BUFFER_PCT??0.1),
@@ -227,11 +232,16 @@ const demoTrader=new DemoTrader({
   secret:process.env.BINANCE_DEMO_API_SECRET,
   enabled:DEMO_TRADING,
   stateFile:process.env.BINANCE_DEMO_STATE_FILE||'/var/data/binance-demo-trading.json',
-  trailingStopPct:1.5,
-  stopLossPct:1.5,
+  trailingStopPct:6,
+  stopLossPct:6,
   trailActivatePct:0
 });
-const tradingPositions=()=>DEMO_TRADING&&mode==='demo'?demoTrader.state.positions:paper.positions;
+const tradingPositions=()=>{
+ if(mode==='live'){
+  return trackedLivePositions(liveActionLog);
+ }
+ return DEMO_TRADING?demoTrader.state.positions:paper.positions;
+};
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
 
 function ensureStateDir(){
@@ -265,6 +275,7 @@ function loadPaperState(){
       positions:raw.positions||{},
       trades:Array.isArray(raw.trades)?raw.trades:[],
       actionLog:Array.isArray(raw.actionLog)?raw.actionLog:[],
+      usedPatterns:raw.usedPatterns||{},
       lastAction:raw.lastAction||null
     };
     console.log('Paper state restored',Object.keys(paper.positions).length,'positions');
@@ -276,6 +287,7 @@ function loadPaperState(){
 }
 
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
+const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const DECISION_HISTORY_FILE=process.env.BINANCE_DECISION_HISTORY_FILE||'/var/data/binance-decision-history.json';
 let decisionHistory={};
 
@@ -389,9 +401,9 @@ function pushDemoAction(action){
 }
 
 function pushLiveAction(action){
-  liveActionLog.unshift(action);
-  liveActionLog=liveActionLog.slice(0,200);
-  saveLiveActionLog();
+  if(!liveActionLog.some(a=>a.orderId===action.orderId&&a.symbol===action.symbol))liveActionLog.unshift(action);
+  // Execution metadata and consumed patterns must survive display log limits.
+  if(!saveLiveActionLog())throw Error('LIVE_EXECUTION_JOURNAL_UNAVAILABLE');
 }
 
 let mode='demo';
@@ -529,6 +541,10 @@ function floorToStep(value,step){
   return Number(floored.toFixed(Math.min(precision,12)));
 }
 
+async function recordLiveFill(order,intent){
+ const fills=order.fills||await signedBinanceGet('/api/v3/myTrades',{symbol:intent.params.symbol,orderId:String(order.orderId)});
+ pushLiveAction(liveFillAction(order,intent,fills));
+}
 async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const restrictions=await getApiRestrictions();
   const gate=liveTradingGate(restrictions);
@@ -564,30 +580,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
-  const order=await signedBinancePost('/api/v3/order',{
-    symbol,
-    side:'BUY',
-    type:'MARKET',
-    quoteOrderQty:quoteText,
-    newOrderRespType:'FULL'
-  });
-
-  const spent=Number(order.cummulativeQuoteQty||quoteUsdt);
-  const qty=Number(order.executedQty||0);
-  const avgPrice=qty>0?spent/qty:0;
-  pushLiveAction({
-    type:reason==='ROTATION_IN'?'ROTATE_IN':'BUY',
-    symbol,
-    price:avgPrice,
-    amountUsdt:spent,
-    qty,
-    reason,
-    orderId:order.orderId,
-    status:order.status,
-    at:new Date().toISOString(),
-    ...meta
-  });
-  return order;
+  return liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
 }
 
 async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
@@ -603,217 +596,44 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
 
   const info=await symbolExchangeInfo(symbol);
   const lot=info?.filters?.find(x=>x.filterType==='LOT_SIZE');
-  const qty=floorToStep(bal.free,Number(lot?.stepSize||0));
+  const trackedQty=Number(tradingPositions()[symbol]?.qty||0);
+  if(!(trackedQty>0))throw Error('No tracked Wyckoff quantity to sell');
+  const qty=floorToStep(Math.min(bal.free,trackedQty),Number(lot?.stepSize||0));
   if(!(qty>0))throw Error('Sell quantity is below LOT_SIZE');
 
-  const order=await signedBinancePost('/api/v3/order',{
-    symbol,
-    side:'SELL',
-    type:'MARKET',
-    quantity:String(qty),
-    newOrderRespType:'FULL'
-  });
-
-  const proceeds=Number(order.cummulativeQuoteQty||0);
-  const executed=Number(order.executedQty||qty);
-  const avgPrice=executed>0?proceeds/executed:0;
-  pushLiveAction({
-    type:reason==='ROTATION_OUT'?'ROTATE_OUT':'SELL',
-    symbol,
-    price:avgPrice,
-    amountUsdt:proceeds,
-    qty:executed,
-    reason,
-    orderId:order.orderId,
-    status:order.status,
-    at:new Date().toISOString(),
-    ...meta
-  });
-  return order;
+  return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
 }
 
+let liveExecutionInFlight=false;
 async function maybeExecuteLive(evals){
+ if(liveExecutionInFlight)return;liveExecutionInFlight=true;
+ try{return await executeLiveCycle(evals);}finally{liveExecutionInFlight=false;}
+}
+async function executeLiveCycle(evals){
   if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
-
-  const restrictions=await getApiRestrictions();
-  const gate=liveTradingGate(restrictions);
+  const gate=liveTradingGate(await getApiRestrictions());
   if(!gate.ready)return;
   if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for LIVE auto execution');
-
+  await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
   let account=await getLiveAccountSnapshot();
-  const assetMap=new Map(account.balances.map(x=>[x.asset,x]));
-  const held=()=>evals.filter(ev=>{
-    if(!ev.ok)return false;
-    const base=ev.symbol.endsWith('USDT')?ev.symbol.slice(0,-4):ev.symbol;
-    const b=assetMap.get(base);
-    return b&&Number(b.valueUsdt||0)>=5;
-  });
-
-  // Normal SELL signals first. A definitive symbol/filter rejection must
-  // not block BUY execution for every other free slot in the same cycle.
-  for(const ev of held()){
-    if(decidePosition(ev.strategy,'LONG')==='SELL'){
-      try{
-        await placeLiveMarketSell(ev.symbol,'STRATEGY_SELL',{score:ev.score});
-        account=await getLiveAccountSnapshot();
-        assetMap.clear();
-        for(const x of account.balances)assetMap.set(x.asset,x);
-      }catch(e){
-        pushLiveAction({
-          type:'SELL_REJECTED',
-          symbol:ev.symbol,
-          reason:'STRATEGY_SELL',
-          error:e.message,
-          code:e.code??null,
-          status:e.status??null,
-          score:ev.score,
-          at:new Date().toISOString()
-        });
-
-        const definitive=Number(e.status)>=400&&Number(e.status)<500&&![-1006,-1007,-1001].includes(Number(e.code));
-        if(!definitive)throw e;
-        // Keep the position held and continue to evaluate/fill other free slots.
-      }
-    }
+  const owned=symbol=>account.balances.find(b=>b.asset===symbol.slice(0,-4)&&b.qty>0&&Number(b.valueUsdt||0)>=5);
+  const sold=new Set();
+  for(const ev of evals){
+    if(!ev.ok||!owned(ev.symbol))continue;
+    const saved=tradingPositions()[ev.symbol];
+    if(!saved)continue;
+    const exit=wyckoffExit(saved,ev.strategy.price);
+    if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
-
-  let heldNow=held();
-
-  // Dynamic LIVE trailing profit. It activates only after a real profit peak,
-  // then tightens as the peak grows. Existing positions without a recorded
-  // strategy BUY are initialized conservatively from the current price.
-  for(const ev of [...heldNow]){
-    const base=ev.symbol.endsWith('USDT')?ev.symbol.slice(0,-4):ev.symbol;
-    const bal=assetMap.get(base);
-    const current=Number(bal?.usdtPrice||streams[ev.symbol]?.lastPrice||0);
-    if(!(current>0))continue;
-
-    let state=livePeakState.get(ev.symbol);
-    if(!state){
-      const lastBuy=liveActionLog.find(a=>
-        a.symbol===ev.symbol &&
-        ['BUY','ROTATE_IN'].includes(a.type) &&
-        Number(a.price)>0
-      );
-      const entry=Number(lastBuy?.price||current);
-      state={entryPrice:entry,peakPrice:Math.max(entry,current),entryAt:lastBuy?.at||new Date().toISOString()};
-    }
-    state.peakPrice=Math.max(Number(state.peakPrice)||current,current);
-    livePeakState.set(ev.symbol,state);
-
-    const peakGainPct=(state.peakPrice/state.entryPrice-1)*100;
-    const initialStop=state.entryPrice*(1-STOP_LOSS_PCT/100);
-    const trailingActive=peakGainPct>=TRAIL_ACTIVATE_PCT;
-    const trailPct=EXIT_TRAIL_PCT;
-    const trailingStop=trailingActive?state.peakPrice*(1-trailPct/100):null;
-    const stopPrice=trailingActive?Math.max(initialStop,trailingStop):initialStop;
-    const exitReason=trailingActive?'TRAILING_PROFIT':'STOP_LOSS';
-
-    if(current<=stopPrice){
-      try{
-        await placeLiveMarketSell(ev.symbol,exitReason,{
-          score:ev.score,
-          entryPrice:state.entryPrice,
-          peakPrice:state.peakPrice,
-          peakGainPct,
-          trailActivatePct:0,
-          trailPct,
-          stopLossPct:null,
-          stopPrice,
-          currentPrice:current
-        });
-        livePeakState.delete(ev.symbol);
-        account=await getLiveAccountSnapshot();
-        assetMap.clear();
-        for(const x of account.balances)assetMap.set(x.asset,x);
-      }catch(e){
-        pushLiveAction({
-          type:'SELL_REJECTED',
-          symbol:ev.symbol,
-          reason:'SMART_TRAILING_PROFIT',
-          error:e.message,
-          code:e.code??null,
-          status:e.status??null,
-          score:ev.score,
-          at:new Date().toISOString()
-        });
-      }
-    }
-  }
-
-  heldNow=held();
-  const candidates=evals
-    .filter(ev=>ev.ok && ev.rawDecision==='BUY')
-    .filter(ev=>!heldNow.some(h=>h.symbol===ev.symbol))
-    .sort((a,b)=>b.score-a.score);
-
-  // Fill empty slots using the same principle as DEMO:
-  // divide currently available USDT across the remaining free slots.
-  // LIVE_MAX_USDT remains a hard per-order safety cap.
-  while(heldNow.length<MAX && candidates.length){
-    const ev=candidates.shift();
-    account=await getLiveAccountSnapshot();
-
-    const freeSlots=Math.max(1,MAX-heldNow.length);
-    const availableUsdt=Math.max(0,Number(account.usdtFree||0));
-    const spend=Math.min(
-      LIVE_MAX_USDT,
-      (availableUsdt/freeSlots)*0.995
-    );
-
+  for(const ev of evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade)){
+    if(owned(ev.symbol)||sold.has(ev.symbol))continue;
+    if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
+    const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
+    if(held>=MAX)break;
+    const spend=Math.min(LIVE_MAX_USDT,Number(account.usdtFree||0)/(MAX-held)*.995);
     if(spend<5)break;
-
-    try{
-      await placeLiveMarketBuy(ev.symbol,spend,'BEST_AVAILABLE_BUY',{score:ev.score});
-    }catch(e){
-      pushLiveAction({
-        type:'BUY_REJECTED',
-        symbol:ev.symbol,
-        amountUsdt:spend,
-        reason:e.code||'BUY_ERROR',
-        error:e.message,
-        minimum:e.minimum??null,
-        score:ev.score,
-        at:new Date().toISOString()
-      });
-      // A symbol-specific rejection must not block stronger/next candidates.
-      continue;
-    }
-
+    await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade});
     account=await getLiveAccountSnapshot();
-    assetMap.clear();
-    for(const x of account.balances)assetMap.set(x.asset,x);
-    heldNow=held();
-  }
-
-  // One smart rotation per cycle.
-  if(heldNow.length>=MAX && candidates.length && ROTATION_ENABLED){
-    const candidate=candidates[0];
-    const weakest=[...heldNow]
-      .map(x=>({...x,comparableScore:x.strategy?.buyConfirmed?x.score:0}))
-      .sort((a,b)=>a.comparableScore-b.comparableScore)[0];
-
-    if(weakest){
-      const gap=candidate.score-weakest.comparableScore;
-      if(candidate.score>=ROTATION_MIN_SCORE && gap>=ROTATION_SCORE_GAP){
-        await placeLiveMarketSell(weakest.symbol,'ROTATION_OUT',{
-          score:weakest.comparableScore,
-          rotatedTo:candidate.symbol,
-          candidateScore:candidate.score,
-          scoreGap:gap
-        });
-        account=await getLiveAccountSnapshot();
-        const spend=Math.min(LIVE_MAX_USDT,Number(account.usdtFree||0)*0.995);
-        if(spend>=5){
-          await placeLiveMarketBuy(candidate.symbol,spend,'ROTATION_IN',{
-            score:candidate.score,
-            rotatedFrom:weakest.symbol,
-            previousScore:weakest.comparableScore,
-            scoreGap:gap
-          });
-        }
-      }
-    }
   }
 }
 
@@ -961,7 +781,7 @@ function startMarketStream(){
     if(marketSocket!==socket)return;
     try{
       const msg=JSON.parse(raw),m=msg.data||msg,s=String(m.s||'');
-      if(m.e==='trade'&&streams[s]){
+      if((m.e==='trade'||!m.e&&m.p!=null)&&streams[s]){
         streams[s].lastPrice=+m.p;
         streams[s].lastEventAt=new Date(m.E).toISOString();
         streams[s].status='connected';
@@ -1049,48 +869,10 @@ function evalWaveWithWindow(candles,{minWave=4,maxWave=12,maPeriod=200,sellRetra
   };
 }
 
-function backtestWindow(candles,{minWave=4,maxWave=12,maPeriod=200,initial=5000,sellRetraceRatio=SELL_RETRACE_RATIO}={}){
-  let cash=initial,qty=0,entryPrice=null;
-  const trades=[];
-  const equity=[];
-  for(let i=maPeriod+3;i<candles.length;i++){
-    const hist=candles.slice(0,i+1);
-    const st=evalWaveWithWindow(hist,{minWave,maxWave,maPeriod,sellRetraceRatio});
-    if(!st)continue;
-    const price=st.price;
-
-    if(qty===0&&st.buyConfirmed){
-      qty=cash/price;
-      entryPrice=price;
-      cash=0;
-    }else if(qty>0&&st.sellConfirmed){
-      const proceeds=qty*price;
-      const pnlPct=(price/entryPrice-1)*100;
-      trades.push({entryPrice,exitPrice:price,pnlPct,exitAt:candles[i].closeTime});
-      cash=proceeds;qty=0;entryPrice=null;
-    }
-    const eq=cash+qty*price;
-    equity.push(eq);
-  }
-  const lastPrice=Number(candles.at(-1)?.close||0);
-  const finalValue=cash+qty*lastPrice;
-  let peak=initial,maxDD=0;
-  for(const e of equity){
-    if(e>peak)peak=e;
-    const dd=peak>0?(e/peak-1)*100:0;
-    if(dd<maxDD)maxDD=dd;
-  }
-  const wins=trades.filter(t=>t.pnlPct>0).length;
-  return {
-    minWave,maxWave,initial,finalValue,
-    returnPct:(finalValue/initial-1)*100,
-    closedTrades:trades.length,
-    winRate:trades.length?wins/trades.length*100:0,
-    maxDrawdownPct:maxDD,
-    openPosition:qty>0,
-    openEntryPrice:entryPrice,
-    trades
-  };
+function backtestWindow(candles,{initial=5000}={}){
+  const r=backtestWyckoff(candles,.1);
+  const buys=r.journal.filter(t=>t.type==='BUY'),sells=r.journal.filter(t=>t.type==='SELL');
+  return {...r,initial,finalValue:r.value*initial/10000,closedTrades:sells.length,maxDrawdownPct:-r.maxDrawdown,openPosition:buys.length>sells.length,trades:r.journal,strategyId:'WYCKOFF_D1_V1'};
 }
 
 async function candles(s,{force=false}={}){
@@ -1103,7 +885,7 @@ async function candles(s,{force=false}={}){
   const now=Date.now();
   const rows=r
     .filter(x=>+x[6]<now)
-    .map(x=>({closeTime:+x[6],close:+x[4]}));
+    .map(x=>({closeTime:+x[6],open:+x[1],high:+x[2],low:+x[3],close:+x[4],timeframe:'1d',closed:true}));
 
   dailyCandleCache.set(s,{at:Date.now(),rows});
   return rows;
@@ -1195,9 +977,11 @@ function apply(s,d,price,at,meta={}){
       allocationIls:a,
       entryAt:at,
       entryScore:Number.isFinite(+meta.score)?+meta.score:null,
-      entryReason:meta.reason||'BUY'
+      entryReason:meta.reason||'BUY',
+      ...(meta.wyckoffTrade||{})
     };
     paper.cashIls-=a;
+    if(meta.wyckoffTrade?.patternId){paper.usedPatterns??={};(paper.usedPatterns[s]??=[]).push(meta.wyckoffTrade.patternId);}
     paper.lastAction={type:'BUY',symbol:s,price,at,...meta};
     pushDemoAction({
       type:meta.reason==='ROTATION_IN'?'ROTATE_IN':'BUY',
@@ -1206,6 +990,7 @@ function apply(s,d,price,at,meta={}){
       amountIls:a,
       qty:a/price,
       reason:meta.reason||'BUY',
+      ...(meta.wyckoffTrade||{}),
       at:new Date().toISOString(),
       score:Number.isFinite(+meta.score)?+meta.score:null,
       rotatedFrom:meta.rotatedFrom||null
@@ -1317,138 +1102,20 @@ function scoreStrategy(st){
 
 async function evaluateSymbol(s){
   try{
-    const positions=tradingPositions();
-    const p=positions[s]||null;
-    const pos=p?'LONG':'CASH';
-    const livePrice=requireLivePrice(streams[s]);
-    const setup=consolidationBreakout(s);
-
-    if(!setup.ready)return {ok:false,symbol:s,error:'WAIT_BREAKOUT_CANDLES'};
-
-    let rawDecision='HOLD';
-    let entryEligible=false;
-    let entryConfirmed=false;
-    let entryStage=null;
-    let orderFraction=null;
-    let entryBasePrice=null;
-    let entryTargetPrice=null;
-    let entryGainPct=null;
-    let peakPrice=null;
-    let trailingStopPrice=null;
-    let drawdownFromPeakPct=null;
-
-    const score=setup.strongBreakout
-      ? Math.min(100,70+Math.min(15,setup.breakoutPct*20)+Math.min(15,setup.bodyRatio*15))
-      : 0;
-
-    const st={
-      price:livePrice,
-      livePrice,
-      direction:setup.strongBreakout?'UP':'SIDEWAYS',
-      consolidation:setup,
-      buyConfirmed:false,
-      sellConfirmed:false,
-      isLiveEvaluation:true
-    };
-
-    if(pos==='CASH'){
-      livePeakState.delete(s);
-
-      entryEligible=setup.strongBreakout;
-      entryConfirmed=setup.strongBreakout;
-      entryStage=entryConfirmed?1:null;
-      orderFraction=entryConfirmed?0.5:null;
-      entryBasePrice=setup.rangeHigh;
-      entryTargetPrice=setup.rangeHigh*1.001;
-      entryGainPct=(livePrice/setup.rangeHigh-1)*100;
-
-      st.entryStage=entryStage;
-      st.breakoutLevel=setup.rangeHigh;
-      st.buyConfirmed=entryConfirmed;
-      rawDecision=entryConfirmed?'BUY':'HOLD';
-    }else{
-      entryTrackingState.delete(s);
-
-      const riskStage=Number(p.riskStage||1);
-      const entryPrice=Number(p.entryPrice||livePrice);
-      const breakoutLevel=Number(p.breakoutLevel||setup.rangeHigh||entryPrice);
-
-      // Stage 2: add the second 50% only after continuation proves itself.
-      if(riskStage===1 && livePrice>=entryPrice*1.006 && livePrice>=breakoutLevel){
-        entryEligible=true;
-        entryConfirmed=true;
-        entryStage=2;
-        orderFraction=0.5;
-        entryBasePrice=entryPrice;
-        entryTargetPrice=entryPrice*1.006;
-        entryGainPct=(livePrice/entryPrice-1)*100;
-        st.addConfirmed=true;
-        st.entryStage=2;
-        rawDecision='BUY';
-      }
-
-      const rememberedPeak=Number(livePeakState.get(s)||0);
-      peakPrice=Math.max(entryPrice,rememberedPeak>0?rememberedPeak:0,livePrice);
-      livePeakState.set(s,peakPrice);
-
-      trailingStopPrice=peakPrice*0.985;
-      drawdownFromPeakPct=peakPrice>0?(peakPrice-livePrice)/peakPrice*100:0;
-
-      st.entryPrice=entryPrice;
-      st.riskStage=riskStage;
-      st.breakoutLevel=breakoutLevel;
-      st.peakPrice=peakPrice;
-      st.trailingActive=true;
-      st.trailingStopPrice=trailingStopPrice;
-      st.effectiveStopPrice=trailingStopPrice;
-      st.drawdownFromPeakPct=drawdownFromPeakPct;
-      st.sellConfirmed=livePrice<=trailingStopPrice;
-      st.exitReason=st.sellConfirmed?'TRAILING_1_5_FROM_PEAK':null;
-
-      if(st.sellConfirmed){
-        entryConfirmed=false;
-        rawDecision='SELL';
-      }
+    let p=tradingPositions()[s]||null;
+    let used=paper.actionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.patternId);
+    used.push(...(paper.usedPatterns?.[s]||[]));
+    if(DEMO_TRADING&&mode==='demo')used=[...(demoTrader.state.usedPatterns?.[s]||[]),...demoTrader.state.actionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.patternId)];
+    if(mode==='live'){
+      p=tradingPositions()[s]||null;
+      used=liveActionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.wyckoffTrade?.patternId);
     }
-
-    const demoTradable=DEMO_TRADING ? (await demoTradableSymbols()).has(s) : true;
-
-    return {
-      ok:true,
-      symbol:s,
-      strategy:st,
-      position:pos,
-      rawDecision,
-      score,
-      buyQualified:setup.strongBreakout||entryStage===2,
-      buyReason:setup.strongBreakout?'BREAKOUT_STAGE_1':entryStage===2?'BREAKOUT_STAGE_2':'WAIT_CONSOLIDATION_BREAKOUT',
-      entryEligible,
-      entryConfirmed,
-      entryStage,
-      orderFraction,
-      breakoutLevel:Number(p?.breakoutLevel||setup.rangeHigh||0),
-      priceAsOf:streams[s]?.lastEventAt,
-      entryBasePrice,
-      entryTargetPrice,
-      entryGainPct,
-      entryCost:null,
-      entryTriggerPct:null,
-      entryMinScore:null,
-      entryMaxRunPct:null,
-      stopLossPct:null,
-      trailActivatePct:0,
-      exitTrailPct:1.5,
-      peakPrice,
-      trailingStopPrice,
-      drawdownFromPeakPct,
-      breakoutSetup:setup,
-      demoTradable,
-      decisionPriceSource:'LIVE_PRICE',
-      at:new Date().toISOString()
-    };
-  }catch(e){
-    return {ok:false,symbol:s,error:e.message};
-  }
+    const livePrice=requireLivePrice(streams[s]);
+    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used});
+    ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
+    ev.decisionPriceSource='D1_CONFIRMED_WITH_LIVE_EXECUTION';
+    return ev;
+  }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
 
 function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
@@ -1510,41 +1177,12 @@ function decisionReasonFromAgent(agent,ev){
 }
 
 function candidateBlocker(ev,evals){
-  if(DEMO_TRADING&&mode==='demo'&&ev?.demoTradable===false){
-    return {code:'NOT_DEMO_TRADABLE',text:'נסרק בלבד · לא זמין למסחר ב-Binance Demo'};
-  }
-  if(!ev?.ok){
-    return ev?.error==='WAIT_BREAKOUT_CANDLES'
-      ? {code:'WAIT_BREAKOUT_CANDLES',text:'אוסף 16 נרות של דקה לזיהוי דשדוש ופריצה'}
-      : {code:'WAIT_FRESH_PRICE',text:'ממתין למחיר חי'};
-  }
-
-  const positions=tradingPositions();
-  const activeCount=Object.keys(positions).length;
-  const p=positions[ev.symbol];
-
-  if(p){
-    const stage=Number(p.riskStage||1);
-    if(stage===1){
-      return {
-        code:ev.entryConfirmed&&ev.entryStage===2?'STAGE_2_READY':'STAGE_1_ACTIVE',
-        text:ev.entryConfirmed&&ev.entryStage===2
-          ? 'שלב 2 מוכן · המשך +0.6% אושר'
-          : 'שלב 1 פעיל · ממתין לאישור המשך +0.6% לשלב 2'
-      };
-    }
-    return {code:'ACTIVE_LONG',text:'פוזיציה מלאה · שלב 2 פעיל'};
-  }
-
-  const b=ev.breakoutSetup||{};
-  if(!b.rangeOk){
-    return {code:'WAIT_CONSOLIDATION',text:'אין דשדוש צר · טווח '+Number(b.rangePct||0).toFixed(2)+'% · נדרש עד 1.20%'};
-  }
-  if(!b.strongBreakout){
-    return {code:'WAIT_BREAKOUT',text:'דשדוש זוהה · ממתין לנר פריצה חזק מעל '+Number(b.rangeHigh||0).toFixed(6)};
-  }
-  if(activeCount>=MAX)return {code:'NO_SLOT',text:'אין Slot פנוי · '+activeCount+'/'+MAX};
-  return {code:'STAGE_1_READY',text:'פריצה אושרה · BUY שלב 1 · 50% מה-Slot'};
+  if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות יומיים סגורים או למחיר עדכני'};
+  if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
+  if(ev.position==='LONG')return {code:ev.strategy?.strategyId==='WYCKOFF_D1_V1'?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.strategyId==='WYCKOFF_D1_V1'?'מעקב יעד 7% מעל השיא הראשוני ועצירה 6% מהכניסה':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף יומי: '+ev.buyReason};
+  if(Object.keys(tradingPositions()).length>=MAX)return {code:'NO_SLOT',text:'אין מקום פנוי'};
+  return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר יומי'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1586,9 +1224,9 @@ async function runEvaluation(){
   strategyDiagnostics={
     ...strategyDiagnostics,
     evaluated:evals.length,
-    minuteReady:valid.length,
-    consolidation:valid.filter(e=>e.breakoutSetup?.rangeOk).length,
-    strongBreakouts:valid.filter(e=>e.breakoutSetup?.strongBreakout).length,
+    dailyReady:valid.length,
+    consolidation:valid.filter(e=>e.strategy?.wyckoff?.phase==='CONSOLIDATION').length,
+    spring:valid.filter(e=>e.strategy?.wyckoff?.phase==='SPRING').length,
     stage1Ready:stage1Ready.length,
     stage2Ready:stage2Ready.length,
     executionCandidates:stage1Ready.length+stage2Ready.length,
@@ -1774,7 +1412,7 @@ async function runEvaluation(){
         'BUY',
         ev.strategy.price,
         ev.at,
-        {reason:'BEST_AVAILABLE_BUY',score:ev.score}
+        {reason:'WYCKOFF_RECLAIM',score:ev.score,wyckoffTrade:ev.wyckoffTrade}
       );
       if(bought)setAgentFromEval(ev,'BUY','PAPER_EXECUTED');
     }
@@ -1970,30 +1608,13 @@ async function runEvaluation(){
 }
 
 async function buildTechnicalDailyHistory(symbol,limit=30){
-  const c=await candles(symbol);
-  const rows=[];
-  const start=Math.max(MAP+3,c.length-limit-10);
-  for(let i=start;i<c.length;i++){
-    try{
-      const hist=c.slice(0,i+1);
-      const st=evaluateWaveStrategy(hist,{minWave:MIN,maxWave:8,maPeriod:MAP,sellRetraceRatio:SELL_RETRACE_RATIO});
-      const qualification=buyQualification(st);
-      rows.push({
-        at:new Date(c[i].closeTime).toISOString(),
-        price:Number(st.price||0),
-        ma:Number(st.ma||0),
-        aboveMA:Boolean(st.aboveMA),
-        direction:st.direction||null,
-        currentWave:Number(st.currentWave||0),
-        previousDownWave:st.previousDownWave==null?null:Number(st.previousDownWave),
-        previousUpWave:st.previousUpWave==null?null:Number(st.previousUpWave),
-        buyQualified:Boolean(qualification.qualified),
-        buyReason:qualification.reason,
-        technicalDecision:qualification.qualified?'BUY_READY':'HOLD'
-      });
-    }catch{}
+  const c=await candles(symbol),rows=[];
+  for(let i=Math.max(2,c.length-limit);i<c.length;i++){
+   const historicalNow=c[i].closeTime+1;
+   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i+1),price:c[i].close,priceAsOf:new Date(historicalNow).toISOString(),now:historicalNow});
+   rows.push({at:new Date(c[i].closeTime).toISOString(),price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',strategyId:'WYCKOFF_D1_V1'});
   }
-  return rows.slice(-limit).reverse();
+  return rows.reverse();
 }
 
 async function refreshUniverse(){
@@ -2005,7 +1626,7 @@ async function refreshUniverse(){
 
     if(selected.length){
       initUniverse(selected);
-      await seedMinuteCandles(SYMBOLS);
+      // D1 history is loaded by candles(); minute setup is no longer used.
       startMarketStream();
       await evalAll();
       universeStatus='READY';
@@ -2021,6 +1642,11 @@ async function refreshUniverse(){
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
 // Exit monitoring does not wait for the 100-symbol daily-candle scan.
 setInterval(async()=>{
+  if(mode==='live'){
+   if(!LIVE||!AUTO_EXECUTION)return;
+   try{await maybeExecuteLive(await Promise.all(Object.keys(tradingPositions()).map(evaluateSymbol)));}catch(e){console.error('LIVE exit monitor failed',e.message);}
+   return;
+  }
   if(!DEMO_TRADING||mode!=='demo')return;
   if(!await demoTrader.monitorExits())return;
   for(const a of Object.values(agents)){
@@ -2336,6 +1962,10 @@ const server=http.createServer((req,res)=>{
       universeStatus,
       universeError,
       config:{
+        strategyId:'WYCKOFF_D1_V1',
+        timeframe:'1d',
+        targetMultiplier:1.07,
+        wyckoffStopLossPct:6,
         minWave:MIN,
         maPeriod:MAP,
         maxPositions:MAX,
@@ -2351,9 +1981,9 @@ const server=http.createServer((req,res)=>{
         entryMinScore:null,
         entryMaxRunPct:null,
         entryCostFilter:{enabled:true,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
-        stopLossPct:null,
+        stopLossPct:6,
         trailActivatePct:0,
-        exitTrailPct:EXIT_TRAIL_PCT,
+        exitTrailPct:null,
           buyCandidateCount:Object.values(agents).filter(a=>a?.entryConfirmed&&a?.position!=='LONG').length,
           trendCandidateCount:Object.values(agents).filter(a=>a?.buyQualified&&a?.position!=='LONG').length,
           demoExecutionBusy:demoTrader.busy,
@@ -2387,7 +2017,7 @@ const server=http.createServer((req,res)=>{
     const windows=String(u.searchParams.get('windows')||'8,10,12,15').split(',').map(Number).filter(Number.isFinite);
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
     fetchHistoricalDaily(symbol,start,Date.now()).then(c=>{
-      const results=windows.map(maxWave=>backtestWindow(c,{minWave:4,maxWave,maPeriod:MAP,initial:5000}));
+      const results=[backtestWindow(c,{initial:5000})];
       send(res,{ok:true,symbol,candles:c.length,start:new Date(start).toISOString(),end:c.length?new Date(c.at(-1).closeTime).toISOString():null,results});
     }).catch(e=>send(res,{ok:false,error:e.message},502));
     return;
@@ -2417,6 +2047,6 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadPaperState();
   loadLiveActionLog();
   loadDecisionHistory();
-  resetExperimentStateOnce();
+  /* Wyckoff upgrade preserves existing holdings and journals. */
   await refreshUniverse();
 });

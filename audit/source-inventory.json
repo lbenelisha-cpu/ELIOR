@@ -1,0 +1,1652 @@
+{
+  "scope": "File inventory, complete text parsing, JS syntax and static relative import resolution; not a claim of formal line-by-line verification.",
+  "files": [
+    {
+      "file": "001-paper-agent.sql",
+      "lines": 79,
+      "bytes": 5126,
+      "sha256": "1d4799c9de2effea7f69c09d7ac9c25016bde1e055e09839385ba91ea05d23c0",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "002-paper-rotation.sql",
+      "lines": 299,
+      "bytes": 23273,
+      "sha256": "e05efba8f7d84d93086b3ebd8543aeba4522eb2f9de34691b9b3cd2ac5452363",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "003-preserve-existing.sql",
+      "lines": 50,
+      "bytes": 4194,
+      "sha256": "b4bcb7da335272383e1f84e6f02a6c6578596f12d845f46f831a495e75b9a722",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "004-automation-plans.sql",
+      "lines": 275,
+      "bytes": 22673,
+      "sha256": "7c609ee64a5fb36668df5ddb3077b7129e15902c577558ed23010eda9b4ea4da",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "agent.mjs",
+      "lines": 44,
+      "bytes": 3013,
+      "sha256": "f77d943fa0cca18fcdf80ca1e4c56ea539e826b4454bd61764e6674d64118d13",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "agent.test.mjs",
+      "lines": 42,
+      "bytes": 2032,
+      "sha256": "3be6d352999122b2e9ae41c873aaa543bcb50cac5d231e675d9219394903cf76",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "ai-monitor (1).mjs",
+      "lines": 2,
+      "bytes": 67,
+      "sha256": "f3f5a316fa62d62be61212a817e2d59d1b504602c087e0ed0a65e2eceaabcf3d",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "ai-monitor (2).mjs",
+      "lines": 2,
+      "bytes": 67,
+      "sha256": "f3f5a316fa62d62be61212a817e2d59d1b504602c087e0ed0a65e2eceaabcf3d",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "ai-monitor.mjs",
+      "lines": 3,
+      "bytes": 112,
+      "sha256": "34fc275622474e16d1dad3d9de8b99a71350940bdc241b8d65af2152838bb4ed",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "app.js",
+      "lines": 385,
+      "bytes": 37577,
+      "sha256": "4f12f9ae1d8b869d42d1b6f5f253fe5b38d8322d2ee036825fa7a898250def27",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "atrade-market.html",
+      "lines": 12,
+      "bytes": 2861,
+      "sha256": "40237c8dc59ec3fe0afc8b6ba1edeb7fee7547be1bbd85f13bd82705db00750a",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "atrade-market.js",
+      "lines": 14,
+      "bytes": 3109,
+      "sha256": "2fc64929e77a85daee3c66f44ae515f41348d32065a2ca1ccd3699da9c8d6707",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "atrade-panel.js",
+      "lines": 49,
+      "bytes": 7085,
+      "sha256": "93bfc3545a06342b82d32d27d4a500cc96dd1c2d6c8bce6156f2749cf30e49fc",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "backtest-results.json",
+      "lines": 6324,
+      "bytes": 210746,
+      "sha256": "7351a9ddb274908bdb174479639565327a19f8c33f2f74929b8f9d9f7b284626",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-agent-portfolio.js",
+      "lines": 24,
+      "bytes": 1527,
+      "sha256": "7255801ac87206d28edbbafd450490b04bda7b626c29f78417f06001327378fb",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-agent.css",
+      "lines": 359,
+      "bytes": 20524,
+      "sha256": "5ea7f404b76b550d841765f3bf63df6a431576f2698d24b64f729c0589f5a0fc",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-agent.html",
+      "lines": 309,
+      "bytes": 12539,
+      "sha256": "039938697699ad49c86f050b214f2e974fd368a8a9e2b3db782732bd4522518d",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-agent.js",
+      "lines": 620,
+      "bytes": 28522,
+      "sha256": "80c605ee489050bcef7fa410bf33d28adc072fc1f6b016256805b4f7f32e5da1",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-demo-account.js",
+      "lines": 21,
+      "bytes": 1612,
+      "sha256": "b580739ec5bb558bc84a0983256bf9ecaf2bb309bcf12e7b38a67ceb6c4c51e4",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-research-worker.mjs",
+      "lines": 3,
+      "bytes": 250,
+      "sha256": "e53a7d4710f6f449a24a2ec68e4ab96974b1152d73a0b740325ec2ef621651ca",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-research.css",
+      "lines": 2,
+      "bytes": 786,
+      "sha256": "f39cfff75688b17439b3f0c7a3f0d65fbba796674da41c4597677969905dd9aa",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-research.html",
+      "lines": 10,
+      "bytes": 7476,
+      "sha256": "2224fed3f79fef342d41e5e8a22407159bcb30c212b484b6da02ed35591baa2f",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-research.js",
+      "lines": 34,
+      "bytes": 9127,
+      "sha256": "4c782be568b42ae36a63dab81514d2d92b56d5e7dd0602227c772638c5613d08",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "binance-wave-server-rotation-v3.mjs",
+      "lines": 3,
+      "bytes": 99,
+      "sha256": "13094be00c15a2a15ede00dd1e8b2edcf3919e85b9e6c0b61d99b2d51ac276d6",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "BINANCE_ENTRY_COST_HE.md",
+      "lines": 12,
+      "bytes": 2057,
+      "sha256": "99b4531fa44496d92a6412995661c9f390f197ab88762cca54b7137ec7a8ce7e",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "BINANCE_RESEARCH_HE.md",
+      "lines": 27,
+      "bytes": 6320,
+      "sha256": "3e6822d882640228b57767958295d79455407fd5d5de1577b613fd08ba4faf0f",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "BINANCE_REVIEW_HE.txt",
+      "lines": 16,
+      "bytes": 2718,
+      "sha256": "592f93ec70f5e8a0c48933cdfeda9c6191a1ae0945777381a13db2514816eec9",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "BINANCE_WAVE_SETUP_HE.txt",
+      "lines": 37,
+      "bytes": 1576,
+      "sha256": "616a629d894369ed2e237bdbfd379448cd483f0cda7dc92b9f795c9cc529722c",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "cloud-state (3).js",
+      "lines": 2,
+      "bytes": 60,
+      "sha256": "a920313f13db996c1d50583bff5b91051d94b58ebba02a2370d860fc5fae5ec3",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "cloud-state.js",
+      "lines": 2,
+      "bytes": 52,
+      "sha256": "b693c34e83f45a410880a012ebb6f9700c177ee093e6f62140e94afd8295bd93",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "colmex-dashboard.css",
+      "lines": 2,
+      "bytes": 5830,
+      "sha256": "a97a378c5e6419871e3e192ccd1bd4a94465298359cbafb1b074acce4f39bbde",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "colmex-execution-panel.js",
+      "lines": 45,
+      "bytes": 11702,
+      "sha256": "acce283afc5a823c48a136f79aba59a4055e4f095f10ba7bcaf36796632bb291",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "colmex-market.html",
+      "lines": 12,
+      "bytes": 2816,
+      "sha256": "b95b6f952095535c966ea8881300dd0eedb5724132474e418ce89e2f93c42fd2",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "colmex-market.js",
+      "lines": 14,
+      "bytes": 3109,
+      "sha256": "ede53f0fc1b24b4d9fb642f23c01c514d2a119a9adaf3ddace6e113f0b7d8d11",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "colmex-panel.js",
+      "lines": 50,
+      "bytes": 7771,
+      "sha256": "dc277bbb0fcad1cf448abe3cd2ba7ed93092394580df6c8a9a8ddf4c19af2acf",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "config.js",
+      "lines": 6,
+      "bytes": 233,
+      "sha256": "30dfd228befa088a505f06cae2b467abba38c2eaef0397a62a3fc1d9676ad634",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "daily-snapshot.mjs",
+      "lines": 4,
+      "bytes": 229,
+      "sha256": "f57faa5430d3cd23919a6a940ffd4ba6b2e577ea8bd3ebac4bd7c90367daaefa",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "DEMO_ACCOUNT_SETUP_HE.txt",
+      "lines": 21,
+      "bytes": 1373,
+      "sha256": "07a2016f107b0c186579af60aac92b9a46519feb5bbb32a8ed843ad53640ef18",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "DEMO_TRADING_SETUP_HE.txt",
+      "lines": 37,
+      "bytes": 4080,
+      "sha256": "41001eb2150ad61f98b95a2448c082ea5e0cee8e4e49e314f33c75b0e893a3aa",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "fx-rate (4).js",
+      "lines": 2,
+      "bytes": 56,
+      "sha256": "3510ab09fa50efdc26b27b35ee219cd6ee8af52a0b9b80415960a7b4469bdc4e",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "fx-rate.js",
+      "lines": 25,
+      "bytes": 1200,
+      "sha256": "b816b5d610f6d106fcffb13c685c1a03855d7c48acea988de8bb83cd242efb60",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "index.html",
+      "lines": 69,
+      "bytes": 3377,
+      "sha256": "93945fe091583faa59f9326c59eef7316a893cebf24f399158a6ab98781b3044",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "INSTALL_ALL.sql",
+      "lines": 805,
+      "bytes": 63635,
+      "sha256": "2ec9b71dc6a47c3116fff7906bb8fbc50914ec33c7ebc2cbbe4987471b832459",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "INSTALL_HE.md",
+      "lines": 57,
+      "bytes": 9268,
+      "sha256": "9e33d60161f25d786df99739063bca9f9d0f960094821b2e20ff088eb4cfb5e1",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "INSTALL_HE.txt",
+      "lines": 30,
+      "bytes": 4140,
+      "sha256": "93c7bad044c2450cb9fe1237417fe9e09f0885578ce55fce6133a1a7a1425b31",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "landing.js",
+      "lines": 2,
+      "bytes": 209,
+      "sha256": "934cb7d9dc0e43b8585d9d32ce0b928839e0e7f284db98de1c893ccffc235abd",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "legacy-dashboard.html",
+      "lines": 66,
+      "bytes": 15863,
+      "sha256": "f7794f22c2f1b359f32532b4a44600bde65dba2cfe85c24bcfd9cbda1561ef20",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/agent.mjs",
+      "lines": 71,
+      "bytes": 5270,
+      "sha256": "1b702b16b88d55427af37b1e2d5006cc5efa3f86fc3b66ffce0ba791b0de5d79",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/atrade-contracts.mjs",
+      "lines": 24,
+      "bytes": 2797,
+      "sha256": "0411fe41fc622d8d5d910e18ad656e4ecb2210710e18101c6419d7c36f5ee8b7",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/atrade-market.mjs",
+      "lines": 68,
+      "bytes": 5299,
+      "sha256": "24e0a8ae6601981e8ef57436005c70bcd5e7cf73b17feadae3fdcfecf215e7cb",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/benchmark.mjs",
+      "lines": 10,
+      "bytes": 1054,
+      "sha256": "f2c50c0b6f38fbce03b83d0d2ff2d937a8c0e07fd405813331c528c5c1f04680",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-control-auth.mjs",
+      "lines": 7,
+      "bytes": 370,
+      "sha256": "d6e0e22a114955b233b9abb51d5f510bbb5405c91b6de91aefdf06c864470dce",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-demo-account.mjs",
+      "lines": 42,
+      "bytes": 2432,
+      "sha256": "f7bd2feb1efda44c89ec92aed4d9667cd6624cb319986f398464b38a817a56a0",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-demo-account.test.mjs",
+      "lines": 21,
+      "bytes": 1755,
+      "sha256": "321eb12f7115f7872c2dfef6bffc65033c6d7f32b671ffc697664eed6fa5264c",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-demo-trader.mjs",
+      "lines": 510,
+      "bytes": 24164,
+      "sha256": "5d17de11328a723e39b7406ba94b4741ab16a62f0e936aa313ff8ea1e74b2072",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-demo-trader.test.mjs",
+      "lines": 193,
+      "bytes": 13636,
+      "sha256": "1f8701d7924c82e9547f0327e62b2f0ae8f72c870b7c9292de35b6a41f318363",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-entry-cost.mjs",
+      "lines": 35,
+      "bytes": 3124,
+      "sha256": "0f96363556004feb25f44579e4d250c94e58d1d900287712b35b2f3ec9e575ce",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-live-price.mjs",
+      "lines": 11,
+      "bytes": 457,
+      "sha256": "c359621119a7b22df72e27435772135387527059ff10f60ae0bce10c930dc3a4",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-research-data.mjs",
+      "lines": 28,
+      "bytes": 2914,
+      "sha256": "8902ff752608818866a1c8d3a36384fa4d5febb9011e1694a11bd5dac4df7cf0",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-research-engine.mjs",
+      "lines": 67,
+      "bytes": 7119,
+      "sha256": "d21db797f31b2df3b3138e1138ae5f7d243fa132c5ed5b8e8fd199ca77e0bb63",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/binance-wave-agent.mjs",
+      "lines": 34,
+      "bytes": 2168,
+      "sha256": "c9e5c146e3d3335b4d744587b7d14f7b1f907a806a9490142c1913e2e96b77c3",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/broker-daily-wyckoff.mjs",
+      "lines": 31,
+      "bytes": 2471,
+      "sha256": "8b93f9d6e06ab623a7038d623f21bc2ada4bc41a0c323ba699e16da0859c47ee",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/colmex-contracts.mjs",
+      "lines": 24,
+      "bytes": 2797,
+      "sha256": "effdd5f28508e03676dc0e7bd00194924aa561caeb3106a241f51bce9c3e3d16",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/colmex-execution.mjs",
+      "lines": 144,
+      "bytes": 14807,
+      "sha256": "75bce0a55b11b7d0da8be1c401b1257d4ac602b260d947beda9582f62f359277",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/colmex-fx.mjs",
+      "lines": 19,
+      "bytes": 1452,
+      "sha256": "53c1457d2f0abffdb6d67a464306ef78d9f075fec5ce05683d87b8150e32ed85",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/colmex-market.mjs",
+      "lines": 72,
+      "bytes": 6020,
+      "sha256": "367b52ce71c3820602cc939b164c67c375f109d597a6bfc403bb53ea3714677e",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/colmex-wyckoff.mjs",
+      "lines": 46,
+      "bytes": 4489,
+      "sha256": "727909a0ed179f83caa4982171b77612a77fac95c833e23e5f960770035d0cf7",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/daily-wyckoff-quotes.mjs",
+      "lines": 19,
+      "bytes": 1761,
+      "sha256": "88bbea96528d510ce658617abb92477158408e704454c344196ae8c4dc8f9885",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/legacy-wave-backtest.mjs",
+      "lines": 21,
+      "bytes": 1423,
+      "sha256": "42601c245adc48463e44a4471144607e0c3377dce45eeaea5e94f7025fdb154b",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/meitav-experiments.mjs",
+      "lines": 42,
+      "bytes": 3822,
+      "sha256": "90e65c9a5680cc8fcb3ebe7364d992f087aea5906997fab272613e13fd38c1a2",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/meitav-paper.mjs",
+      "lines": 64,
+      "bytes": 4567,
+      "sha256": "3bcc16d84cece4a0ba9e93ebe385fff9b2200c33b8113e38be69e8b6c909994c",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/meitav-research.mjs",
+      "lines": 59,
+      "bytes": 6244,
+      "sha256": "c8d805c89fd6b45660503bef5f9422164078463b6c24803f88631bf5b9ed848e",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/meitav-wave-strategy.mjs",
+      "lines": 35,
+      "bytes": 2169,
+      "sha256": "c218fc04f1eb3f1e92f976a6b0e6f4e5d00930050ac6b435aca7c4123d3171c5",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/persisted-market-order.mjs",
+      "lines": 32,
+      "bytes": 1720,
+      "sha256": "2f9ac64408b1fc796c7bd86c4dd2ab8c8901658428421980559e0a589649784c",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/scan-history.mjs",
+      "lines": 14,
+      "bytes": 1040,
+      "sha256": "d2c0a9d6f476717f9fb0a5cb29ad3b2a236d7d2dfeb6cf2d9ffbbafe36100cc1",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/wyckoff-backtest.mjs",
+      "lines": 24,
+      "bytes": 1870,
+      "sha256": "9d01f1ccf3f1228cc39db8e555b6e60985edbcad903bf20409cc4b82683514d4",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/wyckoff-evaluation.mjs",
+      "lines": 26,
+      "bytes": 2062,
+      "sha256": "8bba4c92f762aa857e88f5c22a569fd214e2da73703e36fcd41fd4ea3cbbf4c9",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/wyckoff-live-positions.mjs",
+      "lines": 19,
+      "bytes": 1210,
+      "sha256": "19666a1bb4b32e34a14b37c576e039bae53f04eb22b78d53276d8fee9a446303",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "lib/wyckoff-strategy.mjs",
+      "lines": 82,
+      "bytes": 5979,
+      "sha256": "28f4f8eecf2392bbde0cd4c0f9adaf3497477f622b3cf20a0a164e6a33fea98b",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "market-data (1).js",
+      "lines": 54,
+      "bytes": 2319,
+      "sha256": "8e7e2834309c73f82cd37b19d2fa25f0e5a9b81d21ae9e3243a1f82fff9d272f",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "market-data.js",
+      "lines": 54,
+      "bytes": 2319,
+      "sha256": "8e7e2834309c73f82cd37b19d2fa25f0e5a9b81d21ae9e3243a1f82fff9d272f",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "market-scanner.js",
+      "lines": 2,
+      "bytes": 64,
+      "sha256": "0723b373da3221040485203ff68c166e0c94a76d6ad8046ad065f966b466e154",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "market-scanner.mjs",
+      "lines": 2,
+      "bytes": 56,
+      "sha256": "d56c85b17f07bb9dff08abb7e37df8ec8857091caee543ac2128d041a0fbc879",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "meitav-agent.css",
+      "lines": 284,
+      "bytes": 17613,
+      "sha256": "2f77daf8cec26280ed2fc80c3fbdd377f0b708ba0d6aee27f18a9561a69790cf",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "meitav-agent.html",
+      "lines": 16,
+      "bytes": 12915,
+      "sha256": "35aaa36a7d9bd7b027d092818f24a9f50f158368c38319e341d7ad6811f3ba02",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "meitav-agent.js",
+      "lines": 96,
+      "bytes": 18803,
+      "sha256": "499bedf99224d3575f66f8904a2e9fb269d4a6c25f0d0650c176e1195b344354",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "meitav-research-worker.mjs",
+      "lines": 6,
+      "bytes": 229,
+      "sha256": "b4eabca06795ca3de1da0163f8f104bbb312cdb07943bb76572502896a49362e",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "MEITAV_SETUP_HE.md",
+      "lines": 51,
+      "bytes": 9601,
+      "sha256": "05a978a6fc53ff0602c95cd5cfbc8a9c92fe89826fd9d7564f83320e7ace24c2",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/buying-power.mjs",
+      "lines": 14,
+      "bytes": 1243,
+      "sha256": "07684106382ece84aed3487a474aebd1ffd714c56cc08640f04bccd000619143",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/ELIOR_Daily_Market_Reader.mq4",
+      "lines": 39,
+      "bytes": 3957,
+      "sha256": "5dbe12f963f4ea9f41cde57178f8c08f0443230d34c11c2e686de0af01893ba3",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/ELIOR_Demo_Reader.mq4",
+      "lines": 27,
+      "bytes": 2473,
+      "sha256": "9a3660fe2a1fda2ef748ded3e216224f75643f17f2856f11d2944d16b5419f60",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/LEVI_Live_Connector.mq4",
+      "lines": 82,
+      "bytes": 8279,
+      "sha256": "d52333fbed36af08693bc4afac72932218ae16bdcb9ed7ef5070e43048eeb4fb",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/live-bridge.mjs",
+      "lines": 81,
+      "bytes": 7567,
+      "sha256": "caf5100c05120945c34beaf4fa45a13110419c631ca2605caf89888820001421",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/live-client.mjs",
+      "lines": 18,
+      "bytes": 1920,
+      "sha256": "f79bf8495a2eef978f148253c04d0568d53f7c0d59aba8a23a5dbe3730a3bab8",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/monitor.mjs",
+      "lines": 54,
+      "bytes": 5088,
+      "sha256": "83d4f2b16b8e56c06ed6d6ec7c420196a27b8495dfd532b7598546d4d6444474",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/orders.mjs",
+      "lines": 42,
+      "bytes": 3176,
+      "sha256": "5a84645d5ef57020818e7b592cbd773e23ce19ca558e1da935248d13848bfe4d",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/push-relay.mjs",
+      "lines": 17,
+      "bytes": 3072,
+      "sha256": "e2f23601343431ce6e34b6feedf4d9475f78662ef751bdb708efa5f4508e5f5c",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4/Start-Live.ps1",
+      "lines": 10,
+      "bytes": 648,
+      "sha256": "c81b645c5a2e1fdaf277a09a95a4ded2e903ec230f1917551d6b3e2d7fe14d3e",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4-alerts.js",
+      "lines": 12,
+      "bytes": 1946,
+      "sha256": "236029aff79b97e26a3a4b95afd67d34237c3c9386ea52021500e792cd96727e",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4-demo.html",
+      "lines": 9,
+      "bytes": 3712,
+      "sha256": "caf5f36955c0dfd9f2397caed80cd3d106bd02002cf4037ead22d5d7096aabf1",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4-monitor-ui.js",
+      "lines": 82,
+      "bytes": 11823,
+      "sha256": "df8ae587e5b6d9229f80b534e696251efbcd41cf246efa6cf661f052b7a2b2dd",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4-panel.js",
+      "lines": 54,
+      "bytes": 7135,
+      "sha256": "6491ddfff244db183489e5bd892655a2c172867c73abc0342046c800cbc5c203",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4.css",
+      "lines": 5,
+      "bytes": 3468,
+      "sha256": "8676b662131f975890a6a39529ea81d912763b4fad89c9002b45f59556e46feb",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt4.html",
+      "lines": 13,
+      "bytes": 3856,
+      "sha256": "89cf364eaf354fb9376a1ca7ec2951e02853537e57cb6908861e0056ec9bee03",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5/bridge.mjs",
+      "lines": 72,
+      "bytes": 5477,
+      "sha256": "e1a806fc7e416d75c0ace58ea19e51ca8ac2fa1388a67840fb92a5c4cfea6a43",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5/README_HE.md",
+      "lines": 17,
+      "bytes": 1769,
+      "sha256": "3a8157493b305f405ad84b8aedeca36e92eff8fc5d1bb2f48b351101021bdd93",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5/Start-MT5.ps1",
+      "lines": 16,
+      "bytes": 1196,
+      "sha256": "80331b37eeb779373188a0119261328f5ce0f761b44ccbe1dc53c4fc800faed4",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5-panel.js",
+      "lines": 20,
+      "bytes": 2194,
+      "sha256": "725225fa6eaedb59a8c8295f0a5cd6154d32a73123be3fa8562d478809544014",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5.css",
+      "lines": 2,
+      "bytes": 585,
+      "sha256": "4ea217843da5706bb5ad741a85a40b4fe2bc6d99669f035826036561a6743de3",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "mt5.html",
+      "lines": 5,
+      "bytes": 1415,
+      "sha256": "3d47c667be2e3fa7e4e07b69450bb2e99f99813ba0301023bfbf8daa4ca65f09",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/ai-monitor.mjs",
+      "lines": 43,
+      "bytes": 3784,
+      "sha256": "2166bde3395c9b0ab5023a22fd5020679dc8950aa478a97ab8d1f39f9ed3d591",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/atrade-market.mjs",
+      "lines": 44,
+      "bytes": 4405,
+      "sha256": "0e9b2533fbf4bb7c89a76f0027004489ef0acd5d3f4a687beefbf318b22286d5",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/binance-research-market.mjs",
+      "lines": 11,
+      "bytes": 1115,
+      "sha256": "beba774f6dd6c0f5e0ca365310bda350fa4a847055eee824a6fbc93e2c72064c",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/cloud-state.js",
+      "lines": 38,
+      "bytes": 3382,
+      "sha256": "b36c12cffb46096571fa1ba16ae586e9fd4f29eb6eaaa60085ac6cdc757c23f8",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/colmex-execution.mjs",
+      "lines": 39,
+      "bytes": 4349,
+      "sha256": "b22864ec1ad652b19f33c7bcce114d783d39d3a0c9c2b596828d83b8699a8f43",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/colmex-market.mjs",
+      "lines": 44,
+      "bytes": 4450,
+      "sha256": "f7fa0e58e5d76207bd83a686d5d43b67b96fb204ebb26a47e9a11584fffe18b6",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/daily-snapshot.mjs",
+      "lines": 4,
+      "bytes": 229,
+      "sha256": "f57faa5430d3cd23919a6a940ffd4ba6b2e577ea8bd3ebac4bd7c90367daaefa",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/fx-rate.js",
+      "lines": 19,
+      "bytes": 873,
+      "sha256": "a138375edb9ff5bcb6ec9980958659b18b464ef5a6cef78795b7c6376041afd9",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/market-data.js",
+      "lines": 44,
+      "bytes": 1836,
+      "sha256": "952c81f0d6d34c53873e1048758938dd39ffc48dedd601d2460b99b2edd02554",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/market-scanner.mjs",
+      "lines": 22,
+      "bytes": 1435,
+      "sha256": "32e487af48aa209092b3e21ae76ed3a0eae0f3404d9432cb5d497f4789735576",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/meitav-market.mjs",
+      "lines": 20,
+      "bytes": 1971,
+      "sha256": "db8b923d96eddd3d02dcd4b48d9bedd135b6815f6202aa2368ec1125e17c5e74",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/mt4-demo.js",
+      "lines": 28,
+      "bytes": 3111,
+      "sha256": "c29223d053068ba766977d539766b9f609699cdaecb10987c559f8a60693d96b",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/nvda-breakout-backtest.mjs",
+      "lines": 224,
+      "bytes": 6483,
+      "sha256": "6931ae6d3a3305522cbf47206b81054f361babbab4f0273ed326705451e043b5",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify/functions/push-api.mjs",
+      "lines": 35,
+      "bytes": 3645,
+      "sha256": "4edaeccb61c45ec5436fab373d02b6a00abfef61354d075f61c41538b0e23f09",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "netlify.toml",
+      "lines": 26,
+      "bytes": 498,
+      "sha256": "907c7a13c8077998f06842226a9aa3386197159b04ce3cebbdae71387d84d34a",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "package-lock.json",
+      "lines": 734,
+      "bytes": 27626,
+      "sha256": "3b4eec2fbcc0e1f16c37e14e3fe74c3d9efa1baca3d66a6ba8452c2ee626378c",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "package.json",
+      "lines": 8,
+      "bytes": 371,
+      "sha256": "105d4bcf5b5dbb683104bf0a6628669f64b96ef806b5dd5b4c850ff9c3b34f2f",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "push/core.mjs",
+      "lines": 16,
+      "bytes": 2590,
+      "sha256": "350006a85bdf83db5cbc0a8e335aed7509a98ff8321dd6c351426ecd3cff7a8a",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "push/generate-keys.mjs",
+      "lines": 9,
+      "bytes": 1205,
+      "sha256": "ef335e3dc869e46f3e43f1c761a92b43d523d1cfad4183884b45e09393c3e1ce",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "push-client.js",
+      "lines": 8,
+      "bytes": 3080,
+      "sha256": "a17ab1d5ddeb7d7ea87b3498093927c8f746ed1c07d71aec75abc58c7406b6a5",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "push-sw.js",
+      "lines": 3,
+      "bytes": 666,
+      "sha256": "976d512fd2650356820c31fa8564c483fc7566205b6ddd4323dfe394933b85a9",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "push.html",
+      "lines": 2,
+      "bytes": 1607,
+      "sha256": "4a1261fdd5e844f3150602a23e018486f48dc8de69202fe070610e4456392367",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "PUSH_INSTALL_HE.txt",
+      "lines": 31,
+      "bytes": 5556,
+      "sha256": "5f69843f6aa505114ca64e01c06f8c12d1036d8b0f01d84077e5bbb86e8b42dd",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "README_HE.txt",
+      "lines": 5,
+      "bytes": 373,
+      "sha256": "ef90cc4165bc8bd542b8f72c718035baa10764c81ea5a19656c77eb92b2d166f",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "README_UPDATE_HE.txt",
+      "lines": 5,
+      "bytes": 447,
+      "sha256": "f1a779cdac2f86c43eed7a1aa74a6f6bb3f5e599e6d2dc93eb50f752177a3062",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "rotation.test.mjs",
+      "lines": 138,
+      "bytes": 13419,
+      "sha256": "acbd429fd35a4846d07708b292ce7cf2310efb9254b6033d42302c600fe07ccc",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "server.mjs",
+      "lines": 2053,
+      "bytes": 72488,
+      "sha256": "021b52e6003792f4a6bdf327fcd0cd43833804c7ad428c74569f2c3d66d2d881",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/001-paper-agent.sql",
+      "lines": 79,
+      "bytes": 5126,
+      "sha256": "1d4799c9de2effea7f69c09d7ac9c25016bde1e055e09839385ba91ea05d23c0",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/002-paper-rotation.sql",
+      "lines": 299,
+      "bytes": 23273,
+      "sha256": "e05efba8f7d84d93086b3ebd8543aeba4522eb2f9de34691b9b3cd2ac5452363",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/003-preserve-existing.sql",
+      "lines": 50,
+      "bytes": 4194,
+      "sha256": "b4bcb7da335272383e1f84e6f02a6c6578596f12d845f46f831a495e75b9a722",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/004-automation-plans.sql",
+      "lines": 275,
+      "bytes": 22673,
+      "sha256": "7c609ee64a5fb36668df5ddb3077b7129e15902c577558ed23010eda9b4ea4da",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/005-market-cache.sql",
+      "lines": 25,
+      "bytes": 2003,
+      "sha256": "a4ad14e412a18b2aef39efe142023b5b14d2db9a33d26620699259e88d09d48c",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/006-wyckoff-daily.sql",
+      "lines": 97,
+      "bytes": 8240,
+      "sha256": "a5e98d83cdf8a32814b127058ff98f2d0e57fb6730f545f15352529e6e674d97",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql/INSTALL_ALL.sql",
+      "lines": 829,
+      "bytes": 65566,
+      "sha256": "af8609d53a3bd3e4ae3983447aab802a88520d3d3c7b6cb64f1d7c1f3948ddbb",
+      "changed": true,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "sql.test.mjs",
+      "lines": 49,
+      "bytes": 3627,
+      "sha256": "70ffac83806255a82b0bf2aeae2f2de11a17b78cc9f5cd6fdf60d4f4b724c5c9",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/agent.test.mjs",
+      "lines": 35,
+      "bytes": 2120,
+      "sha256": "d2c18693b195e320083160dfa60ea7c66b4d2bfb04f3236fcfce452b14737d13",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-control-auth.test.mjs",
+      "lines": 9,
+      "bytes": 537,
+      "sha256": "706404e544d0ca3d53e4e744e0d27602c923b71be38c030bf34eb13ff7e43e10",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-entry-blockers.test.mjs",
+      "lines": 20,
+      "bytes": 1371,
+      "sha256": "40e64e4da144397d0856f2d12f2235a98784e884b297ddc54bab360f80ceed52",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-entry-cost.test.mjs",
+      "lines": 21,
+      "bytes": 1242,
+      "sha256": "24f5145fa402145d48f1ed012b4261e2b7835171ea1fad3ef83a79f563b40337",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-live-price.test.mjs",
+      "lines": 15,
+      "bytes": 829,
+      "sha256": "da626f2d615c70275d7de9f85832df0661c8f830cccc8155be6960dc54f0a142",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-pnl-ui.test.mjs",
+      "lines": 30,
+      "bytes": 2793,
+      "sha256": "5a513612fc5e7ed448060373162fb6d85336ba62c9906cf169e80002a4800b09",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-research.test.mjs",
+      "lines": 41,
+      "bytes": 4820,
+      "sha256": "85abd46005c867fb5f9bba272511b13cfed4a80a376809deb62170d94bf26cd7",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-stream-lifecycle.test.mjs",
+      "lines": 42,
+      "bytes": 3066,
+      "sha256": "efb0547ead514da641f4d680fa219c6a5875909e2847b17bebdab203fc1d10ba",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/binance-wave-agent.test.mjs",
+      "lines": 6,
+      "bytes": 936,
+      "sha256": "1145a3b5d928b0677663dd82b37c938a6837ed29604d1eb643ee1f2693f46c44",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/bridge-security.test.mjs",
+      "lines": 12,
+      "bytes": 837,
+      "sha256": "605555717903662d7a243f2fe13dd7cbbe446c160b3413949dff4b487203ab9f",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/buying-power.test.mjs",
+      "lines": 6,
+      "bytes": 1177,
+      "sha256": "1df6b421ff78c8e7e6d48e7bd57df115fed590eb35bc0f04b39fbb10696dfc1f",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/cache.test.mjs",
+      "lines": 22,
+      "bytes": 1267,
+      "sha256": "cbba5c6b4aedf624f4947d3ce8a679cda37942d2c7344ecb48044e5ea694e3fa",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/meitav-experiments.test.mjs",
+      "lines": 26,
+      "bytes": 2529,
+      "sha256": "85b53e776f8ff5d316c4cec2ec5cbd5511bd8cbe1c562415cc30ea42d0b2806d",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/meitav-paper.test.mjs",
+      "lines": 31,
+      "bytes": 2511,
+      "sha256": "7473c58d0120e55482f6293408ffc892dbba815fafba5ef26b88210c980bd1f7",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/meitav-research.test.mjs",
+      "lines": 30,
+      "bytes": 3232,
+      "sha256": "2c4d9b93f22eac7fb9a833ebcba3d508da150336ccacec0d4251ba22e96aa2af",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/monitor-live.test.mjs",
+      "lines": 12,
+      "bytes": 2806,
+      "sha256": "4178034a5dd33e21c042e282ec72d97a426eefe5213099ffbc9470be7d43bd86",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/monitor.test.mjs",
+      "lines": 29,
+      "bytes": 3216,
+      "sha256": "c15987d604b815a8bee63863fcd949f974fdbf972608475b77c4df6d8f65d2d3",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/mt4-live.test.mjs",
+      "lines": 7,
+      "bytes": 1024,
+      "sha256": "fa257e5407fd41938f9557fbd72a31b3b4b13833acf158e42b70f390af175d8c",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/mt5-bridge.test.mjs",
+      "lines": 31,
+      "bytes": 2327,
+      "sha256": "7cc70a0101d1b6c6f3ae88505a2e8cff03efaffe2b3ccd6ef3632a66add71441",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/orders.test.mjs",
+      "lines": 7,
+      "bytes": 2824,
+      "sha256": "3c396e9ecc669e57b28d607b5ec8c6044cfdf93836c6161a186a594db222d0e2",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/push-dependencies.test.mjs",
+      "lines": 3,
+      "bytes": 985,
+      "sha256": "756b8168245afde780137c8e287c7f0ca5b5b52d241463f0e228db98a2e2ec41",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/push-handler.test.mjs",
+      "lines": 3,
+      "bytes": 699,
+      "sha256": "aa1e947f8315e71792dcba1300af14a85af365a09010cf3533b117864ac6a8d5",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/push.test.mjs",
+      "lines": 9,
+      "bytes": 3095,
+      "sha256": "c56217c3d1dfc087613afe9fb29f21eb5b3612034fcc81e5c06218fe5e724685",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/rotation.test.mjs",
+      "lines": 138,
+      "bytes": 13477,
+      "sha256": "084011c8cf627db36eb00d6d36ec254eb01f178b9b9d061f78a45d24f60550e7",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/session-recovery.test.mjs",
+      "lines": 9,
+      "bytes": 1205,
+      "sha256": "bba7ca4aef4b57394ef20d35448675e565da2ae1863acf12aa1bb845c08a226a",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/sound.test.mjs",
+      "lines": 13,
+      "bytes": 1486,
+      "sha256": "ae8cfbddc1753fcebb88993a50134c0f08e4d1468312fada4484092dbcc9b031",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/sql.test.mjs",
+      "lines": 49,
+      "bytes": 3625,
+      "sha256": "c535dbf66082659e566657bf5ad8af36445e94535b1c0a514a849d18454d9534",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/ui.test.mjs",
+      "lines": 84,
+      "bytes": 9136,
+      "sha256": "eee4f693fb90613d307c110156449954e61e1c173b54988280b1161dd6edfccd",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-demo-helper.mjs",
+      "lines": 31,
+      "bytes": 2707,
+      "sha256": "6e871734f5406fd5104573c4ddc9a82abfe1647c74e8dd9f5453be0c176a2a6f",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-demo.test.mjs",
+      "lines": 35,
+      "bytes": 2897,
+      "sha256": "cdd28ef3593bebdd978fe99f3abaea3abc4dce50976ecae8c5dd4ef7a73d97fa",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-integration.test.mjs",
+      "lines": 48,
+      "bytes": 4030,
+      "sha256": "76593f8a1bef223546d2460cebe38dd2b7fd42a559015cdfe327ee8f34d0ccd0",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-live-order.test.mjs",
+      "lines": 33,
+      "bytes": 2669,
+      "sha256": "4b60debf573121c94384ceb3f6a7e1b0cbe2e47b27dc82bf6f93135f9717388e",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-sql.test.mjs",
+      "lines": 55,
+      "bytes": 5653,
+      "sha256": "bee7b60210d7a5ae08b857495ea27bf51e7626a61a396c2445f121a4e716e657",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "tests/wyckoff-strategy.test.mjs",
+      "lines": 49,
+      "bytes": 3930,
+      "sha256": "37e9e5d0677289116d6e25f5052aea89b99aee04456752009c4ef7110372c76f",
+      "changed": true,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "ui.test.mjs",
+      "lines": 69,
+      "bytes": 8033,
+      "sha256": "2f45d02e424e9658ce21058f9f96e15b95e5c2e2797fccc5b1f7f2e2a51ac06b",
+      "changed": false,
+      "syntax": "PASS",
+      "missingRelativeImports": []
+    },
+    {
+      "file": "UPGRADE_V63_HE.txt",
+      "lines": 10,
+      "bytes": 1161,
+      "sha256": "ad9b6d48a2e6df41aeaece6fb59db3d932bf235a4542e67591b6354fb2f778d5",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "VALIDATION_HE.txt",
+      "lines": 6,
+      "bytes": 2465,
+      "sha256": "b5d18e2a14d51c999a47b6e00a326193d83f385aaecf1236a0d1b7722ff9ee7e",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    },
+    {
+      "file": "הסבר תצוגת גרף.html",
+      "lines": 359,
+      "bytes": 908023,
+      "sha256": "e0c4df9b6fccfc85350781b3f7f6dc061b3e9882b54e5aaa2a154fedaadcf560",
+      "changed": false,
+      "syntax": null,
+      "missingRelativeImports": []
+    }
+  ]
+}

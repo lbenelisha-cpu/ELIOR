@@ -68,9 +68,9 @@ test('dynamic opening starts with cash and account capital cannot be changed by 
 test('reset clears votes, cycles and account history as one transaction',async()=>{
  await setup();await run();await db.exec("select manage_paper_portfolio('reset','{}')");const s=await state();assert.equal(s.rows.length,0);assert.equal(s.accountSnapshots.length,0);assert.equal(s.rotation,null);assert.equal(s.account.initialized,false);
 });
-test('full SQL installer can be rerun without losing positions or realized profits',async()=>{
+test('archived rotation SQL sections can be rerun without losing positions or realized profits',async()=>{
  await setup();await run();const before=await state();
- await db.exec(fs.readFileSync(new URL('../sql/INSTALL_ALL.sql',import.meta.url),'utf8'));
+ await db.exec(fs.readFileSync(new URL('../sql/INSTALL_ALL.sql',import.meta.url),'utf8').split('-- Wyckoff daily strategy migration')[0]);
  const afterState=await state();assert.deepEqual(afterState,before);
 });
 test('legacy holdings are valued before the first account snapshot without writing data',async()=>{

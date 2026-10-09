@@ -1,5 +1,5 @@
-import {prepareOrder,trackRisk,canPrepareOrder} from './monitor.mjs';
-import {buyingPower} from './buying-power.mjs';
+import {prepareOrder,trackRisk,canPrepareOrder} from './mt4/monitor.mjs';
+import {buyingPower} from './mt4/buying-power.mjs';
 const el=id=>document.getElementById(id);
 let latest=null,draft=null,tracking=null,lastKinds=new Map();
 try{tracking=JSON.parse(localStorage.getItem('levi-tracking-639367')||'null');}catch{}
@@ -28,7 +28,7 @@ function render(){
    cash.append(text('p',power.freeMargin===null?'ביטחונות פנויים לא מדווחים בגרסת המחבר הזו. במניות CFD היתרה אינה בדיקת ביטחונות; MT4 בודק אותם שוב לפני ביצוע.':`ביטחונות פנויים: ${money(power.freeMargin)}. דרישת הביטחונות בפועל נבדקת ב־MT4 לפני ביצוע.`));
    cash.classList.add(power.budgetEnough&&power.cashEnough?'power-positive':'power-limited');
   }card.append(cash);
-  card.append(text('p',q.status==='current'?`ציון ${q.score}/100 · ${q.confirmed?'3 אימותים בנרות סגורים':'טרם אומת ב־3 נרות'} · מגמה ${q.components.trend}, מומנטום ${q.components.momentum}, סיכון ${q.components.risk}`:q.reason));
+  card.append(text('p',q.wyckoff?`וויקוף יומי · ${q.wyckoff.phase} · ${q.confirmed?'חזרה מאושרת מעל השפל הראשון':'ממתין לתבנית'} · יעד ${q.wyckoff.targetPrice??'—'}`:q.reason));
   card.append(text('p',`מקור: ${q.source} · זמן מחיר: ${Number.isFinite(q.tickTime)?new Date(q.tickTime*1000).toLocaleString('he-IL'):'חסר'} · ביקוש ${q.bid??'—'} / היצע ${q.ask??'—'}`));
   card.append(text('p','האות מתאר את הנוסחה הטכנית בלבד; אינו מבטיח תוצאה או כולל עלויות, חדשות ודוחות.'));
   const actions=document.createElement('div');actions.className='trade-actions';
@@ -77,6 +77,5 @@ el('draft-confirm').onclick=async()=>{
  try{const result=await window.LEVIRequest('/api/order/confirm',{id:approval.id,confirm:true});el('draft-result').textContent=result.message;el('execution-status').textContent=result.message;el('refresh').click();}
  catch(e){el('draft-result').textContent=e.message+' — אם השליחה נותקה, בדוק את הפוזיציות ולוג MT4 לפני ניסיון נוסף.';}
 };
-
 
 

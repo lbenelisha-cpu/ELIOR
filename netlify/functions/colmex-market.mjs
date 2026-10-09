@@ -36,8 +36,8 @@ export async function handler(e){
    stage='save-scan';await db('colmex_market_scans?on_conflict=bar_time',{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify({bar_time:analysis.barTime,leader:top.symbol,score:top.master,universe_id:analysis.universeId,candidates:analysis.candidates})});
   }
   stage='read-scans';const scans=await db('colmex_market_scans?select=*&order=bar_time.desc&limit=10');
-  const leader=confirmation(scans);
-  if(!analysis.complete||Number(scans[0]?.bar_time)!==analysis.barTime||scans[0]?.universe_id!==analysis.universeId)leader.verified=false;
+  const top=analysis.candidates[0];
+  const leader={symbol:top?.symbol||null,consecutive:top?.wyckoff?.consolidationBars||0,required:3,verified:!!top?.wyckoff?.buyConfirmed,phase:top?.wyckoff?.phase||'WAIT_DAILY_BARS'};
   return reply(200,{...analysis,contracts,leader,history:scans,executionEnabled:false,notice:'ניתוח מחירי קולמקס בלבד. מעבר בתיק הכספי ממתין לאימות מפרטי החוזים והעלויות; אין פקודות לברוקר.'});
  }catch(e){const code=e.diagnostic||'PROCESSING_ERROR';return reply(503,{error:'תקלה בחיבור נתוני קולמקס: '+stage+' / '+code+' / project: '+projectRef(),diagnostic:{stage,code,project:projectRef()},version:'market-diagnostics-3'});}
 }
