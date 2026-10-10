@@ -371,3 +371,5 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 #tradeControlStatus.trading-paused{color:#ff9ba6;background:rgba(255,97,114,.12);border-color:#ff6172}
 
 .chart-analysis{margin:12px 0;line-height:1.7}.chart-analysis-markers{display:flex;gap:8px;overflow:auto;max-height:160px;flex-wrap:wrap}.analysis-marker{background:#101f2f;border:1px solid currentColor;border-radius:12px;padding:9px;cursor:pointer;font:inherit}.analysis-marker.signal{color:#2bd88a}.analysis-marker.wait{color:#ffbd59}.analysis-marker.error{color:#ff6172}.analysis-marker.fill{color:#8bbdff}#chartDecisionDetails{max-height:320px;overflow:auto;padding:10px}.chart-analysis-row{white-space:pre-line;border-bottom:1px solid #28415a;padding:12px 0;font-size:13px}
+
+.indicator-panel{margin-top:10px;border:1px solid #1e3248;border-radius:12px;background:#081523;overflow:hidden}.indicator-panel canvas{display:block;width:100%;height:140px}

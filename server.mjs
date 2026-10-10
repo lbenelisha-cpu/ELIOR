@@ -1833,6 +1833,7 @@ const server=http.createServer((req,res)=>{
   }
 
   const sf={
+    '/binance-indicators.js':['binance-indicators.js','text/javascript'],
     '/binance-agent.html':['binance-agent.html','text/html'],
     '/binance-agent.js':['binance-agent.js','text/javascript'],
     '/binance-agent.css':['binance-agent.css','text/css'],

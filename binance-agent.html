@@ -159,6 +159,7 @@
             <button class="time-pill range-btn" data-range="ALL">ALL</button>
           </div>
 
+          <div class="toolbar-group"><label><input type="checkbox" id="showRSI" checked> RSI (14)</label><label><input type="checkbox" id="showROC" checked> ROC (12)</label></div>
           <span id="chartLegend" class="chart-legend">נר 5M · עד שבוע · MA200</span>
         </div>
 
@@ -167,6 +168,9 @@
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
+        <div id="rsiPanel" class="indicator-panel"><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
+        <div id="rocPanel" class="indicator-panel"><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
+        <p class="mini">RSI: קווים ב־30 ו־70 · ROC: שינוי באחוזים לעומת 12 נרות קודם · לתצוגה בלבד.</p>
         <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
           <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; מוצגים 120 הנרות האחרונים. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
@@ -324,6 +328,7 @@
   </main>
 
   <script src="binance-chart-decisions.js"></script>
+  <script src="binance-indicators.js"></script>
   <script src="binance-agent.js"></script>
   <script src="binance-agent-portfolio.js"></script>
 <script src="binance-demo-account.js"></script>
