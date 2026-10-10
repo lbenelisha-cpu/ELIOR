@@ -45,12 +45,12 @@ function chartDecisionDetails(group,candles,interval){
   if(setup.phase)parts.push('שלב: '+decisionReasonLabel(setup.phase));
   if(Number(row.targetPrice)>0)parts.push('יעד מחיר: '+fmt(row.targetPrice,6));
   if(kind==='signal'){
-   if(interval!=='1d')parts.push('למעקב אחרי האות בחר נרות 1D.');
+   if(!['1d','5m'].includes(interval))parts.push('למעקב אחרי האות בחר נרות 5M או 1D.');
    else for(const days of [1,7]){
     const result=chartSignalReturn(row,candles,days);
     parts.push('שינוי מחיר אחרי '+days+' ימים: '+(result===null?'ממתין / נתונים לא זמינים':(result>=0?'+':'')+fmt(result,2)+'%'));
    }
-   parts.push('מעקב לפי הסגירה היומית הראשונה לאחר פרק הזמן; אינו רווח ממומש ואינו כולל עמלות.');
+   parts.push('מעקב לפי סגירת הנר הראשונה לאחר פרק הזמן; אינו רווח ממומש ואינו כולל עמלות.');
   }
   article.textContent=parts.join('\n');panel.append(article);
  }

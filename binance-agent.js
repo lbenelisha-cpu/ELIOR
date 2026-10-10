@@ -18,8 +18,8 @@ let currentAgentData=null;
 let currentMode='demo';
 let currentLiveAccount=null;
 let currentVisibleAgents=[];
-let selectedInterval='1d';
-let selectedRange='6M';
+let selectedInterval='5m';
+let selectedRange='1W';
 let activeView='trade';
 let demoTradingEnabled=false;
 let tradeControlToken=null;
@@ -184,7 +184,7 @@ function render(d,currentMode='demo',liveAccount=null){
 
   const sd=d.config?.strategyDiagnostics||{};
   const nearest=(sd.nearestToTarget||[])[0];
-  put('#strategyDiagnostics','D1 מוכנים '+(sd.dailyReady??0)+'/'+(sd.evaluated??0)+' · דשדוש '+(sd.consolidation??0)+' · Spring '+(sd.spring??0)+' · מועמדים '+(sd.executionCandidates??0)+' · בוצעו '+(sd.demoFilled??0)+' · נדחו '+(sd.demoRejected??0));
+  put('#strategyDiagnostics','5M מוכנים '+(sd.dailyReady??0)+'/'+(sd.evaluated??0)+' · דשדוש '+(sd.consolidation??0)+' · Spring '+(sd.spring??0)+' · מועמדים '+(sd.executionCandidates??0)+' · בוצעו '+(sd.demoFilled??0)+' · נדחו '+(sd.demoRejected??0));
 
   if(!activeAgents.length){
     put('#scanStatusMessage','נסרקו '+agents.length+' · מוצגים '+agents.length+' · אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
@@ -337,6 +337,9 @@ function decisionReasonLabel(r){
     BELOW_MA200:'מתחת ל־MA200',
     NOT_UP:'לא בגל עולה',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
+    STALE_5M_SIGNAL:'נר 5 הדקות האחרון אינו עדכני',
+    WAIT_CURRENT_5M_HISTORY:'ממתין להיסטוריית 5 דקות עדכנית',
+    FIVE_MINUTE_TIMEFRAME_REQUIRED:'חסרים נרות רציפים של 5 דקות',
     TRADING_PAUSED:'מסחר עצור · אין קניות חדשות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאות וויקוף חדש לאחר חידוש המסחר',
     HOLD:'HOLD',
@@ -408,7 +411,7 @@ async function loadDecisionHistory(symbol){
         <div>${fmt(x.currentWave,2)}%</div>
         <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
         <div>${fmt(x.score,1)}</div>
-        <div title="Slots: ${x.activeSlots}/${x.maxSlots}">${x.decisionPriceSource==='LIVE_PRICE'?'LIVE':'D1'}</div>
+        <div title="Slots: ${x.activeSlots}/${x.maxSlots}">${x.decisionPriceSource==='LIVE_PRICE'?'LIVE':x.decisionPriceSource?.startsWith('5M')?'5M':'D1'}</div>
         <div>${decisionReasonLabel(x.reason||x.buyReason)}</div>
       </div>`;
     }).join('');
@@ -422,7 +425,7 @@ async function loadDecisionHistory(symbol){
         <div>${fmt(x.currentWave,2)}%</div>
         <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
         <div>—</div>
-        <div>D1</div>
+        <div>5M</div>
         <div>${decisionReasonLabel(x.buyReason)}</div>
       </div>`;
     }).join('');
@@ -432,7 +435,7 @@ async function loadDecisionHistory(symbol){
       out+='<div class="decision-history-section-title">בדיקות אמיתיות שנרשמו במערכת</div>'+header+renderRecorded;
     }
     if(technical.length){
-      out+='<div class="decision-history-section-title">היסטוריה יומית טכנית</div>'+header+renderTechnical;
+      out+='<div class="decision-history-section-title">היסטוריה טכנית · 5 דקות</div>'+header+renderTechnical;
     }
     $('#decisionHistory').innerHTML=technicalWarning+(out||'<div class="mini">אין עדיין היסטוריית החלטות.</div>');
   }catch(e){
@@ -499,7 +502,7 @@ async function loadChart(symbol){
   try{
     $('#chartEmpty')?.classList.add('hidden');
     const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
-    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · טווח '+selectedRange+' · MA200');
+    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+(selectedInterval==='5m'?'עד שבוע':'טווח '+selectedRange)+' · MA200');
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
     if(chartAnalysisContext!==contextKey){
       put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
@@ -703,7 +706,7 @@ setDashboardView('trade');
 
 document.querySelectorAll('.timeframe-btn').forEach(btn=>{
   btn.onclick=async()=>{
-    selectedInterval=btn.dataset.interval||'1d';
+    selectedInterval=btn.dataset.interval||'5m';
     document.querySelectorAll('.timeframe-btn').forEach(x=>x.classList.toggle('active',x===btn));
     await loadChart(selectedSymbol);
   };
@@ -711,7 +714,7 @@ document.querySelectorAll('.timeframe-btn').forEach(btn=>{
 
 document.querySelectorAll('.range-btn').forEach(btn=>{
   btn.onclick=async()=>{
-    selectedRange=btn.dataset.range||'6M';
+    selectedRange=btn.dataset.range||'1W';
     document.querySelectorAll('.range-btn').forEach(x=>x.classList.toggle('active',x===btn));
     await loadChart(selectedSymbol);
   };
