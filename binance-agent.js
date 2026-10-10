@@ -520,7 +520,17 @@ async function loadChart(symbol){
   }
 }
 
+function drawIndicators(candles){
+  const engine=globalThis.BinanceIndicators;if(!engine)return;
+  const values=engine.calculateIndicators(candles);
+  for(const [key,name,color,bounds,levels] of [['rsi','RSI (14)','#bb90ff',[0,100],[30,70]],['roc','ROC (12)','#40d5de',null,[0]]]){
+    const show=$('#show'+key.toUpperCase())?.checked;
+    const panel=$('#'+key+'Panel');if(panel)panel.hidden=!show;
+    if(show)engine.drawIndicator($('#'+key+'Chart'),values[key].slice(-120),{name,color,bounds,levels});
+  }
+}
 function drawCandles(candles){
+  drawIndicators(candles);
   const canvas=$('#priceChart');
   if(!canvas||!candles.length)return;
   const rect=canvas.getBoundingClientRect();
@@ -735,3 +745,5 @@ document.querySelectorAll('[data-detail-toggle]').forEach(button=>{
     button.textContent=content.hidden?'פירוט':'סגור פירוט';
   });
 });
+
+for(const id of ['showRSI','showROC'])document.getElementById(id)?.addEventListener('change',()=>drawIndicators(chartCandles));
