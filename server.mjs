@@ -1,3 +1,4 @@
+import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
 import {retainDecision} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,liveFillAction} from './lib/wyckoff-live-positions.mjs';
@@ -221,7 +222,6 @@ function consolidationBreakout(symbol){
 }
 
 const dailyCandleCache=new Map();
-const DAILY_CANDLE_CACHE_MS=Math.max(60000,+(process.env.BINANCE_D1_CACHE_MS||300000));
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
@@ -898,18 +898,11 @@ function backtestWindow(candles,{initial=5000}={}){
 }
 
 async function candles(s,{force=false}={}){
+  const now=Date.now(),bucket=Math.floor(now/FIVE_MINUTE_MS);
   const cached=dailyCandleCache.get(s);
-  if(!force && cached && Date.now()-cached.at<DAILY_CANDLE_CACHE_MS){
-    return cached.rows;
-  }
-
-  const r=await j(`/api/v3/klines?symbol=${s}&interval=1d&limit=${Math.max(250,MAP+30)}`);
-  const now=Date.now();
-  const rows=r
-    .filter(x=>+x[6]<now)
-    .map(x=>({closeTime:+x[6],open:+x[1],high:+x[2],low:+x[3],close:+x[4],timeframe:'1d',closed:true}));
-
-  dailyCandleCache.set(s,{at:Date.now(),rows});
+  if(!force&&cached&&cached.bucket===bucket)return cached.rows;
+  const rows=await loadFiveMinuteBars(j,s,now);
+  dailyCandleCache.set(s,{at:now,bucket,rows});
   return rows;
 }
 
@@ -1133,7 +1126,7 @@ async function evaluateSymbol(s){
       used=liveActionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.wyckoffTrade?.patternId);
     }
     const livePrice=requireLivePrice(streams[s]);
-    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used});
+    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m'});
     ev.analysisSignal=ev.entryConfirmed===true;
     ev.analysisReason=ev.buyReason;
     if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
@@ -1146,7 +1139,7 @@ async function evaluateSymbol(s){
       if(ev.strategy)ev.strategy.buyConfirmed=false;
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
-    ev.decisionPriceSource='D1_CONFIRMED_WITH_LIVE_EXECUTION';
+    ev.decisionPriceSource='5M_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
   }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
@@ -1210,12 +1203,12 @@ function decisionReasonFromAgent(agent,ev){
 }
 
 function candidateBlocker(ev,evals){
-  if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות יומיים סגורים או למחיר עדכני'};
+  if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:ev.strategy?.strategyId==='WYCKOFF_D1_V1'?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.strategyId==='WYCKOFF_D1_V1'?'מעקב יעד 7% מעל השיא הראשוני ועצירה 6% מהכניסה':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
-  if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף יומי: '+ev.buyReason};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'מעקב יעד 7% מעל השיא הראשוני ועצירה 6% מהכניסה':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=MAX)return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר יומי'};
+  return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1633,7 +1626,7 @@ async function runEvaluation(){
       previousUpWave:ev.strategy?.previousUpWave==null?null:Number(ev.strategy.previousUpWave),
       sellThreshold:ev.strategy?.sellThreshold==null?null:Number(ev.strategy.sellThreshold),
       sellRetraceRatio:Number(ev.strategy?.sellRetraceRatio??SELL_RETRACE_RATIO),
-      decisionPriceSource:ev.decisionPriceSource||'CLOSED_D1',
+      decisionPriceSource:ev.decisionPriceSource||'CLOSED_5M',
       livePrice:ev.strategy?.livePrice==null?null:Number(ev.strategy.livePrice),
       closedPrice:ev.strategy?.closedPrice==null?Number(ev.strategy?.price||0):Number(ev.strategy.closedPrice),
       score:Number(ev.score||0),
@@ -1656,8 +1649,8 @@ async function buildTechnicalDailyHistory(symbol,limit=30){
   const c=await candles(symbol),rows=[];
   for(let i=Math.max(2,c.length-limit);i<c.length;i++){
    const historicalNow=c[i].closeTime+1;
-   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i+1),price:c[i].close,priceAsOf:new Date(historicalNow).toISOString(),now:historicalNow});
-   rows.push({at:new Date(c[i].closeTime).toISOString(),price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',strategyId:'WYCKOFF_D1_V1'});
+   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i+1),price:c[i].close,priceAsOf:new Date(historicalNow).toISOString(),now:historicalNow,timeframe:'5m'});
+   rows.push({at:new Date(c[i].closeTime).toISOString(),price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
   }
   return rows.reverse();
 }
@@ -1671,7 +1664,7 @@ async function refreshUniverse(){
 
     if(selected.length){
       initUniverse(selected);
-      // D1 history is loaded by candles(); minute setup is no longer used.
+      // Closed 5-minute history is loaded by candles(); execution prices remain live.
       startMarketStream();
       await evalAll();
       universeStatus='READY';
@@ -2002,11 +1995,11 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-chart'&&req.method==='GET'){
     const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
-    const interval=String(u.searchParams.get('interval')||'1d');
-    const range=String(u.searchParams.get('range')||'6M').toUpperCase();
+    const interval=String(u.searchParams.get('interval')||'5m');
+    const range=String(u.searchParams.get('range')||'1W').toUpperCase();
 
-    const allowedIntervals=new Set(['1h','4h','1d','1w','1M']);
-    const allowedRanges=new Set(['1M','3M','6M','1Y','ALL']);
+    const allowedIntervals=new Set(['5m','1h','4h','1d','1w','1M']);
+    const allowedRanges=new Set(['1W','1M','3M','6M','1Y','ALL']);
 
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
     if(!allowedIntervals.has(interval))return send(res,{ok:false,error:'Invalid interval'},400);
@@ -2015,13 +2008,14 @@ const server=http.createServer((req,res)=>{
     const now=Date.now();
     const day=86400000;
     const startByRange={
+      '1W':now-7*day,
       '1M':now-31*day,
       '3M':now-93*day,
       '6M':now-186*day,
       '1Y':now-366*day,
       'ALL':Date.UTC(2017,0,1)
     };
-    const startTime=startByRange[range];
+    const startTime=interval==='5m'?Math.max(startByRange[range],now-7*day):startByRange[range];
 
     (async()=>{
       const rows=[];
@@ -2055,7 +2049,7 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-agent'&&req.method==='GET'){
-    const isWyckoffFill=a=>a?.strategyId==='WYCKOFF_D1_V1'||a?.wyckoffTrade?.strategyId==='WYCKOFF_D1_V1';
+    const isWyckoffFill=a=>['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(a?.strategyId||a?.wyckoffTrade?.strategyId);
     const wyckoffStats=mode==='live'
       ? {
           buys:liveActionLog.filter(a=>a.type==='BUY'&&isWyckoffFill(a)).length,
@@ -2082,8 +2076,8 @@ const server=http.createServer((req,res)=>{
       universeStatus,
       universeError,
       config:{
-        strategyId:'WYCKOFF_D1_V1',
-        timeframe:'1d',
+        strategyId:'WYCKOFF_5M_V1',
+        timeframe:'5m',
         targetMultiplier:1.07,
         wyckoffStopLossPct:6,
         minWave:MIN,
