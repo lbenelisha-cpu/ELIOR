@@ -231,7 +231,7 @@ function render(d,currentMode='demo',liveAccount=null){
     const s=a.strategy||{};
     const held=isHeld(a);
     const score=Number(a.score||0);
-    const pnl=positionPnlDisplay(isLive?null:paperPos[a.symbol]);
+    const pnl=positionPnlDisplay(isLive?liveBalances.find(x=>x.asset+'USDT'===a.symbol):paperPos[a.symbol]);
     const trendLabel=({UP:'עולה',DOWN:'יורדת'}[s.direction]||'לא ידועה');
     const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive);
     const rowClasses=[
@@ -244,7 +244,7 @@ function render(d,currentMode='demo',liveAccount=null){
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
       <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(a.blocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
       <td>${fmt(s.price)}</td>
-      <td><b>${fmt(score,1)}</b></td>
+      <td class="${held?pnl.className:''}">${held?pnl.text:'—'}</td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
     </tr>`;
   }).join('');
@@ -259,7 +259,7 @@ function render(d,currentMode='demo',liveAccount=null){
 
   if(isLive){
     $('#positions').innerHTML=liveBalances.length
-      ? liveBalances.map(x=>`<div><b>${x.asset}USDT</b> · כמות ${fmt(x.qty,8)} · שווי ${fmt(x.valueUsdt)} USDT</div>`).join('')
+      ? liveBalances.map(x=>{const pnl=positionPnlDisplay(x,'USDT');return `<div><b>${x.asset}USDT</b> · כמות ${fmt(x.qty,8)} · שווי ${fmt(x.valueUsdt)} USDT<div class="${pnl.className}">${pnl.text}</div><div class="mini">לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר</div></div>`;}).join('')
       : '<div class="mini">אין פוזיציות LIVE פעילות.</div>';
   }else{
     const ps=Object.values(paperPos);
@@ -298,7 +298,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
-  const selectedPnl=positionPnlDisplay(currentModeArg==='live'?null:p.positions?.[a.symbol]);
+  const selectedPnl=positionPnlDisplay(currentModeArg==='live'?liveAccount?.balances?.find(x=>x.asset+'USDT'===a.symbol):p.positions?.[a.symbol]);
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);

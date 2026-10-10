@@ -1,7 +1,7 @@
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
 import {retainDecision} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
-import {trackedLivePositions,liveFillAction} from './lib/wyckoff-live-positions.mjs';
+import {trackedLivePositions,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
 import {wyckoffExit} from './lib/wyckoff-strategy.mjs';
@@ -689,7 +689,8 @@ async function getLiveAccountSnapshot(){
       }
 
       const valueUsdt=qty*usdtPrice;
-      return {...x,qty,usdtPrice,valueUsdt};
+      const balance={...x,qty,usdtPrice,valueUsdt};
+      return {...balance,...liveBalancePnl(balance,liveActionLog)};
     });
 
   const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0,qty:0,usdtPrice:1,valueUsdt:0};
