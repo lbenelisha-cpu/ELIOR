@@ -71,13 +71,29 @@ async function J(u,o={}){
   return r.json();
 }
 
+function renderTradeControlStatus(s){
+  const el=$('#tradeControlStatus');
+  if(!el)return;
+  const known=typeof s.tradeControl?.paused==='boolean';
+  const paused=s.tradeControl?.paused===true;
+  const active=known&&!paused;
+  const executable=s.mode==='demo'||(s.liveTradingEnabled===true&&s.autoExecution===true);
+  el.classList.toggle('trading-active',active&&executable);
+  el.classList.toggle('trading-paused',known&&paused);
+  const since=paused?s.tradeControl?.pausedAt:s.tradeControl?.resumedAt;
+  const timestamp=Date.parse(since);
+  const label=!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
+  const minutes=Number.isFinite(timestamp)?Math.max(0,Math.floor((Date.now()-timestamp)/60000)):null;
+  el.textContent=label+(minutes===null?' · זמן שינוי לא זמין':' · מאז '+new Date(timestamp).toLocaleString('he-IL')+' · '+minutes+' דקות');
+}
+
 function mode(s){
   const isDemo=s.mode==='demo';
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   currentMode=s.mode;
+  renderTradeControlStatus(s);
   const paused=s.tradeControl?.paused===true;
-  put('#tradeControlStatus',paused?'מסחר עצור · אין קניות חדשות':'מסחר אוטומטי פעיל');
   const stopButton=$('#stopTradingBtn'),startButton=$('#startTradingBtn');
   if(stopButton){stopButton.hidden=paused;stopButton.disabled=tradeControlWorking;}
   if(startButton){startButton.hidden=!paused;startButton.disabled=tradeControlWorking;}
@@ -318,6 +334,8 @@ function decisionReasonLabel(r){
     BELOW_MA200:'מתחת ל־MA200',
     NOT_UP:'לא בגל עולה',
     NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
+    TRADING_PAUSED:'מסחר עצור · אין קניות חדשות',
+    WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאות וויקוף חדש לאחר חידוש המסחר',
     HOLD:'HOLD',
     ERROR:'שגיאה'
   })[r]||r||'—';
@@ -374,6 +392,7 @@ async function loadDecisionHistory(symbol){
     const d=await J(DECISION_HISTORY+'?symbol='+encodeURIComponent(symbol)+'&limit=20');
     const recorded=d.recorded||[];
     const technical=d.technicalDaily||[];
+    const technicalWarning=d.technicalError?'<div class="mini">ההיסטוריה הטכנית אינה זמינה כרגע; מוצגות הבדיקות שנרשמו.</div>':'';
 
     const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>גל</div><div>ירידה קודמת</div><div>ציון</div><div>מקור</div><div>סיבה</div></div>';
 
@@ -412,7 +431,7 @@ async function loadDecisionHistory(symbol){
     if(technical.length){
       out+='<div class="decision-history-section-title">היסטוריה יומית טכנית</div>'+header+renderTechnical;
     }
-    $('#decisionHistory').innerHTML=out||'<div class="mini">אין עדיין היסטוריית החלטות.</div>';
+    $('#decisionHistory').innerHTML=technicalWarning+(out||'<div class="mini">אין עדיין היסטוריית החלטות.</div>');
   }catch(e){
     $('#decisionHistory').innerHTML='<div class="mini">שגיאה בטעינת היסטוריית החלטות</div>';
   }
@@ -574,6 +593,9 @@ async function load(){
     await loadActionJournal(m.mode);
   }catch(e){
     put('#status','שרת לא זמין');
+    const control=$('#tradeControlStatus');
+    control?.classList.remove('trading-active','trading-paused');
+    put('#tradeControlStatus','מצב המסחר לא אומת · שרת לא זמין');
     console.error(e);
   }
 }

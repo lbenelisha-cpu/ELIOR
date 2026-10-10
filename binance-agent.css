@@ -366,3 +366,6 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
   .top-actions{flex-wrap:wrap}
   .trade-control-buttons{width:100%;justify-content:flex-start}
 }
+
+#tradeControlStatus.trading-active{color:#7af2b1;background:rgba(38,208,124,.14);border-color:#26d07c}
+#tradeControlStatus.trading-paused{color:#ff9ba6;background:rgba(255,97,114,.12);border-color:#ff6172}

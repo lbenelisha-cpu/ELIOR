@@ -1198,13 +1198,13 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
 }
 
 function decisionReasonFromAgent(agent,ev){
-  if(!ev?.ok)return ev?.error==='WAIT_BREAKOUT_CANDLES'?'WAIT_BREAKOUT_CANDLES':'ERROR';
+  if(!ev?.ok)return ev?.error||'WAIT_DATA';
   if(agent?.decision==='BUY')return ev.entryStage===2?'BREAKOUT_STAGE_2_BUY':'BREAKOUT_STAGE_1_BUY';
   if(agent?.decision==='SELL')return 'SELL_EXECUTED';
   if(ev.entryConfirmed&&ev.entryStage===2)return 'STAGE_2_READY';
   if(agent?.position==='LONG')return 'ACTIVE_LONG';
   if(ev.entryConfirmed)return 'STAGE_1_READY';
-  return 'WAIT_CONSOLIDATION_BREAKOUT';
+  return ev.buyReason||'WAIT_CONSOLIDATION_BREAKOUT';
 }
 
 function candidateBlocker(ev,evals){
@@ -1363,16 +1363,16 @@ async function runEvaluation(){
       setAgentFromEval(ev,decision,execution);
       agents[ev.symbol].blocker=blocker;
 
-      if(ev.ok)pushDecisionHistory(ev.symbol,{
+      pushDecisionHistory(ev.symbol,{
         at:new Date().toISOString(),
         mode:'demo',
         source:'BINANCE_DEMO_SPOT',
         decision,
         execution,
-        reason:blocker.text,
+        reason:ev.ok?blocker.text:(ev.error||'WAIT_DATA'),
         blockerCode:blocker.code,
         position:held?'LONG':'CASH',
-        price:ev.strategy.price,
+        price:ev.strategy?.price??null,
         score:ev.score,
         activeSlots:activeCount,
         maxSlots:MAX,
@@ -1607,7 +1607,6 @@ async function runEvaluation(){
   // Record the final decision context for every symbol after the cycle completes.
   const slotCountAtCheck=Object.keys(paper.positions).length;
   for(const ev of evals){
-    if(!ev.ok)continue;
     const a=agents[ev.symbol]||{};
     pushDecisionHistory(ev.symbol,{
       at:new Date().toISOString(),
@@ -1974,11 +1973,13 @@ const server=http.createServer((req,res)=>{
     const limit=Math.min(30,Math.max(1,Number(u.searchParams.get('limit')||20)));
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
     buildTechnicalDailyHistory(symbol,limit)
+      .catch(error=>({error:error.message}))
       .then(technicalDaily=>send(res,{
         ok:true,
         symbol,
         recorded:(decisionHistory[symbol]||[]).slice(0,limit),
-        technicalDaily
+        technicalDaily:Array.isArray(technicalDaily)?technicalDaily:[],
+        technicalError:technicalDaily?.error||null
       }))
       .catch(e=>send(res,{ok:false,error:e.message},502));
     return;
