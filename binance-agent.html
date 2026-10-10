@@ -165,6 +165,12 @@
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
+        <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
+          <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
+          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; מוצגים 120 הנרות האחרונים. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
+          <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
+          <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
+        </div>
         <div class="chart-footer">
           <div><span>MA200</span><strong id="chartMA">—</strong></div>
           <div><span>גל נוכחי</span><strong id="chartWave">—</strong></div>
@@ -256,7 +262,7 @@
       <div class="panel-title-row">
         <div>
           <h2>היסטוריית החלטות · <span id="decisionHistorySymbol">—</span></h2>
-          <p>20 הבדיקות האחרונות + היסטוריה יומית טכנית</p>
+          <p>20 קבוצות הבדיקות האחרונות + היסטוריה יומית טכנית</p>
         </div>
       </div>
       <div id="decisionHistory" class="decision-history">
@@ -312,6 +318,7 @@
     </section>
   </main>
 
+  <script src="binance-chart-decisions.js"></script>
   <script src="binance-agent.js"></script>
   <script src="binance-agent-portfolio.js"></script>
 <script src="binance-demo-account.js"></script>
