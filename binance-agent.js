@@ -724,3 +724,14 @@ if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).obse
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
 setInterval(load,5000);
+
+// Keep account detail and recent trades collapsed until explicitly opened.
+document.querySelectorAll('[data-detail-toggle]').forEach(button=>{
+  button.addEventListener('click',()=>{
+    const content=document.getElementById(button.dataset.detailToggle);
+    if(!content)return;
+    content.hidden=!content.hidden;
+    button.setAttribute('aria-expanded',String(!content.hidden));
+    button.textContent=content.hidden?'פירוט':'סגור פירוט';
+  });
+});
