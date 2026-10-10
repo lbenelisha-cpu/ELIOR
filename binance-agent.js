@@ -244,7 +244,7 @@ function render(d,currentMode='demo',liveAccount=null){
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
       <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(a.blocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
       <td>${fmt(s.price)}</td>
-      <td><b>${fmt(score,1)}</b></td>
+      <td class="${held?pnl.className:''}">${held?pnl.text:'—'}</td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
     </tr>`;
   }).join('');
