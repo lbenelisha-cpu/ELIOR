@@ -8,7 +8,7 @@ import {trackedLivePositions,liveFillAction} from '../lib/wyckoff-live-positions
 test('base commission and partial sale retain correct tracked quantity and frozen target',()=>{
  const trade={initialPeak:120,targetPrice:128.4,stopPrice:1,strategyId:'WYCKOFF_D1_V1'};
  const buy=liveFillAction({executedQty:'1',cummulativeQuoteQty:'100',status:'FILLED',orderId:1},{params:{symbol:'BTCUSDT',side:'BUY'},meta:{wyckoffTrade:trade}},[{commissionAsset:'BTC',commission:'.001'}]);
- assert.equal(buy.qty,.999);assert.equal(buy.wyckoffTrade.stopPrice,94);
+ assert.equal(buy.qty,.999);assert.equal(buy.wyckoffTrade.stopPrice,98);
  const sell={symbol:'BTCUSDT',type:'SELL',qty:.4};
  const p=trackedLivePositions([sell,buy]).BTCUSDT;assert.ok(Math.abs(p.qty-.599)<1e-10);assert.equal(p.targetPrice,128.4);
  assert.deepEqual(trackedLivePositions([{...sell,qty:.599},sell,buy]),{});

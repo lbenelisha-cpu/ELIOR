@@ -13,7 +13,7 @@
         <div class="brand-mark">◈</div>
         <div>
           <div class="brand-title">LEVI · BINANCE WAVE</div>
-          <div class="brand-sub">וויקוף · נרות 5 דקות · קנייה מעל השפל הראשון · יעד שיא +7% · עצירה 6%</div>
+          <div class="brand-sub">וויקוף · נרות 5 דקות · קנייה מעל השפל הראשון · עצירה 2% מהקנייה · הגנה 2.5% מהשיא</div>
         </div>
       </div>
 
@@ -242,12 +242,14 @@
     </section>
 
       <section class="panel" id="binanceDemoBalanceCard">
-<h2>יתרות חשבון הדמו ב־Binance</h2>
+<div class="panel-title-row"><h2>יתרות חשבון הדמו ב־Binance</h2><button type="button" class="refresh" data-detail-toggle="demoBalanceDetails" aria-controls="demoBalanceDetails" aria-expanded="false">פירוט</button></div>
+<div id="demoBalanceDetails" hidden>
 <p id="demoAccountStatus">טוען יתרות מהחשבון…</p>
 <h3 id="demoAccountTotal">— USDT</h3>
 <p>שווי כל הנכסים ב־USDT · כולל סכומים זמינים ונעולים.</p>
 <div class="demo-balances-wrap"><table class="asset-table demo-balances-table"><thead><tr><th>מטבע</th><th>זמין</th><th>נעול</th><th>שווי USDT</th></tr></thead><tbody id="demoAccountBalances"></tbody></table></div>
 <button id="refreshDemoAccount" class="refresh">רענן יתרות Binance Demo</button>
+</div>
 </section>
 
     <section id="portfolioViewPanel" class="panel app-view portfolio-view" hidden>
@@ -291,8 +293,9 @@
     <section id="demoTradesSection" class="panel">
       <div class="panel-title-row">
         <h2>10 עסקאות אחרונות</h2>
+        <button type="button" class="refresh" data-detail-toggle="paperHistory" aria-controls="paperHistory" aria-expanded="false">פירוט</button>
       </div>
-      <div id="paperHistory" class="paper-history"></div>
+      <div id="paperHistory" class="paper-history" hidden></div>
     </section>
 
     <section id="demoRealtimePositionsSection" class="panel">

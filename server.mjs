@@ -4,7 +4,7 @@ import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
-import {wyckoffExit} from './lib/wyckoff-strategy.mjs';
+import {binancePositionExit as wyckoffExit} from './lib/binance-position-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
@@ -625,6 +625,14 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
   return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
 }
 
+function persistLivePeak(symbol, position){
+  const buy=liveActionLog.find(a=>a.type==='BUY'&&a.symbol===symbol&&a.wyckoffTrade);
+  if(!buy)return;
+  if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice)return;
+  buy.wyckoffTrade.peakPrice=position.peakPrice;
+  if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
+}
+
 let liveExecutionInFlight=false;
 async function maybeExecuteLive(evals){
  if(liveExecutionInFlight)return;liveExecutionInFlight=true;
@@ -644,6 +652,7 @@ async function executeLiveCycle(evals){
     const saved=tradingPositions()[ev.symbol];
     if(!saved)continue;
     const exit=wyckoffExit(saved,ev.strategy.price);
+    persistLivePeak(ev.symbol,saved);
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
   if(tradeControl.paused)return;
@@ -1127,7 +1136,12 @@ async function evaluateSymbol(s){
       used=liveActionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.wyckoffTrade?.patternId);
     }
     const livePrice=requireLivePrice(streams[s]);
-    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m'});
+    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit});
+    if(p){
+      if(mode==='live')persistLivePeak(s,p);
+      else if(DEMO_TRADING)demoTrader.save();
+      else savePaperState();
+    }
     ev.analysisSignal=ev.entryConfirmed===true;
     ev.analysisReason=ev.buyReason;
     if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
@@ -1206,7 +1220,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'מעקב יעד 7% מעל השיא הראשוני ועצירה 6% מהכניסה':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'עצירה 2% מהכניסה או ירידה 2.5% מהשיא — ללא יעד מכירה קבוע':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=MAX)return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
