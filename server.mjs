@@ -1,3 +1,4 @@
+import {retainDecision} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,liveFillAction} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
@@ -340,8 +341,7 @@ function loadDecisionHistory(){
 
 function pushDecisionHistory(symbol,row){
   const arr=Array.isArray(decisionHistory[symbol])?decisionHistory[symbol]:[];
-  arr.unshift(row);
-  decisionHistory[symbol]=arr.slice(0,30);
+  decisionHistory[symbol]=retainDecision(arr,row);
 }
 const EXPERIMENT_RESET_VERSION='2026-10-06-5s-v1';
 const EXPERIMENT_RESET_FILE=process.env.BINANCE_EXPERIMENT_RESET_FILE||'/var/data/binance-experiment-reset.json';
@@ -1134,6 +1134,8 @@ async function evaluateSymbol(s){
     }
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used});
+    ev.analysisSignal=ev.entryConfirmed===true;
+    ev.analysisReason=ev.buyReason;
     if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
       ev.entryConfirmed=false;
       ev.entryEligible=false;
@@ -1374,6 +1376,13 @@ async function runEvaluation(){
         position:held?'LONG':'CASH',
         price:ev.strategy?.price??null,
         score:ev.score,
+        entryConfirmed:ev.entryConfirmed===true,
+        analysisError:ev.ok?null:(ev.error||'WAIT_DATA'),
+        analysisSignal:ev.analysisSignal===true,
+        analysisReason:ev.analysisReason||ev.error||null,
+        buyReason:ev.buyReason||null,
+        setup:ev.strategy?.wyckoff||null,
+        targetPrice:ev.entryTargetPrice??null,
         activeSlots:activeCount,
         maxSlots:MAX,
         demoError:demoTrader.error||null,
@@ -1628,6 +1637,12 @@ async function runEvaluation(){
       livePrice:ev.strategy?.livePrice==null?null:Number(ev.strategy.livePrice),
       closedPrice:ev.strategy?.closedPrice==null?Number(ev.strategy?.price||0):Number(ev.strategy.closedPrice),
       score:Number(ev.score||0),
+      entryConfirmed:ev.entryConfirmed===true,
+      analysisError:ev.ok?null:(ev.error||'WAIT_DATA'),
+      analysisSignal:ev.analysisSignal===true,
+      analysisReason:ev.analysisReason||ev.error||null,
+      setup:ev.strategy?.wyckoff||null,
+      targetPrice:ev.entryTargetPrice??null,
       buyQualified:Boolean(ev.buyQualified),
       buyReason:ev.buyReason||null,
       activeSlots:slotCountAtCheck,
@@ -2032,7 +2047,9 @@ const server=http.createServer((req,res)=>{
         openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]
       }));
 
-      send(res,{ok:true,symbol,interval,range,candles,candleAnalysis:analyzeCandlePower(candles,10)});
+      const decisions=(decisionHistory[symbol]||[]).filter(x=>Date.parse(x.at)>=startTime&&x.mode===mode);
+      const actions=(mode==='live'?liveActionLog:DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).filter(x=>x.symbol===symbol&&Date.parse(x.at)>=startTime);
+      send(res,{ok:true,symbol,interval,range,candles,decisions,actions,decisionMode:mode,candleAnalysis:analyzeCandlePower(candles,10)});
     })().catch(e=>send(res,{ok:false,error:e.message},502));
     return;
   }

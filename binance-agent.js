@@ -26,6 +26,9 @@ let tradeControlToken=null;
 let tradeControlWorking=false;
 let moneyUnit='₪';
 let chartCandles=[];
+let chartDecisions=[];
+let chartRequestId=0;
+let chartAnalysisContext=null;
 function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
 function positionPnlDisplay(position,currency=moneyUnit){
@@ -489,14 +492,27 @@ function renderCandlePower(a){
 }
 
 async function loadChart(symbol){
+  const requestId=++chartRequestId;
+  const interval=selectedInterval;
+  const modeAtRequest=currentMode;
+  const contextKey=[symbol,interval,selectedRange,modeAtRequest].join(':');
   try{
     $('#chartEmpty')?.classList.add('hidden');
     const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
     put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · טווח '+selectedRange+' · MA200');
+    if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
+    if(chartAnalysisContext!==contextKey){
+      put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
+      chartAnalysisContext=contextKey;
+    }
     chartCandles=d.candles||[];
+    chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
     drawCandles(chartCandles);
     renderCandlePower(d.candleAnalysis);
   }catch(e){
+    if(requestId!==chartRequestId)return;
+    chartDecisions=[];
+    $('#chartDecisionMarkers')?.replaceChildren();
     $('#chartEmpty')?.classList.remove('hidden');
   }
 }
@@ -565,6 +581,8 @@ function drawCandles(candles){
     if(!began){ctx.moveTo(x,yy);began=true}else ctx.lineTo(x,yy);
   });
   ctx.stroke();
+
+  renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,top,selectedInterval);
 
   const labelCount=5;
   ctx.fillStyle='#7890a8';
