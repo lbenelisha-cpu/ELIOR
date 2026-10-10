@@ -59,6 +59,7 @@ function setDashboardView(view){
   const grid=$('.trading-grid');
   if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
   if(activeView==='portfolio')renderPortfolioView();
+  if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
     const name=btn.dataset.view||['trade','portfolio','scans','journal'][i];
     btn.classList.toggle('active',name===activeView);
@@ -270,6 +271,7 @@ function render(d,currentMode='demo',liveAccount=null){
   }
 
   if(activeView==='portfolio')renderPortfolioView();
+  if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   updateSelectedAsset(d,currentMode,liveAccount);
 }
 

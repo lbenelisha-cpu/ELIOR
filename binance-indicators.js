@@ -19,7 +19,7 @@
     canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);
     const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);
     const W=rect.width,H=rect.height,left=18,right=56,top=25,bottom=18;
-    ctx.clearRect(0,0,W,H);ctx.font='11px Arial';
+    ctx.clearRect(0,0,W,H);ctx.direction='ltr';ctx.textAlign='left';ctx.font='bold 14px Arial';
     const valid=series.filter(Number.isFinite),last=series.at(-1);
     ctx.fillStyle=color;ctx.fillText(name+' · '+(Number.isFinite(last)?last.toFixed(2)+(name.startsWith('ROC')?'%':''):'אין מספיק נרות'),left,15);
     if(!valid.length)return;

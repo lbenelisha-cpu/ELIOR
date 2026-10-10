@@ -24,6 +24,7 @@
         <button class="nav-pill">יומן פעולות</button>
       </nav>
 
+      <details class="dashboard-menu"><summary class="refresh">פירוט · תפריט מסחר</summary>
       <div class="top-actions">
         <div id="status" class="status">מתחבר…</div>
         <div class="trade-control-buttons">
@@ -36,6 +37,7 @@
           <button id="liveBtn">LIVE</button>
         </div>
       </div>
+      </details>
     </header>
     <p><a href="/binance-research.html" style="color:#8ec5ff">מחקר מטבעות · השוואת שיטות בתיק סימולציה נפרד</a></p>
 
@@ -47,6 +49,7 @@
       <div><span>AAVE</span><strong id="tickerAAVE">—</strong></div>
     </section>
 
+    <details class="account-menu"><summary class="refresh">פירוט · מצב החשבון</summary>
     <section class="account-strip">
       <article>
         <span>שווי תיק</span>
@@ -95,6 +98,8 @@
       <div id="liveBalances" class="balances-grid"></div>
     </section>
 
+    </details>
+
     <section class="trading-grid">
       <aside class="panel scanner-panel">
         <div class="panel-title-row">
@@ -138,6 +143,7 @@
           </div>
         </div>
 
+        <details class="chart-menu"><summary class="refresh">פירוט · הגדרות גרף</summary>
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
             <span class="toolbar-label">משך נר</span>
@@ -163,13 +169,14 @@
           <span id="chartLegend" class="chart-legend">נר 5M · עד שבוע · MA200</span>
         </div>
 
+        </details>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
-        <div id="rsiPanel" class="indicator-panel"><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
-        <div id="rocPanel" class="indicator-panel"><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
+        <div id="rsiPanel" class="indicator-panel"><h3 class="indicator-heading rsi-heading">RSI (14) · מדד עוצמה יחסית</h3><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
+        <div id="rocPanel" class="indicator-panel"><h3 class="indicator-heading roc-heading">ROC (12) · שיעור שינוי המחיר (%)</h3><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
         <p class="mini">RSI: קווים ב־30 ו־70 · ROC: שינוי באחוזים לעומת 12 נרות קודם · לתצוגה בלבד.</p>
         <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
