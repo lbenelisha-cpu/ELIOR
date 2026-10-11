@@ -54,7 +54,7 @@ const MAX=10;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
 const DECISION_INTERVAL_MS=Math.max(5000,+(process.env.BINANCE_DECISION_INTERVAL_MS||5000));
-const UNIVERSE_SIZE=Math.min(100,Math.max(10,+(process.env.BINANCE_UNIVERSE_SIZE||100)));
+const UNIVERSE_SIZE=Math.min(60,Math.max(10,+(process.env.BINANCE_UNIVERSE_SIZE||60)));
 const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
@@ -801,6 +801,10 @@ function initUniverse(symbols){
   marketRanks.clear();
   symbols.forEach((s,i)=>marketRanks.set(s,i+1));
   SYMBOLS=[...new Set([...symbols,...Object.keys(tradingPositions())])];
+  const activeSymbols=new Set(SYMBOLS);
+  for(const cache of [dailyCandleCache,minuteCandleState,microCandleState,entryTrackingState,livePeakState]){
+    for(const symbol of cache.keys())if(!activeSymbols.has(symbol))cache.delete(symbol);
+  }
   agents=Object.fromEntries(
     SYMBOLS.map(symbol=>[
       symbol,
