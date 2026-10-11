@@ -392,25 +392,56 @@ function resetExperimentStateOnce(){
 let liveActionLog=[];
 const LIVE_ALLOCATION_FILE=LIVE_LOG_FILE+'.allocation';
 let liveAllocation=null;
+function liveRealizedPnl(actions){
+  const inventory=new Map();let realized=0;
+  const seen=new Set();
+  for(const a of [...actions].reverse()){
+    const id=a.orderId==null?null:a.symbol+':'+a.type+':'+a.orderId;
+    if(id&&seen.has(id))continue;if(id)seen.add(id);
+    const qty=Number(a.qty),amount=Number(a.amountUsdt);
+    if(!(qty>0)||!Number.isFinite(amount)||amount<0)continue;
+    const p=inventory.get(a.symbol)||{qty:0,cost:0};
+    if(a.type==='BUY'){
+      if((a.commissions||[]).some(f=>Number(f.amount)>0&&!['USDT',a.symbol.slice(0,-4)].includes(f.asset)))
+        throw Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED');
+      p.qty+=qty;p.cost+=amount+Number(a.quoteFeeUsdt||0);
+      inventory.set(a.symbol,p);
+    }else if(a.type==='SELL'&&p.qty>0){
+      if(qty>p.qty+Math.max(1e-8,p.qty*1e-6))continue;
+      const sold=Math.min(qty,p.qty),cost=p.cost*sold/p.qty;
+      // Fees paid in a third asset cannot be valued from this journal.
+      if((a.commissions||[]).some(f=>Number(f.amount)>0&&!['USDT',a.symbol.slice(0,-4)].includes(f.asset)))
+        throw Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED');
+      realized+=amount-Number(a.quoteFeeUsdt||0)-cost;
+      p.qty-=sold;p.cost-=cost;inventory.set(a.symbol,p);
+    }
+  }
+  return realized;
+}
 function fixedLiveAllocation(total){
   if(!liveAllocation&&fs.existsSync(LIVE_ALLOCATION_FILE)){
     liveAllocation=JSON.parse(fs.readFileSync(LIVE_ALLOCATION_FILE,'utf8'));
     if(!(liveAllocation.baseUsdt>0)||!(liveAllocation.positionUsdt>0))throw Error('INVALID_FIXED_LIVE_ALLOCATION');
   }
   if(!liveAllocation&&Number(total)>0){
+    liveAllocation={baseUsdt:Number(total),positionUsdt:Number(total)/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS,at:new Date().toISOString()};
+  }
+  if(!liveAllocation)return null;
+  const realized=liveRealizedPnl(liveActionLog);
+  const initialBaseUsdt=liveAllocation.initialBaseUsdt??liveAllocation.baseUsdt;
+  const realizedBaselineUsdt=liveAllocation.realizedBaselineUsdt??realized;
+  const reinvestedProfitUsdt=Math.max(0,realized-realizedBaselineUsdt);
+  const baseUsdt=initialBaseUsdt+reinvestedProfitUsdt;
+  const value={...liveAllocation,initialBaseUsdt,realizedBaselineUsdt,
+    reinvestedProfitUsdt,baseUsdt,positionUsdt:baseUsdt/LIVE_MAX_POSITIONS,
+    maxPositions:LIVE_MAX_POSITIONS,allocationVersion:2};
+  if(JSON.stringify(value)!==JSON.stringify(liveAllocation)||!fs.existsSync(LIVE_ALLOCATION_FILE)){
     ensureStateDir();
-    const value={baseUsdt:Number(total),positionUsdt:Number(total)/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS,at:new Date().toISOString()};
     fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
     fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
-    liveAllocation=value;
   }
-  if(liveAllocation&&liveAllocation.maxPositions!==LIVE_MAX_POSITIONS){
-    const value={...liveAllocation,positionUsdt:liveAllocation.baseUsdt/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS};
-    fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
-    fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
-    liveAllocation=value;
-  }
-  return liveAllocation;
+  liveAllocation=value;
+  return value;
 }
 
 
