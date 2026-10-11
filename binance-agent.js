@@ -31,6 +31,14 @@ let chartRequestId=0;
 let chartAnalysisContext=null;
 function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
+function commissionsText(fees){
+  if(!Array.isArray(fees))return 'לא תועדו';
+  if(!fees.length)return '0';
+  const totals={};
+  for(const f of fees)totals[f.asset]=(totals[f.asset]||0)+Number(f.amount||0);
+  return Object.entries(totals).map(([asset,amount])=>fmt(amount,8)+' '+asset).join(' + ');
+}
+
 function tradeExecutionTime(at){
   const date=at?new Date(at):null;
   if(!date||!Number.isFinite(date.getTime()))return 'תאריך לא זמין';
@@ -273,7 +281,7 @@ function render(d,currentMode='demo',liveAccount=null){
     $('#positions').innerHTML=ps.length
       ? ps.map(x=>{const pnl=positionPnlDisplay(x);return `<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה ${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}<div class="${pnl.className}">${pnl.text}</div></div>`;}).join('')
       : '<div class="mini">אין פוזיציות פעילות.</div>';
-    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
+    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
   if(activeView==='portfolio')renderPortfolioView();
@@ -368,8 +376,9 @@ async function loadActionJournal(currentModeArg){
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
       const amount=Number.isFinite(+x.amountIls)?' · סכום '+fmt(x.amountIls)+' '+moneyUnit:Number.isFinite(+x.amountUsdt)?' · סכום '+fmt(x.amountUsdt)+' USDT':'';
       const pnl=Number.isFinite(+x.pnlIls)?' · P/L '+(+x.pnlIls>=0?'+':'')+fmt(x.pnlIls)+' '+moneyUnit:'';
+      const fees=' · עמלה: '+commissionsText(x.commissions);
       const reason=x.reason?' · '+x.reason:'';
-      return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${reason} · ${when}</div>`;
+      return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${fees}${reason} · ${when}</div>`;
     }).join(''):'<div class="mini">'+(currentModeArg==='live'?'עדיין אין פעולות LIVE.':'עדיין אין פעולות DEMO.')+'</div>';
   }catch(e){
     $('#actionJournal').innerHTML='<div class="mini">שגיאה בטעינת יומן הפעולות</div>';
