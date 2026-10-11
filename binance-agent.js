@@ -1,4 +1,4 @@
-const B='https://binance-wave-agent.onrender.com';
+const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://binance-wave-agent.onrender.com';
 const MODE=B+'/api/binance-mode';
 const TRADE_CONTROL=B+'/api/binance-trade-control';
 const AGENT=B+'/api/binance-agent';
@@ -193,7 +193,7 @@ function render(d,currentMode='demo',liveAccount=null){
   const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
   const paperPos=p.positions||{};
   const rotationGap=Number(d.config?.rotationScoreGap||20);
-  const maxPositions=Number(p.maxPositions||6);
+  const maxPositions=Number(currentMode==='live'?(d.config?.maxPositions||5):(p.maxPositions||10));
 
   renderMarketStrip(agents);
 
@@ -396,7 +396,7 @@ async function loadLiveAccount(prefetched=null){
     put('#paperValue',fmt(a.totalValueUsdt)+' USDT');
     put('#paperCash',fmt(a.usdtFree)+' USDT');
     put('#paperPnl','—');
-    put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/6');
+    put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
     put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
     put('#paperTradesCount','—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
