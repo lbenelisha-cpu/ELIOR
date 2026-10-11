@@ -452,7 +452,7 @@ function pushLiveAction(action){
   if(!saveLiveActionLog())throw Error('LIVE_EXECUTION_JOURNAL_UNAVAILABLE');
 }
 
-let mode='demo';
+let mode=process.env.BINANCE_MODE==='live'?'live':'demo';
 let SYMBOLS=[];
 const marketRanks=new Map();
 let agents={};
