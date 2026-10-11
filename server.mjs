@@ -607,6 +607,9 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   }
 
   const funding=await getLiveAccountSnapshot();
+  const activeBalances=funding.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5);
+  if(activeBalances.some(b=>b.asset+'USDT'===symbol))throw Error('LIVE position is already held');
+  if(activeBalances.length>=LIVE_MAX_POSITIONS)throw Error('No free LIVE position slot');
   quoteUsdt=Number(funding.fixedPositionUsdt||0);
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
