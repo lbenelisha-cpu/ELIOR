@@ -388,6 +388,23 @@ function resetExperimentStateOnce(){
 }
 
 let liveActionLog=[];
+const LIVE_ALLOCATION_FILE=LIVE_LOG_FILE+'.allocation';
+let liveAllocation=null;
+function fixedLiveAllocation(total){
+  if(!liveAllocation&&fs.existsSync(LIVE_ALLOCATION_FILE)){
+    liveAllocation=JSON.parse(fs.readFileSync(LIVE_ALLOCATION_FILE,'utf8'));
+    if(!(liveAllocation.baseUsdt>0)||!(liveAllocation.positionUsdt>0))throw Error('INVALID_FIXED_LIVE_ALLOCATION');
+  }
+  if(!liveAllocation&&Number(total)>0){
+    ensureStateDir();
+    const value={baseUsdt:Number(total),positionUsdt:Number(total)*0.1,at:new Date().toISOString()};
+    fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
+    fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
+    liveAllocation=value;
+  }
+  return liveAllocation;
+}
+
 
 function saveLiveActionLog(){
   try{
@@ -580,7 +597,10 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     throw Error('LIVE quoteOrderQty market buy is not supported: '+symbol);
   }
 
-  quoteUsdt=Math.min(Number(quoteUsdt)||0,LIVE_MAX_USDT);
+  const funding=await getLiveAccountSnapshot();
+  quoteUsdt=Number(funding.fixedPositionUsdt||0);
+  if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
+  if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!(quoteUsdt>0))throw Error('Invalid LIVE buy amount');
 
   const minimum=Math.max(
@@ -661,8 +681,8 @@ async function executeLiveCycle(evals){
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
     const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
     if(held>=MAX)break;
-    const spend=Math.min(LIVE_MAX_USDT,Number(account.usdtFree||0)/(MAX-held)*.995);
-    if(spend<5)break;
+    const spend=Number(account.fixedPositionUsdt||0);
+    if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
     await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade});
     account=await getLiveAccountSnapshot();
   }
@@ -704,6 +724,7 @@ async function getLiveAccountSnapshot(){
 
   const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0,qty:0,usdtPrice:1,valueUsdt:0};
   const totalValueUsdt=balances.reduce((sum,x)=>sum+(Number.isFinite(x.valueUsdt)?x.valueUsdt:0),0);
+  const fixedAllocation=fixedLiveAllocation(totalValueUsdt);
 
   return {
     connected:true,
@@ -715,6 +736,9 @@ async function getLiveAccountSnapshot(){
     usdtFree:usdt.free,
     usdtLocked:usdt.locked,
     totalValueUsdt,
+    allocationBaseUsdt:fixedAllocation?.baseUsdt??null,
+    fixedPositionUsdt:fixedAllocation?.positionUsdt??null,
+    allocationMode:'FIXED_10_PERCENT',
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,
     takerCommission:acct.takerCommission,

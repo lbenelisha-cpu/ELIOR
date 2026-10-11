@@ -223,7 +223,7 @@ function render(d,currentMode='demo',liveAccount=null){
     put('#paperCash',fmt(p.cashIls)+' '+moneyUnit);
     put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ${moneyUnit} (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);
     put('#slots',`${p.activePositions||0}/${maxPositions}`);
-    put('#slotValue',fmt(p.slotIls)+' '+moneyUnit);
+    put('#slotValue',fmt(p.slotIls)+' '+moneyUnit+(p.allocationMode==='FIXED_10_PERCENT'?' · קבוע':''));
     put('#paperTradesCount',(p.trades||[]).length);
   }
 
@@ -397,7 +397,7 @@ async function loadLiveAccount(prefetched=null){
     put('#paperCash',fmt(a.usdtFree)+' USDT');
     put('#paperPnl','—');
     put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/6');
-    put('#slotValue',a.totalValueUsdt>0?fmt(Math.min(Number(a.tradingGate?.liveMaxUsdt||a.totalValueUsdt),a.totalValueUsdt)/6)+' USDT':'—');
+    put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
     put('#paperTradesCount','—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
