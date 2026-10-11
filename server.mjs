@@ -51,6 +51,7 @@ const MIN=+(process.env.BINANCE_WAVE_MIN_PERCENT||3);
 const SELL_RETRACE_RATIO=+(process.env.BINANCE_SELL_RETRACE_RATIO||0.15);
 const MAP=+(process.env.BINANCE_MA_PERIOD||200);
 const MAX=10;
+const LIVE_MAX_POSITIONS=5;
 const INITIAL=5000;
 const SLOT=INITIAL/MAX;
 const DECISION_INTERVAL_MS=Math.max(5000,+(process.env.BINANCE_DECISION_INTERVAL_MS||5000));
@@ -398,7 +399,13 @@ function fixedLiveAllocation(total){
   }
   if(!liveAllocation&&Number(total)>0){
     ensureStateDir();
-    const value={baseUsdt:Number(total),positionUsdt:Number(total)*0.1,at:new Date().toISOString()};
+    const value={baseUsdt:Number(total),positionUsdt:Number(total)/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS,at:new Date().toISOString()};
+    fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
+    fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
+    liveAllocation=value;
+  }
+  if(liveAllocation&&liveAllocation.maxPositions!==LIVE_MAX_POSITIONS){
+    const value={...liveAllocation,positionUsdt:liveAllocation.baseUsdt/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS};
     fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
     fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
     liveAllocation=value;
@@ -683,7 +690,7 @@ async function executeLiveCycle(evals){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
     const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
-    if(held>=MAX)break;
+    if(held>=LIVE_MAX_POSITIONS)break;
     const spend=Number(account.fixedPositionUsdt||0);
     if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
     await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade});
@@ -741,7 +748,8 @@ async function getLiveAccountSnapshot(){
     totalValueUsdt,
     allocationBaseUsdt:fixedAllocation?.baseUsdt??null,
     fixedPositionUsdt:fixedAllocation?.positionUsdt??null,
-    allocationMode:'FIXED_10_PERCENT',
+    allocationMode:'FIXED_20_PERCENT',
+    maxPositions:LIVE_MAX_POSITIONS,
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,
     takerCommission:acct.takerCommission,
@@ -1257,7 +1265,7 @@ function candidateBlocker(ev,evals){
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
   if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
-  if(Object.keys(tradingPositions()).length>=MAX)return {code:'NO_SLOT',text:'אין מקום פנוי'};
+  if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
 }
 
@@ -2135,7 +2143,7 @@ const server=http.createServer((req,res)=>{
         wyckoffStopLossPct:null,
         minWave:MIN,
         maPeriod:MAP,
-        maxPositions:MAX,
+        maxPositions:mode==='live'?LIVE_MAX_POSITIONS:MAX,
         slotIls:SLOT,
         longOnly:true,
         universeSize:UNIVERSE_SIZE,
