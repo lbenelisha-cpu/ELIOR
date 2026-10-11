@@ -1,4 +1,4 @@
-const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://binance-wave-agent.onrender.com';
+const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://levi-binance.2-29-48-20.sslip.io';
 const MODE=B+'/api/binance-mode';
 const TRADE_CONTROL=B+'/api/binance-trade-control';
 const AGENT=B+'/api/binance-agent';
