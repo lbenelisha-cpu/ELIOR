@@ -124,7 +124,7 @@ function mode(s){
   put('#refreshBtn',isDemo?'בדוק עכשיו':'רענן LIVE');
   put('#portfolioTitle',isDemo?(demoTradingEnabled?'חשבון Binance Demo · USDT':'סימולציה פנימית · נפרדת מ־Binance'):'חשבון LIVE · Binance');
   put('#positionsTitle',isDemo?'פוזיציות פעילות · DEMO':'פוזיציות פעילות · LIVE');
-  put('#status',isDemo?(demoTradingEnabled?'דמו Binance · מסחר אוטומטי':'סימולציה פנימית'):'LIVE · '+(s.liveTradingEnabled?'TRADING ENABLED':'READ ONLY'));
+  put('#status',isDemo?(demoTradingEnabled?'דמו Binance · מסחר אוטומטי':'סימולציה פנימית'):'LIVE · '+(s.liveTradingEnabled&&s.autoExecution?'מסחר אוטומטי מופעל':'ביצוע אוטומטי כבוי'));
 }
 
 function buyReasonLabel(r){
@@ -625,9 +625,13 @@ function drawCandles(candles){
   }
 }
 
+let dashboardLoadInFlight=false;
+let dashboardLoaded=false;
 async function load(){
+  if(dashboardLoadInFlight)return;
+  dashboardLoadInFlight=true;
   try{
-    put('#status','מתחבר…');
+    if(!dashboardLoaded)put('#status','מתחבר…');
     const m=await J(MODE);
     mode(m);
     const agent=await J(AGENT);
@@ -639,12 +643,15 @@ async function load(){
       render(agent,'demo',null);
     }
     await loadActionJournal(m.mode);
+    dashboardLoaded=true;
   }catch(e){
     put('#status','שרת לא זמין');
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
     put('#tradeControlStatus','מצב המסחר לא אומת · שרת לא זמין');
     console.error(e);
+  }finally{
+    dashboardLoadInFlight=false;
   }
 }
 
