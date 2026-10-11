@@ -36,7 +36,8 @@ test('5m fills retain targets, count trades, exit and cannot buy the same patter
   const ev={ok:true,symbol:'BTCUSDT',at:new Date().toISOString(),score:100,entryConfirmed:true,entryStage:1,orderFraction:1,wyckoffTrade:createWyckoffTrade(s,100),strategy:{timeframe:'5m',wyckoff:s,sellConfirmed:false}};
   await x.trader.cycle([ev]);assert.equal(x.orders.length,1);assert.equal(x.trader.wyckoffStats().buys,1);
   assert.equal(x.trader.state.positions.BTCUSDT.strategyId,'WYCKOFF_5M_V1');
-  x.prices.BTC=107;await x.trader.monitorExits();assert.equal(x.orders.length,2);assert.equal(x.trader.wyckoffStats().sells,1);
+  x.prices.BTC=107;await x.trader.monitorExits();assert.equal(x.orders.length,1);
+  x.prices.BTC=105;await x.trader.monitorExits();assert.equal(x.orders.length,2);assert.equal(x.trader.wyckoffStats().sells,1);
   x.prices.BTC=100;await x.trader.cycle([ev]);assert.equal(x.orders.length,2);
  }finally{x.close();}
 });

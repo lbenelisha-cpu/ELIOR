@@ -4,7 +4,7 @@ import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
-import {binancePositionExit as wyckoffExit} from './lib/binance-position-exit.mjs';
+import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
@@ -250,6 +250,7 @@ const DEMO_TRADING=process.env.BINANCE_DEMO_TRADING_ENABLED==='true';
 const demoTrader=new DemoTrader({
   maxPositions:MAX,
   entryCostGuard:checkEntryCost,
+  rankForSymbol:s=>marketRanks.get(s)??null,
   key:process.env.BINANCE_DEMO_API_KEY,
   secret:process.env.BINANCE_DEMO_API_SECRET,
   enabled:DEMO_TRADING,
@@ -446,6 +447,7 @@ function pushLiveAction(action){
 
 let mode='demo';
 let SYMBOLS=[];
+const marketRanks=new Map();
 let agents={};
 let streams={};
 let marketSocket=null;
@@ -671,6 +673,7 @@ async function executeLiveCycle(evals){
     if(!ev.ok||!owned(ev.symbol))continue;
     const saved=tradingPositions()[ev.symbol];
     if(!saved)continue;
+    saved.marketRank=marketRanks.get(ev.symbol)??null;
     const exit=wyckoffExit(saved,ev.strategy.price);
     persistLivePeak(ev.symbol,saved);
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
@@ -795,6 +798,8 @@ async function selectUniverse(){
 }
 
 function initUniverse(symbols){
+  marketRanks.clear();
+  symbols.forEach((s,i)=>marketRanks.set(s,i+1));
   SYMBOLS=[...new Set([...symbols,...Object.keys(tradingPositions())])];
   agents=Object.fromEntries(
     SYMBOLS.map(symbol=>[
@@ -1159,6 +1164,7 @@ async function evaluateSymbol(s){
       p=tradingPositions()[s]||null;
       used=liveActionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.wyckoffTrade?.patternId);
     }
+    if(p)p.marketRank=marketRanks.get(s)??null;
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit});
     if(p){
@@ -1166,6 +1172,7 @@ async function evaluateSymbol(s){
       else if(DEMO_TRADING)demoTrader.save();
       else savePaperState();
     }
+    if(ev.wyckoffTrade)ev.wyckoffTrade.marketRank=marketRanks.get(s)??null;
     ev.analysisSignal=ev.entryConfirmed===true;
     ev.analysisReason=ev.buyReason;
     if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
@@ -1244,7 +1251,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'עצירה 2% מהכניסה או ירידה 2.5% מהשיא — ללא יעד מכירה קבוע':'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=MAX)return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
@@ -2119,7 +2126,9 @@ const server=http.createServer((req,res)=>{
         strategyId:'WYCKOFF_5M_V1',
         timeframe:'5m',
         targetMultiplier:1.07,
-        wyckoffStopLossPct:6,
+        exitPolicyTiers:BINANCE_EXIT_TIERS,
+        exitRankBasis:"CURRENT_UNIVERSE_24H_QUOTE_VOLUME",
+        wyckoffStopLossPct:null,
         minWave:MIN,
         maPeriod:MAP,
         maxPositions:MAX,
@@ -2135,7 +2144,7 @@ const server=http.createServer((req,res)=>{
         entryMinScore:null,
         entryMaxRunPct:null,
         entryCostFilter:{enabled:true,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
-        stopLossPct:6,
+        stopLossPct:null,
         trailActivatePct:0,
         exitTrailPct:null,
           buyCandidateCount:Object.values(agents).filter(a=>a?.entryConfirmed&&a?.position!=='LONG').length,

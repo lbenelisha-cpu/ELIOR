@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {binancePositionExit as exit} from '../lib/binance-position-exit.mjs';
 import {trackedLivePositions} from '../lib/wyckoff-live-positions.mjs';
 import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
-const holding=()=>({strategyId:'WYCKOFF_5M_V1',entryPrice:100,peakPrice:100,targetPrice:107});
+const holding=()=>({strategyId:'WYCKOFF_5M_V1',entryPrice:100,peakPrice:100,targetPrice:107,marketRank:21});
 test('immediate decline triggers at 2% entry loss',()=>{
  const p=holding();assert.equal(exit(p,98.01).sell,false);assert.equal(exit(p,98).reason,'WYCKOFF_STOP_LOSS_2_PERCENT');
 });
@@ -22,4 +22,19 @@ test('existing Wyckoff positions migrate on evaluation; scan uses Binance exit p
  assert.equal(ev.rawDecision,'SELL');assert.equal(p.stopPrice,98);
  assert.throws(()=>exit({...holding(),entryPrice:undefined},100),/INVALID/);
  assert.equal(exit({entryPrice:100},98).sell,false);
+});
+
+test('all ranking boundaries apply entry and peak stops',()=>{
+ for(const [rank,loss,trail] of [[1,3,5],[10,3,5],[11,2.5,3],[20,2.5,3],[21,2,2.5],[50,2,2.5],[51,1,1.5],[100,1,1.5],[null,1,1.5]]){
+  const p={...holding(),marketRank:rank};
+  assert.equal(exit(p,100-loss).sell,true);
+  const q={...holding(),marketRank:rank};exit(q,120);
+  assert.equal(q.stopLossPct,loss);assert.equal(q.trailingStopPct,trail);
+  assert.equal(exit(q,q.trailingStopPrice+.001).sell,false);
+  assert.equal(exit(q,q.trailingStopPrice).sell,true);
+ }
+});
+test('rank changes retain highest observed price',()=>{
+ const p={...holding(),marketRank:1};exit(p,120);p.marketRank=51;
+ assert.equal(exit(p,118).sell,true);assert.equal(p.peakPrice,120);
 });
