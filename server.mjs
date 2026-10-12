@@ -1,7 +1,7 @@
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
 import {retainDecision} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
-import {trackedLivePositions,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
+import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
 import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
@@ -644,7 +644,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   quoteUsdt=Number(funding.fixedPositionUsdt||0);
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
-  if(!(quoteUsdt>0))throw Error('Invalid LIVE buy amount');
+  if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
 
   const minimum=Math.max(
     0,
@@ -684,8 +684,9 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
   if(!(trackedQty>0))throw Error('No tracked Wyckoff quantity to sell');
   const qty=floorToStep(Math.min(bal.free,trackedQty),Number(lot?.stepSize||0));
   if(!(qty>0))throw Error('Sell quantity is below LOT_SIZE');
+  const dustThresholdUsdt=Math.max(5,...(info.filters||[]).filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType)).map(f=>Number(f.minNotional)||0));
 
-  return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
 }
 
 function persistLivePeak(symbol, position){
@@ -781,6 +782,8 @@ async function getLiveAccountSnapshot(){
     canDeposit:Boolean(acct.canDeposit),
     accountType:acct.accountType||'SPOT',
     balances,
+    trackedDust:livePositionLedger(liveActionLog).dust,
+    dustBalances:balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt)>0&&Number(b.valueUsdt)<5),
     usdtFree:usdt.free,
     usdtLocked:usdt.locked,
     totalValueUsdt,
