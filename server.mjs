@@ -8,6 +8,7 @@ import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/bina
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
+import {binanceRsiExit} from './lib/binance-rsi-exit.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
@@ -1220,6 +1221,16 @@ async function evaluateSymbol(s){
     if(p)p.marketRank=marketRanks.get(s)??null;
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit});
+    if(p&&['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId)&&!ev.strategy.sellConfirmed){
+      try{
+        const rsi=binanceRsiExit(await candles(s),{entryAt:p.entryAt});
+        ev.strategy.rsiExit=rsi;
+        if(rsi.sell){
+          ev.rawDecision='SELL';ev.buyReason=rsi.reason;
+          ev.strategy.sellConfirmed=true;ev.strategy.exitReason=rsi.reason;
+        }
+      }catch(error){ev.strategy.rsiExit={sell:false,reason:'RSI_DATA_UNAVAILABLE'};}
+    }
     if(p){
       if(mode==='live')persistLivePeak(s,p);
       else if(DEMO_TRADING)demoTrader.save();
@@ -1304,7 +1315,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא או RSI (14) יורד — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
@@ -2211,6 +2222,8 @@ const server=http.createServer((req,res)=>{
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
         decisionIntervalMs:DECISION_INTERVAL_MS,
+        rsiExitEnabled:true,
+        rsiPeriod:14,
         strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
