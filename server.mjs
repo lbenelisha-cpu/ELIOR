@@ -689,8 +689,12 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
 }
 
 function persistLivePeak(symbol, position){
-  const buy=liveActionLog.find(a=>a.type==='BUY'&&a.symbol===symbol&&a.wyckoffTrade);
-  if(!buy)return;
+  const buyIndex=liveActionLog.findIndex(a=>a.type==='BUY'&&a.symbol===symbol&&a.wyckoffTrade);
+  if(buyIndex<0)return;
+  // A sale closes this journal entry even if rounded dust remains in the wallet.
+  // Newer purchases start a separate entry and may update their own peak.
+  if(liveActionLog.slice(0,buyIndex).some(a=>a.type==='SELL'&&a.symbol===symbol))return;
+  const buy=liveActionLog[buyIndex];
   if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice)return;
   buy.wyckoffTrade.peakPrice=position.peakPrice;
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
