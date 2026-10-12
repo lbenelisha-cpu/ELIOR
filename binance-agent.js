@@ -59,6 +59,16 @@ function positionPnlDisplay(position,currency=moneyUnit){
   return {kind,className:'pnl-'+kind,text:label+': '+amount+(pct===null?'':' ('+(pct>0?'+':'')+fmt(pct)+'%)')};
 }
 
+function liveAccountPnlDisplay(account){
+  if(!account)return {text:'אין נתוני חשבון',className:'pnl-unknown'};
+  const holdings=(account.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt)>=5);
+  const known=holdings.filter(x=>x.pnlIls!==null&&x.pnlIls!==undefined&&x.pnlIls!==''&&Number.isFinite(Number(x.pnlIls)));
+  if(known.length!==holdings.length)return {text:'חסרה עלות קנייה · '+known.length+'/'+holdings.length+' פוזיציות',className:'pnl-unknown'};
+  const pnl=known.reduce((sum,x)=>sum+Number(x.pnlIls),0);
+  const cost=known.reduce((sum,x)=>sum+Number(x.allocationIls||0),0);
+  return {text:(pnl>0?'+':'')+fmt(pnl)+' USDT'+(cost>0?' ('+(pnl>0?'+':'')+fmt(pnl/cost*100)+'%)':''),className:'pnl-'+(pnl>0?'profit':pnl<0?'loss':'flat')};
+}
+
 function renderPortfolioView(){
   const target=$('#portfolioViewContent');
   const source=$('#positions');
@@ -219,6 +229,11 @@ function render(d,currentMode='demo',liveAccount=null){
   }
 
   if(!isLive){
+    put('#accountPnlLabel','רווח / הפסד');
+    put('#accountPnlNote','');
+    put('#holdingsNote','');
+    const pnlEl=$('#paperPnl');
+    if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,false);
     put('#paperValue',fmt(p.valueIls)+' '+moneyUnit);
     put('#paperCash',fmt(p.cashIls)+' '+moneyUnit);
     put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ${moneyUnit} (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);
@@ -395,7 +410,13 @@ async function loadLiveAccount(prefetched=null){
     put('#liveAccountType',a.accountType||'—');
     put('#paperValue',fmt(a.totalValueUsdt)+' USDT');
     put('#paperCash',fmt(a.usdtFree)+' USDT');
-    put('#paperPnl','—');
+    const pnl=liveAccountPnlDisplay(a);
+    put('#paperPnl',pnl.text);
+    put('#accountPnlLabel','רווח / הפסד לא ממומש');
+    const pnlEl=$('#paperPnl');
+    if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,pnl.className==='pnl-'+kind);
+    put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות');
+    put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
     put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
     put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
     put('#paperTradesCount','—');
@@ -403,6 +424,7 @@ async function loadLiveAccount(prefetched=null){
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
     return a;
   }catch(e){
+    put('#paperPnl','אין נתוני חשבון');put('#slots','—');
     put('#liveConnected','שגיאה');put('#liveTotalValue','—');put('#liveUsdt','—');put('#liveCanTrade','—');put('#liveAccountType','—');
     $('#liveBalances').innerHTML='<div class="mini">'+e.message+'</div>';
     return null;
