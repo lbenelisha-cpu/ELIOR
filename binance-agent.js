@@ -21,6 +21,8 @@ let currentVisibleAgents=[];
 let selectedInterval='5m';
 let selectedRange='1W';
 let chartVisibleStartTime=0;
+let manualPriceDigits=null;
+let lastChartPriceDigits=2;
 let activeView='trade';
 let demoTradingEnabled=false;
 let tradeControlToken=null;
@@ -574,6 +576,16 @@ function drawIndicators(candles){
     if(show)engine.drawIndicator($('#'+key+'Chart'),values[key].slice(-120),{name,color,bounds,levels});
   }
 }
+function chartSellLevel(data,liveAccount,mode,symbol){
+ const agent=(data?.agents||[]).find(a=>a.symbol===symbol);
+ const held=mode==='live'?(liveAccount?.balances||[]).some(b=>b.asset+'USDT'===symbol&&Number(b.valueUsdt)>=5):!!data?.paper?.positions?.[symbol];
+ if(!held||!agent||agent.staleData)return null;
+ const strategy=agent.strategy||{},position=mode==='live'?strategy:data.paper.positions[symbol];
+ const stop=Number(strategy.effectiveStopPrice??position.effectiveStopPrice??strategy.stopPrice??position.stopPrice);
+ if(!(stop>0)||!Number.isFinite(stop))return null;
+ return {price:stop,reason:strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
+}
+
 function drawCandles(candles){
   drawIndicators(candles);
   const canvas=$('#priceChart');
@@ -602,10 +614,15 @@ function drawCandles(candles){
   if(!view.length)return;
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
+  const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
+  if(sellLevel)vals.push(sellLevel.price);
+  put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
   let min=Math.min(...vals),max=Math.max(...vals);
   const span=Math.max(max-min,Math.abs((max+min)/2)*0.002,1e-12);
   const mid=(max+min)/2;min=mid-span*.58;max=mid+span*.58;
-  const priceDigits=Math.min(12,Math.max(2,Math.ceil(-Math.log10((max-min)/5))+1));
+  const autoDigits=Math.min(12,Math.max(2,Math.ceil(-Math.log10((max-min)/5))+1));
+  const priceDigits=manualPriceDigits??autoDigits;lastChartPriceDigits=priceDigits;
+  put('#pricePrecisionValue',priceDigits+' ספרות'+(manualPriceDigits===null?' · אוטומטי':''));
 
   const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=94,bottom=112;
   const cw=W-left-right,ch=H-top-bottom;
@@ -644,6 +661,10 @@ function drawCandles(candles){
     if(!began){ctx.moveTo(x,yy);began=true}else ctx.lineTo(x,yy);
   });
   ctx.stroke();
+
+  if(sellLevel){
+    const yy=y(sellLevel.price);ctx.save();ctx.strokeStyle='#ffbd59';ctx.fillStyle='#ffbd59';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.setLineDash([]);ctx.textAlign='left';ctx.fillText('סף מכירה '+fmt(sellLevel.price,priceDigits),left+8,yy-7);ctx.restore();
+  }
 
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
@@ -808,3 +829,7 @@ document.querySelectorAll('[data-detail-toggle]').forEach(button=>{
 });
 
 for(const id of ['showRSI','showROC'])document.getElementById(id)?.addEventListener('change',()=>drawIndicators(chartCandles));
+
+document.getElementById('pricePrecisionUp')?.addEventListener('click',()=>{manualPriceDigits=Math.min(12,lastChartPriceDigits+1);drawCandles(chartCandles);});
+document.getElementById('pricePrecisionDown')?.addEventListener('click',()=>{manualPriceDigits=Math.max(0,lastChartPriceDigits-1);drawCandles(chartCandles);});
+document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{manualPriceDigits=null;drawCandles(chartCandles);});
