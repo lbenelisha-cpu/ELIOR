@@ -1,3 +1,4 @@
+import {observePositionPeak,confirmedRsiExit} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
 import {tradeCounts,tradeFeeTotals} from './lib/trade-counts.mjs';
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
@@ -263,9 +264,12 @@ const demoTrader=new DemoTrader({
   stopLossPct:6,
   trailActivatePct:0
 });
+const livePeakMemory=new Map();
 const tradingPositions=()=>{
  if(mode==='live'){
-  return trackedLivePositions(liveActionLog);
+  const positions=trackedLivePositions(liveActionLog);
+  for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
+  return positions;
  }
  return DEMO_TRADING?demoTrader.state.positions:paper.positions;
 };
@@ -697,10 +701,11 @@ function persistLivePeak(symbol, position){
   if(buyIndex<0)return;
   // A sale closes this journal entry even if rounded dust remains in the wallet.
   // Newer purchases start a separate entry and may update their own peak.
-  if(liveActionLog.slice(0,buyIndex).some(a=>a.type==='SELL'&&a.symbol===symbol))return;
+  if(tradingPositions()[symbol]?.entryAt!==position.entryAt)return;
   const buy=liveActionLog[buyIndex];
   if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice)return;
   buy.wyckoffTrade.peakPrice=position.peakPrice;
+  buy.wyckoffTrade.peakAt=position.peakAt||null;
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
 }
 
@@ -723,7 +728,10 @@ async function executeLiveCycle(evals){
     const saved=tradingPositions()[ev.symbol];
     if(!saved)continue;
     saved.marketRank=marketRanks.get(ev.symbol)??null;
-    const exit=wyckoffExit(saved,ev.strategy.price);
+    let price;try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
+    observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
+    const priceExit=wyckoffExit(saved,price);
+    const exit=priceExit.sell?priceExit:confirmedRsiExit(ev,saved)?{sell:true,reason:'BINANCE_RSI_14_FALLING'}:priceExit;
     persistLivePeak(ev.symbol,saved);
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
@@ -902,6 +910,11 @@ function startMarketStream(){
         streams[s].lastPrice=+m.p;
         streams[s].lastEventAt=new Date(m.E).toISOString();
         streams[s].status='connected';
+        const p=tradingPositions()[s];
+        const tickAt=new Date(Number(m.T||m.E)).toISOString();
+        if(p&&observePositionPeak(p,+m.p,tickAt)){
+          if(mode==='live')livePeakMemory.set(s,{entryAt:p.entryAt,peakPrice:p.peakPrice,peakAt:p.peakAt});
+        }
       }
       if(m.e==='kline'&&m.k){
         const k=m.k;
@@ -1794,10 +1807,24 @@ async function refreshUniverse(){
 
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
 // Exit monitoring does not wait for the 100-symbol daily-candle scan.
+let exitMonitorInFlight=false;
 setInterval(async()=>{
+  if(mode==='live'){try{for(const [symbol,p] of Object.entries(tradingPositions()))persistLivePeak(symbol,p);}catch(error){console.error('LIVE peak persistence failed',error.message);return;}}
+  if(exitMonitorInFlight)return;exitMonitorInFlight=true;
+  try{
   if(mode==='live'){
    if(!LIVE||!AUTO_EXECUTION)return;
-   try{await maybeExecuteLive(await Promise.all(Object.keys(tradingPositions()).map(evaluateSymbol)));}catch(e){console.error('LIVE exit monitor failed',e.message);}
+   try{await maybeExecuteLive(Object.entries(tradingPositions()).map(([symbol,p])=>{
+      try{
+        const price=requireLivePrice(streams[symbol],Date.now(),15000);
+        const ev=evaluateDailyTrade({symbol,bars:[],price,priceAsOf:streams[symbol].lastEventAt,position:p,timeframe:'5m',exitEvaluator:wyckoffExit});
+        const cached={rawDecision:'SELL',strategy:agents[symbol]?.strategy};
+        if(!ev.strategy.sellConfirmed&&confirmedRsiExit(cached,p)){
+          ev.rawDecision='SELL';ev.strategy.sellConfirmed=true;ev.strategy.exitReason='BINANCE_RSI_14_FALLING';ev.strategy.rsiExit=cached.strategy.rsiExit;
+        }
+        return ev;
+      }catch(error){return {ok:false,symbol,error:error.message};}
+    }));}catch(e){console.error('LIVE exit monitor failed',e.message);}
    return;
   }
   if(!DEMO_TRADING||mode!=='demo')return;
@@ -1808,7 +1835,8 @@ setInterval(async()=>{
       a.lastDecisionAt=demoTrader.state.actionLog.find(x=>x.symbol===a.symbol&&x.type==='SELL')?.at;
     }
   }
-},5000).unref();
+  }finally{exitMonitorInFlight=false;}
+},1000).unref();
 setInterval(refreshUniverse,300000).unref();
 
 
@@ -2166,7 +2194,7 @@ const server=http.createServer((req,res)=>{
       tradeControl,
       symbols:SYMBOLS,
       streams,
-      agents:Object.values(agents),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
       paper:accountSnapshot(),
       universeStatus,
       universeError,
@@ -2218,7 +2246,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-agent/evaluate'&&req.method==='POST'){
     evalAll().then(()=>send(res,{
       ok:true,
-      agents:Object.values(agents),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
       paper:accountSnapshot()
     })).catch(e=>send(res,{ok:false,error:e.message},502));
     return;
