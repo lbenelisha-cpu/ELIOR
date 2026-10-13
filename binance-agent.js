@@ -339,7 +339,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
