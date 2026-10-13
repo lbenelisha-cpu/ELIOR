@@ -1,3 +1,4 @@
+import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
 import {tradeCounts,tradeFeeTotals} from './lib/trade-counts.mjs';
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
 import {retainDecision} from './lib/decision-chart-history.mjs';
@@ -2113,33 +2114,25 @@ const server=http.createServer((req,res)=>{
     const interval=String(u.searchParams.get('interval')||'5m');
     const range=String(u.searchParams.get('range')||'1W').toUpperCase();
 
-    const allowedIntervals=new Set(['5m','1h','4h','1d','1w','1M']);
-    const allowedRanges=new Set(['1W','1M','3M','6M','1Y','ALL']);
+    const allowedIntervals=new Set(['1m','5m','30m','1h','5h','1d']);
+    const allowedRanges=new Set(['1D','2D','3D','4D','5D','1W']);
 
     if(!/^[A-Z0-9]+USDT$/.test(symbol))return send(res,{ok:false,error:'Invalid symbol'},400);
     if(!allowedIntervals.has(interval))return send(res,{ok:false,error:'Invalid interval'},400);
     if(!allowedRanges.has(range))return send(res,{ok:false,error:'Invalid range'},400);
 
     const now=Date.now();
-    const day=86400000;
-    const startByRange={
-      '1W':now-7*day,
-      '1M':now-31*day,
-      '3M':now-93*day,
-      '6M':now-186*day,
-      '1Y':now-366*day,
-      'ALL':Date.UTC(2017,0,1)
-    };
-    const startTime=interval==='5m'?Math.max(startByRange[range],now-7*day):startByRange[range];
+    const {visibleStartTime,fetchStartTime,sourceInterval}=chartWindow(interval,range,now);
+    const startTime=visibleStartTime;
 
     (async()=>{
       const rows=[];
-      let cursor=startTime;
+      let cursor=fetchStartTime;
       let pages=0;
 
       while(cursor<now && pages<15){
         const batch=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)
-          +'&interval='+encodeURIComponent(interval)
+          +'&interval='+encodeURIComponent(sourceInterval)
           +'&limit=1000&startTime='+cursor+'&endTime='+now);
 
         if(!Array.isArray(batch)||!batch.length)break;
@@ -2152,13 +2145,14 @@ const server=http.createServer((req,res)=>{
         if(batch.length<1000)break;
       }
 
-      const candles=rows.map(x=>({
-        openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6]
+      let candles=rows.map(x=>({
+        openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6],closed:+x[6]<now
       }));
 
+      if(interval==='5h')candles=aggregateFiveHourCandles(candles);
       const decisions=(decisionHistory[symbol]||[]).filter(x=>Date.parse(x.at)>=startTime&&x.mode===mode);
       const actions=(mode==='live'?liveActionLog:DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).filter(x=>x.symbol===symbol&&Date.parse(x.at)>=startTime);
-      send(res,{ok:true,symbol,interval,range,candles,decisions,actions,decisionMode:mode,candleAnalysis:analyzeCandlePower(candles,10)});
+      send(res,{ok:true,symbol,interval,range,visibleStartTime,candles,decisions,actions,decisionMode:mode,candleAnalysis:analyzeCandlePower(candles,10)});
     })().catch(e=>send(res,{ok:false,error:e.message},502));
     return;
   }
