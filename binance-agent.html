@@ -150,22 +150,22 @@
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
             <span class="toolbar-label">משך נר</span>
-            <button class="time-pill timeframe-btn" data-interval="1h">1H</button>
-            <button class="time-pill timeframe-btn" data-interval="4h">4H</button>
-            <button class="time-pill timeframe-btn active" data-interval="5m">5M</button>
-            <button class="time-pill timeframe-btn" data-interval="1d">1D</button>
-            <button class="time-pill timeframe-btn" data-interval="1w">1W</button>
-            <button class="time-pill timeframe-btn" data-interval="1M">1M</button>
+            <button class="time-pill timeframe-btn" data-interval="1m">דקה</button>
+            <button class="time-pill timeframe-btn active" data-interval="5m">5 דקות</button>
+            <button class="time-pill timeframe-btn" data-interval="30m">30 דקות</button>
+            <button class="time-pill timeframe-btn" data-interval="1h">שעה</button>
+            <button class="time-pill timeframe-btn" data-interval="5h">5 שעות</button>
+            <button class="time-pill timeframe-btn" data-interval="1d">יום</button>
           </div>
 
           <div class="toolbar-group">
             <span class="toolbar-label">טווח</span>
+            <button class="time-pill range-btn" data-range="1D">יום</button>
+            <button class="time-pill range-btn" data-range="2D">יומיים</button>
+            <button class="time-pill range-btn" data-range="3D">3 ימים</button>
+            <button class="time-pill range-btn" data-range="4D">4 ימים</button>
+            <button class="time-pill range-btn" data-range="5D">5 ימים</button>
             <button class="time-pill range-btn active" data-range="1W">שבוע</button>
-            <button class="time-pill range-btn" data-range="1M">1M</button>
-            <button class="time-pill range-btn" data-range="3M">3M</button>
-            <button class="time-pill range-btn" data-range="6M">6M</button>
-            <button class="time-pill range-btn" data-range="1Y">1Y</button>
-            <button class="time-pill range-btn" data-range="ALL">ALL</button>
           </div>
 
           <div class="toolbar-group"><label><input type="checkbox" id="showRSI" checked> RSI (14)</label><label><input type="checkbox" id="showROC" checked> ROC (12)</label></div>
@@ -184,7 +184,7 @@
         <p class="mini">RSI: קווים ב־30 ו־70 · ROC: שינוי באחוזים לעומת 12 נרות קודם · לתצוגה בלבד.</p>
         <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
-          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; נקודות מהבהבות מציגות את תבנית האישור האחרונה; מוצגים 120 הנרות האחרונים, או טווח רחב יותר כדי לכלול את נקודות האישור. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
+          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; נקודות מהבהבות מציגות את תבנית האישור האחרונה; הגרף מציג את הטווח שבחרת. נקודות אישור שמחוץ לטווח אינן מוצגות. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
           <p class="mini">מוני העסקאות מבוססים על היומן הזמין. שארית מתחת לסף המתועד אינה פוזיציה פעילה.</p>
           <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
           <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
