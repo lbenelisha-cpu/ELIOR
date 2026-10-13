@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {tradeCounts} from '../lib/trade-counts.mjs';
+const at=n=>new Date(n*1000).toISOString();
+test('counts untagged sells, partial exits, full exits and duplicate orders',()=>{const rows=[{type:'BUY',symbol:'A',qty:10,at:at(1),orderId:1},{type:'SELL',symbol:'A',qty:4,at:at(2),orderId:2},{type:'SELL',symbol:'A',qty:6,at:at(3),orderId:3}];assert.deepEqual(tradeCounts(rows.slice(0,2)),{buys:1,sells:1,closed:0});assert.deepEqual(tradeCounts([...rows,rows[2]]),{buys:1,sells:2,closed:1});});
+test('dust closes trade; unrelated sell does not invent a completed trade',()=>{assert.deepEqual(tradeCounts([{type:'BUY',symbol:'A',qty:10,at:at(1)},{type:'SELL',symbol:'A',qty:9.9,price:1,dustThresholdUsdt:5,at:at(2)},{type:'SELL',symbol:'B',qty:10,at:at(3)}]),{buys:1,sells:2,closed:1});});

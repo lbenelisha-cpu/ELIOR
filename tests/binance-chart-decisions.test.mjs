@@ -33,3 +33,9 @@ test('future returns use only closed bars after the horizon; missing data stays 
  assert.equal(ctx.chartSignalReturn(row,candles,7,time+10*day),null);
  assert.equal(ctx.chartSignalReturn(row,[{closeTime:time+10*day,close:120}],1,time+11*day),null);
 });
+test('pivot overlay selects the latest confirmed stored setup and never guesses legacy points',()=>{
+ const setup={initialPeak:{price:12,time:time-600000},springLow:{price:9,time:time-300000},confirmation:{price:11,time}};
+ assert.equal(ctx.latestWyckoffSetup([{at,analysisSignal:false,setup}]),null);
+ assert.equal(ctx.latestWyckoffSetup([{at,type:'BUY',wyckoffTrade:{initialPeak:12,springLow:9}}]),null);
+ const found=ctx.latestWyckoffSetup([{at,type:'BUY',wyckoffTrade:{setup}}]);assert.equal(found.confirmation.time,time);assert.equal(found.initialPeak.price,12);
+});

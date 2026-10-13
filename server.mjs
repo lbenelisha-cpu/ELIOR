@@ -1,3 +1,4 @@
+import {tradeCounts} from './lib/trade-counts.mjs';
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
 import {retainDecision} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
@@ -2163,22 +2164,8 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-agent'&&req.method==='GET'){
-    const isWyckoffFill=a=>['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(a?.strategyId||a?.wyckoffTrade?.strategyId);
-    const wyckoffStats=mode==='live'
-      ? {
-          buys:liveActionLog.filter(a=>a.type==='BUY'&&isWyckoffFill(a)).length,
-          sells:liveActionLog.filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
-          closed:liveActionLog.filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
-          scope:'recent_live_log'
-        }
-      : DEMO_TRADING
-        ? {...demoTrader.wyckoffStats(),scope:'demo_persistent'}
-        : {
-            buys:(paper.actionLog||[]).filter(a=>a.type==='BUY'&&isWyckoffFill(a)).length,
-            sells:(paper.actionLog||[]).filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
-            closed:(paper.actionLog||[]).filter(a=>a.type==='SELL'&&isWyckoffFill(a)).length,
-            scope:'paper_log'
-          };
+    const statsActions=mode==='live'?liveActionLog:DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[];
+    const wyckoffStats={...tradeCounts(statsActions),scope:'available_execution_journal'};
     return send(res,{
       wyckoffStats,
       mode,
