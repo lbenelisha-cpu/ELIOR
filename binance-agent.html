@@ -169,6 +169,7 @@
           </div>
 
           <div class="toolbar-group"><label><input type="checkbox" id="showRSI" checked> RSI (14)</label><label><input type="checkbox" id="showROC" checked> ROC (12)</label></div>
+          <div class="toolbar-group"><span>דיוק מחיר</span><button id="pricePrecisionUp" class="time-pill" title="הוסף ספרה עשרונית" aria-label="הגדל דיוק מחיר">▲</button><span id="pricePrecisionValue">אוטומטי</span><button id="pricePrecisionDown" class="time-pill" title="הפחת ספרה עשרונית" aria-label="הקטן דיוק מחיר">▼</button><button id="pricePrecisionAuto" class="time-pill">אוטומטי</button></div>
           <span id="chartLegend" class="chart-legend">נר 5M · עד שבוע · MA200</span>
         </div>
 
@@ -189,6 +190,7 @@
           <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
           <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
         </div>
+        <p id="currentSellLevel" class="mini" aria-live="polite">סף מכירה: בחר פוזיציה פעילה</p>
         <div class="chart-footer">
           <div><span>MA200</span><strong id="chartMA">—</strong></div>
           <div><span>גל נוכחי</span><strong id="chartWave">—</strong></div>
