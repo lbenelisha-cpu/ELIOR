@@ -392,3 +392,8 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .wyckoff-pivot{min-width:0;box-sizing:border-box;white-space:normal;font-size:11px;padding:6px 3px;min-height:32px}
 .wyckoff-pivot.confirmation-pivot{width:20px;min-height:20px;padding:0;border-radius:50%;font-size:12px;animation:wyckoffPulse 1.2s ease-in-out infinite}
 @media(max-width:600px){.wyckoff-pivot{font-size:9px}}
+
+.position-point{position:absolute;width:13px;height:13px;transform:translate(-50%,-50%);border:2px solid #c6e5ff;border-radius:50%;background:#348bff;pointer-events:auto;cursor:pointer;z-index:5;padding:0}
+.position-peak{background:#0065ff;animation:positionPeakPulse 1s ease-in-out infinite}
+@keyframes positionPeakPulse{50%{box-shadow:0 0 0 8px #348bff55;background:#c6e5ff}}
+@media(prefers-reduced-motion:reduce){.position-peak{animation:none}}

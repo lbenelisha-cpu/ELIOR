@@ -585,6 +585,21 @@ function chartSellLevel(data,liveAccount,mode,symbol){
  return {price:stop,reason:strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
 }
 
+function renderPositionPoints(view,step,left,y,digits){
+ const root=$('#wyckoffPivots');if(!root)return;
+ const level=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);if(!level)return;
+ const strategy=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
+ for(const [kind,label,at,price] of [['buy','קנייה בפועל',strategy.entryAt,strategy.entryPrice],['peak','השיא מאז הקנייה',strategy.peakAt,strategy.peakPrice]]){
+  const time=Date.parse(at);if(!Number.isFinite(time)||!(Number(price)>0))continue;
+  const index=view.findIndex(c=>time>=Number(c.openTime)&&time<=Number(c.closeTime));if(index<0)continue;
+  const yy=y(Number(price));if(yy<94||yy>root.clientHeight-112)continue;
+  const dot=document.createElement('button');dot.type='button';dot.className='position-point position-'+kind;
+  dot.style.left=(left+step*(index+.5))+'px';dot.style.top=yy+'px';
+  dot.title=label+' · '+fmt(price,digits)+' USDT · '+tradeExecutionTime(at);dot.setAttribute('aria-label',dot.title);
+  dot.onclick=()=>put('#chartDecisionDetails',dot.title);root.append(dot);
+ }
+}
+
 function drawCandles(candles){
   drawIndicators(candles);
   const canvas=$('#priceChart');
@@ -669,6 +684,7 @@ function drawCandles(candles){
   ctx.restore();
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
+  renderPositionPoints(view,step,left,y,priceDigits);
 
   const labelCount=Math.max(2,Math.min(5,Math.floor(cw/150)));
   ctx.textAlign='center';
