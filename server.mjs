@@ -1,3 +1,5 @@
+import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy,assessQualityEntry} from './lib/binance-quality-policy.mjs';
+import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
 import {observePositionPeak,confirmedRsiExit} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
 import {tradeCounts,tradeFeeTotals} from './lib/trade-counts.mjs';
@@ -96,7 +98,9 @@ async function checkEntryCost(symbol,amount){
     const origin=DEMO_TRADING&&mode==='demo'?'https://demo-api.binance.com':'https://api.binance.com';
     const r=await fetch(origin+'/api/v3/depth?symbol='+encodeURIComponent(symbol)+'&limit=100',{signal:AbortSignal.timeout(5000)});
     if(!r.ok)throw Error('Depth HTTP '+r.status);
-    return {...assessEntryCost(await r.json(),amount,ENTRY_COST_OPTIONS),checkedAt:new Date().toISOString()};
+    const cost=assessEntryCost(await r.json(),amount,ENTRY_COST_OPTIONS);
+    if(cost.ok){const quality=assessQualityEntry(symbol,await candles(symbol),{estimatedCostPct:cost.estimatedCostPct});if(!quality.ok)return {...cost,ok:false,code:quality.code,text:quality.code,quality,checkedAt:new Date().toISOString()};}
+    return {...cost,checkedAt:new Date().toISOString()};
   }catch{return {ok:false,code:'WAIT_COST_DATA',text:'ממתין לנתוני עומק; הקנייה מושהית'};}
 }
 const entryTrackingState=new Map();
@@ -498,7 +502,7 @@ let streams={};
 let marketSocket=null;
 let paper={initialIls:INITIAL,cashIls:INITIAL,positions:{},trades:[],actionLog:[],lastAction:null};
 
-const EXCLUDED_BASES=new Set(['USDC','FDUSD','TUSD','USDP','DAI','EUR','AEUR','TRY','BRL','GBP','AUD','BIDR','IDRT','UAH','RUB','NGN','ZAR','BUSD']);
+const EXCLUDED_BASES=new Set([...STABLE_BASES,'USDC','FDUSD','TUSD','USDP','DAI','EUR','AEUR','TRY','BRL','GBP','AUD','BIDR','IDRT','UAH','RUB','NGN','ZAR','BUSD']);
 const LEVERAGED_SUFFIXES=['UP','DOWN','BULL','BEAR'];
 
 async function j(url){
@@ -703,7 +707,9 @@ function persistLivePeak(symbol, position){
   // Newer purchases start a separate entry and may update their own peak.
   if(tradingPositions()[symbol]?.entryAt!==position.entryAt)return;
   const buy=liveActionLog[buyIndex];
-  if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice)return;
+  const policyChanged=['atrValue','atrTrailPct','effectiveStopPrice'].some(k=>Number(position[k]||0)!==Number(buy.wyckoffTrade[k]||0));
+  if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice&&!policyChanged)return;
+  for(const key of ['atrValue','atrTrailPct','effectiveStopPrice'])if(Number.isFinite(Number(position[key])))buy.wyckoffTrade[key]=Number(position[key]);
   buy.wyckoffTrade.peakPrice=position.peakPrice;
   buy.wyckoffTrade.peakAt=position.peakAt||null;
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
@@ -743,6 +749,9 @@ async function executeLiveCycle(evals){
     if(held>=LIVE_MAX_POSITIONS)break;
     const spend=Number(account.fixedPositionUsdt||0);
     if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
+    const costs=await checkEntryCost(ev.symbol,spend);
+    const quality=costs.ok?assessQualityEntry(ev.symbol,await candles(ev.symbol),{estimatedCostPct:costs.estimatedCostPct}):{ok:false,code:costs.code};
+    if(!quality.ok){setAgentFromEval({...ev,entryConfirmed:false,buyQualified:false,buyReason:quality.code},'HOLD','IDLE');continue;}
     await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade});
     account=await getLiveAccountSnapshot();
   }
@@ -1234,6 +1243,7 @@ async function evaluateSymbol(s){
       used=liveActionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.wyckoffTrade?.patternId);
     }
     if(p)p.marketRank=marketRanks.get(s)??null;
+    if(p?.atrEnabled){const a=atrPolicy(atr14(await candles(s)),Number(streams[s]?.lastPrice));if(a){p.atrValue=a.atrValue;p.atrTrailPct=a.atrTrailPct;}}
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit});
     if(p&&['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId)&&!ev.strategy.sellConfirmed){
@@ -1265,6 +1275,12 @@ async function evaluateSymbol(s){
       ev.wyckoffTrade=null;
       ev.buyReason=tradeControl.paused?'TRADING_PAUSED':'WAIT_NEW_WYCKOFF_SIGNAL';
       if(ev.strategy)ev.strategy.buyConfirmed=false;
+    }
+    if(!p&&ev.entryConfirmed){
+      const quality=assessQualityEntry(s,await candles(s),{estimatedCostPct:ENTRY_COST_OPTIONS.feePct*2+ENTRY_COST_OPTIONS.bufferPct});
+      ev.entryFilters=quality;
+      if(!quality.ok){ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';ev.buyReason=quality.code;ev.wyckoffTrade=null;ev.strategy.buyConfirmed=false;}
+      else Object.assign(ev.wyckoffTrade,quality.policy,{entryQuality:quality});
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource='5M_CONFIRMED_WITH_LIVE_EXECUTION';
@@ -2109,6 +2125,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{
       mode,
+      netJournal:{live:buildNetTradeJournal(liveActionLog),demo:buildNetTradeJournal(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[])},
       demo:(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).slice(0,100),
       live:(liveActionLog||[]).slice(0,100)
     });
@@ -2236,6 +2253,7 @@ const server=http.createServer((req,res)=>{
         decisionIntervalMs:DECISION_INTERVAL_MS,
         rsiExitEnabled:true,
         rsiPeriod:14,
+        qualityPolicy:QUALITY_POLICY,
         strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
