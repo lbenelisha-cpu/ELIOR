@@ -636,6 +636,7 @@ function drawCandles(candles){
   put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
   put('#positionSellPrice',sellLevel?priceText(sellLevel.price):'—');
   if(sellLevel)vals.push(sellLevel.price);
+  if(heldNow)for(const value of [selectedPosition.entryPrice,selectedPosition.peakPrice])if(Number(value)>0&&Number.isFinite(Number(value)))vals.push(Number(value));
   put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
   let min=Math.min(...vals),max=Math.max(...vals);
   const span=Math.max(max-min,Math.abs((max+min)/2)*0.002,1e-12)*priceRangeScale;
@@ -683,10 +684,24 @@ function drawCandles(candles){
   });
   ctx.stroke();
 
-  if(sellLevel&&sellLevel.price>=min&&sellLevel.price<=max){
-    const yy=y(sellLevel.price);ctx.save();ctx.strokeStyle='#ffbd59';ctx.fillStyle='#ffbd59';ctx.lineWidth=2;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.setLineDash([]);ctx.textAlign='left';ctx.fillText('סף מכירה '+fmt(sellLevel.price,priceDigits),left+8,yy-7);ctx.restore();
+  const priceLevels=[
+    {price:heldNow?Number(selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
+    {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
+    {price:sellLevel?.price,label:'סף מכירה',color:'#ffbd59'}
+  ].filter(level=>Number.isFinite(level.price)&&level.price>0);
+  ctx.restore();
+  const labelRows=[];
+  for(const level of priceLevels){
+    const yy=y(level.price),inside=yy>=top&&yy<=top+ch;
+    if(inside){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();ctx.strokeStyle=level.color;ctx.lineWidth=1.5;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.restore();}
+    let labelY=Math.max(top+14,Math.min(top+ch-10,yy-8));
+    while(labelRows.some(row=>Math.abs(row-labelY)<19)&&labelY<top+ch-20)labelY+=20;
+    if(labelRows.some(row=>Math.abs(row-labelY)<19))labelY=Math.max(top+14,labelY-40);
+    labelRows.push(labelY);
+    const text=level.label+' '+fmt(level.price,priceDigits)+(inside?'':' · מחוץ לטווח');
+    ctx.save();ctx.font='12px Arial';ctx.textAlign='left';ctx.fillStyle='#081522';ctx.fillRect(left+4,labelY-14,Math.min(cw-8,ctx.measureText(text).width+12),19);ctx.fillStyle=level.color;ctx.fillText(text,left+10,labelY);ctx.restore();
   }
-
+  ctx.save();
   ctx.restore();
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
