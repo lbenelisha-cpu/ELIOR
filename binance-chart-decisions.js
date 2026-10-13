@@ -92,24 +92,25 @@ function latestWyckoffSetup(rows){
 function renderWyckoffPivots(view,rows,step,left,y,digits){
  const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
  const setup=latestWyckoffSetup(rows);if(!setup)return;
- const occupied=[],width=root.clientWidth,height=root.clientHeight;
+ const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
  for(const [key,label] of points){
   const p=setup[key];if(!p||!(Number(p.price)>0))continue;
   const index=view.findIndex(c=>Number(p.time)>=Number(c.openTime)&&Number(p.time)<=Number(c.closeTime));if(index<0)continue;
   const button=document.createElement('button');button.type='button';button.className='wyckoff-pivot';
   const anchorX=left+step*(index+.5),anchorY=y(Number(p.price));
-  const labelX=Math.max(66,Math.min(width-66,anchorX));
-  let labelY=Math.max(105,Math.min(height-58,anchorY-38));
-  for(let attempt=0;attempt<12&&occupied.some(box=>Math.abs(box.x-labelX)<132&&Math.abs(box.y-labelY)<36);attempt++)labelY=Math.max(105,Math.min(height-58,anchorY-38+(attempt+1)*38));
-  occupied.push({x:labelX,y:labelY});
+  const slot=points.findIndex(point=>point[0]===key);
+  const labelX=key==='confirmation'?anchorX:12+(width-24)*(slot+.5)/5;
+  const labelY=key==='confirmation'?anchorY:height-28;
+  if(key==='confirmation')button.classList.add('confirmation-pivot');
+  else button.style.width=Math.max(36,(width-24)/5-10)+'px';
   const connector=document.createElement('span');connector.className='wyckoff-connector';
   connector.style.left=anchorX+'px';connector.style.top=anchorY+'px';
   connector.style.width=Math.hypot(labelX-anchorX,labelY-anchorY)+'px';
   connector.style.transform='rotate('+Math.atan2(labelY-anchorY,labelX-anchorX)+'rad)';root.append(connector);
   const dot=document.createElement('span');dot.className='wyckoff-anchor';dot.style.left=anchorX+'px';dot.style.top=anchorY+'px';root.append(dot);
   button.style.left=labelX+'px';button.style.top=labelY+'px';
-  button.textContent=label;button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+  button.textContent=key==='confirmation'?'✓':label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
   button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
  }
 }
