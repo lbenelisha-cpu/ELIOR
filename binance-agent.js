@@ -20,6 +20,7 @@ let currentLiveAccount=null;
 let currentVisibleAgents=[];
 let selectedInterval='5m';
 let selectedRange='1W';
+let chartVisibleStartTime=0;
 let activeView='trade';
 let demoTradingEnabled=false;
 let tradeControlToken=null;
@@ -545,12 +546,13 @@ async function loadChart(symbol){
   try{
     $('#chartEmpty')?.classList.add('hidden');
     const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
-    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+(selectedInterval==='5m'?'עד שבוע':'טווח '+selectedRange)+' · MA200');
+    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+('טווח '+({'1D':'יום','2D':'יומיים','3D':'3 ימים','4D':'4 ימים','5D':'5 ימים','1W':'שבוע'}[selectedRange]||selectedRange))+' · MA200');
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
     if(chartAnalysisContext!==contextKey){
       put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
       chartAnalysisContext=contextKey;
     }
+    chartVisibleStartTime=Number(d.visibleStartTime)||0;
     chartCandles=d.candles||[];
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
     drawCandles(chartCandles);
@@ -593,12 +595,11 @@ function drawCandles(candles){
     return sum/200;
   });
 
-  let start=Math.max(0,candles.length-120);
-  const confirmedSetup=latestWyckoffSetup(chartDecisions);
-  const peakIndex=confirmedSetup?.initialPeak?.time?candles.findIndex(c=>Number(confirmedSetup.initialPeak.time)>=Number(c.openTime)&&Number(confirmedSetup.initialPeak.time)<=Number(c.closeTime)):-1;
-  if(peakIndex>=0)start=Math.min(start,Math.max(0,peakIndex-3));
+  const firstVisible=candles.findIndex(c=>Number(c.closeTime)>=chartVisibleStartTime);
+  const start=firstVisible<0?candles.length:firstVisible;
   const view=candles.slice(start);
   const viewMas=mas.slice(start);
+  if(!view.length)return;
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   let min=Math.min(...vals),max=Math.max(...vals);
@@ -610,7 +611,7 @@ function drawCandles(candles){
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
-  const body=Math.max(2,Math.min(7,step*.55));
+  const body=Math.max(.5,Math.min(7,step*.55));
 
   ctx.font='11px Arial';
   ctx.strokeStyle='rgba(120,145,170,.18)';
