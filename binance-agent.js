@@ -629,6 +629,12 @@ function drawCandles(candles){
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
+  const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
+  const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
+  const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
+  put('#positionEntryPrice',heldNow?priceText(selectedPosition.entryPrice):'—');
+  put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
+  put('#positionSellPrice',sellLevel?priceText(sellLevel.price):'—');
   if(sellLevel)vals.push(sellLevel.price);
   put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
   let min=Math.min(...vals),max=Math.max(...vals);
