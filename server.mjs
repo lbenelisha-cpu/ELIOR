@@ -2165,7 +2165,7 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-agent'&&req.method==='GET'){
     const statsActions=mode==='live'?liveActionLog:DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[];
-    const wyckoffStats={...tradeCounts(statsActions),scope:'available_execution_journal'};
+    const wyckoffStats={...tradeCounts(statsActions,{dustThresholdUsdt:mode==='live'?5:1}),scope:'available_execution_journal'};
     return send(res,{
       wyckoffStats,
       mode,
