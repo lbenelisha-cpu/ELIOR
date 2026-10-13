@@ -1239,7 +1239,10 @@ async function evaluateSymbol(s){
     if(ev.wyckoffTrade)ev.wyckoffTrade.marketRank=marketRanks.get(s)??null;
     ev.analysisSignal=ev.entryConfirmed===true;
     ev.analysisReason=ev.buyReason;
-    if(!p && (tradeControl.paused || (tradeControl.resumedAt && Number(ev.strategy?.wyckoff?.signalTime||0)<=Date.parse(tradeControl.resumedAt)))){
+    const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
+    const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&a.type==='SELL').map(a=>Date.parse(a.at)).filter(Number.isFinite));
+    const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
+    if(!p && (tradeControl.paused || (entryBoundary>0 && Number(ev.strategy?.wyckoff?.signalTime||0)<=entryBoundary))){
       ev.entryConfirmed=false;
       ev.entryEligible=false;
       ev.rawDecision='HOLD';
