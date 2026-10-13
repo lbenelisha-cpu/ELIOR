@@ -92,6 +92,16 @@ function latestWyckoffSetup(rows){
 function renderWyckoffPivots(view,rows,step,left,y,digits){
  const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
  const setup=latestWyckoffSetup(rows);if(!setup)return;
+ const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
+ const strategy=agent?.strategy?.wyckoff||agent?.strategy||{};
+ const active=agent?.buyQualified===true&&agent?.entryConfirmed===true&&agent?.position!=='LONG'&&
+  strategy.patternId===setup.patternId&&Number(strategy.signalTime)===Number(setup.signalTime)&&
+  Date.now()-Date.parse(agent.lastDecisionAt)>=0&&Date.now()-Date.parse(agent.lastDecisionAt)<20000;
+ root.dataset.active=String(active);
+ const status=document.createElement('span');status.className='wyckoff-setup-status';
+ const at=Number(setup.signalTime||setup.confirmation?.time);
+ status.textContent=(active?'אישור כניסה פעיל':'תבנית היסטורית — האישור אינו פעיל')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
+ root.append(status);
  const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
  for(const [key,label] of points){
