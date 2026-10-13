@@ -41,3 +41,25 @@ test('5m fills retain targets, count trades, exit and cannot buy the same patter
   x.prices.BTC=100;await x.trader.cycle([ev]);assert.equal(x.orders.length,2);
  }finally{x.close();}
 });
+test('pending signal survives three additional closed bars and then expires',()=>{
+ const extend=n=>[...bars,...Array.from({length:n},(_,i)=>({openTime:now+i*step,closeTime:now+(i+1)*step-1,open:82,high:83,low:81,close:82,timeframe:'5m',closed:true}))];
+ const original=evaluateWyckoff(bars,{now,timeframe:'5m'});
+ for(let n=1;n<=3;n++){
+  const time=now+n*step;
+  const ev=evaluateDailyTrade({symbol:'PENDINGUSDT',bars:extend(n),price:82,priceAsOf:new Date(time).toISOString(),now:time,timeframe:'5m'});
+  assert.equal(ev.entryConfirmed,true);assert.equal(ev.strategy.patternId,original.patternId);assert.equal(ev.strategy.signalTime,original.signalTime);
+  assert.equal(evaluateDailyTrade({symbol:'USEDUSDT',bars:extend(n),price:82,priceAsOf:new Date(time).toISOString(),now:time,timeframe:'5m',usedPatternIds:[original.patternId]}).entryConfirmed,false);
+ }
+ assert.equal(evaluateWyckoff(extend(4),{now:now+4*step,timeframe:'5m'}).buyConfirmed,false);
+ for(const change of [{low:77},{high:107}]){
+  const data=extend(2);Object.assign(data[bars.length],change);
+  assert.equal(evaluateWyckoff(data,{now:now+2*step,timeframe:'5m'}).buyConfirmed,false);
+ }
+});
+test('live Spring break or target touch permanently cancels pending pattern in this process',()=>{
+ for(const [symbol,price] of [['BREAKUSDT',77],['TARGETUSDT',107]]){
+  const args={symbol,bars,price,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m'};
+  assert.equal(evaluateDailyTrade(args).buyReason,'WYCKOFF_SIGNAL_INVALIDATED');
+  assert.equal(evaluateDailyTrade({...args,price:82}).entryConfirmed,false);
+ }
+});
