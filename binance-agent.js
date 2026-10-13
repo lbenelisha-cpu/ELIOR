@@ -192,6 +192,7 @@ function render(d,currentMode='demo',liveAccount=null){
   put('#wyckoffBuys',wx.buys??0);
   put('#wyckoffSells',wx.sells??0);
   put('#wyckoffClosed',wx.closed??0);
+  if(currentMode==='live')put('#paperTradesCount',wx.closed??0);
   if(d.paper?.currency)moneyUnit=d.paper.currency;
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){demoTradingEnabled=true;$('#resetPaperBtn')?.classList.add('hidden');if(!d.paper.error)put('#status','דמו Binance · מסחר אוטומטי');}
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){
@@ -273,7 +274,7 @@ function render(d,currentMode='demo',liveAccount=null){
     ].filter(Boolean).join(' ');
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
       <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(a.blocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
-      <td>${fmt(s.price)}</td>
+      <td>${fmt(s.price,Math.abs(Number(s.price))<10?8:4)}</td>
       <td class="${held?pnl.className:''}">${held?pnl.text:'—'}</td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
     </tr>`;
@@ -323,9 +324,9 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
-  put('#chartPrice',s.price?'$'+fmt(s.price):'—');
+  put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
-  put('#chartMA',s.ma?'$'+fmt(s.ma):'—');
+  put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
@@ -419,7 +420,7 @@ async function loadLiveAccount(prefetched=null){
     put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
     put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
     put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
-    put('#paperTradesCount','—');
+    put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
     return a;
@@ -580,6 +581,7 @@ function drawCandles(candles){
   ctx.setTransform(ratio,0,0,ratio,0,0);
   const W=rect.width,H=rect.height;
   ctx.clearRect(0,0,W,H);
+  ctx.direction="ltr";ctx.textAlign="left";
 
   const closes=candles.map(x=>+x.close);
   const mas=candles.map((_,i)=>{
@@ -588,15 +590,20 @@ function drawCandles(candles){
     return sum/200;
   });
 
-  const start=Math.max(0,candles.length-120);
+  let start=Math.max(0,candles.length-120);
+  const confirmedSetup=latestWyckoffSetup(chartDecisions);
+  const peakIndex=confirmedSetup?.initialPeak?.time?candles.findIndex(c=>Number(confirmedSetup.initialPeak.time)>=Number(c.openTime)&&Number(confirmedSetup.initialPeak.time)<=Number(c.closeTime)):-1;
+  if(peakIndex>=0)start=Math.min(start,Math.max(0,peakIndex-3));
   const view=candles.slice(start);
   const viewMas=mas.slice(start);
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   let min=Math.min(...vals),max=Math.max(...vals);
-  const pad=(max-min)*.08||1;min-=pad;max+=pad;
+  const span=Math.max(max-min,Math.abs((max+min)/2)*0.002,1e-12);
+  const mid=(max+min)/2;min=mid-span*.58;max=mid+span*.58;
+  const priceDigits=Math.min(12,Math.max(2,Math.ceil(-Math.log10((max-min)/5))+1));
 
-  const left=18,right=56,top=20,bottom=32;
+  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=94,bottom=48;
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
@@ -610,7 +617,7 @@ function drawCandles(candles){
     const yy=top+ch*i/5;
     ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();
     const price=max-(max-min)*i/5;
-    ctx.fillText(fmt(price,price<1?4:2),W-right+6,yy+4);
+    ctx.fillText(fmt(price,priceDigits),W-right+6,yy+4);
   }
 
   view.forEach((c,i)=>{
@@ -634,16 +641,20 @@ function drawCandles(candles){
   });
   ctx.stroke();
 
-  renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,top,selectedInterval);
+  renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
+  renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
 
-  const labelCount=5;
+  const labelCount=Math.max(2,Math.min(5,Math.floor(cw/150)));
+  ctx.textAlign='center';
   ctx.fillStyle='#7890a8';
   ctx.font='11px Arial';
   for(let i=0;i<labelCount;i++){
     const idx=Math.min(view.length-1,Math.floor(i*(view.length-1)/(labelCount-1)));
     const c=view[idx],x=left+step*idx;
     const d=new Date(c.openTime);
-    ctx.fillText((d.getMonth()+1)+'/'+String(d.getFullYear()).slice(-2),x,H-10);
+    const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d).split(', ');
+    const labelX=Math.max(55,Math.min(W-right-45,x));
+    ctx.fillText(parts[0],labelX,H-24);ctx.fillText(parts[1]||'',labelX,H-9);
   }
 }
 

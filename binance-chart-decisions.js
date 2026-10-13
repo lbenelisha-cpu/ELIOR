@@ -32,18 +32,18 @@ function chartDecisionDetails(group,candles,interval){
   const article=document.createElement('div');article.className='chart-analysis-row';
   const kind=chartDecisionKind(row);
   const label=kind==='fill'?(row.type==='BUY'?'קנייה בפועל':'מכירה בפועל'):kind==='error'?'שגיאת ניתוח':kind==='signal'?'אות כניסה זוהה':'תנאי הכניסה לא הושלמו';
-  const setup=row.setup||{};
-  const parts=[label+' · '+new Date(row.at).toLocaleString('he-IL')+' · '+String(row.mode||currentMode).toUpperCase(),
-   'מחיר: '+(Number(row.price)>0?fmt(row.price,6):'לא זמין'),
+  const setup=row.setup||row.wyckoffTrade?.setup||{};
+  const parts=[label+' · '+new Date(row.at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})+' · '+String(row.mode||currentMode).toUpperCase(),
+   'מחיר: '+(Number(row.price)>0?fmt(row.price,12):'לא זמין'),
    'סיבה: '+decisionReasonLabel(row.buyReason||row.reason||row.analysisReason),
    'החלטה: '+decisionLabel(row.decision||row.type||'HOLD')+' · '+(row.checks||1)+' בדיקות'];
-  if(row.firstAt&&row.firstAt!==row.at)parts.push('הבדיקה הראשונה בקבוצה: '+new Date(row.firstAt).toLocaleString('he-IL'));
+  if(row.firstAt&&row.firstAt!==row.at)parts.push('הבדיקה הראשונה בקבוצה: '+new Date(row.firstAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}));
   if(row.analysisReason&&row.analysisReason!==row.buyReason)parts.push('תוצאת הניתוח לפני חסימת המסחר: '+decisionReasonLabel(row.analysisReason));
   for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['springLow','שפל שני']]){
-   const value=setup[key]?.price;if(Number(value)>0)parts.push(label+': '+fmt(value,6));
+   const value=setup[key]?.price;if(Number(value)>0)parts.push(label+': '+fmt(value,12));
   }
   if(setup.phase)parts.push('שלב: '+decisionReasonLabel(setup.phase));
-  if(Number(row.targetPrice)>0)parts.push('יעד מחיר: '+fmt(row.targetPrice,6));
+  if(Number(row.targetPrice)>0)parts.push('יעד מחיר: '+fmt(row.targetPrice,12));
   if(kind==='signal'){
    if(!['1d','5m'].includes(interval))parts.push('למעקב אחרי האות בחר נרות 5M או 1D.');
    else for(const days of [1,7]){
@@ -58,7 +58,11 @@ function chartDecisionDetails(group,candles,interval){
 function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,interval){
  const colors={signal:'#2bd88a',wait:'#ffbd59',error:'#ff6172',fill:'#8bbdff'};
  const kinds=['signal','wait','error','fill'];
- const groups=groupChartDecisions(view,rows);
+ const rawGroups=groupChartDecisions(view,rows),groups=[];
+ for(const group of rawGroups.sort((a,b)=>a.index-b.index)){
+  const previous=[...groups].reverse().find(g=>g.kind===group.kind);
+  if(['wait','error'].includes(group.kind)&&previous&&(group.index-previous.index)*step<28){previous.rows.push(...group.rows);previous.checks+=group.checks;}else groups.push(group);
+ }
  const buttons=document.querySelector('#chartDecisionMarkers');
  if(!buttons)return;
  buttons.replaceChildren();
@@ -69,7 +73,7 @@ function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,inter
   hits.push({...group,x,y});
   const button=document.createElement('button');button.type='button';button.className='analysis-marker '+group.kind;
   const labels={signal:'אות אושר',wait:'ממתין',error:'שגיאה',fill:'עסקה בוצעה'};
-  button.textContent=new Date(view[group.index].openTime).toLocaleDateString('he-IL')+' · '+labels[group.kind]+' · '+group.checks;
+  button.textContent=new Date(view[group.index].openTime).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})+' · '+labels[group.kind]+' · '+group.checks;
   button.onclick=()=>chartDecisionDetails(group,allCandles,interval);buttons.append(button);
  }
  if(!groups.length)buttons.textContent='אין בדיקות שמורות בטווח הנרות המוצג. ההיסטוריה הישנה אינה משוחזרת.';
@@ -79,4 +83,22 @@ function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,inter
   const nearest=hits.filter(h=>Math.hypot(h.x-x,h.y-y)<=16).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];
   if(nearest)chartDecisionDetails(nearest,allCandles,interval);
  };
+}
+
+function latestWyckoffSetup(rows){
+ const candidates=rows.filter(r=>(r.analysisSignal===true||r.entryConfirmed===true||r.type==='BUY')&&(r.setup?.springLow||r.wyckoffTrade?.setup?.springLow)).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
+ return candidates[0]?.setup||candidates[0]?.wyckoffTrade?.setup||null;
+}
+function renderWyckoffPivots(view,rows,step,left,y,digits){
+ const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
+ const setup=latestWyckoffSetup(rows);if(!setup)return;
+ const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
+ for(const [key,label] of points){
+  const p=setup[key];if(!p||!(Number(p.price)>0))continue;
+  const index=view.findIndex(c=>Number(p.time)>=Number(c.openTime)&&Number(p.time)<=Number(c.closeTime));if(index<0)continue;
+  const button=document.createElement('button');button.type='button';button.className='wyckoff-pivot';
+  button.style.left=(left+step*(index+.5))+'px';button.style.top=y(Number(p.price))+'px';
+  button.textContent=label;button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+  button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
+ }
 }

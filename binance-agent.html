@@ -80,9 +80,9 @@
     </section>
 
     <section class="account-strip" aria-label="מונה עסקאות וויקוף">
-      <article><span>וויקוף · קניות שבוצעו</span><strong id="wyckoffBuys">0</strong></article>
-      <article><span>וויקוף · מכירות שבוצעו</span><strong id="wyckoffSells">0</strong></article>
-      <article><span>וויקוף · עסקאות שנסגרו</span><strong id="wyckoffClosed">0</strong></article>
+      <article><span>קניות שבוצעו</span><strong id="wyckoffBuys">0</strong></article>
+      <article><span>מכירות שבוצעו</span><strong id="wyckoffSells">0</strong></article>
+      <article><span>עסקאות שנסגרו</span><strong id="wyckoffClosed">0</strong></article>
     </section>
 
     <section id="liveAccountCard" class="panel live-panel hidden">
@@ -174,6 +174,7 @@
         </details>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
+          <div id="wyckoffPivots" class="wyckoff-pivots"></div>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
@@ -182,7 +183,8 @@
         <p class="mini">RSI: קווים ב־30 ו־70 · ROC: שינוי באחוזים לעומת 12 נרות קודם · לתצוגה בלבד.</p>
         <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
-          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; מוצגים 120 הנרות האחרונים. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
+          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; נקודות מהבהבות מציגות את תבנית האישור האחרונה; מוצגים 120 הנרות האחרונים, או טווח רחב יותר כדי לכלול את נקודות האישור. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
+          <p class="mini">מוני העסקאות מבוססים על היומן הזמין. שארית מתחת לסף המתועד אינה פוזיציה פעילה.</p>
           <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
           <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
         </div>
