@@ -192,6 +192,9 @@ function render(d,currentMode='demo',liveAccount=null){
   put('#wyckoffBuys',wx.buys??0);
   put('#wyckoffSells',wx.sells??0);
   put('#wyckoffClosed',wx.closed??0);
+  const fees=wx.fees;
+  put('#tradeFeesTotal',fees?fmt(fees.totalUsdt,4)+' USDT'+(fees.complete?'':' · חלקי'):'—');
+  put('#tradeFeesDetails',fees?'קנייה: '+fmt(fees.buyUsdt,4)+' · מכירה: '+fmt(fees.sellUsdt,4)+' USDT · לפי היומן הזמין'+(fees.missingRecords?' · '+fees.missingRecords+' רשומות ללא נתוני עמלה':'')+Object.entries(fees.unvalued||{}).map(([asset,amount])=>' · טרם הומר: '+fmt(amount,8)+' '+asset).join(''):'ממתין לנתוני עמלות מהשרת');
   if(currentMode==='live')put('#paperTradesCount',wx.closed??0);
   if(d.paper?.currency)moneyUnit=d.paper.currency;
   if(d.paper?.source==='BINANCE_DEMO_SPOT'){demoTradingEnabled=true;$('#resetPaperBtn')?.classList.add('hidden');if(!d.paper.error)put('#status','דמו Binance · מסחר אוטומטי');}
