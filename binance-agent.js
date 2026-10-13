@@ -603,7 +603,7 @@ function drawCandles(candles){
   const mid=(max+min)/2;min=mid-span*.58;max=mid+span*.58;
   const priceDigits=Math.min(12,Math.max(2,Math.ceil(-Math.log10((max-min)/5))+1));
 
-  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=94,bottom=48;
+  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=94,bottom=112;
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
@@ -654,7 +654,7 @@ function drawCandles(candles){
     const d=new Date(c.openTime);
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d).split(', ');
     const labelX=Math.max(55,Math.min(W-right-45,x));
-    ctx.fillText(parts[0],labelX,H-24);ctx.fillText(parts[1]||'',labelX,H-9);
+    ctx.fillText(parts[0],labelX,H-86);ctx.fillText(parts[1]||'',labelX,H-71);
   }
 }
 
