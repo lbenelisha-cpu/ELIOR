@@ -353,6 +353,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
 function blockerLabel(b){
   if(!b)return '—';
   if(typeof b==='string')return b;
+  if(['WAIT_STABLECOIN','WAIT_MOVEMENT','WAIT_VOLUME','WAIT_HOURLY_TREND','WAIT_QUALITY_DATA'].includes(b.code))return decisionReasonLabel(b.code);
   return b.text||b.code||'—';
 }
 
@@ -378,6 +379,11 @@ function decisionReasonLabel(r){
     WAIT_CURRENT_5M_HISTORY:'ממתין להיסטוריית 5 דקות עדכנית',
     FIVE_MINUTE_TIMEFRAME_REQUIRED:'חסרים נרות רציפים של 5 דקות',
     TRADING_PAUSED:'מסחר עצור · אין קניות חדשות',
+    WAIT_STABLECOIN:'מטבע יציב — אינו מועמד למסחר',
+    WAIT_MOVEMENT:'תנועה חלשה ביחס לעלויות',
+    WAIT_VOLUME:'ממתין לאישור מחזור מסחר',
+    WAIT_HOURLY_TREND:'ממתין למגמה עולה בנרות שעה',
+    WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאות וויקוף חדש לאחר חידוש המסחר',
     HOLD:'HOLD',
     ERROR:'שגיאה'
@@ -392,6 +398,8 @@ async function loadActionJournal(currentModeArg){
   try{
     const d=await J(ACTIONLOG);
     const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
+    const journal=d.netJournal?.[currentModeArg]||[];
+    const netPanel=$('#netTradeJournal');if(netPanel)netPanel.innerHTML=journal.length?journal.slice(0,30).map(t=>'<div><b>'+t.symbol+' · '+(t.closed?'נסגרה':'מכירה חלקית')+'</b><div>'+tradeExecutionTime(t.at)+' · קנייה '+fmt(t.entryPrice,12)+' → מכירה '+fmt(t.sellPrice,12)+'</div><div class="'+(t.netPnlUsdt===null?'pnl-unknown':t.netPnlUsdt>=0?'pnl-profit':'pnl-loss')+'">רווח נטו: '+(t.netPnlUsdt===null?'חסרים נתוני עלות / עמלות':fmt(t.netPnlUsdt,4)+' USDT ('+fmt(t.netPnlPct)+'%)')+'</div><div>שיא רווח לפני עמלות: '+fmt(t.maxGrossPnlUsdt,4)+' USDT · שיא מחיר '+fmt(t.peakPrice,12)+'</div><div>עמלת קנייה: '+commissionsText(t.buyCommissions)+' · עמלת מכירה: '+commissionsText(t.sellCommissions)+'</div><div>סיבה: '+decisionReasonLabel(t.reason)+'</div></div>').join(''):'אין עסקאות עם עלות כניסה מתועדת';
     put('#actionJournalTitle','יומן פעולות · '+(currentModeArg==='live'?'LIVE':'DEMO'));
     $('#actionJournal').innerHTML=list.length?list.slice(0,30).map(x=>{
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';

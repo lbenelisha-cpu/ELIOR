@@ -7,7 +7,7 @@ import {trackedLivePositions} from '../lib/wyckoff-live-positions.mjs';
 import '../binance-indicators.js';
 const now=1800000000000;
 const bars=prices=>prices.map((close,i)=>({close,closeTime:now-(prices.length-1-i)*300000,closed:true}));
-const down=bars([...Array.from({length:16},(_,i)=>100+i),114]);
+const down=bars([...Array.from({length:16},(_,i)=>100+i),114,112]);
 const entryAt=new Date(now-600000).toISOString();
 test('falling Wilder RSI matches chart calculation and exits',()=>{const r=binanceRsiExit(down,{entryAt,now});const expected=globalThis.BinanceIndicators.calculateIndicators(down).rsi;assert.equal(r.sell,true);assert.equal(r.reason,'BINANCE_RSI_14_FALLING');assert.equal(r.current,expected.at(-1));assert.equal(r.previous,expected.at(-2));});
 test('flat or non-declining RSI does not sell',()=>{for(const prices of [Array(20).fill(100),Array.from({length:20},(_,i)=>100+i)])assert.equal(binanceRsiExit(bars(prices),{entryAt,now}).sell,false);});
@@ -18,3 +18,4 @@ test('restored live positions retain entry time for RSI causality',()=>{const p=
 const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');const start=source.indexOf("    if(p&&['WYCKOFF_D1_V1'");const end=source.indexOf('\n    if(p){',start);const block=source.slice(start,end);
 test('price protection bypasses candle fetch, and data failure preserves HOLD',async()=>{let calls=0;for(const alreadySell of [true,false]){const ev={rawDecision:alreadySell?'SELL':'HOLD',strategy:{sellConfirmed:alreadySell}};const ctx={p:{strategyId:'WYCKOFF_5M_V1',entryAt},ev,s:'BTCUSDT',binanceRsiExit,candles:async()=>{calls++;throw Error('network');}};vm.createContext(ctx);await vm.runInContext('(async()=>{'+block+'})()',ctx);assert.equal(ev.rawDecision,alreadySell?'SELL':'HOLD');}assert.equal(calls,1);});
 test('same server evaluation emits RSI SELL for demo and live callers',async()=>{const ev={rawDecision:'HOLD',strategy:{sellConfirmed:false}};const ctx={p:{strategyId:'WYCKOFF_5M_V1',entryAt},ev,s:'BTCUSDT',binanceRsiExit:(r,o)=>binanceRsiExit(r,{...o,now}),candles:async()=>down};vm.createContext(ctx);await vm.runInContext('(async()=>{'+block+'})()',ctx);assert.equal(ev.rawDecision,'SELL');assert.equal(ev.strategy.exitReason,'BINANCE_RSI_14_FALLING');assert.equal(ev.strategy.sellConfirmed,true);});
+test('one falling RSI candle does not sell under the less sensitive policy',()=>{const one=bars([...Array.from({length:16},(_,i)=>100+i),112]);assert.equal(binanceRsiExit(one,{entryAt,now}).sell,false);});
