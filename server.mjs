@@ -1,6 +1,6 @@
 import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy,assessQualityEntry} from './lib/binance-quality-policy.mjs';
 import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
-import {observePositionPeak,confirmedRsiExit} from './lib/position-high-water.mjs';
+import {observePositionPeak} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
 import {tradeCounts,tradeFeeTotals} from './lib/trade-counts.mjs';
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
@@ -13,7 +13,6 @@ import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/bina
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
-import {binanceRsiExit} from './lib/binance-rsi-exit.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
@@ -736,8 +735,7 @@ async function executeLiveCycle(evals){
     saved.marketRank=marketRanks.get(ev.symbol)??null;
     let price;try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
     observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
-    const priceExit=wyckoffExit(saved,price);
-    const exit=priceExit.sell?priceExit:confirmedRsiExit(ev,saved)?{sell:true,reason:'BINANCE_RSI_14_FALLING'}:priceExit;
+    const exit=wyckoffExit(saved,price);
     persistLivePeak(ev.symbol,saved);
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
@@ -1246,16 +1244,7 @@ async function evaluateSymbol(s){
     if(p?.atrEnabled){const a=atrPolicy(atr14(await candles(s)),Number(streams[s]?.lastPrice));if(a){p.atrValue=a.atrValue;p.atrTrailPct=a.atrTrailPct;}}
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit});
-    if(p&&['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId)&&!ev.strategy.sellConfirmed){
-      try{
-        const rsi=binanceRsiExit(await candles(s),{entryAt:p.entryAt});
-        ev.strategy.rsiExit=rsi;
-        if(rsi.sell){
-          ev.rawDecision='SELL';ev.buyReason=rsi.reason;
-          ev.strategy.sellConfirmed=true;ev.strategy.exitReason=rsi.reason;
-        }
-      }catch(error){ev.strategy.rsiExit={sell:false,reason:'RSI_DATA_UNAVAILABLE'};}
-    }
+
     if(p){
       if(mode==='live')persistLivePeak(s,p);
       else if(DEMO_TRADING)demoTrader.save();
@@ -1349,7 +1338,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא או RSI (14) יורד — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'חצייה מעל השפל הראשון אושרה בנר 5 דקות סגור'};
@@ -1834,10 +1823,6 @@ setInterval(async()=>{
       try{
         const price=requireLivePrice(streams[symbol],Date.now(),15000);
         const ev=evaluateDailyTrade({symbol,bars:[],price,priceAsOf:streams[symbol].lastEventAt,position:p,timeframe:'5m',exitEvaluator:wyckoffExit});
-        const cached={rawDecision:'SELL',strategy:agents[symbol]?.strategy};
-        if(!ev.strategy.sellConfirmed&&confirmedRsiExit(cached,p)){
-          ev.rawDecision='SELL';ev.strategy.sellConfirmed=true;ev.strategy.exitReason='BINANCE_RSI_14_FALLING';ev.strategy.rsiExit=cached.strategy.rsiExit;
-        }
         return ev;
       }catch(error){return {ok:false,symbol,error:error.message};}
     }));}catch(e){console.error('LIVE exit monitor failed',e.message);}
@@ -2251,7 +2236,7 @@ const server=http.createServer((req,res)=>{
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
         decisionIntervalMs:DECISION_INTERVAL_MS,
-        rsiExitEnabled:true,
+        rsiExitEnabled:false,
         rsiPeriod:14,
         qualityPolicy:QUALITY_POLICY,
         strategyDiagnostics,
