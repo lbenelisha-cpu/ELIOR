@@ -4,9 +4,9 @@ import {evaluateWyckoff,createWyckoffTrade,wyckoffExit} from '../lib/wyckoff-str
 import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
 import {loadFiveMinuteBars} from '../lib/wyckoff-five-minute-data.mjs';
 import {setup} from './wyckoff-demo-helper.mjs';
-const prices=[100,90,80,85,92,87,82,84,86,85,86,78,79,80,81];
+const prices=[95,97,100,90,80,85,92,87,82,84,86,85,86,78,79,80,81];
 const step=300000,now=Date.UTC(2026,9,10,12);
-const bars=prices.map((close,i)=>({openTime:now-(prices.length-i)*step,closeTime:now-(prices.length-i-1)*step-1,open:close,high:close,low:close,close,timeframe:'5m',closed:true}));
+const bars=prices.map((close,i)=>({openTime:now-(prices.length-i)*step,closeTime:now-(prices.length-i-1)*step-1,open:i<2?close-1:close,high:close,low:i<2?close-1:close,close,timeframe:'5m',closed:true}));
 test('5m sequence is causal, uses wick pivots and has a separate saved trade identity',()=>{
  const before=evaluateWyckoff(bars.slice(0,-1),{now,timeframe:'5m'});assert.equal(before.buyConfirmed,false);
  const s=evaluateWyckoff(bars,{now,timeframe:'5m'});assert.equal(s.buyConfirmed,true);assert.equal(s.firstLow.price,80);
@@ -17,7 +17,7 @@ test('incomplete, gapped, wrong-timeframe and stale bars cannot confirm a new 5m
  const args={symbol:'BTCUSDT',bars,price:81,priceAsOf:new Date(now).toISOString(),timeframe:'5m',now};
  assert.equal(evaluateDailyTrade(args).entryConfirmed,true);
  assert.equal(evaluateDailyTrade({...args,now:now+step,priceAsOf:new Date(now+step).toISOString()}).buyReason,'STALE_5M_SIGNAL');
- for(const invalid of [bars.slice(1).filter((_,i)=>i!==4),bars.map(x=>({...x,timeframe:'1d'})),bars.map((x,i)=>i===14?{...x,closed:false}:x)])assert.throws(()=>evaluateWyckoff(invalid,{timeframe:'5m',now}));
+ for(const invalid of [bars.slice(1).filter((_,i)=>i!==4),bars.map(x=>({...x,timeframe:'1d'})),bars.map((x,i)=>i===prices.length-1?{...x,closed:false}:x)])assert.throws(()=>evaluateWyckoff(invalid,{timeframe:'5m',now}));
  const trade=createWyckoffTrade(evaluateWyckoff(bars,{timeframe:'5m',now}),81);
  assert.equal(evaluateDailyTrade({...args,usedPatternIds:[trade.patternId]}).entryConfirmed,false);
 });
@@ -62,4 +62,27 @@ test('live Spring break or target touch permanently cancels pending pattern in t
   assert.equal(evaluateDailyTrade(args).buyReason,'WYCKOFF_SIGNAL_INVALIDATED');
   assert.equal(evaluateDailyTrade({...args,price:82}).entryConfirmed,false);
  }
+});
+test('5m initial peak requires two strictly preceding closed green candles',()=>{
+ const valid=evaluateWyckoff(bars,{now,timeframe:'5m'});
+ assert.equal(valid.buyConfirmed,true);
+ assert.equal(valid.minGreenBeforePeak,2);
+ assert.equal(valid.initialPeak.index,2);
+ for(const variant of ['red','doji','missing']){
+  const changed=bars.map(b=>({...b}));
+  if(variant==='red'){changed[0].open=changed[0].close+1;changed[0].high=changed[0].open;}
+  if(variant==='doji')changed[0].open=changed[0].close;
+  if(variant==='missing')delete changed[0].open;
+  assert.equal(evaluateWyckoff(changed,{now,timeframe:'5m'}).buyConfirmed,false,variant);
+ }
+ // The peak candle itself cannot substitute for a missing preceding green candle.
+ const peakGreen=bars.map(b=>({...b}));peakGreen[0].open=peakGreen[0].close;peakGreen[2].open=peakGreen[2].close-1;peakGreen[2].low=peakGreen[2].open;
+ assert.equal(evaluateWyckoff(peakGreen,{now,timeframe:'5m'}).buyConfirmed,false);
+});
+test('5m peak qualification is causal for every historical prefix',()=>{
+ for(let i=3;i<=bars.length;i++){
+  const result=evaluateWyckoff(bars.slice(0,i),{now:bars[i-1].closeTime,timeframe:'5m'});
+  if(result.initialPeak){const k=result.initialPeak.index;assert.ok(k>=2);assert.ok(bars[k-1].close>bars[k-1].open);assert.ok(bars[k-2].close>bars[k-2].open);}
+ }
+ assert.throws(()=>evaluateWyckoff(bars,{now,timeframe:'5m',minGreenBeforePeak:-1}),/INVALID_GREEN_PEAK_COUNT/);
 });
