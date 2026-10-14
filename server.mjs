@@ -1,3 +1,4 @@
+import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
 import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy,assessQualityEntry} from './lib/binance-quality-policy.mjs';
 import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
 import {observePositionPeak} from './lib/position-high-water.mjs';
@@ -499,6 +500,11 @@ const marketRanks=new Map();
 let agents={};
 let streams={};
 let marketSocket=null;
+const MARKET_WATCH_FILE=process.env.BINANCE_MARKET_WATCH_FILE||'/var/data/binance-market-watch.json';
+let watchInitial={};try{watchInitial=JSON.parse(fs.readFileSync(MARKET_WATCH_FILE,'utf8'));}catch{}
+const marketWatch=new MarketWatch({fetchJson:async url=>{const response=await fetch('https://api.binance.com'+url,{signal:AbortSignal.timeout(15000)});if(!response.ok)throw Error('Binance '+response.status);return response.json();},initial:watchInitial,save:state=>{try{fs.mkdirSync(path.dirname(MARKET_WATCH_FILE),{recursive:true});const tmp=MARKET_WATCH_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(state));fs.renameSync(tmp,MARKET_WATCH_FILE);}catch(error){console.error('Market watch persistence failed',error.message);}}});
+setInterval(()=>marketWatch.tick().catch(error=>console.error('Market watch failed',error.message)),1000).unref();
+
 let paper={initialIls:INITIAL,cashIls:INITIAL,positions:{},trades:[],actionLog:[],lastAction:null};
 
 const EXCLUDED_BASES=new Set([...STABLE_BASES,'USDC','FDUSD','TUSD','USDP','DAI','EUR','AEUR','TRY','BRL','GBP','AUD','BIDR','IDRT','UAH','RUB','NGN','ZAR','BUSD']);
@@ -1504,7 +1510,8 @@ async function runEvaluation(){
         score:ev.score,
         entryConfirmed:ev.entryConfirmed===true,
         analysisError:ev.ok?null:(ev.error||'WAIT_DATA'),
-        analysisSignal:ev.analysisSignal===true,
+        entryFilters:ev.entryFilters||null,
+      analysisSignal:ev.analysisSignal===true,
         analysisReason:ev.analysisReason||ev.error||null,
         buyReason:ev.buyReason||null,
         setup:ev.strategy?.wyckoff||null,
@@ -1765,6 +1772,7 @@ async function runEvaluation(){
       score:Number(ev.score||0),
       entryConfirmed:ev.entryConfirmed===true,
       analysisError:ev.ok?null:(ev.error||'WAIT_DATA'),
+      entryFilters:ev.entryFilters||null,
       analysisSignal:ev.analysisSignal===true,
       analysisReason:ev.analysisReason||ev.error||null,
       setup:ev.strategy?.wyckoff||null,
@@ -2121,6 +2129,8 @@ const server=http.createServer((req,res)=>{
     reset();
     return send(res,{ok:true,paper:accountSnapshot()});
   }
+
+  if(u.pathname==='/api/binance-market-watch'&&req.method==='GET')return send(res,{ok:true,watch:marketWatch.snapshot(),recorded:recordedEntryAudit(decisionHistory,{mode})});
 
   if(u.pathname==='/api/binance-decision-history'&&req.method==='GET'){
     const symbol=String(u.searchParams.get('symbol')||'BTCUSDT').toUpperCase();
