@@ -384,7 +384,11 @@ function decisionReasonLabel(r){
     WAIT_VOLUME:'ממתין לאישור מחזור מסחר',
     WAIT_HOURLY_TREND:'ממתין למגמה עולה בנרות שעה',
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
-    WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאות וויקוף חדש לאחר חידוש המסחר',
+    WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
+    WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    WYCKOFF_SPRING_RETEST:'קנייה בחזרה ל־Spring לאחר אישור וויקוף',
+    WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · ירידה של 10% ממחיר הקנייה',
+    WYCKOFF_GAIN_GIVEBACK_20_PERCENT:'מכירה · החזרה של 20% מהעלייה שנצברה',
     HOLD:'HOLD',
     ERROR:'שגיאה'
   })[r]||r||'—';
