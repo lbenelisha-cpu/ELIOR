@@ -1,3 +1,4 @@
+import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
 import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy,assessQualityEntry} from './lib/binance-quality-policy.mjs';
 import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
@@ -756,7 +757,7 @@ async function executeLiveCycle(evals){
     const costs=await checkEntryCost(ev.symbol,spend);
     const quality=costs.ok?assessQualityEntry(ev.symbol,await candles(ev.symbol),{estimatedCostPct:costs.estimatedCostPct}):{ok:false,code:costs.code};
     if(!quality.ok){setAgentFromEval({...ev,entryConfirmed:false,buyQualified:false,buyReason:quality.code},'HOLD','IDLE');continue;}
-    await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade});
+    await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade,kellyPolicyVersion:KELLY_RULESET});
     account=await getLiveAccountSnapshot();
   }
 }
@@ -2114,6 +2115,8 @@ const server=http.createServer((req,res)=>{
       .catch(e=>send(res,{connected:false,error:e.message},502));
     return;
   }
+
+  if(u.pathname==='/api/binance-kelly'&&req.method==='GET')return send(res,{ok:true,live:kellyLearningReport(liveActionLog)});
 
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{
