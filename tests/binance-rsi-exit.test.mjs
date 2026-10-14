@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
 import {binanceRsiExit} from '../lib/binance-rsi-exit.mjs';
 import {trackedLivePositions} from '../lib/wyckoff-live-positions.mjs';
 import '../binance-indicators.js';
@@ -15,7 +14,5 @@ test('pre-entry signal cannot sell a new position',()=>{assert.equal(binanceRsiE
 test('open candle and future candle do not create a sell signal',()=>{const data=bars(Array.from({length:16},(_,i)=>100+i));const open=[...data,{close:1,closeTime:now+300000,closed:false}];assert.equal(binanceRsiExit(open,{entryAt,now}).sell,false);});
 test('missing, stale or gapped bars hold',()=>{assert.equal(binanceRsiExit([],{entryAt,now}).sell,false);assert.equal(binanceRsiExit(down,{entryAt,now:now+300001}).sell,false);assert.equal(binanceRsiExit(down.filter((_,i)=>i!==3),{entryAt,now}).sell,false);assert.equal(binanceRsiExit(down,{now}).sell,false);});
 test('restored live positions retain entry time for RSI causality',()=>{const p=trackedLivePositions([{type:'BUY',symbol:'BTCUSDT',qty:1,price:100,at:entryAt,wyckoffTrade:{strategyId:'WYCKOFF_5M_V1'}}]);assert.equal(p.BTCUSDT.entryAt,entryAt);});
-const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');const start=source.indexOf("    if(p&&['WYCKOFF_D1_V1'");const end=source.indexOf('\n    if(p){',start);const block=source.slice(start,end);
-test('price protection bypasses candle fetch, and data failure preserves HOLD',async()=>{let calls=0;for(const alreadySell of [true,false]){const ev={rawDecision:alreadySell?'SELL':'HOLD',strategy:{sellConfirmed:alreadySell}};const ctx={p:{strategyId:'WYCKOFF_5M_V1',entryAt},ev,s:'BTCUSDT',binanceRsiExit,candles:async()=>{calls++;throw Error('network');}};vm.createContext(ctx);await vm.runInContext('(async()=>{'+block+'})()',ctx);assert.equal(ev.rawDecision,alreadySell?'SELL':'HOLD');}assert.equal(calls,1);});
-test('same server evaluation emits RSI SELL for demo and live callers',async()=>{const ev={rawDecision:'HOLD',strategy:{sellConfirmed:false}};const ctx={p:{strategyId:'WYCKOFF_5M_V1',entryAt},ev,s:'BTCUSDT',binanceRsiExit:(r,o)=>binanceRsiExit(r,{...o,now}),candles:async()=>down};vm.createContext(ctx);await vm.runInContext('(async()=>{'+block+'})()',ctx);assert.equal(ev.rawDecision,'SELL');assert.equal(ev.strategy.exitReason,'BINANCE_RSI_14_FALLING');assert.equal(ev.strategy.sellConfirmed,true);});
+test('server treats RSI as chart-only in evaluation, execution and monitor',()=>{const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');assert.doesNotMatch(source,/binanceRsiExit|confirmedRsiExit|BINANCE_RSI_14_FALLING/);assert.match(source,/rsiExitEnabled:false/);});
 test('one falling RSI candle does not sell under the less sensitive policy',()=>{const one=bars([...Array.from({length:16},(_,i)=>100+i),112]);assert.equal(binanceRsiExit(one,{entryAt,now}).sell,false);});
