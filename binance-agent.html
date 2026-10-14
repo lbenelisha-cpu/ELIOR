@@ -103,6 +103,16 @@
 
     </details>
 
+    <details id="marketWatchDetails" class="panel">
+      <summary>פירוט · כל שוק Spot מול USDT וחסימות כניסה ב־24 שעות</summary>
+      <p data-watch-status aria-live="polite">מעקב נפרד · אינו מרחיב את המסחר האוטומטי.</p>
+      <label>תצוגה <select><option value="recorded">חסימות ואישורים שנרשמו בפועל · 24 שעות</option><option value="replay">שחזור אישורי וויקוף · כללים נוכחיים · 24 שעות</option><option value="latest">מצב אחרון לכל זוג שנבדק</option></select></label>
+      <label>חיפוש נכס <input type="search" placeholder="לדוגמה BTC" aria-label="חיפוש נכס במעקב"></label>
+      <button type="button" data-watch-refresh>רענן דוח</button>
+      <div style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס</th><th>זמן בדיקה</th><th>סיבת המתנה / אישור</th><th>שלב</th><th>מחזור ביחס לממוצע</th></tr></thead><tbody></tbody></table></div>
+      <button type="button" data-watch-more hidden>הצג עוד</button>
+    </details>
+
     <section class="trading-grid">
       <aside class="panel scanner-panel">
         <div class="panel-title-row">
@@ -349,5 +359,6 @@
   <script src="binance-agent.js"></script>
   <script src="binance-agent-portfolio.js"></script>
 <script src="binance-demo-account.js"></script>
+<script src="binance-market-watch.js"></script>
 </body>
 </html>
