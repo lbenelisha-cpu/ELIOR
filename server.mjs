@@ -1,6 +1,6 @@
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
-import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy,assessQualityEntry} from './lib/binance-quality-policy.mjs';
+import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy} from './lib/binance-quality-policy.mjs';
 import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
 import {observePositionPeak} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
@@ -13,7 +13,6 @@ import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade} from './lib/wyckoff-evaluation.mjs';
 import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
-import {assessEntryCost} from './lib/binance-entry-cost.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
@@ -94,15 +93,8 @@ const ENTRY_COST_OPTIONS={
   trailActivatePct:0,exitTrailPct:EXIT_TRAIL_PCT,
   maxCostPctOverride:Number(process.env.BINANCE_ENTRY_MAX_COST_PCT??0.5)
 };
-async function checkEntryCost(symbol,amount){
-  try{
-    const origin=DEMO_TRADING&&mode==='demo'?'https://demo-api.binance.com':'https://api.binance.com';
-    const r=await fetch(origin+'/api/v3/depth?symbol='+encodeURIComponent(symbol)+'&limit=100',{signal:AbortSignal.timeout(5000)});
-    if(!r.ok)throw Error('Depth HTTP '+r.status);
-    const cost=assessEntryCost(await r.json(),amount,ENTRY_COST_OPTIONS);
-    if(cost.ok){const quality=assessQualityEntry(symbol,await candles(symbol),{estimatedCostPct:cost.estimatedCostPct});if(!quality.ok)return {...cost,ok:false,code:quality.code,text:quality.code,quality,checkedAt:new Date().toISOString()};}
-    return {...cost,checkedAt:new Date().toISOString()};
-  }catch{return {ok:false,code:'WAIT_COST_DATA',text:'ממתין לנתוני עומק; הקנייה מושהית'};}
+async function checkEntryCost(){
+  return {ok:true,code:'ENTRY_FILTERS_DISABLED',enabled:false,checkedAt:new Date().toISOString()};
 }
 const entryTrackingState=new Map();
 const livePeakState=new Map();
@@ -754,9 +746,6 @@ async function executeLiveCycle(evals){
     if(held>=LIVE_MAX_POSITIONS)break;
     const spend=Number(account.fixedPositionUsdt||0);
     if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
-    const costs=await checkEntryCost(ev.symbol,spend);
-    const quality=costs.ok?assessQualityEntry(ev.symbol,await candles(ev.symbol),{estimatedCostPct:costs.estimatedCostPct}):{ok:false,code:costs.code};
-    if(!quality.ok){setAgentFromEval({...ev,entryConfirmed:false,buyQualified:false,buyReason:quality.code},'HOLD','IDLE');continue;}
     await placeLiveMarketBuy(ev.symbol,spend,'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade,kellyPolicyVersion:KELLY_RULESET});
     account=await getLiveAccountSnapshot();
   }
@@ -1273,10 +1262,11 @@ async function evaluateSymbol(s){
       if(ev.strategy)ev.strategy.buyConfirmed=false;
     }
     if(!p&&ev.entryConfirmed){
-      const quality=assessQualityEntry(s,await candles(s),{estimatedCostPct:ENTRY_COST_OPTIONS.feePct*2+ENTRY_COST_OPTIONS.bufferPct});
-      ev.entryFilters=quality;
-      if(!quality.ok){ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';ev.buyReason=quality.code;ev.wyckoffTrade=null;ev.strategy.buyConfirmed=false;}
-      else Object.assign(ev.wyckoffTrade,quality.policy,{entryQuality:quality});
+      // Entry filters are disabled; retain ATR parameters solely for existing exit rules.
+      const policy=atrPolicy(atr14(await candles(s)),livePrice);
+      ev.entryFilters={ok:true,code:'ENTRY_FILTERS_DISABLED',enabled:false};
+      if(policy)Object.assign(ev.wyckoffTrade,policy);
+
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource='5M_CONFIRMED_WITH_LIVE_EXECUTION';
@@ -2234,7 +2224,7 @@ const server=http.createServer((req,res)=>{
         entryTriggerPct:ENTRY_TRIGGER_PCT,
         entryMinScore:null,
         entryMaxRunPct:null,
-        entryCostFilter:{enabled:true,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
+        entryCostFilter:{enabled:false,...ENTRY_COST_OPTIONS,feeSource:'CONFIGURED_ESTIMATE'},
         stopLossPct:null,
         trailActivatePct:0,
         exitTrailPct:null,
@@ -2252,6 +2242,7 @@ const server=http.createServer((req,res)=>{
         rsiExitEnabled:false,
         rsiPeriod:14,
         qualityPolicy:QUALITY_POLICY,
+        entryFiltersEnabled:false,
         strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE

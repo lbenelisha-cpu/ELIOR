@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 function allocation(saved=null){
   const files=new Map(saved?[['allocation',JSON.stringify(saved)]]:[]);
-  const context=vm.createContext({LIVE_MAX_POSITIONS:5,LIVE_ALLOCATION_FILE:'allocation',ensureStateDir(){},fs:{
+  const context=vm.createContext({LIVE_MAX_POSITIONS:5,LIVE_ALLOCATION_FILE:'allocation',liveActionLog:[],liveRealizedPnl:()=>0,ensureStateDir(){},fs:{
     existsSync:p=>files.has(p),readFileSync:p=>files.get(p),
     writeFileSync:(p,v)=>files.set(p,v),renameSync:(a,b)=>{files.set(b,files.get(a));files.delete(a);}
   }});
@@ -30,7 +30,7 @@ test('LIVE permits fifth position and rejects sixth while DEMO remains ten',asyn
   const end=source.indexOf('\nasync function getLiveAccountSnapshot',start);
   for(const held of [4,5]){
     const buys=[];let count=held;
-    const context=vm.createContext({mode:'live',LIVE:true,AUTO_EXECUTION:true,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:100,
+    const context=vm.createContext({mode:'live',LIVE:true,AUTO_EXECUTION:true,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:100,KELLY_RULESET:'TEST_RULESET',
       liveTradingGate:()=>({ready:true,withdrawalsEnabled:false}),getApiRestrictions:async()=>({}),
       liveOrders:{recover:async()=>{}},signedBinanceGet(){},recordLiveFill(){},liveActionLog:[],tradeControl:{paused:false},
       getLiveAccountSnapshot:async()=>({balances:Array.from({length:count},(_,i)=>({asset:'HELD'+i,qty:1,valueUsdt:30})),fixedPositionUsdt:30,usdtFree:90}),
