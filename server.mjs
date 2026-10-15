@@ -1,3 +1,4 @@
+import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
 import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy} from './lib/binance-quality-policy.mjs';
@@ -663,7 +664,9 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const activeBalances=funding.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5);
   if(activeBalances.some(b=>b.asset+'USDT'===symbol))throw Error('LIVE position is already held');
   if(activeBalances.length>=LIVE_MAX_POSITIONS)throw Error('No free LIVE position slot');
-  quoteUsdt=Number(funding.fixedPositionUsdt||0);
+  const allocation=liveNextBuyAllocation(funding,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
+  if(!allocation.ok)throw Error('LIVE buy allocation blocked: '+allocation.code);
+  quoteUsdt=allocation.amountUsdt;
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
@@ -762,7 +765,9 @@ async function executeLiveCycle(evals){
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
     const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
     if(held>=LIVE_MAX_POSITIONS)break;
-    const spend=Number(account.fixedPositionUsdt||0);
+    const allocation=liveNextBuyAllocation(account,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
+    if(!allocation.ok)break;
+    const spend=allocation.amountUsdt;
     if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
     await placeLiveMarketBuy(ev.symbol,spend,ev.buyReason||'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade,kellyPolicyVersion:KELLY_RULESET});
     account=await getLiveAccountSnapshot();
@@ -824,7 +829,8 @@ async function getLiveAccountSnapshot(){
     realizedPnlComplete:fixedAllocation?.realizedPnlComplete!==false,
     profitReinvestmentPaused:fixedAllocation?.profitReinvestmentPaused===true,
     allocationWarning:fixedAllocation?.allocationWarning??null,
-    allocationMode:'FIXED_20_PERCENT',
+    allocationMode:'FIXED_EQUAL_LAST_REMAINDER',
+    nextBuyAllocation:liveNextBuyAllocation({balances,usdtFree:usdt.free,fixedPositionUsdt:fixedAllocation?.positionUsdt},{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT}),
     maxPositions:LIVE_MAX_POSITIONS,
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,

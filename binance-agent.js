@@ -31,7 +31,7 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartRequestId=0;
 let chartAnalysisContext=null;
-function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
+function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_CASH:'ממתין למזומן',WAIT_ACCOUNT:'ממתין לנתוני חשבון',WAIT_ALLOCATION:'ממתין להקצאה',WAIT_LIVE_GATE:'מסחר אינו זמין',WAIT_EXECUTION_ERROR:'שגיאת ביצוע',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
 function commissionsText(fees){
   if(!Array.isArray(fees))return 'לא תועדו';
@@ -153,18 +153,29 @@ function buyReasonLabel(r){
   })[r]||r||'—';
 }
 
-function decisionFor(a,isHeld,activeCount,maxPositions,weakestActive,rotationGap,isLive){
+function liveEntryStatus(a,account,maxPositions){
+  const waiting=(decision,code,text)=>({decision,blocker:{code,text}});
+  if(a.entryConfirmed!==true||a.entryEligible===false)return {decision:'HOLD',blocker:a.blocker};
+  if(!account?.connected)return waiting('WAIT_ACCOUNT','WAIT_ACCOUNT','וויקוף אושר · ממתין לנתוני יתרה והרשאות עדכניים');
+  if(!account.tradingGate?.ready||account.tradingGate.withdrawalsEnabled)return waiting('WAIT_LIVE_GATE','WAIT_LIVE_GATE','וויקוף אושר · מסחר LIVE אינו זמין לפי הרשאות החשבון');
+  const held=(account.balances||[]).filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
+  if(held>=maxPositions)return waiting('WAIT_NO_SLOT','NO_SLOT','וויקוף אושר · אין מקום פנוי לפוזיציה נוספת');
+  const plan=account.nextBuyAllocation;
+  const spend=Number(plan?.amountUsdt??account.fixedPositionUsdt),cash=Number(account.usdtFree);
+  if(plan?.code==='LIVE_ORDER_LIMIT')return waiting('WAIT_ALLOCATION','LIVE_ORDER_LIMIT','יתרת הפוזיציה האחרונה חורגת ממגבלת סכום הקנייה שהוגדרה');
+  if(!Number.isFinite(spend)||spend<5)return waiting('WAIT_ALLOCATION',plan?.code||'WAIT_ALLOCATION','וויקוף אושר · סכום הקנייה אינו זמין או נמוך מהמינימום');
+  if(!Number.isFinite(cash))return waiting('WAIT_ACCOUNT','WAIT_ACCOUNT','וויקוף אושר · יתרת USDT אינה זמינה');
+  const required=spend*1.002;
+  if(cash<required)return waiting('WAIT_CASH','NO_CASH','וויקוף אושר · ממתין ליתרה: זמינים '+cash.toFixed(2)+', נדרשים '+required.toFixed(2)+' USDT כולל מרווח לעמלות · חסרים '+(required-cash).toFixed(2)+' USDT');
+  if(a.lastError)return waiting('WAIT_EXECUTION_ERROR','EXECUTION_ERROR','וויקוף אושר · שגיאת ביצוע: '+a.lastError);
+  return {decision:'BUY_READY',blocker:plan?.lastSlot?{code:'BUY_READY',text:'וויקוף אושר · פוזיציה אחרונה: קנייה ב־'+spend.toFixed(2)+' USDT מהיתרה, עם מרווח לעמלות'}:a.blocker};
+}
+
+function decisionFor(a,isHeld,activeCount,maxPositions,weakestActive,rotationGap,isLive,liveAccount=null){
   const s=a.strategy||{};
-  if(!isLive) return a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
-  if(isHeld) return s.sellConfirmed?'SELL':'HOLD';
-  if(s.buyConfirmed){
-    if(activeCount>=maxPositions)return 'WAIT · NO SLOT';
-    if(activeCount<maxPositions) return 'BUY READY';
-    const gap=weakestActive?Number(a.score||0)-weakestActive.score:-999;
-    return (Number(a.score||0)>=Number(currentAgentData?.config?.rotationMinScore||65)&&gap>=rotationGap)
-      ?'ROTATE READY':'WAIT_NO_ROTATION';
-  }
-  return 'HOLD';
+  if(!isLive)return a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
+  if(isHeld)return s.sellConfirmed?'SELL':'HOLD';
+  return liveEntryStatus(a,liveAccount,maxPositions).decision;
 }
 
 function renderMarketStrip(agents){
@@ -178,7 +189,7 @@ function renderMarketStrip(agents){
 function activeContext(d,currentMode,liveAccount){
   const p=d.paper||{},agents=d.agents||[];
   const isLive=currentMode==='live';
-  const liveBalances=(liveAccount?.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5);
+  const liveBalances=(liveAccount?.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5);
   const liveHeldSymbols=new Set(liveBalances.map(x=>x.asset+'USDT'));
   const isHeld=a=>isLive&&liveAccount?liveHeldSymbols.has(a.symbol):a.position==='LONG';
   const activeAgents=agents.filter(isHeld);
@@ -269,7 +280,8 @@ function render(d,currentMode='demo',liveAccount=null){
     const score=Number(a.score||0);
     const pnl=positionPnlDisplay(isLive?liveBalances.find(x=>x.asset+'USDT'===a.symbol):paperPos[a.symbol],isLive?'USDT':moneyUnit);
     const trendLabel=({UP:'עולה',DOWN:'יורדת'}[s.direction]||'לא ידועה');
-    const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive);
+    const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive,liveAccount);
+    const displayBlocker=isLive&&!held?liveEntryStatus(a,liveAccount,maxPositions).blocker:a.blocker;
     const rowClasses=[
       a.symbol===selectedSymbol?'selected':'',
       held?'active-position':'',
@@ -278,7 +290,7 @@ function render(d,currentMode='demo',liveAccount=null){
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
-      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(a.blocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
+      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
       <td>${fmt(s.price,Math.abs(Number(s.price))<10?8:4)}</td>
       <td class="${held?pnl.className:''}">${held?pnl.text:'—'}</td>
       <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
@@ -325,7 +337,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   if(!a) return;
   selectedSymbol=a.symbol;
   const {isHeld,activeAgents,weakestActive,p}=activeContext(d,currentModeArg,liveAccount);
-  const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(p.maxPositions||6),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live');
+  const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(currentModeArg==='live'?(d.config?.maxPositions||5):(p.maxPositions||6)),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live',liveAccount);
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
@@ -345,7 +357,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionSelectedDecision',decisionLabel(dec));
   put('#actionSelectedScore',fmt(a.score,1));
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
-  put('#actionQualification',buyReasonLabel(a.buyReason));
+  put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
 
   await Promise.all([loadChart(a.symbol),loadDecisionHistory(a.symbol)]);
 }
@@ -439,8 +451,8 @@ async function loadLiveAccount(prefetched=null){
     if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,pnl.className==='pnl-'+kind);
     put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות'+(a.profitReinvestmentPaused?' · ההקצאה הקיימת נשמרת; עדכון מרווחים ממתין להמרת עמלה':''));
     put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
-    put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
-    put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
+    put('#slots',((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
+    put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
     put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
