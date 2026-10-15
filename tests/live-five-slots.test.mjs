@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {liveNextBuyAllocation} from '../lib/live-buy-allocation.mjs';
 
 const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 function allocation(saved=null){
@@ -30,7 +31,7 @@ test('LIVE permits fifth position and rejects sixth while DEMO remains ten',asyn
   const end=source.indexOf('\nasync function getLiveAccountSnapshot',start);
   for(const held of [4,5]){
     const buys=[];let count=held;
-    const context=vm.createContext({mode:'live',LIVE:true,AUTO_EXECUTION:true,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:100,KELLY_RULESET:'TEST_RULESET',
+    const context=vm.createContext({liveNextBuyAllocation,mode:'live',LIVE:true,AUTO_EXECUTION:true,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:100,KELLY_RULESET:'TEST_RULESET',
       liveTradingGate:()=>({ready:true,withdrawalsEnabled:false}),getApiRestrictions:async()=>({}),
       liveOrders:{recover:async()=>{}},signedBinanceGet(){},recordLiveFill(){},liveActionLog:[],tradeControl:{paused:false},
       getLiveAccountSnapshot:async()=>({balances:Array.from({length:count},(_,i)=>({asset:'HELD'+i,qty:1,valueUsdt:30})),fixedPositionUsdt:30,usdtFree:90}),
