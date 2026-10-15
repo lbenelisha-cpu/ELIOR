@@ -1259,8 +1259,9 @@ async function evaluateSymbol(s){
     }
     if(p)p.marketRank=marketRanks.get(s)??null;
     if(p?.atrEnabled){const a=atrPolicy(atr14(await candles(s)),Number(streams[s]?.lastPrice));if(a){p.atrValue=a.atrValue;p.atrTrailPct=a.atrTrailPct;}}
+    const entryBars=p?[]:await candles(s);
     const livePrice=requireLivePrice(streams[s]);
-    const ev=evaluateDailyTrade({symbol:s,bars:p?[]:await candles(s),price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'wyckoff_confirmation'});
+    const ev=evaluateDailyTrade({symbol:s,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'wyckoff_confirmation',priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(p){
       if(mode==='live')persistLivePeak(s,p);
@@ -1288,7 +1289,7 @@ async function evaluateSymbol(s){
 
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
-    ev.decisionPriceSource='5M_CONFIRMED_WITH_LIVE_EXECUTION';
+    ev.decisionPriceSource=ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
   }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
@@ -2263,6 +2264,8 @@ const server=http.createServer((req,res)=>{
         qualityPolicy:QUALITY_POLICY,
         entryFiltersEnabled:false,
         entryMode:'wyckoff_confirmation',
+        entryConfirmation:'LIVE_PRICE_AFTER_SPRING',
+        waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:20,
         springStopLossPct:10,
