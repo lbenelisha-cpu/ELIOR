@@ -91,23 +91,23 @@ function latestWyckoffSetup(rows){
 }
 function renderWyckoffPivots(view,rows,step,left,y,digits){
  const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
- const setup=latestWyckoffSetup(rows);if(!setup)return;
  const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
- const strategy=agent?.strategy?.wyckoff||agent?.strategy||{};
- const active=agent?.buyQualified===true&&agent?.entryConfirmed===true&&agent?.position!=='LONG'&&
-  strategy.patternId===setup.patternId&&Number(strategy.signalTime)===Number(setup.signalTime)&&
-  Date.now()-Date.parse(agent.lastDecisionAt)>=0&&Date.now()-Date.parse(agent.lastDecisionAt)<20000;
+ const tradeSetup=agent?.position==='LONG'?agent.strategy?.setup:null;
+ const setup=tradeSetup?.springLow?tradeSetup:latestWyckoffSetup(rows);if(!setup)return;
+ const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&setup===tradeSetup;
  root.dataset.active=String(active);
  const status=document.createElement('span');status.className='wyckoff-setup-status';
  const at=Number(setup.signalTime||setup.confirmation?.time);
- status.textContent=(active?'אישור כניסה פעיל':'תבנית היסטורית — האישור אינו פעיל')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
+ status.textContent=(active?'מסחר פעיל · תבנית הקנייה':'תבנית היסטורית — אין מסחר פעיל בתבנית')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
  root.append(status);
  const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
+ const colors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
  for(const [key,label] of points){
   const p=setup[key];if(!p||!(Number(p.price)>0))continue;
   const index=view.findIndex(c=>Number(p.time)>=Number(c.openTime)&&Number(p.time)<=Number(c.closeTime));if(index<0)continue;
   const button=document.createElement('button');button.type='button';button.className='wyckoff-pivot';
+  button.style.setProperty('--pivot-color',colors[key]);button.dataset.pivot=key;
   const anchorX=left+step*(index+.5),anchorY=y(Number(p.price));
   const slot=points.findIndex(point=>point[0]===key);
   const labelX=key==='confirmation'?anchorX:12+(width-24)*(slot+.5)/5;
@@ -115,10 +115,11 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   if(key==='confirmation')button.classList.add('confirmation-pivot');
   else button.style.width=Math.max(36,(width-24)/5-10)+'px';
   const connector=document.createElement('span');connector.className='wyckoff-connector';
+  connector.style.setProperty('--pivot-color',colors[key]);
   connector.style.left=anchorX+'px';connector.style.top=anchorY+'px';
   connector.style.width=Math.hypot(labelX-anchorX,labelY-anchorY)+'px';
   connector.style.transform='rotate('+Math.atan2(labelY-anchorY,labelX-anchorX)+'rad)';root.append(connector);
-  const dot=document.createElement('span');dot.className='wyckoff-anchor';dot.style.left=anchorX+'px';dot.style.top=anchorY+'px';root.append(dot);
+  const dot=document.createElement('span');dot.className='wyckoff-anchor';dot.dataset.pivot=key;dot.style.setProperty('--pivot-color',colors[key]);dot.style.left=anchorX+'px';dot.style.top=anchorY+'px';root.append(dot);
   button.style.left=labelX+'px';button.style.top=labelY+'px';
   button.textContent=key==='confirmation'?'✓':label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
   button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
