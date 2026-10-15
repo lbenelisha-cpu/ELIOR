@@ -11,7 +11,7 @@ import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from './lib/wyckoff-evaluation.mjs';
-import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
+import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS, MINIMUM_PROFIT_HOLD_MS} from './lib/binance-position-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
@@ -1354,7 +1354,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?['spring_retest','wyckoff_confirmation'].includes(ev.strategy.entryMode)?'עצירה 10% ממחיר הקנייה; לאחר עלייה נשמרים 80% מההפרש לשיא':`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?['spring_retest','wyckoff_confirmation'].includes(ev.strategy.entryMode)?ev.strategy.profitProtectionPending?'עצירה 10% פעילה · הגנת רווח תופעל ב־'+new Date(ev.strategy.profitProtectionStartsAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'עצירה 10% ממחיר הקנייה; נשמרים 80% מההפרש לשיא':`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'וויקוף אושר · קנייה ללא המתנה לחזרה ל־Spring'};
@@ -2268,6 +2268,8 @@ const server=http.createServer((req,res)=>{
         springStopLossPct:10,
         profitGivebackPct:20,
         profitRetentionPct:80,
+        minProfitHoldMinutes:MINIMUM_PROFIT_HOLD_MS/60000,
+        minProfitHoldDays:MINIMUM_PROFIT_HOLD_MS/86400000,
         strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE
