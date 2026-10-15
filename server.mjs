@@ -431,7 +431,20 @@ function fixedLiveAllocation(total){
     liveAllocation={baseUsdt:Number(total),positionUsdt:Number(total)/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS,at:new Date().toISOString()};
   }
   if(!liveAllocation)return null;
-  const realized=liveRealizedPnl(liveActionLog);
+  let realized;
+  try{realized=liveRealizedPnl(liveActionLog);}
+  catch(e){
+    if(e.message!=='LIVE_REALIZED_FEE_VALUATION_REQUIRED')throw e;
+    // Unknown third-asset fees suspend profit reinvestment, not wallet reads or exits.
+    // Preserve the recorded capital and allocation; never treat unknown fees as zero.
+    const value={...liveAllocation,positionUsdt:liveAllocation.baseUsdt/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS};
+    if(JSON.stringify(value)!==JSON.stringify(liveAllocation)||!fs.existsSync(LIVE_ALLOCATION_FILE)){
+      ensureStateDir();fs.writeFileSync(LIVE_ALLOCATION_FILE+'.tmp',JSON.stringify(value),'utf8');
+      fs.renameSync(LIVE_ALLOCATION_FILE+'.tmp',LIVE_ALLOCATION_FILE);
+    }
+    liveAllocation=value;
+    return {...value,realizedPnlComplete:false,profitReinvestmentPaused:true,allocationWarning:e.message};
+  }
   const initialBaseUsdt=liveAllocation.initialBaseUsdt??liveAllocation.baseUsdt;
   const realizedBaselineUsdt=liveAllocation.realizedBaselineUsdt??realized;
   const reinvestedProfitUsdt=Math.max(0,realized-realizedBaselineUsdt);
@@ -808,6 +821,9 @@ async function getLiveAccountSnapshot(){
     totalValueUsdt,
     allocationBaseUsdt:fixedAllocation?.baseUsdt??null,
     fixedPositionUsdt:fixedAllocation?.positionUsdt??null,
+    realizedPnlComplete:fixedAllocation?.realizedPnlComplete!==false,
+    profitReinvestmentPaused:fixedAllocation?.profitReinvestmentPaused===true,
+    allocationWarning:fixedAllocation?.allocationWarning??null,
     allocationMode:'FIXED_20_PERCENT',
     maxPositions:LIVE_MAX_POSITIONS,
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],

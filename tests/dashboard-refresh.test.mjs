@@ -21,3 +21,17 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   context.J=async()=>({});release({mode:'demo'});await pending;
   assert.deepEqual(labels,['מתחבר…']);
 });
+test('LIVE market renders before account completes; account errors do not erase market data',async()=>{
+ const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
+ const start=source.indexOf('let dashboardLoadInFlight='),end=source.indexOf('\nasync function authenticatedControl',start);
+ const rendered=[],labels=[];let rejectAccount;
+ const ctx=vm.createContext({MODE:'mode',AGENT:'agent',LIVEACC:'live',currentLiveAccount:null,AbortSignal,
+  put:(id,label)=>labels.push(label),mode(){},render:(agent,mode)=>rendered.push({agent,mode}),
+  loadActionJournal:async()=>{},loadLiveAccount:async d=>{assert.equal(d.connected,false);return null;},
+  J:async url=>url==='mode'?{mode:'live'}:url==='agent'?{agents:[{symbol:'BTCUSDT'}]}:new Promise((resolve,reject)=>{rejectAccount=reject;}),console,
+  $:()=>({classList:{remove(){}}})});
+ vm.runInContext(source.slice(start,end),ctx);const load=vm.runInContext('load()',ctx);
+ await new Promise(setImmediate);assert.equal(rendered.length,1);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');
+ rejectAccount(Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED'));await load;
+ assert.equal(rendered.length,2);assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
+});

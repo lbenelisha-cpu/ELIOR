@@ -180,7 +180,7 @@ function activeContext(d,currentMode,liveAccount){
   const isLive=currentMode==='live';
   const liveBalances=(liveAccount?.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5);
   const liveHeldSymbols=new Set(liveBalances.map(x=>x.asset+'USDT'));
-  const isHeld=a=>isLive?liveHeldSymbols.has(a.symbol):a.position==='LONG';
+  const isHeld=a=>isLive&&liveAccount?liveHeldSymbols.has(a.symbol):a.position==='LONG';
   const activeAgents=agents.filter(isHeld);
   const weakestActive=activeAgents
     .map(a=>({symbol:a.symbol,score:(a.strategy?.buyConfirmed?Number(a.score||0):0)}))
@@ -422,6 +422,7 @@ async function loadActionJournal(currentModeArg){
 async function loadLiveAccount(prefetched=null){
   try{
     const d=prefetched||await J(LIVEACC),a=d.account||{};
+    if(!d.connected||!d.account)throw Error(d.error||'נתוני החשבון אינם זמינים');
     put('#liveConnected',d.connected?'מחובר ✅':'לא מחובר');
     put('#liveTotalValue',fmt(a.totalValueUsdt)+' USDT');
     put('#liveUsdt',fmt(a.usdtFree)+' USDT');
@@ -434,7 +435,7 @@ async function loadLiveAccount(prefetched=null){
     put('#accountPnlLabel','רווח / הפסד לא ממומש');
     const pnlEl=$('#paperPnl');
     if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,pnl.className==='pnl-'+kind);
-    put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות');
+    put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות'+(a.profitReinvestmentPaused?' · ההקצאה הקיימת נשמרת; עדכון מרווחים ממתין להמרת עמלה':''));
     put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
     put('#slots',((a.balances||[]).filter(x=>x.asset!=='USDT'&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
     put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · קבוע':'—');
@@ -744,12 +745,15 @@ async function load(){
     const m=await J(MODE);
     mode(m);
     const agent=await J(AGENT);
+    // Render market data independently of the signed account endpoint.
+    render(agent,m.mode,m.mode==='live'?currentLiveAccount:null);
     if(m.mode==='live'){
-      const liveData=await J(LIVEACC);
+      let liveData;
+      try{liveData=await J(LIVEACC,{signal:AbortSignal.timeout(15000)});}
+      catch(e){liveData={connected:false,error:e.message};}
       const liveAccount=await loadLiveAccount(liveData);
       render(agent,'live',liveAccount);
-    }else{
-      render(agent,'demo',null);
+      if(!liveAccount)put('#status','LIVE · נתוני שוק זמינים · נתוני חשבון אינם זמינים');
     }
     await loadActionJournal(m.mode);
     dashboardLoaded=true;
