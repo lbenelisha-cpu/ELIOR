@@ -2268,6 +2268,7 @@ const server=http.createServer((req,res)=>{
         springStopLossPct:10,
         profitGivebackPct:20,
         profitRetentionPct:80,
+        minProfitHoldMinutes:15,
         strategyDiagnostics,
         keysConfigured:KEYS_CONFIGURED,
         liveTradingEnabled:LIVE

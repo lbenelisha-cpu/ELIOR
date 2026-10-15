@@ -21,8 +21,8 @@ test('no early, stale or reused setup entry; 10% / 80% exit policy remains intac
  assert.equal(evaluateDailyTrade({...args,bars:bars.slice(0,-1),now:now-step,priceAsOf:new Date(now-step).toISOString()}).entryConfirmed,false);
  assert.equal(evaluateDailyTrade({...args,usedPatternIds:[ev.wyckoffTrade.patternId]}).entryConfirmed,false);
  assert.throws(()=>evaluateDailyTrade({...args,priceAsOf:new Date(now-100000).toISOString()}),/WAIT_FRESH_PRICE/);
- const p={...ev.wyckoffTrade,entryPrice:50,peakPrice:50};assert.equal(binancePositionExit(p,45.01).sell,false);assert.equal(binancePositionExit(p,45).sell,true);
- const q={...ev.wyckoffTrade,entryPrice:50,peakPrice:50};binancePositionExit(q,60);assert.equal(q.effectiveStopPrice,58);assert.equal(binancePositionExit(q,58).sell,true);
+ const p={...ev.wyckoffTrade,entryAt:new Date(Date.now()-16*60000).toISOString(),entryPrice:50,peakPrice:50};assert.equal(binancePositionExit(p,45.01).sell,false);assert.equal(binancePositionExit(p,45).sell,true);
+ const q={...ev.wyckoffTrade,entryAt:new Date(Date.now()-16*60000).toISOString(),entryPrice:50,peakPrice:50};binancePositionExit(q,60);assert.equal(q.effectiveStopPrice,58);assert.equal(binancePositionExit(q,58).sell,true);
 });
 test('Demo confirmation entry can buy above Spring and fills retain the same exit protection',async()=>{
  const x=setup();try{

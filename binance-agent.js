@@ -386,6 +386,7 @@ function decisionReasonLabel(r){
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    WYCKOFF_MINIMUM_PROFIT_HOLD:'ממתין 15 דקות מהקנייה להפעלת הגנת הרווח · סטופ 10% פעיל',
     WAIT_WYCKOFF_ENTRY_PRICE:'ממתין למחיר חי מעל השפל הראשון ומתחת ליעד התבנית',
     WYCKOFF_SPRING_RETEST:'קנייה בחזרה ל־Spring לאחר אישור וויקוף',
     WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · ירידה של 10% ממחיר הקנייה',
@@ -596,7 +597,7 @@ function chartSellLevel(data,liveAccount,mode,symbol){
  const strategy=agent.strategy||{},position=mode==='live'?strategy:data.paper.positions[symbol];
  const stop=Number(strategy.effectiveStopPrice??position.effectiveStopPrice??strategy.stopPrice??position.stopPrice);
  if(!(stop>0)||!Number.isFinite(stop))return null;
- return {price:stop,reason:strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
+ return {price:stop,reason:strategy.profitProtectionPending?'עצירת הפסד · הגנת רווח תופעל ב־'+tradeExecutionTime(strategy.profitProtectionStartsAt):strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
 }
 
 function renderPositionPoints(view,step,left,y,digits){
