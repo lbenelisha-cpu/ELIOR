@@ -385,6 +385,7 @@ function decisionReasonLabel(r){
     WAIT_HOURLY_TREND:'ממתין למגמה עולה בנרות שעה',
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
+    WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
     WYCKOFF_MINIMUM_PROFIT_HOLD:'ממתין 7 ימים מהקנייה להפעלת הגנת הרווח · סטופ 10% פעיל',
     WAIT_WYCKOFF_ENTRY_PRICE:'ממתין למחיר חי מעל השפל הראשון ומתחת ליעד התבנית',

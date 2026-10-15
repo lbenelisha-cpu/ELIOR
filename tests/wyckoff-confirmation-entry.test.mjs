@@ -18,7 +18,7 @@ test('complete confirmation immediately authorizes entry above Spring without a 
 });
 test('no early, stale or reused setup entry; 10% / 80% exit policy remains intact',()=>{
  const ev=evaluateDailyTrade(args);
- assert.equal(evaluateDailyTrade({...args,bars:bars.slice(0,-1),now:now-step,priceAsOf:new Date(now-step).toISOString()}).entryConfirmed,false);
+ assert.equal(evaluateDailyTrade({...args,bars:bars.slice(0,-4),now:now-4*step,priceAsOf:new Date(now-4*step).toISOString()}).entryConfirmed,false);
  assert.equal(evaluateDailyTrade({...args,usedPatternIds:[ev.wyckoffTrade.patternId]}).entryConfirmed,false);
  assert.throws(()=>evaluateDailyTrade({...args,priceAsOf:new Date(now-100000).toISOString()}),/WAIT_FRESH_PRICE/);
  const p={...ev.wyckoffTrade,entryAt:new Date(Date.now()-8*86400000).toISOString(),entryPrice:50,peakPrice:50};assert.equal(binancePositionExit(p,45.01).sell,false);assert.equal(binancePositionExit(p,45).sell,true);
