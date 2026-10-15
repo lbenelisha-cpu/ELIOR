@@ -386,6 +386,7 @@ function decisionReasonLabel(r){
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    WAIT_WYCKOFF_ENTRY_PRICE:'ממתין למחיר חי מעל השפל הראשון ומתחת ליעד התבנית',
     WYCKOFF_SPRING_RETEST:'קנייה בחזרה ל־Spring לאחר אישור וויקוף',
     WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · ירידה של 10% ממחיר הקנייה',
     WYCKOFF_GAIN_GIVEBACK_20_PERCENT:'מכירה · החזרה של 20% מהעלייה שנצברה',
