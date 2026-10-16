@@ -2,9 +2,12 @@ import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawing
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
 const markets={},manualCharts=new Set(),pendingMarkets=new Set();let marketRequest=0;
-let state={symbols:['AAPL','MSFT','NVDA','SPY'],positions:{},bars:{},drawings:{}},selected='AAPL';
+const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX'];
+let state={symbols:[...DEFAULT_SYMBOLS],positions:{},bars:{},drawings:{}},selected='AAPL';
 try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.symbols)){state.symbols=[...new Set(saved.symbols.filter(s=>typeof s==='string'&&validSymbol(s)))].slice(0,100);for(const s of state.symbols){const p=saved.positions?.[s];if(p&&positive(p.entry)&&positive(p.qty))state.positions[s]={entry:Number(p.entry),qty:Number(p.qty),mark:positive(p.mark)?Number(p.mark):null,updatedAt:p.updatedAt};const drawings=saved.drawings?.[s];if(Array.isArray(drawings))state.drawings[s]=drawings.filter(validDrawing).slice(0,100);const bars=saved.bars?.[s];if(Array.isArray(bars)&&bars.length<=2000&&bars.every(validBar))state.bars[s]=bars;}}}catch{}
-if(!state.symbols.length)state.symbols=['AAPL'];selected=state.symbols[0];
+// Populate ten choices while preserving existing watchlist entries and holdings.
+for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=10)break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
+selected=state.symbols[0];
 function message(s){$('#message').textContent=s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{message('לא ניתן לשמור בדפדפן. הנתונים זמינים כעת בלבד; נסה לצמצם את גודל הייבוא.');return false;}}
 function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);}
@@ -13,6 +16,7 @@ function pnl(symbol){const p=state.positions[symbol],m=mark(symbol);return p&&m?
 function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});}
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
 function render(preserveForm=false){
+ $('#watchCount').textContent=String(state.symbols.length);
  $('#watchList').replaceChildren();for(const s of state.symbols){const b=document.createElement('button');b.className='watch-row'+(s===selected?' active':'');b.type='button';b.setAttribute('aria-pressed',s===selected?'true':'false');const symbol=document.createElement('b');symbol.textContent=s;const price=document.createElement('span');price.textContent=mark(s)?money(mark(s).price):'אין מחיר';b.append(symbol,price);b.onclick=()=>{selected=s;render();loadMarket(false);};$('#watchList').append(b);}
  $('#selectedSymbol').textContent=selected;$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
