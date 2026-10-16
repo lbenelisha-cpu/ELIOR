@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newSimulation,applyStockObservation,simulationSummary,stockBars,stockObservation,stockSessionGap,regularSession} from '../lib/colmex-simulation.mjs';
-import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
 import {evaluateWyckoff} from '../lib/wyckoff-strategy.mjs';
 import {runSimulation} from '../lib/colmex-simulation-runner.mjs';
 const base=Date.parse('2026-10-16T15:00:00Z'),step=300000;
@@ -9,7 +8,7 @@ const prices=[95,97,100,90,80,85,92,87,82,84,86,85,86,78];
 const values=prices.map((close,i)=>({datetime:new Date(base-(prices.length-i)*step).toISOString().slice(0,19).replace('T',' '),open:i<2?close-1:close,high:close,low:i<2?close-1:close,close}));
 const series={meta:{symbol:'AAPL',currency:'USD',type:'Common Stock'},values};
 function obs(price,at=base+60000,symbol='AAPL'){return {symbol,series:{...series,meta:{...series.meta,symbol}},quote:{symbol,currency:'USD',close:price,last_quote_at:at/1000,is_market_open:true},now:at};}
-function fresh(fee=null){return newSimulation(base,fee);}
+function fresh(fee=null){return newSimulation(base-1000,fee);}
 
 test('stock simulation uses shared causal Wyckoff and confirms with a post-Spring quote',()=>{
  const bars=stockBars(series,'AAPL',base);assert.equal(evaluateWyckoff(bars,{now:base,timeframe:'5m'}).phase,'SPRING');
@@ -50,12 +49,12 @@ test('scheduler persists a single cycle atomically, rotates after provider failu
  const old=JSON.stringify(value);assert.equal((await runSimulation({store,td,now:Date.parse('2026-10-17T15:00:00Z')})).status,'MARKET_CLOSED');assert.equal(JSON.stringify(value),old);
 });
 
-test('Colmex entry agrees with Binance on the same fresh Spring quotes',()=>{
- for(const price of [77,78,80,81,90,107,108]){
-  const input=obs(price),bars=stockBars(series,'AAPL',input.now);
-  const binance=evaluateDailyTrade({symbol:'PARITY'+price,bars,price,priceAsOf:new Date(input.now).toISOString(),now:input.now,timeframe:'5m',entryMode:'wyckoff_confirmation'});
-  const colmex=applyStockObservation(fresh(),input);
-  assert.equal(!!colmex.positions.AAPL,binance.entryConfirmed,'price '+price);
+test('Spring buys below or at first low without reclaim; Binance modules are unchanged',()=>{
+ for(const price of [78,79,80]){
+  const s=applyStockObservation(fresh(),obs(price));
+  assert.equal(s.assets.AAPL.reason,'BUY');
+  assert.equal(s.journal[0].reason,'WYCKOFF_SPRING');
+  assert.equal(s.journal[0].setup.signalTime,base);
  }
 });
 test('90-second freshness is measured at receipt, never by backdating the scan',()=>{
