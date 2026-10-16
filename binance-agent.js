@@ -650,6 +650,13 @@ function renderPositionPoints(view,step,left,y,digits){
  }
 }
 
+let candleFlashOn=true;
+setInterval(()=>{
+ if(document.hidden||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
+ if(agent?.position!=='LONG'||!chartCandles.length)return;
+ candleFlashOn=!candleFlashOn;drawCandles(chartCandles);
+},650);
 function drawCandles(candles){
   drawIndicators(candles);
   const canvas=$('#priceChart');
@@ -712,11 +719,18 @@ function drawCandles(candles){
     ctx.fillText(fmt(price,priceDigits),W-right+6,yy+4);
   }
 
+  const flashingIndices=new Set();
+  if(heldNow){
+   const setup=selectedPosition.setup||{};
+   const stamps=Object.entries(setup).filter(([key,p])=>['initialPeak','firstLow','rallyHigh','secondaryTest','springLow','confirmation'].includes(key)&&p?.time).map(([key,p])=>Number(p.time)-(key==='confirmation'&&p.live?0:1));
+   stamps.push(Date.parse(selectedPosition.entryAt),Date.parse(selectedPosition.peakAt));
+   for(const stamp of stamps){const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0)flashingIndices.add(i);}
+  }
   ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();
   view.forEach((c,i)=>{
     const x=left+step*i+step/2;
     const up=+c.close>=+c.open;
-    ctx.strokeStyle=up?'#2bd88a':'#ff6172';
+    ctx.strokeStyle=flashingIndices.has(i)&&!candleFlashOn?'#03080d':up?'#2bd88a':'#ff6172';
     ctx.fillStyle=ctx.strokeStyle;
     ctx.beginPath();ctx.moveTo(x,y(+c.high));ctx.lineTo(x,y(+c.low));ctx.stroke();
     const y1=y(Math.max(+c.open,+c.close)),y2=y(Math.min(+c.open,+c.close));
