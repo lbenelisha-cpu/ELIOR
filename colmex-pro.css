@@ -5,3 +5,5 @@
 .drawing-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px}.drawing-tools button{font-size:13px;padding:9px 11px;background:transparent}.drawing-tools button[aria-pressed="true"]{background:#1e4d78;border-color:var(--blue)}.drawing-tools label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}#drawingColor{width:40px;height:34px;padding:3px}.chart svg{touch-action:none;user-select:none}.drawing-hit{cursor:move}.drawing-handle{cursor:grab}.chart svg:focus-visible{outline:2px solid var(--blue);outline-offset:-3px}
 
 #watchList{max-height:520px;overflow-y:auto;scrollbar-width:thin;padding-left:3px}
+
+.watch-row span{text-align:left;overflow-wrap:anywhere;max-width:65%;line-height:1.5}#refreshWatchQuotes{font-size:13px;padding:9px 12px}#watchQuoteStatus{font-size:12px}
