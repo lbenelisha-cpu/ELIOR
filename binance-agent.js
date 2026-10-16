@@ -355,7 +355,10 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
-  put('#actionSelectedScore',fmt(a.score,1));
+  put('#actionSelectedPnl',isHeld(a)?selectedPnl.text:'אין פוזיציה פעילה');
+  const selectedPnlEl=$('#actionSelectedPnl');
+  if(selectedPnlEl)for(const kind of ['profit','loss','flat','unknown'])selectedPnlEl.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
+  put('#actionSelectedPnlNote',isHeld(a)?(currentModeArg==='live'?'לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר':'רווח / הפסד לא ממומש'):'P&L יוצג לאחר קנייה');
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
 
