@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {newSimulation,applyStockObservation,simulationSummary,stockBars,stockObservation,stockSessionGap,regularSession} from '../lib/colmex-simulation.mjs';
+import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
 import {evaluateWyckoff} from '../lib/wyckoff-strategy.mjs';
 import {runSimulation} from '../lib/colmex-simulation-runner.mjs';
 const base=Date.parse('2026-10-16T15:00:00Z'),step=300000;
@@ -34,17 +35,46 @@ test('stop exits immediately, profit lock waits a week, quotes cannot duplicate 
  loss=applyStockObservation(loss,obs(81,base+3*60000));assert.equal(loss.journal.length,2);assert.equal(loss.assets.AAPL.reason,'PATTERN_ALREADY_USED');
 });
 test('delayed observations record both timestamps, fees are explicit and cash accounting reconciles',()=>{
- let a=obs(81);a.now+=5*60000;let s=applyStockObservation(fresh(10),a);assert.notEqual(s.journal[0].at,s.journal[0].observedAt);assert.equal(s.assets.AAPL.delaySeconds,300);
+ let a=obs(81);a.now+=60000;let s=applyStockObservation(fresh(10),a);assert.notEqual(s.journal[0].at,s.journal[0].observedAt);assert.equal(s.assets.AAPL.delaySeconds,60);
  assert.ok(s.journal[0].fee>0);s=applyStockObservation(s,obs(72,base+7*60000));const j=s.journal[1];assert.ok(Math.abs(j.netPnl-(j.grossPnl-j.fee-j.entryFee))<1e-8);assert.ok(Math.abs(s.cash-10000-j.netPnl)<1e-8);assert.equal(simulationSummary(s).netKnown,true);
 });
 test('five slots cap entries, final slot uses remaining cash and invalidated confirmations remain invalid',()=>{
- let s=fresh();for(const symbol of ['AAPL','MSFT','NVDA','AMZN','GOOGL','META'])s=applyStockObservation(s,obs(81,base+60000,symbol));assert.equal(Object.keys(s.positions).length,5);assert.ok(Math.abs(s.cash)<1e-8);assert.equal(s.assets.META.reason,'NO_FREE_SLOT');
+ let s=fresh();for(const symbol of ['AAPL','MSFT','NVDA','AMZN','GOOGL','META'])s=applyStockObservation(s,obs(81,base+60000,symbol));assert.equal(Object.keys(s.positions).length,5);assert.ok(s.cash>0&&s.cash<5);assert.equal(s.assets.META.reason,'NO_FREE_SLOT');
  s=applyStockObservation(s,obs(77,base+2*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');s=applyStockObservation(s,obs(81,base+3*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');
 });
 test('scheduler persists a single cycle atomically, rotates after provider failures, and does not fetch while closed',async()=>{
- let value=null,version=0,calls=0;const store={async getWithMetadata(){return value?{data:structuredClone(value),etag:String(version)}:null;},async setJSON(k,v,opt){if(opt.onlyIfNew&&value||opt.onlyIfMatch&&opt.onlyIfMatch!==String(version))return {modified:false};value=structuredClone(v);version++;return {modified:true};}};
+ let value=fresh(),version=0,calls=0;const store={async getWithMetadata(){return value?{data:structuredClone(value),etag:String(version)}:null;},async setJSON(k,v,opt){if(opt.onlyIfNew&&value||opt.onlyIfMatch&&opt.onlyIfMatch!==String(version))return {modified:false};value=structuredClone(v);version++;return {modified:true};}};
  const td=async endpoint=>{calls++;if(endpoint==='quote')return obs(81).quote;return series;};const a=await runSimulation({store,td,now:base+60000});assert.equal(a.status,'SAVED');assert.equal(value.journal.length,1);
  assert.equal((await runSimulation({store,td,now:base+60000})).status,'ALREADY_CHECKED');assert.equal(calls,2);
  await runSimulation({store,td:async()=>{throw Error('limit');},now:base+2*60000});assert.equal(value.cursor,2);assert.equal(value.assets.MSFT.reason,'DATA_UNAVAILABLE_OR_PROVIDER_LIMIT');
  const old=JSON.stringify(value);assert.equal((await runSimulation({store,td,now:Date.parse('2026-10-17T15:00:00Z')})).status,'MARKET_CLOSED');assert.equal(JSON.stringify(value),old);
+});
+
+test('Colmex entry agrees with Binance on the same fresh Spring quotes',()=>{
+ for(const price of [77,78,80,81,90,107,108]){
+  const input=obs(price),bars=stockBars(series,'AAPL',input.now);
+  const binance=evaluateDailyTrade({symbol:'PARITY'+price,bars,price,priceAsOf:new Date(input.now).toISOString(),now:input.now,timeframe:'5m',entryMode:'wyckoff_confirmation'});
+  const colmex=applyStockObservation(fresh(),input);
+  assert.equal(!!colmex.positions.AAPL,binance.entryConfirmed,'price '+price);
+ }
+});
+test('90-second freshness is measured at receipt, never by backdating the scan',()=>{
+ const input=obs(81);input.now+=90001;
+ const s=applyStockObservation(fresh(),input);assert.equal(s.assets.AAPL.reason,'WAIT_FRESH_MARKET_PRICE');assert.equal(s.journal.length,0);
+});
+test('sale boundary uses the new confirmation, not the initial peak of an unused pattern',()=>{
+ const s=fresh();s.assets.AAPL={checks:0,usedPatterns:[],lastExitAt:base-30000,lastPriceAt:null};
+ const bought=applyStockObservation(s,obs(81));assert.equal(bought.assets.AAPL.reason,'BUY');
+ const before=fresh();before.assets.AAPL={checks:0,usedPatterns:[],lastExitAt:base+90000,lastPriceAt:null};
+ const blocked=applyStockObservation(before,obs(81));assert.equal(blocked.assets.AAPL.reason,'WAIT_NEW_WYCKOFF_SIGNAL');
+});
+test('realized gains grow the fixed allocation while insufficient cash blocks a full slot',()=>{
+ const s=fresh();s.allocation={initialBase:10000,realizedBaseline:0};s.cash=10100;
+ s.journal.push({side:'SELL',grossPnl:100,netPnl:null});
+ const bought=applyStockObservation(s,obs(81));assert.equal(bought.positions.AAPL.cost,2020);
+ const poor=fresh();poor.cash=1999;const blocked=applyStockObservation(poor,obs(81));assert.equal(blocked.assets.AAPL.reason,'INSUFFICIENT_SIM_CASH');assert.equal(blocked.journal.length,0);
+});
+test('stock history excludes all candles outside seven calendar days',()=>{
+ const old={...values[0],datetime:'2026-10-08 14:00:00'};
+ assert.equal(stockBars({...series,values:[old,...values]},'AAPL',base).length,values.length);
 });
