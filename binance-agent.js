@@ -1,5 +1,11 @@
 const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://levi-binance.2-29-48-20.sslip.io';
 window.API_BASE=B;
+window.binanceReadUrl=url=>{
+  if(['localhost','127.0.0.1'].includes(window.location.hostname))return url;
+  const target=new URL(url,window.location.origin);
+  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
+  return target.origin===new URL(B).origin&&paths.includes(target.pathname)?'/.netlify/functions/binance-read-proxy?path='+encodeURIComponent(target.pathname+target.search):url;
+};
 const MODE=B+'/api/binance-mode';
 const TRADE_CONTROL=B+'/api/binance-trade-control';
 const AGENT=B+'/api/binance-agent';
@@ -100,7 +106,8 @@ async function J(u,o={}){
   if(external?.aborted)abort();else external?.addEventListener('abort',abort,{once:true});
   const timer=setTimeout(()=>controller.abort(new DOMException('השרת לא השיב בזמן. מתבצע ניסיון חוזר.','TimeoutError')),timeoutMs);
   try{
-    const r=await fetch(u,{cache:'no-store',...options,signal:controller.signal});
+    const requestUrl=String(options.method||'GET').toUpperCase()==='GET'?window.binanceReadUrl(u):u;
+    const r=await fetch(requestUrl,{cache:'no-store',...options,signal:controller.signal});
     if(!r.ok){
       let x={};try{x=await r.json()}catch{}
       throw Error(x.error||`HTTP ${r.status}`);
@@ -786,7 +793,7 @@ async function load(){
     await loadActionJournal(m.mode);
     dashboardLoaded=true;
   }catch(e){
-    put('#status','שרת לא זמין');
+    put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
     put('#tradeControlStatus','מצב המסחר לא אומת · שרת לא זמין');
