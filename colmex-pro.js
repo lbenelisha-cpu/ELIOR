@@ -1,3 +1,4 @@
+import {initSimulation,simulationMarks} from './colmex-simulation-ui.js';
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
@@ -42,10 +43,12 @@ function renderChart(){
  draft=null;drag=null;chartDrawing=null;
  const root=$('#chart'),bars=chartBars().slice(-90);root.replaceChildren();if(!bars.length){paintDrawings();$('#drawingHelp').textContent='טען נרות לפני הוספת קווים לגרף';const p=document.createElement('p');p.textContent='טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
- const entry=state.positions[selected]?.entry,values=bars.flatMap(b=>[b.high,b.low]);if(entry)values.push(entry);let lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const y=p=>275-(p-lo)/(hi-lo)*250,x=i=>20+(i+.5)*730/bars.length;
+ const sim=manualCharts.has(selected)?{points:[],lines:[]}:simulationMarks(selected);const entry=state.positions[selected]?.entry,values=bars.flatMap(b=>[b.high,b.low]);for(const line of sim.lines)values.push(line.price);if(entry)values.push(entry);let lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const y=p=>275-(p-lo)/(hi-lo)*250,x=i=>20+(i+.5)*730/bars.length;
  for(let i=0;i<5;i++){const price=lo+(hi-lo)*i/4;add('line',{x1:15,y1:y(price),x2:760,y2:y(price),stroke:'#21364b'});add('text',{x:775,y:y(price)+4,fill:'#93a8bf','font-size':11},price.toFixed(price<10?4:2));}
  bars.forEach((b,i)=>{const color=b.close>=b.open?'#67e0ae':'#ff798b',w=Math.max(2,Math.min(12,730/bars.length*.6));const line=add('line',{x1:x(i),x2:x(i),y1:y(b.high),y2:y(b.low),stroke:color});const body=add('rect',{x:x(i)-w/2,y:Math.min(y(b.open),y(b.close)),width:w,height:Math.max(1,Math.abs(y(b.open)-y(b.close))),fill:color});for(const el of [line,body]){const title=document.createElementNS(ns,'title');title.textContent=b.date+' · O '+b.open+' · H '+b.high+' · L '+b.low+' · C '+b.close;el.append(title);}});
  if(entry)add('line',{x1:15,x2:760,y1:y(entry),y2:y(entry),stroke:'#74b8ff','stroke-dasharray':'6 4'});
+ for(const line of sim.lines){add('line',{x1:15,x2:760,y1:y(line.price),y2:y(line.price),stroke:line.color,'stroke-dasharray':'5 4'});add('text',{x:22,y:y(line.price)-5,fill:line.color,'font-size':10},line.label+' '+line.price.toFixed(4));}
+ for(const point of sim.points){if(point.at<Date.parse(bars[0].date)||point.at>Date.parse(bars.at(-1).date)+300000||point.price<lo||point.price>hi)continue;let i=bars.findLastIndex(b=>Date.parse(b.date)<=point.at);const dot=add('circle',{cx:x(Math.max(0,i)),cy:y(point.price),r:3,fill:point.color,class:point.pulse?'sim-peak':''});const title=document.createElementNS(ns,'title');title.textContent=point.label;dot.append(title);}
  add('text',{x:20,y:303,fill:'#93a8bf','font-size':11},bars[0].date);add('text',{x:750,y:303,fill:'#93a8bf','font-size':11,'text-anchor':'end'},bars.at(-1).date);root.append(svg);attachDrawingTools(svg,bars,lo,hi);root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים עד 90 נרות אחרונים.');
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
@@ -134,3 +137,5 @@ async function loadNextWatchQuote(){
 $('#refreshWatchQuotes').onclick=()=>{for(const s of state.symbols){quoteNextAt[s]=0;if(quotes[s])quotes[s].loadedAt=0;}$('#autoMarket').checked=true;loadNextWatchQuote();};
 setInterval(loadNextWatchQuote,12500);
 loadNextWatchQuote();
+
+initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!drag&&!draft)renderChart();}});
