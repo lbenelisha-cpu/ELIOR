@@ -643,8 +643,8 @@ function renderPositionPoints(view,step,left,y,digits){
   const time=Date.parse(at);if(!Number.isFinite(time)||!(Number(price)>0))continue;
   const index=view.findIndex(c=>time>=Number(c.openTime)&&time<=Number(c.closeTime));if(index<0)continue;
   const yy=y(Number(price));if(yy<94||yy>root.clientHeight-112)continue;
-  const dot=document.createElement('button');dot.type='button';dot.className='position-point position-'+kind;
-  dot.style.left=(left+step*(index+.5))+'px';dot.style.top=yy+'px';
+  const dot=document.createElement('button');dot.type='button';dot.className='position-candle-hit';
+  dot.style.left=(left+step*(index+.5))+'px';dot.style.top=Math.min(y(Number(view[index].high)),y(Number(view[index].low)))-5+'px';dot.style.width=Math.max(12,step*.7)+'px';dot.style.height=Math.max(16,Math.abs(y(Number(view[index].high))-y(Number(view[index].low)))+10)+'px';
   dot.title=label+' · '+fmt(price,digits)+' USDT · '+tradeExecutionTime(at);dot.setAttribute('aria-label',dot.title);
   dot.onclick=()=>put('#chartDecisionDetails',dot.title);root.append(dot);
  }
@@ -654,7 +654,8 @@ let candleFlashOn=true;
 setInterval(()=>{
  if(document.hidden||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
  const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
- if(agent?.position!=='LONG'||!chartCandles.length)return;
+ const held=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
+ if(!held||!chartCandles.length)return;
  candleFlashOn=!candleFlashOn;drawCandles(chartCandles);
 },650);
 function drawCandles(candles){
@@ -719,18 +720,17 @@ function drawCandles(candles){
     ctx.fillText(fmt(price,priceDigits),W-right+6,yy+4);
   }
 
-  const flashingIndices=new Set();
-  if(heldNow){
-   const setup=selectedPosition.setup||{};
-   const stamps=Object.entries(setup).filter(([key,p])=>['initialPeak','firstLow','rallyHigh','secondaryTest','springLow','confirmation'].includes(key)&&p?.time).map(([key,p])=>Number(p.time)-(key==='confirmation'&&p.live?0:1));
-   stamps.push(Date.parse(selectedPosition.entryAt),Date.parse(selectedPosition.peakAt));
-   for(const stamp of stamps){const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0)flashingIndices.add(i);}
-  }
+  const flashingIndices=new Set(),candleColors=new Map();
+  const candleSetup=heldNow?selectedPosition.setup:latestWyckoffSetup(chartDecisions);
+  const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
+  const markCandle=(stamp,color,active)=>{const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0){candleColors.set(i,color);if(active)flashingIndices.add(i);}};
+  for(const [key,color] of Object.entries(pivotColors)){const p=candleSetup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,heldNow);}
+  if(heldNow){markCandle(Date.parse(selectedPosition.entryAt),'#348bff',true);markCandle(Date.parse(selectedPosition.peakAt),'#348bff',true);}
   ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();
   view.forEach((c,i)=>{
     const x=left+step*i+step/2;
     const up=+c.close>=+c.open;
-    ctx.strokeStyle=flashingIndices.has(i)&&!candleFlashOn?'#03080d':up?'#2bd88a':'#ff6172';
+    ctx.strokeStyle=flashingIndices.has(i)&&!candleFlashOn?'#03080d':candleColors.get(i)||(up?'#2bd88a':'#ff6172');
     ctx.fillStyle=ctx.strokeStyle;
     ctx.beginPath();ctx.moveTo(x,y(+c.high));ctx.lineTo(x,y(+c.low));ctx.stroke();
     const y1=y(Math.max(+c.open,+c.close)),y2=y(Math.min(+c.open,+c.close));
