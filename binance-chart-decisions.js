@@ -69,7 +69,7 @@ function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,inter
  const hits=[];
  for(const group of groups){
   const x=left+step*(group.index+.5),y=top+12+kinds.indexOf(group.kind)*17;
-  ctx.fillStyle=colors[group.kind];ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill();
+  // Analysis is selected through the existing history buttons; no chart dots overlay the candles.
   hits.push({...group,x,y});
   const button=document.createElement('button');button.type='button';button.className='analysis-marker '+group.kind;
   const labels={signal:'אות אושר',wait:'ממתין',error:'שגיאה',fill:'עסקה בוצעה'};
@@ -80,7 +80,7 @@ function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,inter
  const canvas=document.querySelector('#priceChart');
  canvas.onclick=event=>{
   const rect=canvas.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
-  const nearest=hits.filter(h=>Math.hypot(h.x-x,h.y-y)<=16).sort((a,b)=>Math.hypot(a.x-x,a.y-y)-Math.hypot(b.x-x,b.y-y))[0];
+  const nearest=hits.filter(h=>Math.abs(h.x-x)<=Math.max(8,step/2)).sort((a,b)=>Math.abs(a.x-x)-Math.abs(b.x-x))[0];
   if(nearest)chartDecisionDetails(nearest,allCandles,interval);
  };
 }
@@ -105,23 +105,21 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const colors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
  for(const [key,label] of points){
   const p=setup[key];if(!p||!(Number(p.price)>0))continue;
-  const index=view.findIndex(c=>Number(p.time)>=Number(c.openTime)&&Number(p.time)<=Number(c.closeTime));if(index<0)continue;
+  const stamp=Number(p.time)-(key==='confirmation'&&p.live?0:1);const index=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(index<0)continue;
   const button=document.createElement('button');button.type='button';button.className='wyckoff-pivot';
   button.style.setProperty('--pivot-color',colors[key]);button.dataset.pivot=key;
   const anchorX=left+step*(index+.5),anchorY=y(Number(p.price));
   const slot=points.findIndex(point=>point[0]===key);
-  const labelX=key==='confirmation'?anchorX:12+(width-24)*(slot+.5)/5;
-  const labelY=key==='confirmation'?anchorY:height-28;
-  if(key==='confirmation')button.classList.add('confirmation-pivot');
-  else button.style.width=Math.max(36,(width-24)/5-10)+'px';
+  const labelX=12+(width-24)*(slot+.5)/points.length;
+  const labelY=height-28;
+  button.style.width=Math.max(30,(width-24)/points.length-6)+'px';
   const connector=document.createElement('span');connector.className='wyckoff-connector';
   connector.style.setProperty('--pivot-color',colors[key]);
   connector.style.left=anchorX+'px';connector.style.top=anchorY+'px';
   connector.style.width=Math.hypot(labelX-anchorX,labelY-anchorY)+'px';
   connector.style.transform='rotate('+Math.atan2(labelY-anchorY,labelX-anchorX)+'rad)';root.append(connector);
-  const dot=document.createElement('span');dot.className='wyckoff-anchor';dot.dataset.pivot=key;dot.style.setProperty('--pivot-color',colors[key]);dot.style.left=anchorX+'px';dot.style.top=anchorY+'px';root.append(dot);
   button.style.left=labelX+'px';button.style.top=labelY+'px';
-  button.textContent=key==='confirmation'?'✓':label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+  button.textContent=label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
   button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
  }
 }

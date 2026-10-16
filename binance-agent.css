@@ -410,3 +410,5 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 
 /* Candle bodies and wicks flash instead of the annotation dots. */
 .wyckoff-pivots[data-active="true"] .wyckoff-anchor,.wyckoff-pivot.confirmation-pivot,.position-peak{animation:none}
+
+.position-candle-hit{position:absolute;transform:translateX(-50%);pointer-events:auto;border:0;border-radius:0;background:transparent;padding:0;cursor:pointer;z-index:5}.position-candle-hit:focus-visible{outline:2px solid #348bff;outline-offset:2px}
