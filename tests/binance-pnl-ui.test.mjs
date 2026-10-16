@@ -23,7 +23,7 @@ test('a DOWN trend with a profitable position is green; no profit is guessed for
 });
 test('real-time portfolio colors the P/L cells using actual signed P/L',async()=>{
  const body={innerHTML:''};
- const context={window:{},document:{querySelector:()=>body},setInterval(){},fetch:async()=>({json:async()=>({paper:{currency:'USDT',positions:{LOSS:{pnlIls:-1,pnlPct:-1},GAIN:{pnlIls:1,pnlPct:1},UNKNOWN:{pnlIls:null},ZERO:{pnlIls:0,pnlPct:0}}}})})};
+ const context={window:{binanceReadUrl:u=>u},document:{querySelector:()=>body},setInterval(){},fetch:async()=>({json:async()=>({paper:{currency:'USDT',positions:{LOSS:{pnlIls:-1,pnlPct:-1},GAIN:{pnlIls:1,pnlPct:1},UNKNOWN:{pnlIls:null},ZERO:{pnlIls:0,pnlPct:0}}}})})};
  vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../binance-agent-portfolio.js',import.meta.url),'utf8'),context);
  await context.refreshPortfolioPositions();assert.match(body.innerHTML,/pnl-loss/);assert.match(body.innerHTML,/pnl-profit/);assert.match(body.innerHTML,/pnl-unknown/);assert.match(body.innerHTML,/pnl-flat/);
 });
