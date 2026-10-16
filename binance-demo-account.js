@@ -1,5 +1,5 @@
 (()=>{
-const base=window.API_BASE||'https://binance-wave-agent.onrender.com';
+const base=window.API_BASE||'https://levi-binance.2-29-48-20.sslip.io';
 const status=document.getElementById('demoAccountStatus'),total=document.getElementById('demoAccountTotal'),body=document.getElementById('demoAccountBalances');
 const valueFormat=n=>Number(n).toLocaleString('he-IL',{maximumFractionDigits:2});
 const format=n=>Number(n).toLocaleString('he-IL',{maximumFractionDigits:8});

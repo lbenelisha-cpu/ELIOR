@@ -1,7 +1,7 @@
 
 async function refreshPortfolioPositions(){
   try{
-    const base = window.API_BASE || 'https://binance-wave-agent.onrender.com';
+    const base = window.API_BASE || 'https://levi-binance.2-29-48-20.sslip.io';
     const r = await fetch(base + '/api/binance-agent',{cache:'no-store'});
     const d = await r.json();
     const body=document.querySelector('#activePositionsBody');
