@@ -1,4 +1,5 @@
 const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://levi-binance.2-29-48-20.sslip.io';
+window.API_BASE=B;
 const MODE=B+'/api/binance-mode';
 const TRADE_CONTROL=B+'/api/binance-trade-control';
 const AGENT=B+'/api/binance-agent';
@@ -93,12 +94,22 @@ function setDashboardView(view){
 }
 
 async function J(u,o={}){
-  const r=await fetch(u,{cache:'no-store',...o});
-  if(!r.ok){
-    let x={}; try{x=await r.json()}catch{}
-    throw Error(x.error||`HTTP ${r.status}`);
+  const {timeoutMs=15000,...options}=o;
+  const controller=new AbortController(),external=options.signal;
+  const abort=()=>controller.abort(external.reason);
+  if(external?.aborted)abort();else external?.addEventListener('abort',abort,{once:true});
+  const timer=setTimeout(()=>controller.abort(new DOMException('השרת לא השיב בזמן. מתבצע ניסיון חוזר.','TimeoutError')),timeoutMs);
+  try{
+    const r=await fetch(u,{cache:'no-store',...options,signal:controller.signal});
+    if(!r.ok){
+      let x={};try{x=await r.json()}catch{}
+      throw Error(x.error||`HTTP ${r.status}`);
+    }
+    return await r.json();
+  }finally{
+    clearTimeout(timer);
+    external?.removeEventListener('abort',abort);
   }
-  return r.json();
 }
 
 function renderTradeControlStatus(s){
