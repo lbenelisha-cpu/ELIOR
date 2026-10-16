@@ -1,0 +1,22 @@
+# Colmex Wyckoff paper history
+
+The Colmex page now reads a separate server-side paper portfolio. No broker credentials, account balances or order endpoints are used. Existing browser-local manual positions and Binance LIVE execution remain separate.
+
+Production Netlify scheduled function `colmex-simulation-monitor` runs once per minute during UTC hours 13–21 on weekdays; the New York regular-session guard handles DST. It rotates the ten `SIM_SYMBOLS` in approximately ten minutes, using the existing shared Twelve Data cache and request limiter. Closing the browser does not stop it. Provider failures advance the queue and are visible per symbol, rather than blocking all stocks. Holidays and delayed/static prices never manufacture fills.
+
+State is stored in the site-wide, strongly consistent Netlify Blobs store `levi-colmex-wyckoff-simulation-v1`, key `portfolio`, with conditional creation/update. A repeated minute is ignored; concurrent results cannot overwrite an intervening portfolio version. GET `colmex-simulation` is read-only, returns the last 500 journal rows and full totals; `?all=1` returns the complete retained journal for CSV. Entries pause at 20,000 rows until an archive/migration is implemented; open positions can still exit. No public reset or configuration-write endpoint exists.
+
+## Rules and observation limits
+
+- Paper seed: USD 10,000, LONG only, five slots, USD 2,000 for each normal slot, available remainder for the last slot. Fractional shares are modeled, not asserted to be supported by the broker.
+- Shared `evaluateWyckoff` 5m pattern: two preceding green candles, initial high, first low, rally, secondary test, consolidation, Spring, reclaim. Open candles are excluded. The stocks-only session-gap callback permits a 16:00 close followed by a different session's 09:35 close. Intraday gaps stay invalid. Default Binance validation is unchanged. Early-close-session gaps currently remain invalid and are reported rather than filled with invented bars.
+- A current provider quote can confirm after a closed Spring without waiting for another closed candle. Twenty-minute signal expiry, target/Spring invalidation, consumed pattern guard, and a new initial peak after a sale are enforced. First live confirmation is persisted across invocations. Fills are never inserted before simulation creation.
+- Shared Spring exit: 10% below actual paper entry immediately; peak is updated on observed quotes; 80% of entry-to-peak gain protected after seven calendar days. Stops execute at the next observed quote, not the theoretical stop or a historical extreme. RSI is not an exit trigger.
+- Quotes up to twenty minutes delayed are accepted only in their regular session; decision time is the quote's event time. Both provider time (`at`) and receipt time (`observedAt`) are retained. Repeated/out-of-order quotes are skipped. Missing/currently stale bars block entry but cannot block an exit when an existing position has a usable quote.
+- This is a sampled, possibly delayed paper implementation. It is NOT a per-second replay or equivalent to Binance LIVE execution. Peaks and stop crossings between observations can be missed. No bid/ask spread, slippage, market impact, borrowing costs or short trades are modeled. The journal starts when enabled; historical candles supply setup context, not invented past trades.
+
+## Fees
+
+Real Colmex fees have not been supplied. The initial portfolio defaults `feeBps=null`: fees and net realized P/L stay unknown, and cash/value/P&L explicitly exclude commissions. `COLMEX_SIM_FEE_BPS` can seed a proportional per-side paper fee for a NEW portfolio (10 bps = 0.1%). It does not retroactively modify existing history. A per-share/minimum commission schedule will need a separate agreed model before net results can represent Colmex costs. Do not reset existing history just to change fee assumptions.
+
+Validation: full Node suite, causal buy/stop/weekly-lock cases, no-rebuy/invalidation, timezone/session gaps, data failures, fee accounting, scheduler deduplication; DOM checks of summary, ten symbols and 5m chart selection. Deployed scheduled execution and data-source availability must be checked separately.
