@@ -1,6 +1,10 @@
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
+const quotes={},quoteStatus={},quoteNextAt={};let quoteBusy=false;
+try{const stored=JSON.parse(localStorage.getItem(KEY+'-quotes')||'{}');for(const [symbol,q] of Object.entries(stored)){if(validSymbol(symbol)&&q?.symbol===symbol&&q.currency==='USD'&&positive(q.price)&&q.source==='Twelve Data'&&Number.isFinite(q.loadedAt)&&q.loadedAt<=Date.now()&&Date.now()-q.loadedAt<86400000)quotes[symbol]=q;}}catch{}
+function saveQuotes(){try{localStorage.setItem(KEY+'-quotes',JSON.stringify(quotes));}catch{}}
+
 const markets={},manualCharts=new Set(),pendingMarkets=new Set();let marketRequest=0;
 const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX'];
 let state={symbols:[...DEFAULT_SYMBOLS],positions:{},bars:{},drawings:{}},selected='AAPL';
@@ -11,20 +15,20 @@ selected=state.symbols[0];
 function message(s){$('#message').textContent=s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{message('לא ניתן לשמור בדפדפן. הנתונים זמינים כעת בלבד; נסה לצמצם את גודל הייבוא.');return false;}}
 function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);}
-function mark(symbol){const m=markets[symbol];const p=state.positions[symbol];if(positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):'זמן נתון לא זמין')+' · ייתכן עיכוב'};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
+function mark(symbol){const sources=[markets[symbol],quotes[symbol]].filter(Boolean).sort((a,b)=>(Date.parse(b.priceAt)||0)-(Date.parse(a.priceAt)||0));const m=sources[0];const p=state.positions[symbol];if(positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):'זמן נתון לא זמין')+' · ייתכן עיכוב'+(m.loadedAt&&Date.now()-m.loadedAt>=300000?' · נתון קודם, ממתין לרענון':'')};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
 function pnl(symbol){const p=state.positions[symbol],m=mark(symbol);return p&&m?{value:p.qty*m.price,gain:p.qty*(m.price-p.entry),pct:(m.price/p.entry-1)*100}:null;}
 function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});}
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
-function render(preserveForm=false){
+function render(preserveForm=false,preserveChart=false){
  $('#watchCount').textContent=String(state.symbols.length);
- $('#watchList').replaceChildren();for(const s of state.symbols){const b=document.createElement('button');b.className='watch-row'+(s===selected?' active':'');b.type='button';b.setAttribute('aria-pressed',s===selected?'true':'false');const symbol=document.createElement('b');symbol.textContent=s;const price=document.createElement('span');price.textContent=mark(s)?money(mark(s).price):'אין מחיר';b.append(symbol,price);b.onclick=()=>{selected=s;render();loadMarket(false);};$('#watchList').append(b);}
+ $('#watchList').replaceChildren();for(const s of state.symbols){const b=document.createElement('button');b.className='watch-row'+(s===selected?' active':'');b.type='button';b.setAttribute('aria-pressed',s===selected?'true':'false');const symbol=document.createElement('b');symbol.textContent=s;const price=document.createElement('span');const m=mark(s);price.textContent=m?money(m.price):(quoteStatus[s]||'ממתין לטעינה');if(m)price.title=m.source+(quoteStatus[s]?' · '+quoteStatus[s]:'');b.append(symbol,price);b.onclick=()=>{selected=s;render();loadMarket(false);};$('#watchList').append(b);}
  $('#selectedSymbol').textContent=selected;$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
  $('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
  const f=$('#positionForm');if(!preserveForm){f.elements.entry.value=p?.entry??'';f.elements.qty.value=p?.qty??'';f.elements.mark.value=p?.mark??'';}
  const symbols=Object.keys(state.positions),results=symbols.map(pnl),complete=results.every(Boolean);$('#positionCount').textContent=String(symbols.length);
  $('#totalValue').textContent=!symbols.length?'—':complete?money(results.reduce((s,p)=>s+p.value,0)):'חסרים מחירים';const gain=results.filter(Boolean).reduce((s,p)=>s+p.gain,0);$('#totalPnl').textContent=!symbols.length?'—':complete?(gain>0?'+':'')+money(gain):'חסרים מחירים';$('#totalPnl').className=symbols.length&&complete?(gain>=0?'profit':'loss'):'';
- renderChart();
+ if(!preserveChart)renderChart();
 }
 function validBar(b){return b&&typeof b.date==='string'&&Number.isFinite(Date.parse(b.date))&&['open','high','low','close'].every(k=>positive(b[k]))&&b.high>=Math.max(b.open,b.close)&&b.low<=Math.min(b.open,b.close)&&b.high>=b.low;}
 function parseCandles(text){
@@ -61,7 +65,7 @@ async function loadMarket(force=true){
   if(!response.ok)throw Error(data.error||'שגיאת מקור נתונים');
   if(data.symbol!==symbol||data.currency!=='USD'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
   if(drag||draft||manualCharts.has(symbol)||request!==marketRequest||selected!==symbol||$('#marketInterval').value!==interval)return;
-  markets[symbol]={...data,loadedAt:Date.now()};
+  markets[symbol]={...data,loadedAt:Date.now()};quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
   if(request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','1week':'שבוע','1month':'חודש'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
  }catch(error){if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=(error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message)+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון.';}
  finally{pendingMarkets.delete(key);}
@@ -112,3 +116,21 @@ $('#deleteDrawing').onclick=deleteSelectedDrawing;
 $('#drawingColor').oninput=()=>{const d=drawings().find(x=>x.id===selectedDrawingId);if(d){d.color=$('#drawingColor').value;save();paintDrawings();}};
 render();
 loadMarket(false);
+
+// Only quote prices are fetched for the watchlist; chart history stays selected-only.
+// A paced queue shares the provider's existing eight-request/minute guard.
+async function loadNextWatchQuote(){
+ if(quoteBusy||document.hidden||!$('#autoMarket').checked)return;
+ const now=Date.now(),symbol=state.symbols.find(s=>(quoteNextAt[s]||0)<=now&&(!quotes[s]||now-quotes[s].loadedAt>=300000)&&![...pendingMarkets].some(k=>k.startsWith(s+':')));
+ if(!symbol)return;quoteBusy=true;quoteStatus[symbol]='טוען מחיר…';render(true,true);
+ try{
+  const r=await fetch('/.netlify/functions/colmex-stock-quote?symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();
+  if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
+  quotes[symbol]={...data,loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
+ }catch{quoteStatus[symbol]='ממתין לספק · ניסיון חוזר';quoteNextAt[symbol]=Date.now()+65000;}
+ finally{quoteBusy=false;render(true,true);}
+ const ready=state.symbols.filter(s=>mark(s)).length;$('#watchQuoteStatus').textContent='מחירים מוצגים: '+ready+'/'+state.symbols.length+' · טעינה מדורגת · ייתכן עיכוב';
+}
+$('#refreshWatchQuotes').onclick=()=>{for(const s of state.symbols){quoteNextAt[s]=0;if(quotes[s])quotes[s].loadedAt=0;}$('#autoMarket').checked=true;loadNextWatchQuote();};
+setInterval(loadNextWatchQuote,12500);
+loadNextWatchQuote();
