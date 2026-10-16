@@ -405,3 +405,5 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 @keyframes wyckoffTradeBlink{0%,100%{opacity:1}50%{opacity:.15}}
 @media(prefers-reduced-motion:reduce){.wyckoff-pivots[data-active="true"] .wyckoff-anchor{animation:none}}
 .wyckoff-pivots[data-active="true"] .wyckoff-setup-status{color:#70f3be}
+
+.tradingview-link{color:#74b8ff;font-size:13px;text-decoration:none;display:inline-block;margin-top:8px}.tradingview-link:hover{text-decoration:underline}.tradingview-link:focus-visible{outline:2px solid #74b8ff;outline-offset:3px}

@@ -359,6 +359,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
+  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+a.symbol);
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
   put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');

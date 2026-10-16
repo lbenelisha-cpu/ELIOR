@@ -1,17 +1,11 @@
+import {buildColmexMarks} from './lib/colmex-chart-marks.mjs';
 let snapshot=null;
 const $=s=>document.querySelector(s),money=n=>Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4})+' USD':'—',time=at=>at?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'—';
 const labels={WAIT_POST_START_PRICE:'ממתין למחיר חדש לאחר תחילת הסימולציה',SEARCH_PEAK:'מחפש שיא ראשוני',FIRST_LOW:'מחפש שפל ראשון',RALLY_HIGH:'מחפש שיא התאוששות',SECONDARY_TEST:'בדיקה חוזרת',CONSOLIDATION:'דשדוש',SPRING:'ממתין לאישור אחרי Spring',SIGNALLED:'אות אושר',BUY:'קנייה מדומה',NO_FREE_SLOT:'כל 5 הפוזיציות תפוסות',INSUFFICIENT_SIM_CASH:'מזומן מדומה לא מספיק',WAIT_NEW_POST_SALE_PATTERN:'ממתין לתבנית חדשה לאחר מכירה',PATTERN_ALREADY_USED:'האישור כבר נוצל',WAIT_NEW_PRICE:'ממתין למחיר חדש',WAIT_CURRENT_5M_BARS:'ממתין לנרות 5 דקות עדכניים',WAIT_FRESH_MARKET_PRICE:'ממתין למחיר ספק עדכני בשעות המסחר',DATA_UNAVAILABLE_OR_PROVIDER_LIMIT:'נתונים לא זמינים / מגבלת ספק',WYCKOFF_SIGNAL_INVALIDATED:'האישור בוטל',STALE_5M_SIGNAL:'תוקף האישור פג',WAIT_RECLAIM:'ממתין לחזרה מעל השפל הראשון',WYCKOFF_MINIMUM_PROFIT_HOLD:'מעקב · הגנת רווח לאחר שבוע',WYCKOFF_HOLD:'מחזיק פוזיציה מדומה',WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · הפסד 10% מהכניסה',WYCKOFF_GAIN_GIVEBACK_20_PERCENT:'מכירה · החזרת 20% מהעלייה לשיא',WYCKOFF_LIVE_RECLAIM:'אישור וואיקוף במחיר ספק',WYCKOFF_RECLAIM:'אישור וואיקוף בנר',HISTORY_CAPACITY_REACHED:'היומן מלא · נדרשת ארכוב לפני המשך'};
 const label=x=>labels[x]||x||'ממתין לבדיקה הראשונה';
 function element(tag,text,className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function assetButton(symbol,detail,onSelect){const b=element('button',undefined,'sim-asset secondary');b.type='button';b.append(element('b',symbol),element('span',detail));b.onclick=()=>onSelect(symbol);return b;}
-export function simulationMarks(symbol){
- if(!snapshot?.state)return {points:[],lines:[]};const s=snapshot.state,p=s.positions[symbol],a=s.assets[symbol],points=[],lines=[];
- for(const j of s.journal.filter(j=>j.symbol===symbol))points.push({at:Date.parse(j.at),price:j.price,color:j.side==='BUY'?'#74b8ff':'#ff798b',label:(j.side==='BUY'?'קנייה מדומה':'מכירה מדומה')+' · '+money(j.price)+' · '+time(j.at)});
- const setup=p?.setup||a?.setup;
- for(const [key,name,color] of [['initialPeak','שיא ראשוני','#b99bff'],['firstLow','שפל ראשון','#ffbc70'],['rallyHigh','שיא התאוששות','#f18cce'],['secondaryTest','בדיקה חוזרת','#8dd8d0'],['springLow','Spring','#f4dd7c']]){const point=setup?.[key];if(point)points.push({at:point.time,price:point.price,color,label:name+' · '+money(point.price)+' · '+time(point.time)});}
- if(p){points.push({at:Date.parse(p.peakAt),price:p.peakPrice,color:'#74b8ff',pulse:true,label:'השיא שנצפה · '+money(p.peakPrice)+' · '+time(p.peakAt)});lines.push({price:p.entryPrice,color:'#74b8ff',label:'כניסה מדומה'},{price:p.peakPrice,color:'#b99bff',label:'שיא שנצפה'},{price:p.effectiveStopPrice||p.entryPrice*.9,color:'#ff798b',label:'סף מכירה פעיל'});}
- return {points,lines};
-}
+export function simulationMarks(symbol){return buildColmexMarks(snapshot?.state,symbol);}
 export function initSimulation({onSelect,onUpdate}){
  let busy=false;
  async function refresh(){if(busy)return;busy=true;$('#refreshSimulation').disabled=true;
