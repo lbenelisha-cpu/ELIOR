@@ -31,7 +31,7 @@ let chartVisibleStartTime=0;
 let priceRangeScale=1;
 let activeView='trade';
 let demoTradingEnabled=false;
-let tradeControlToken=null;
+let tradeControlToken=window.LEVI_TRADE_AUTH?.read()||null;
 let tradeControlWorking=false;
 let moneyUnit='₪';
 let chartCandles=[];
@@ -852,21 +852,23 @@ async function load(){
 
 async function authenticatedControl(url,body){
   if(!tradeControlToken){
-    const token=prompt('הזן את קוד בקרת המסחר (BINANCE_CONTROL_TOKEN) המוגדר בשרת — לפחות 32 תווים:');
+    const token=prompt('חיבור חד־פעמי של המכשיר למסחר: הזן את BINANCE_CONTROL_TOKEN. הקוד יישמר במכשיר ולא יידרש בכל קנייה או מכירה:');
     if(!token)return null;
     const trimmed=token.trim();
     if(trimmed.length<32){const error=Error('קוד בקרת המסחר חייב להכיל לפחות 32 תווים.');error.status=400;throw error;}
     tradeControlToken=trimmed;
   }
   try{
-    return await J(url,{
+    const result=await J(url,{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+tradeControlToken},
       body:JSON.stringify(body)
     });
+    window.LEVI_TRADE_AUTH?.remember(tradeControlToken);
+    return result;
   }catch(e){
     if(/401|Authenticated control required/i.test(e.message)){
-      tradeControlToken=null;
+      tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();
       const error=Error('האימות נכשל. יש להגדיר בשרת BINANCE_CONTROL_TOKEN באורך 32 תווים לפחות ולהזין כאן את אותו הקוד.');error.status=401;throw error;
     }
     throw e;
@@ -902,7 +904,7 @@ async function sendTradeControl(action){
       alert('המסחר נעצר. נסגרו '+(r.sold||[]).length+' פוזיציות. אין קניות חדשות.');
     }
   }catch(e){
-    if(/401|Authenticated control required/i.test(e.message))tradeControlToken=null;
+    if(/401|Authenticated control required/i.test(e.message)){tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();}
     alert('הפעולה לא הושלמה: '+e.message);
   }finally{
     tradeControlWorking=false;
@@ -974,5 +976,6 @@ document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{pri
 window.LEVI_MANUAL_TRADES={
  context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
  submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
+ forget:()=>{tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();},
  refresh:async()=>{await load();await loadChart(selectedSymbol);}
 };
