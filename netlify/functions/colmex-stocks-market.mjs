@@ -1,3 +1,4 @@
+import {cachedStockRead,validStockSnapshot} from '../../lib/colmex-market-cache.mjs';
 import {td} from '../../lib/agent.mjs';
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 const positive=x=>Number.isFinite(Number(x))&&Number(x)>0;
@@ -16,8 +17,10 @@ export async function handler(event){
  const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase(),interval=String(event.queryStringParameters?.interval||'1day');
  if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)||!['5min','1h','1day','1week','1month'].includes(interval))return reply(400,{error:'סימול או משך נר לא תקינים'});
  try{
+  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+interval,validate:d=>validStockSnapshot(d,symbol,interval),fetchData:async()=>{
   const [series,quote]=await Promise.allSettled([td('time_series',{symbol,interval,outputsize:250,order:'ASC',adjust:'splits',timezone:'UTC'},['1day','1week','1month'].includes(interval)?1800:60),td('quote',{symbol},60)]);
   if(series.status!=='fulfilled')throw Error('SERIES_UNAVAILABLE');
-  return reply(200,normalizeMarket(series.value,quote.status==='fulfilled'?quote.value:null,symbol,interval));
+  return normalizeMarket(series.value,quote.status==='fulfilled'?quote.value:null,symbol,interval);
+  }});return reply(200,data);
  }catch{return reply(503,{error:'לא ניתן לטעון נתוני שוק כעת. ייתכן שהסימול אינו נתמך או שמכסת הספק נוצלה. נסה שוב או ייבא CSV.'});}
 }
