@@ -973,6 +973,6 @@ document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{pri
 
 window.LEVI_MANUAL_TRADES={
  context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
- submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {ok:false,uncertain:false,error:error.message};throw error;}},
+ submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
  refresh:async()=>{await load();await loadChart(selectedSymbol);}
 };

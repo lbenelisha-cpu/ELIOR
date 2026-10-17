@@ -38,3 +38,7 @@ test('manual route remains inside authenticated live controls and execution take
 test('status-only checks with no recorded request can never become new trades',async()=>{
  const requests=store();let posts=0;const result=await requests.execute({...manualTradeInput(request),statusOnly:true},{submit:async()=>{posts++;},reconcile:async()=>null,isUncertain:()=>false});assert.equal(posts,0);assert.equal(result.uncertain,true);assert.equal(Object.keys(requests.rows).length,0);
 });
+test('a previously ambiguous order that is confirmed rejected unlocks the UI without a replacement order',async()=>{
+ const ctx=vm.createContext({manualTradeInput,mode:'live',liveExecutionInFlight:false,manualRequests:{rows:{[request.requestId]:{}},execute:async(input,options)=>options.reconcile(input)},liveOrders:{pending:{meta:{manualRequestId:request.requestId}},recover:async()=>({status:'REJECTED',executedQty:'0'})},liveActionLog:[],recordLiveFill(){}});
+ vm.runInContext(source.slice(source.indexOf('async function executeManualTrade('),source.indexOf('async function executeLiveCycle(')),ctx);const result=await ctx.executeManualTrade({...request,statusOnly:true});assert.equal(result.ok,false);assert.equal(result.uncertain,false);assert.match(result.error,/REJECTED/);assert.equal(result.requestId,request.requestId);
+});

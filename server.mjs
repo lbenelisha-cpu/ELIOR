@@ -765,7 +765,9 @@ async function executeManualTrade(body){
    return placeLiveMarketSell(request.symbol,'MANUAL_SELL',{manualRequestId:request.requestId,sellAllBalance:true});
   },
   reconcile:async request=>{
-   if(liveOrders.pending?.meta?.manualRequestId===request.requestId)await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+   let recovered=null;
+   if(liveOrders.pending?.meta?.manualRequestId===request.requestId)recovered=await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+   if(recovered&&!(Number(recovered.executedQty)>0))return {ok:false,uncertain:false,requestId:request.requestId,error:'ההזמנה הסתיימה ללא ביצוע: '+recovered.status};
    const fill=liveActionLog.find(a=>a.manualRequestId===request.requestId);
    return fill?{ok:true,requestId:request.requestId,order:{orderId:fill.orderId,status:fill.status,executedQty:fill.executedQty,cummulativeQuoteQty:fill.amountUsdt}}:null;
   },
