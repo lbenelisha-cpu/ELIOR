@@ -1,3 +1,4 @@
+import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
 import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
 import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
@@ -520,7 +521,7 @@ const EXCLUDED_BASES=new Set([...STABLE_BASES,'USDC','FDUSD','TUSD','USDP','DAI'
 const LEVERAGED_SUFFIXES=['UP','DOWN','BULL','BEAR'];
 
 async function j(url){
-  const r=await fetch('https://api.binance.com'+url);
+  const r=await fetch('https://api.binance.com'+url,{signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw Error('Binance '+r.status);
   return r.json();
 }
@@ -573,7 +574,8 @@ async function signedBinanceGet(pathname,params={}){
   const url='https://api.binance.com'+pathname+'?'+query.toString()+'&signature='+signature;
   const r=await fetch(url,{
     headers:{'X-MBX-APIKEY':BINANCE_API_KEY},
-    cache:'no-store'
+    cache:'no-store',
+    signal:AbortSignal.timeout(15000)
   });
 
   const body=await r.json().catch(()=>({}));
@@ -600,7 +602,8 @@ async function signedBinancePost(pathname,params={}){
   const r=await fetch(url,{
     method:'POST',
     headers:{'X-MBX-APIKEY':BINANCE_API_KEY},
-    cache:'no-store'
+    cache:'no-store',
+    signal:AbortSignal.timeout(15000)
   });
 
   const body=await r.json().catch(()=>({}));
@@ -746,17 +749,14 @@ function persistLivePeak(symbol, position){
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
 }
 
-let liveExecutionInFlight=false;
+const liveExecution=new LiveExecutionLock();
 async function maybeExecuteLive(evals){
- if(liveExecutionInFlight)return;liveExecutionInFlight=true;
- try{return await executeLiveCycle(evals);}finally{liveExecutionInFlight=false;}
+ return liveExecution.automatic(()=>executeLiveCycle(evals));
 }
 async function executeManualTrade(body){
  const input=manualTradeInput(body);
  if(mode!=='live'&&!manualRequests.rows?.[input.requestId]&&!input.statusOnly)throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
- if(liveExecutionInFlight)throw Error('פעולת מסחר אחרת מתבצעת כעת. המתן לסיומה.');
- liveExecutionInFlight=true;
- try{return await manualRequests.execute(input,{
+ return liveExecution.manual(()=>manualRequests.execute(input,{
   submit:async request=>{
    if(request.side==='BUY'&&tradeControl.paused)throw Error('המסחר מושהה. יש לחדש אותו לפני קנייה.');
    await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
@@ -772,10 +772,27 @@ async function executeManualTrade(body){
    return fill?{ok:true,requestId:request.requestId,order:{orderId:fill.orderId,status:fill.status,executedQty:fill.executedQty,cummulativeQuoteQty:fill.amountUsdt}}:null;
   },
   isUncertain:request=>liveOrders.pending?.meta?.manualRequestId===request.requestId
- });}finally{liveExecutionInFlight=false;}
+ }));
 }
 async function executeLiveCycle(evals){
   if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
+  // Most one-second cycles only observe peaks. Do not reserve network work
+  // (and block manual execution) unless a sale, entry, or recovery is needed.
+  let needsExecution=Boolean(liveOrders.pending);
+  for(const ev of evals){
+    if(!ev.ok)continue;
+    const saved=tradingPositions()[ev.symbol];
+    if(saved){
+      let price;
+      try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
+      observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
+      persistLivePeak(ev.symbol,saved);
+      if(wyckoffExit(saved,price).sell)needsExecution=true;
+    }
+    if(!tradeControl.paused&&ev.entryConfirmed&&ev.wyckoffTrade&&!saved&&
+      !liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))needsExecution=true;
+  }
+  if(!needsExecution)return;
   const gate=liveTradingGate(await getApiRestrictions());
   if(!gate.ready)return;
   if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for LIVE auto execution');
@@ -2041,7 +2058,7 @@ const server=http.createServer((req,res)=>{
     req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy();});
     req.on('end',async()=>{
       try{
-        if(liveExecutionInFlight)return send(res,{ok:false,error:'פעולת מסחר מתבצעת כעת. המתן לסיומה.'},409);
+        if(liveExecution.busy)return send(res,{ok:false,error:'פעולת מסחר מתבצעת כעת. המתן לסיומה.'},409);
         const action=JSON.parse(body||'{}').action;
         if(!['stop','start'].includes(action))return send(res,{ok:false,error:'Invalid action'},400);
         if(action==='start'){
@@ -2109,7 +2126,7 @@ const server=http.createServer((req,res)=>{
     req.on('data',x=>b+=x);
     req.on('end',()=>{
       try{
-        if(liveExecutionInFlight)throw Error('פעולת מסחר מתבצעת כעת. המתן לסיומה לפני מעבר מצב.');
+        if(liveExecution.busy)throw Error('פעולת מסחר מתבצעת כעת. המתן לסיומה לפני מעבר מצב.');
         const m=JSON.parse(b).mode;
         if(!['demo','live'].includes(m))throw Error('Invalid mode');
         if(m==='live'&&!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');

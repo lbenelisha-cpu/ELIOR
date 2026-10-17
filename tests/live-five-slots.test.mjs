@@ -33,7 +33,7 @@ test('LIVE permits fifth position and rejects sixth while DEMO remains ten',asyn
     const buys=[];let count=held;
     const context=vm.createContext({liveNextBuyAllocation,mode:'live',LIVE:true,AUTO_EXECUTION:true,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:100,KELLY_RULESET:'TEST_RULESET',
       liveTradingGate:()=>({ready:true,withdrawalsEnabled:false}),getApiRestrictions:async()=>({}),
-      liveOrders:{recover:async()=>{}},signedBinanceGet(){},recordLiveFill(){},liveActionLog:[],tradeControl:{paused:false},
+      tradingPositions:()=>({}),liveOrders:{recover:async()=>{}},signedBinanceGet(){},recordLiveFill(){},liveActionLog:[],tradeControl:{paused:false},
       getLiveAccountSnapshot:async()=>({balances:Array.from({length:count},(_,i)=>({asset:'HELD'+i,qty:1,valueUsdt:30})),fixedPositionUsdt:30,usdtFree:90}),
       placeLiveMarketBuy:async s=>{buys.push(s);count++;}
     });

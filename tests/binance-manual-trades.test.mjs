@@ -1,3 +1,4 @@
+import {LiveExecutionLock} from '../lib/live-execution-lock.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import vm from 'node:vm';
 import {manualTradeInput,manualBuyAmount,manualSellQuantity,manualPosition,ManualTradeRequests} from '../lib/binance-manual-trades.mjs';
 import {liveFillAction,trackedLivePositions} from '../lib/wyckoff-live-positions.mjs';import {binancePositionExit} from '../lib/binance-position-exit.mjs';
@@ -33,12 +34,12 @@ test('manual fill is tracked, protected by current stop and cleared by the full 
  const now=Date.now(),buy=liveFillAction({executedQty:'1',cummulativeQuoteQty:'100',status:'FILLED',orderId:1,transactTime:now},{params:{symbol:'UNIUSDT',side:'BUY'},meta:{wyckoffTrade:manualPosition()},at:new Date(now).toISOString(),reason:'MANUAL_BUY'},[]);const p=trackedLivePositions([buy]).UNIUSDT;assert.equal(p.entryPrice,100);assert.equal(binancePositionExit(p,89,now+1000).sell,true);assert.equal(p.setup,undefined);assert.deepEqual(trackedLivePositions([{symbol:'UNIUSDT',type:'SELL',qty:1,price:105},buy]),{});
 });
 test('manual route remains inside authenticated live controls and execution takes the automatic order lock',async()=>{
- assert.match(source,/u\.pathname\.startsWith\('\/api\/binance-live\/'\)/);let called=0;const ctx=vm.createContext({manualTradeInput,mode:'demo',liveExecutionInFlight:false,manualRequests:{execute:async()=>{called++;}}});vm.runInContext(source.slice(source.indexOf('async function executeManualTrade('),source.indexOf('async function executeLiveCycle(')),ctx);await assert.rejects(()=>ctx.executeManualTrade(request),/DEMO/);ctx.mode='live';ctx.liveExecutionInFlight=true;await assert.rejects(()=>ctx.executeManualTrade(request),/אחרת/);assert.equal(called,0);
+ assert.match(source,/u\.pathname\.startsWith\('\/api\/binance-live\/'\)/);let called=0;const ctx=vm.createContext({manualTradeInput,mode:'demo',liveExecution:new LiveExecutionLock(),manualRequests:{execute:async()=>{called++;}}});vm.runInContext(source.slice(source.indexOf('async function executeManualTrade('),source.indexOf('async function executeLiveCycle(')),ctx);await assert.rejects(()=>ctx.executeManualTrade(request),/DEMO/);ctx.mode='live';await ctx.executeManualTrade(request);assert.equal(called,1);
 });
 test('status-only checks with no recorded request can never become new trades',async()=>{
  const requests=store();let posts=0;const result=await requests.execute({...manualTradeInput(request),statusOnly:true},{submit:async()=>{posts++;},reconcile:async()=>null,isUncertain:()=>false});assert.equal(posts,0);assert.equal(result.uncertain,true);assert.equal(Object.keys(requests.rows).length,0);
 });
 test('a previously ambiguous order that is confirmed rejected unlocks the UI without a replacement order',async()=>{
- const ctx=vm.createContext({manualTradeInput,mode:'live',liveExecutionInFlight:false,manualRequests:{rows:{[request.requestId]:{}},execute:async(input,options)=>options.reconcile(input)},liveOrders:{pending:{meta:{manualRequestId:request.requestId}},recover:async()=>({status:'REJECTED',executedQty:'0'})},liveActionLog:[],recordLiveFill(){}});
+ const ctx=vm.createContext({manualTradeInput,mode:'live',liveExecution:new LiveExecutionLock(),manualRequests:{rows:{[request.requestId]:{}},execute:async(input,options)=>options.reconcile(input)},liveOrders:{pending:{meta:{manualRequestId:request.requestId}},recover:async()=>({status:'REJECTED',executedQty:'0'})},liveActionLog:[],recordLiveFill(){}});
  vm.runInContext(source.slice(source.indexOf('async function executeManualTrade('),source.indexOf('async function executeLiveCycle(')),ctx);const result=await ctx.executeManualTrade({...request,statusOnly:true});assert.equal(result.ok,false);assert.equal(result.uncertain,false);assert.match(result.error,/REJECTED/);assert.equal(result.requestId,request.requestId);
 });

@@ -11,3 +11,16 @@ Manual buys record entrySource MANUAL without fabricated Wyckoff pivots, and ent
 Deployment requires `server.mjs`, `lib/binance-manual-trades.mjs` and `lib/live-buy-allocation.mjs` from the same revision, with existing backend libraries retained. The frontend enables controls only when GET `/api/binance-mode` advertises `manualTrading.version: 1`. Old backends keep the buttons disabled with an update notice; installing only the frontend cannot accidentally use the old amount-overriding endpoints. No actual order was sent while implementing or testing. SSH from this workspace was network-unreachable, so backend installation must be completed through the owner's existing SSH terminal.
 
 Validation: 356 repository tests and an offline DOM scenario cover exact quote amounts, full free-wallet sale versus automatic tracked-quantity sale, minimums/caps/slots, decimal rounding and tiny assets, persisted request deduplication, uncertainty recovery, LIVE authorization/mode locks, normal exit tracking, confirmation/cancel/double-click behavior, symbol changes and old-backend capability gating.
+
+## Manual execution priority
+
+Manual requests wait up to eight seconds for the existing execution to finish,
+then take priority over new automatic cycles. A waiting timeout cancels only
+that waiting request; it never releases an active order lock or submits later.
+Idle one-second monitoring still observes and persists peaks, but only performs
+exchange account/recovery work when an exit, an entry, or a pending order needs
+it. Public and signed Binance requests have a 15-second network deadline;
+ambiguous submissions retain their persisted identity for reconciliation.
+
+Install this revision with the same pinned installer command. This is a server
+update; publishing the web page alone does not update the trading process.

@@ -6,7 +6,7 @@ cd /opt/levi-binance
 stage=$(mktemp -d /tmp/levi-manual-trades.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/lib"
-for file in server.mjs lib/binance-manual-trades.mjs lib/live-buy-allocation.mjs; do
+for file in server.mjs lib/binance-manual-trades.mjs lib/live-buy-allocation.mjs lib/live-execution-lock.mjs; do
   git show "$revision:$file" > "$stage/$file"
   node --check "$stage/$file"
 done
@@ -24,6 +24,7 @@ backup="/root/levi-before-manual-$(date +%Y%m%d-%H%M%S).tgz"
 tar -czf "$backup" server.mjs lib
 cp "$stage/lib/binance-manual-trades.mjs" lib/binance-manual-trades.mjs
 cp "$stage/lib/live-buy-allocation.mjs" lib/live-buy-allocation.mjs
+cp "$stage/lib/live-execution-lock.mjs" lib/live-execution-lock.mjs
 cp "$stage/server.mjs" server.mjs
 if ! systemctl restart levi-binance; then
   tar -xzf "$backup" -C /opt/levi-binance
