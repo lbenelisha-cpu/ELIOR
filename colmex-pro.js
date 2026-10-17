@@ -1,6 +1,6 @@
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
-import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences} from './lib/colmex-chart-view.mjs?v=20261017-occurrences';
-import {markBarIndex} from './lib/colmex-chart-marks.mjs';
+import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences} from './lib/colmex-chart-view.mjs?v=20261017-intervals';
+import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
 import {initSimulation,simulationMarks,simulationWyckoffHistory} from './colmex-simulation-ui.js?v=20261017-occurrences';
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
 'use strict';
@@ -94,11 +94,11 @@ async function loadMarket(force=true){
  try{
   const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await response.json();
   if(!response.ok)throw Error(data.error||'שגיאת מקור נתונים');
-  if(data.symbol!==symbol||data.currency!=='USD'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
+  if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
   if(drag||draft||manualCharts.has(symbol)||request!==marketRequest||selected!==symbol||$('#marketInterval').value!==interval)return;
   markets[symbol]={...data,loadedAt:Date.now()};quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
-  if(interval==='5min'){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
- if(request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','1week':'שבוע','1month':'חודש'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
+  if(['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
+ if(request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
  }catch(error){if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=(error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message)+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון.';}
  finally{pendingMarkets.delete(key);}
 }
