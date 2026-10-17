@@ -1,3 +1,4 @@
+import {lastTwoTradingDays,startCandleFlashing} from './lib/colmex-chart-view.mjs';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs';
 import {initSimulation,simulationMarks} from './colmex-simulation-ui.js';
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
@@ -43,7 +44,7 @@ function parseCandles(text){
 let drawTool='select',selectedDrawingId=null,draft=null,drag=null,chartDrawing=null;
 function renderChart(){
  draft=null;drag=null;chartDrawing=null;
- const root=$('#chart'),bars=chartBars().slice(-250);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();root.replaceChildren();if(!bars.length){paintDrawings();$('#drawingHelp').textContent='טען נרות לפני הוספת קווים לגרף';const p=document.createElement('p');p.textContent='טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
+ const root=$('#chart'),bars=lastTwoTradingDays(chartBars(),markets[selected]?.interval||$('#marketInterval').value);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();root.replaceChildren();if(!bars.length){paintDrawings();$('#drawingHelp').textContent='טען נרות לפני הוספת קווים לגרף';const p=document.createElement('p');p.textContent=['1week','1month'].includes($('#marketInterval').value)?'לטווח של שני ימי מסחר בחר נרות 5 דקות, שעה או יום.':'טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
  const chartName=STOCK_NAMES[selected]||markets[selected]?.name||quotes[selected]?.name||selected;
  add('rect',{x:15,y:2,width:745,height:22,rx:4,fill:'#08111f'});
@@ -69,7 +70,7 @@ function renderChart(){
  let previousBadgeY=-Infinity;for(const line of [...sim.lines].sort((a,b)=>y(a.price)-y(b.price))){const badgeY=Math.min(270,Math.max(35,y(line.price),previousBadgeY+16));previousBadgeY=badgeY;add('line',{x1:760,y1:y(line.price),x2:770,y2:badgeY,stroke:line.color});add('rect',{x:766,y:badgeY-10,width:81,height:15,rx:3,fill:'#08111f',stroke:line.color});add('text',{x:843,y:badgeY+1,fill:line.color,'font-size':10,'text-anchor':'end'},money(line.price));}
  for(const card of sim.cards){const button=document.createElement('button');button.type='button';button.className='mark-card secondary';button.style.borderColor=card.color;const name=document.createElement('span'),value=document.createElement('b');name.textContent=card.name;value.textContent=money(card.price)+' USD';value.style.color=card.color;button.append(name,value);if(Number.isFinite(card.at)){const date=document.createElement('small');date.textContent=atTime(card.at);button.append(date);}button.onclick=()=>{$('#chartMarkDetails').textContent=detail(card)+(Number.isFinite(card.at)&&markBarIndex(card,bars,interval)<0?' · הנקודה מחוץ לטווח הנרות המוצג':'');};$('#chartMarkLegend').append(button);}
  if(!sim.cards.length)$('#chartMarkDetails').textContent=manualCharts.has(selected)?'מצב CSV · סימוני סימולציה מוסתרים כדי לא לערבב מקורות נתונים.':'טרם זוהו נקודות וואיקוף או עסקאות עבור המניה הזו; נקודות יופיעו עם התקדמות הבדיקה.';
- add('text',{x:20,y:303,fill:'#93a8bf','font-size':11},bars[0].date);add('text',{x:750,y:303,fill:'#93a8bf','font-size':11,'text-anchor':'end'},bars.at(-1).date);root.append(svg);attachDrawingTools(svg,bars,lo,hi);root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים עד 250 נרות אחרונים.');
+ add('text',{x:20,y:303,fill:'#93a8bf','font-size':11},bars[0].date);add('text',{x:750,y:303,fill:'#93a8bf','font-size':11,'text-anchor':'end'},bars.at(-1).date);root.append(svg);attachDrawingTools(svg,bars,lo,hi);root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים שני ימי המסחר האחרונים בלבד.');
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
 $('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};
@@ -159,3 +160,5 @@ setInterval(loadNextWatchQuote,12500);
 loadNextWatchQuote();
 
 initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!drag&&!draft)renderChart();}});
+
+startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});

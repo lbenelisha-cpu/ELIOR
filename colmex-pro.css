@@ -12,5 +12,7 @@
 
 .chart-mark-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.mark-card{padding:10px;text-align:right;display:flex;flex-direction:column;gap:6px;font-size:12px;min-width:0}.mark-card b{font-size:14px;direction:ltr;text-align:right;overflow-wrap:anywhere}.mark-card small{font-size:11px;color:var(--muted)}.sim-chart-key{flex-wrap:wrap;line-height:1.7}.chart [data-mark-id]{cursor:pointer}.chart [data-mark-id]:focus{outline:none;stroke:#fff;stroke-width:3}#chartMarkDetails{min-height:2em;background:#0a1625;border-radius:8px;padding:10px;overflow-wrap:anywhere}@media(max-width:800px){.chart-mark-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
-/* Flash the actual candle body and wick; chart events have no circle markers. */
-.sim-candle-flash{animation:simCandleFlash 1.25s ease-in-out infinite}@keyframes simCandleFlash{0%,100%{opacity:1;filter:brightness(1.6)}50%{opacity:.08;filter:brightness(.6)}}@media(prefers-reduced-motion:reduce){.sim-candle-flash{animation:none;filter:brightness(1.5)}}
+/* Explicit chart control drives both wick and body phases, including iOS. */
+.sim-candle-flash{animation:none;opacity:1;filter:none}
+#chart.candle-phase-off .sim-candle-flash{opacity:.08!important}
+.flash-control{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}.flash-control input{width:auto}
