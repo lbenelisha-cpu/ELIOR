@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="/binance-agent.css?v=20261017-history">
+  <link rel="stylesheet" href="/binance-agent.css?v=20261017-manual">
 </head>
 <body>
   <main class="app-shell">
@@ -168,6 +168,7 @@
           </div>
         </div>
 
+        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה ידנית</button><button id="manualSellBtn" type="button" disabled>מכור את כל הכמות</button><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
         <details class="chart-menu"><summary class="refresh">פירוט · הגדרות גרף</summary>
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
@@ -372,9 +373,11 @@
     </section>
   </main>
 
+  <dialog id="manualTradeDialog" aria-labelledby="manualTradeTitle"><h2 id="manualTradeTitle"></h2><p id="manualTradeSummary"></p><label id="manualAmountRow">סכום קנייה ב־USDT<input id="manualQuoteAmount" type="number" inputmode="decimal" min="5" step="0.01" autocomplete="off"></label><p id="manualTradePolicy" class="mini"></p><p id="manualTradeResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="manualTradeSubmit" type="button">אשר</button><button id="manualTradeCheck" type="button" hidden>בדוק מצב בקשה</button><button id="manualTradeCancel" type="button">סגור / ביטול</button></div></dialog>
   <script src="/binance-chart-decisions.js?v=20261017-history"></script>
   <script src="/binance-indicators.js?v=20261017-history"></script>
-  <script src="/binance-agent.js?v=20261017-history"></script>
+  <script src="/binance-agent.js?v=20261017-manual"></script>
+  <script src="/binance-manual-trades.js?v=20261017-manual"></script>
   <script src="/binance-agent-portfolio.js?v=20261017-history"></script>
 <script src="/binance-demo-account.js?v=20261017-history"></script>
 <script src="/binance-market-watch.js?v=20261017-history"></script>

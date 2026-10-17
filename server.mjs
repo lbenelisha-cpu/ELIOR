@@ -1,3 +1,4 @@
+import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
 import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
@@ -317,6 +318,7 @@ function loadPaperState(){
 
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
+const manualRequests=new ManualTradeRequests(LIVE_LOG_FILE+'.manual');
 const DECISION_HISTORY_FILE=process.env.BINANCE_DECISION_HISTORY_FILE||'/var/data/binance-decision-history.json';
 let decisionHistory={};
 
@@ -662,11 +664,18 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
 
   const funding=await getLiveAccountSnapshot();
   const activeBalances=funding.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5);
-  if(activeBalances.some(b=>b.asset+'USDT'===symbol))throw Error('LIVE position is already held');
-  if(activeBalances.length>=LIVE_MAX_POSITIONS)throw Error('No free LIVE position slot');
-  const allocation=liveNextBuyAllocation(funding,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
-  if(!allocation.ok)throw Error('LIVE buy allocation blocked: '+allocation.code);
-  quoteUsdt=allocation.amountUsdt;
+  if(reason!=='MANUAL_BUY'){
+    if(activeBalances.some(b=>b.asset+'USDT'===symbol))throw Error('LIVE position is already held');
+    if(activeBalances.length>=LIVE_MAX_POSITIONS)throw Error('No free LIVE position slot');
+  }
+  if(reason==='MANUAL_BUY'){
+    quoteUsdt=manualBuyAmount(quoteUsdt,funding,{...info,symbol},{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
+    meta={...meta,wyckoffTrade:manualPosition()};
+  }else{
+    const allocation=liveNextBuyAllocation(funding,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
+    if(!allocation.ok)throw Error('LIVE buy allocation blocked: '+allocation.code);
+    quoteUsdt=allocation.amountUsdt;
+  }
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
@@ -689,6 +698,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
+  if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
   if(['spring_retest','wyckoff_confirmation'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000));
@@ -710,10 +720,12 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
 
   const info=await symbolExchangeInfo(symbol);
   const lot=info?.filters?.find(x=>x.filterType==='LOT_SIZE');
+  if(!info||info.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false)throw Error('המטבע אינו זמין למסחר Spot');
   const trackedQty=Number(tradingPositions()[symbol]?.qty||0);
-  if(!(trackedQty>0))throw Error('No tracked Wyckoff quantity to sell');
-  const qty=floorToStep(Math.min(bal.free,trackedQty),Number(lot?.stepSize||0));
-  if(!(qty>0))throw Error('Sell quantity is below LOT_SIZE');
+  const sellAll=reason==='MANUAL_SELL'&&meta.sellAllBalance===true;
+  if(!sellAll&&!(trackedQty>0))throw Error('No tracked Wyckoff quantity to sell');
+  const qty=sellAll?manualSellQuantity(bal,info):floorToStep(Math.min(bal.free,trackedQty),Number(lot?.stepSize||0));
+  if(!(Number(qty)>0))throw Error('Sell quantity is below LOT_SIZE');
   const dustThresholdUsdt=Math.max(5,...(info.filters||[]).filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType)).map(f=>Number(f.minNotional)||0));
 
   return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
@@ -738,6 +750,27 @@ let liveExecutionInFlight=false;
 async function maybeExecuteLive(evals){
  if(liveExecutionInFlight)return;liveExecutionInFlight=true;
  try{return await executeLiveCycle(evals);}finally{liveExecutionInFlight=false;}
+}
+async function executeManualTrade(body){
+ const input=manualTradeInput(body);
+ if(mode!=='live'&&!manualRequests.rows?.[input.requestId]&&!input.statusOnly)throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
+ if(liveExecutionInFlight)throw Error('פעולת מסחר אחרת מתבצעת כעת. המתן לסיומה.');
+ liveExecutionInFlight=true;
+ try{return await manualRequests.execute(input,{
+  submit:async request=>{
+   if(request.side==='BUY'&&tradeControl.paused)throw Error('המסחר מושהה. יש לחדש אותו לפני קנייה.');
+   await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+   if(mode!=='live')throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
+   if(request.side==='BUY')return placeLiveMarketBuy(request.symbol,request.quoteUsdt,'MANUAL_BUY',{manualRequestId:request.requestId});
+   return placeLiveMarketSell(request.symbol,'MANUAL_SELL',{manualRequestId:request.requestId,sellAllBalance:true});
+  },
+  reconcile:async request=>{
+   if(liveOrders.pending?.meta?.manualRequestId===request.requestId)await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+   const fill=liveActionLog.find(a=>a.manualRequestId===request.requestId);
+   return fill?{ok:true,requestId:request.requestId,order:{orderId:fill.orderId,status:fill.status,executedQty:fill.executedQty,cummulativeQuoteQty:fill.amountUsdt}}:null;
+  },
+  isUncertain:request=>liveOrders.pending?.meta?.manualRequestId===request.requestId
+ });}finally{liveExecutionInFlight=false;}
 }
 async function executeLiveCycle(evals){
   if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
@@ -2006,6 +2039,7 @@ const server=http.createServer((req,res)=>{
     req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy();});
     req.on('end',async()=>{
       try{
+        if(liveExecutionInFlight)return send(res,{ok:false,error:'פעולת מסחר מתבצעת כעת. המתן לסיומה.'},409);
         const action=JSON.parse(body||'{}').action;
         if(!['stop','start'].includes(action))return send(res,{ok:false,error:'Invalid action'},400);
         if(action==='start'){
@@ -2056,6 +2090,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-mode'&&req.method==='GET'){
     return send(res,{
       mode,
+      manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl,
       demoTradingEnabled:DEMO_TRADING,
       demoTradingError:demoTrader.error,
@@ -2072,6 +2107,7 @@ const server=http.createServer((req,res)=>{
     req.on('data',x=>b+=x);
     req.on('end',()=>{
       try{
+        if(liveExecutionInFlight)throw Error('פעולת מסחר מתבצעת כעת. המתן לסיומה לפני מעבר מצב.');
         const m=JSON.parse(b).mode;
         if(!['demo','live'].includes(m))throw Error('Invalid mode');
         if(m==='live'&&!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
@@ -2084,35 +2120,15 @@ const server=http.createServer((req,res)=>{
     return;
   }
 
-  if(u.pathname==='/api/binance-live/buy'&&req.method==='POST'){
-    let b='';
-    req.on('data',x=>b+=x);
+  if(['/api/binance-live/manual','/api/binance-live/buy','/api/binance-live/sell'].includes(u.pathname)&&req.method==='POST'){
+    let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy();});
     req.on('end',async()=>{
-      try{
-        const body=JSON.parse(b||'{}');
-        const symbol=String(body.symbol||'').toUpperCase();
-        const quoteUsdt=Number(body.quoteUsdt||0);
-        if(!/^[A-Z0-9]+USDT$/.test(symbol))throw Error('Invalid symbol');
-        const order=await placeLiveMarketBuy(symbol,quoteUsdt,'MANUAL_BUY');
-        send(res,{ok:true,order});
-      }catch(e){send(res,{ok:false,error:e.message},400);}
-    });
-    return;
-  }
-
-  if(u.pathname==='/api/binance-live/sell'&&req.method==='POST'){
-    let b='';
-    req.on('data',x=>b+=x);
-    req.on('end',async()=>{
-      try{
-        const body=JSON.parse(b||'{}');
-        const symbol=String(body.symbol||'').toUpperCase();
-        if(!/^[A-Z0-9]+USDT$/.test(symbol))throw Error('Invalid symbol');
-        const order=await placeLiveMarketSell(symbol,'MANUAL_SELL');
-        send(res,{ok:true,order});
-      }catch(e){send(res,{ok:false,error:e.message},400);}
-    });
-    return;
+      try{const input=JSON.parse(body||'{}');
+        if(u.pathname.endsWith('/buy'))input.side='BUY';
+        if(u.pathname.endsWith('/sell'))input.side='SELL';
+        const result=await executeManualTrade(input);return send(res,result,result.ok?200:result.uncertain?202:400);
+      }catch(error){return send(res,{ok:false,error:error.message},400);}
+    });return;
   }
 
   if(u.pathname==='/api/binance-demo-account'&&req.method==='GET'){
