@@ -412,3 +412,7 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .wyckoff-pivots[data-active="true"] .wyckoff-anchor,.wyckoff-pivot.confirmation-pivot,.position-peak{animation:none}
 
 .position-candle-hit{position:absolute;transform:translateX(-50%);pointer-events:auto;border:0;border-radius:0;background:transparent;padding:0;cursor:pointer;z-index:5}.position-candle-hit:focus-visible{outline:2px solid #348bff;outline-offset:2px}
+
+.wyckoff-occurrences{position:absolute;inset:0;pointer-events:none;overflow:hidden}.wyckoff-occurrence{position:absolute;transform:translateX(-50%);pointer-events:auto;min-width:23px;height:23px;padding:0 4px;border:1px solid #52e0a4;border-radius:5px;background:#0d2933;color:#c7ffe5;font:bold 12px Arial;cursor:pointer;z-index:6}.wyckoff-occurrence:focus-visible{outline:2px solid white;outline-offset:2px}#chartDecisionDetails{white-space:pre-line}
+
+.wyckoff-occurrence-line{position:absolute;width:1px;background:#52e0a455;pointer-events:none}

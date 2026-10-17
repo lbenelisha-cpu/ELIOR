@@ -38,6 +38,9 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartRequestId=0;
 let chartAnalysisContext=null;
+let chartWyckoffHistory=[],chartWyckoffError=null,selectedWyckoffId=null;
+const wyckoffHistoryCache=new Map();
+let wyckoffHistoryEngine=null;
 function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_CASH:'ממתין למזומן',WAIT_ACCOUNT:'ממתין לנתוני חשבון',WAIT_ALLOCATION:'ממתין להקצאה',WAIT_LIVE_GATE:'מסחר אינו זמין',WAIT_EXECUTION_ERROR:'שגיאת ביצוע',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
 function commissionsText(fees){
@@ -589,6 +592,16 @@ function renderCandlePower(a){
   }).join('');
 }
 
+async function runBinanceWyckoffScan(candles,rows,position){
+ if(typeof Worker==='undefined')return wyckoffHistoryEngine.binanceWyckoffHistory(candles,rows,position);
+ return new Promise((resolve,reject)=>{
+  const worker=new Worker('/binance-wyckoff-worker.js?v=20261017-history',{type:'module'});
+  const timer=setTimeout(()=>{worker.terminate();reject(Error('WYCKOFF_SCAN_TIMEOUT'));},15000);
+  worker.onmessage=event=>{clearTimeout(timer);worker.terminate();resolve(event.data);};
+  worker.onerror=()=>{clearTimeout(timer);worker.terminate();reject(Error('WYCKOFF_SCAN_UNAVAILABLE'));};
+  worker.postMessage({candles,rows,position});
+ });
+}
 async function loadChart(symbol){
   const requestId=++chartRequestId;
   const interval=selectedInterval;
@@ -601,11 +614,26 @@ async function loadChart(symbol){
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
     if(chartAnalysisContext!==contextKey){
       put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
-      chartAnalysisContext=contextKey;
+      chartAnalysisContext=contextKey;selectedWyckoffId=null;
     }
     chartVisibleStartTime=Number(d.visibleStartTime)||0;
     chartCandles=d.candles||[];
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
+    try{
+    const historyEngine=wyckoffHistoryEngine||await import('/lib/binance-wyckoff-history.mjs?v=20261017-history');
+    wyckoffHistoryEngine=historyEngine;
+    const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(selectedRange));
+    if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode)return;
+    const sourceCandles=source.candles||[];
+    const closedAt=sourceCandles.filter(b=>b.closed!==false).at(-1)?.closeTime;
+    const cacheKey=[symbol,selectedRange,modeAtRequest,closedAt].join(':');
+    let analysis=wyckoffHistoryCache.get(cacheKey);
+    const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};
+    if(!analysis){analysis=await runBinanceWyckoffScan(sourceCandles,[...(source.decisions||[]),...(source.actions||[])],position);wyckoffHistoryCache.clear();wyckoffHistoryCache.set(cacheKey,analysis);}
+    if(requestId!==chartRequestId)return;
+    chartWyckoffHistory=historyEngine.mergeBinanceRecorded(analysis.history,[...(source.decisions||[]),...(source.actions||[])],position);chartWyckoffError=analysis.error;
+    }catch(historyError){if(requestId!==chartRequestId)return;const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};chartWyckoffHistory=wyckoffHistoryEngine?wyckoffHistoryEngine.mergeBinanceRecorded([],chartDecisions,position):[];chartWyckoffError=historyError.message;}
+    if(requestId!==chartRequestId)return;
     drawCandles(chartCandles);
     renderCandlePower(d.candleAnalysis);
   }catch(e){
@@ -724,6 +752,7 @@ function drawCandles(candles){
   const candleSetup=heldNow?selectedPosition.setup:latestWyckoffSetup(chartDecisions);
   const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
   const markCandle=(stamp,color,active)=>{const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0){candleColors.set(i,color);if(active)flashingIndices.add(i);}};
+  for(const item of chartWyckoffHistory)for(const [key,color] of Object.entries(pivotColors)){const p=item.setup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,false);}
   for(const [key,color] of Object.entries(pivotColors)){const p=candleSetup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,heldNow);}
   if(heldNow){markCandle(Date.parse(selectedPosition.entryAt),'#348bff',true);markCandle(Date.parse(selectedPosition.peakAt),'#348bff',true);}
   ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();
@@ -769,6 +798,7 @@ function drawCandles(candles){
   ctx.restore();
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
+  renderNumberedWyckoff(view,step,left,y,priceDigits);
   renderPositionPoints(view,step,left,y,priceDigits);
 
   const labelCount=Math.max(2,Math.min(5,Math.floor(cw/150)));

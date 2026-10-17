@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Binance Wave Agent V6</title>
-  <link rel="stylesheet" href="/binance-agent.css?v=20261016-candle-only">
+  <link rel="stylesheet" href="/binance-agent.css?v=20261017-history">
 </head>
 <body>
   <main class="app-shell">
@@ -195,6 +195,7 @@
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
           <div id="wyckoffPivots" class="wyckoff-pivots"></div>
+          <div id="wyckoffOccurrences" class="wyckoff-occurrences"></div>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
@@ -203,8 +204,12 @@
         <p class="mini">RSI: קווים ב־30 ו־70 · ROC: שינוי באחוזים לעומת 12 נרות קודם · לתצוגה בלבד.</p>
         <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
-          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; כל שלב מסומן בצבע ייחודי; נקודות תבנית הקנייה מהבהבות בזמן פוזיציה פעילה בלבד; תבנית היסטורית מוצגת ללא הבהוב ועם תאריך; הגרף מציג את הטווח שבחרת. נקודות אישור שמחוץ לטווח אינן מוצגות. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
+          <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; כל שלב מסומן בצבע ייחודי; נרות תבנית הקנייה מהבהבים בזמן פוזיציה פעילה בלבד; תבנית היסטורית מוצגת ללא הבהוב ועם תאריך; הגרף מציג את הטווח שבחרת. נקודות אישור שמחוץ לטווח אינן מוצגות. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
           <p class="mini">מוני העסקאות מבוססים על היומן הזמין. שארית מתחת לסף המתועד אינה פוזיציה פעילה.</p>
+          <p id="wyckoffOccurrenceSummary" aria-live="polite">טוען תבניות וואיקוף…</p>
+          <p class="mini">המספרים מציינים תבניות שונות בטווח הגרף. לחץ על מספר להצגת כל השלבים. השחזור ממשיך בזמן פוזיציה; אינו אישור שנשלחה עסקה ואינו משנה כללי מסחר.</p>
+          <p><a class="tradingview-link" href="/reports/binance-exit-study-20261017.html">סימולציה: השוואת יציאה אחרי שיא ↗</a></p>
+          <div id="wyckoffOccurrenceList" class="chart-analysis-markers"></div>
           <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
           <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
         </div>
@@ -363,12 +368,12 @@
     </section>
   </main>
 
-  <script src="/binance-chart-decisions.js?v=20261016-candle-only"></script>
-  <script src="/binance-indicators.js?v=20261016-candle-only"></script>
-  <script src="/binance-agent.js?v=20261016-candle-only"></script>
-  <script src="/binance-agent-portfolio.js?v=20261016-candle-only"></script>
-<script src="/binance-demo-account.js?v=20261016-candle-only"></script>
-<script src="/binance-market-watch.js?v=20261016-candle-only"></script>
-<script src="/binance-kelly.js?v=20261016-candle-only"></script>
+  <script src="/binance-chart-decisions.js?v=20261017-history"></script>
+  <script src="/binance-indicators.js?v=20261017-history"></script>
+  <script src="/binance-agent.js?v=20261017-history"></script>
+  <script src="/binance-agent-portfolio.js?v=20261017-history"></script>
+<script src="/binance-demo-account.js?v=20261017-history"></script>
+<script src="/binance-market-watch.js?v=20261017-history"></script>
+<script src="/binance-kelly.js?v=20261017-history"></script>
 </body>
 </html>
