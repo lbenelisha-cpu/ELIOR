@@ -38,6 +38,7 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartRequestId=0;
 let chartAnalysisContext=null;
+let manualTradeCapabilities=null;
 let chartWyckoffHistory=[],chartWyckoffError=null,selectedWyckoffId=null;
 const wyckoffHistoryCache=new Map();
 let wyckoffHistoryEngine=null;
@@ -107,13 +108,13 @@ async function J(u,o={}){
   const controller=new AbortController(),external=options.signal;
   const abort=()=>controller.abort(external.reason);
   if(external?.aborted)abort();else external?.addEventListener('abort',abort,{once:true});
-  const timer=setTimeout(()=>controller.abort(new DOMException('השרת לא השיב בזמן. מתבצע ניסיון חוזר.','TimeoutError')),timeoutMs);
+  const timer=setTimeout(()=>controller.abort(new DOMException('השרת לא השיב בזמן.','TimeoutError')),timeoutMs);
   try{
     const requestUrl=String(options.method||'GET').toUpperCase()==='GET'?window.binanceReadUrl(u):u;
     const r=await fetch(requestUrl,{cache:'no-store',...options,signal:controller.signal});
     if(!r.ok){
       let x={};try{x=await r.json()}catch{}
-      throw Error(x.error||`HTTP ${r.status}`);
+      const error=Error(x.error||`HTTP ${r.status}`);error.status=r.status;error.response=x;throw error;
     }
     return await r.json();
   }finally{
@@ -143,6 +144,7 @@ function mode(s){
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   currentMode=s.mode;
+  manualTradeCapabilities=s.manualTrading||null;
   renderTradeControlStatus(s);
   const paused=s.tradeControl?.paused===true;
   const stopButton=$('#stopTradingBtn'),startButton=$('#startTradingBtn');
@@ -853,7 +855,7 @@ async function authenticatedControl(url,body){
     const token=prompt('הזן את קוד בקרת המסחר (BINANCE_CONTROL_TOKEN) המוגדר בשרת — לפחות 32 תווים:');
     if(!token)return null;
     const trimmed=token.trim();
-    if(trimmed.length<32)throw Error('קוד בקרת המסחר חייב להכיל לפחות 32 תווים.');
+    if(trimmed.length<32){const error=Error('קוד בקרת המסחר חייב להכיל לפחות 32 תווים.');error.status=400;throw error;}
     tradeControlToken=trimmed;
   }
   try{
@@ -865,7 +867,7 @@ async function authenticatedControl(url,body){
   }catch(e){
     if(/401|Authenticated control required/i.test(e.message)){
       tradeControlToken=null;
-      throw Error('האימות נכשל. יש להגדיר בשרת BINANCE_CONTROL_TOKEN באורך 32 תווים לפחות ולהזין כאן את אותו הקוד.');
+      const error=Error('האימות נכשל. יש להגדיר בשרת BINANCE_CONTROL_TOKEN באורך 32 תווים לפחות ולהזין כאן את אותו הקוד.');error.status=401;throw error;
     }
     throw e;
   }
@@ -968,3 +970,9 @@ for(const id of ['showRSI','showROC'])document.getElementById(id)?.addEventListe
 document.getElementById('pricePrecisionUp')?.addEventListener('click',()=>{priceRangeScale=Math.max(.1,priceRangeScale/1.25);drawCandles(chartCandles);});
 document.getElementById('pricePrecisionDown')?.addEventListener('click',()=>{priceRangeScale=Math.min(10,priceRangeScale*1.25);drawCandles(chartCandles);});
 document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{priceRangeScale=1;drawCandles(chartCandles);});
+
+window.LEVI_MANUAL_TRADES={
+ context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
+ submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
+ refresh:async()=>{await load();await loadChart(selectedSymbol);}
+};
