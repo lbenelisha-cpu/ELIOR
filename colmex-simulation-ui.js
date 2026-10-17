@@ -1,3 +1,4 @@
+import {recordedWyckoffOccurrences,mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
 import {buildColmexMarks} from './lib/colmex-chart-marks.mjs';
 let snapshot=null;
 const $=s=>document.querySelector(s),money=n=>Number.isFinite(n)?n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4})+' USD':'—',time=at=>at?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'—';
@@ -5,6 +6,7 @@ const labels={WAIT_POST_START_PRICE:'ממתין למחיר חדש לאחר תח�
 const label=x=>labels[x]||x||'ממתין לבדיקה הראשונה';
 function element(tag,text,className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
 function assetButton(symbol,detail,onSelect){const b=element('button',undefined,'sim-asset secondary');b.type='button';b.append(element('b',symbol),element('span',detail));b.onclick=()=>onSelect(symbol);const p=snapshot?.state?.positions?.[symbol];if(p){const pnl=Number(p.mark)-Number(p.entryPrice);b.classList.add('sim-position-active',pnl<0?'sim-position-loss':'sim-position-profit');b.prepend(element('strong',pnl<0?'● פוזיציה פעילה · הפסד':'● פוזיציה פעילה · רווח / מאוזנת'));b.setAttribute('aria-label',symbol+' פוזיציה פעילה '+detail);}return b;}
+export function simulationWyckoffHistory(symbol){const s=snapshot?.state;if(!s)return [];return mergeWyckoffOccurrences(recordedWyckoffOccurrences([s.positions?.[symbol]?.setup,...(s.journal||[]).filter(j=>j.symbol===symbol).map(j=>j.setup)]),s.assets?.[symbol]?.wyckoffHistory||[]);}
 export function simulationMarks(symbol){return buildColmexMarks(snapshot?.state,symbol);}
 export function initSimulation({onSelect,onUpdate}){
  if(!document.getElementById('simActivePositionStyle')){

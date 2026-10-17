@@ -17,8 +17,8 @@ export async function handler(event){
  const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase(),interval=String(event.queryStringParameters?.interval||'1day');
  if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)||!['5min','1h','1day','1week','1month'].includes(interval))return reply(400,{error:'סימול או משך נר לא תקינים'});
  try{
-  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+interval,validate:d=>validStockSnapshot(d,symbol,interval),fetchData:async()=>{
-  const [series,quote]=await Promise.allSettled([td('time_series',{symbol,interval,outputsize:250,order:'ASC',adjust:'splits',timezone:'UTC'},['1day','1week','1month'].includes(interval)?1800:60),td('quote',{symbol},60)]);
+  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+interval+(interval==='5min'?':analysis-v2':''),validate:d=>validStockSnapshot(d,symbol,interval),fetchData:async()=>{
+  const [series,quote]=await Promise.allSettled([td('time_series',{symbol,interval,outputsize:interval==='5min'?1000:250,order:'ASC',adjust:'splits',timezone:'UTC'},['1day','1week','1month'].includes(interval)?1800:60),td('quote',{symbol},60)]);
   if(series.status!=='fulfilled')throw Error('SERIES_UNAVAILABLE');
   return normalizeMarket(series.value,quote.status==='fulfilled'?quote.value:null,symbol,interval);
   }});return reply(200,data);
