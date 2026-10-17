@@ -93,8 +93,9 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
  const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
  const tradeSetup=agent?.position==='LONG'?agent.strategy?.setup:null;
- const setup=tradeSetup?.springLow?tradeSetup:latestWyckoffSetup(rows);if(!setup)return;
- const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&setup===tradeSetup;
+ const chosen=typeof chartWyckoffHistory!=='undefined'?chartWyckoffHistory.find(x=>x.id===selectedWyckoffId):null;
+ const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:latestWyckoffSetup(rows));if(!setup)return;
+ const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&(!chosen||(setup.initialPeak?.time===tradeSetup.initialPeak?.time&&setup.secondaryTest?.time===tradeSetup.secondaryTest?.time));
  root.dataset.active=String(active);
  const status=document.createElement('span');status.className='wyckoff-setup-status';
  const at=Number(setup.signalTime||setup.confirmation?.time);
@@ -122,4 +123,29 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   button.textContent=label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
   button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
  }
+}
+
+function renderNumberedWyckoff(view,step,left,y,digits){
+ const overlay=document.querySelector('#wyckoffOccurrences'),list=document.querySelector('#wyckoffOccurrenceList'),summary=document.querySelector('#wyckoffOccurrenceSummary');
+ if(!overlay||!list||!summary||!wyckoffHistoryEngine)return;
+ const items=wyckoffHistoryEngine.visibleBinanceOccurrences(chartWyckoffHistory,view);
+ overlay.replaceChildren();
+ summary.textContent='תבניות וואיקוף בטווח: '+items.length+' · ניתוח נרות 5 דקות, גם בזמן פוזיציה פעילה'+(chartWyckoffError?' · שחזור חלקי: '+chartWyckoffError:'');
+ const detail=item=>{
+  selectedWyckoffId=item.id;drawCandles(chartCandles);
+  const panel=document.querySelector('#chartDecisionDetails');if(!panel)return;
+  const parts=['תבנית וואיקוף '+item.number+' · '+(item.source==='TRADE_RECORDED_SETUP'?'תבנית מתועדת ביומן':'שחזור מנרות סגורים; אינו ביצוע עסקה')];
+  for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']]){const p=item.setup[key];if(p)parts.push(label+': '+fmt(p.price,12)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}));}
+  if(!item.confirmedAt)parts.push('Spring זוהה; אין אישור כניסה מתועד בתבנית זו.');
+  panel.textContent=parts.join('\n');
+ };
+ const lanes=[];
+ for(const item of items){
+  const x=left+step*(item.index+.5);let lane=lanes.findIndex(last=>x-last>=28);if(lane<0)lane=lanes.length;lanes[lane]=x;
+  const b=document.createElement('button');b.type='button';b.className='wyckoff-occurrence';b.textContent=item.number;b.style.left=x+'px';b.style.top=(42+lane*25)+'px';
+  b.title='תבנית '+item.number+' · Spring · '+new Date(item.springAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});b.setAttribute('aria-label',b.title);b.onclick=()=>detail(item);overlay.append(b);
+  const line=document.createElement('span');line.className='wyckoff-occurrence-line';const yy=y(Number(item.setup.springLow.price)),yy0=65+lane*25;line.style.left=x+'px';line.style.top=Math.min(yy,yy0)+'px';line.style.height=Math.abs(yy-yy0)+'px';overlay.append(line);
+ }
+ const key=selectedSymbol+':'+selectedInterval+':'+items.map(x=>x.id+':'+x.springAt+':'+x.confirmedAt).join('|');
+ if(list.dataset.key!==key){list.dataset.key=key;list.replaceChildren();for(const item of items){const b=document.createElement('button');b.type='button';b.className='analysis-marker signal';b.textContent='וואיקוף '+item.number+' · '+new Date(item.springAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});b.onclick=()=>detail(item);list.append(b);}}
 }
