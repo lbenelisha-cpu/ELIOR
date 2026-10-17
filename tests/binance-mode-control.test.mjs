@@ -6,7 +6,7 @@ import vm from 'node:vm';
 function harness({token='a'.repeat(40),mode='demo',failure=null,confirm=true}={}){
   const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
   const calls=[],alerts=[];let prompts=0,loads=0;
-  const context=vm.createContext({MODE:'/mode',TRADE_CONTROL:'/control',tradeControlToken:null,
+  const context=vm.createContext({window:{},MODE:'/mode',TRADE_CONTROL:'/control',tradeControlToken:null,
     prompt:()=>{prompts++;return token;},confirm:()=>confirm,alert:x=>alerts.push(x),
     load:async()=>{loads++;},J:async(url,options)=>{
       if(!options)return {mode};
