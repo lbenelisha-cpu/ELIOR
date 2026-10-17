@@ -16,3 +16,5 @@
 .sim-candle-flash{animation:none;opacity:1;filter:none}
 #chart.candle-phase-off .sim-candle-flash{opacity:.08!important}
 .flash-control{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}.flash-control input{width:auto}
+
+.wyckoff-occurrences{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.wyckoff-occurrences button{font-size:12px;padding:9px}.chart [data-wyckoff-occurrence]{cursor:pointer}.chart [data-wyckoff-occurrence]:focus rect{stroke:#fff;stroke-width:2}
