@@ -163,6 +163,7 @@ function mode(s){
 }
 
 function buyReasonLabel(r){
+  if(['WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','HOURLY_TREND_CONFIRMED'].includes(r))return decisionReasonLabel(r);
   return ({
     QUALIFIED:'מתאים לקנייה',
     NOT_UP:'לא בגל עולה',
@@ -371,11 +372,15 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
+  const hourly=a.entryFilters;
+  put('#hourlyTrendStatus',d.config?.hourlyTrendFilter?.enabled!==true?'אישור מגמה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
+    'מגמת שעה: '+(hourly.ok?'מאושרת':'ממתינה')+' · סגירה '+fmt(hourly.close,8)+' · ממוצע 20 '+fmt(hourly.sma20,8)+' · ממוצע 50 '+fmt(hourly.sma50,8)+' · '+new Date(hourly.asOf).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'מגמת שעה: ממתין ל־50 שעות מלאות ועדכניות');
+
   const selectedPnl=positionPnlDisplay(currentModeArg==='live'?liveAccount?.balances?.find(x=>x.asset+'USDT'===a.symbol):p.positions?.[a.symbol],currentModeArg==='live'?'USDT':moneyUnit);
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',d.config?.hourlyTrendFilter?.enabled?'וואיקוף 5 דקות · אישור מגמת שעה · '+buyReasonLabel(a.buyReason):(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
@@ -392,7 +397,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
 function blockerLabel(b){
   if(!b)return '—';
   if(typeof b==='string')return b;
-  if(['WAIT_STABLECOIN','WAIT_MOVEMENT','WAIT_VOLUME','WAIT_HOURLY_TREND','WAIT_QUALITY_DATA'].includes(b.code))return decisionReasonLabel(b.code);
+  if(['WAIT_STABLECOIN','WAIT_MOVEMENT','WAIT_VOLUME','WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','WAIT_QUALITY_DATA'].includes(b.code))return decisionReasonLabel(b.code);
   return b.text||b.code||'—';
 }
 
@@ -421,7 +426,9 @@ function decisionReasonLabel(r){
     WAIT_STABLECOIN:'מטבע יציב — אינו מועמד למסחר',
     WAIT_MOVEMENT:'תנועה חלשה ביחס לעלויות',
     WAIT_VOLUME:'ממתין לאישור מחזור מסחר',
-    WAIT_HOURLY_TREND:'ממתין למגמה עולה בנרות שעה',
+    WAIT_HOURLY_TREND:'וויקוף אושר · ממתין לסגירת שעה מעל ממוצע 20, וממוצע 20 מעל 50',
+    WAIT_HOURLY_TREND_DATA:'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה',
+    HOURLY_TREND_CONFIRMED:'מגמת שעה מאושרת: סגירה מעל ממוצע 20, וממוצע 20 מעל 50',
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
     WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',

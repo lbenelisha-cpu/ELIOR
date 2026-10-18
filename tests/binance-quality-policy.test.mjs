@@ -1,9 +1,12 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {assessQualityEntry,atrPolicy} from '../lib/binance-quality-policy.mjs';import {binancePositionExit} from '../lib/binance-position-exit.mjs';import {buildNetTradeJournal} from '../lib/net-trade-journal.mjs';
 const end=Math.floor(Date.now()/3600000)*3600000;const bars=Array.from({length:720},(_,i)=>({openTime:end-(720-i)*300000,closeTime:end-(719-i)*300000-1,close:100+i*.02,high:100+i*.02+.1,low:100+i*.02-.1,volume:i>=717?200:100,closed:true}));
-test('volume, hourly trend, movement and depth estimates no longer block entry',()=>{
- for(const data of [bars,bars.map(b=>({...b,volume:0})),bars.map((b,i)=>({...b,close:200-i*.02,high:201-i*.02,low:199-i*.02})),bars.map(b=>({...b,close:100,high:100.0001,low:99.9999})),bars.slice(-100)]){
-  const result=assessQualityEntry('BTCUSDT',data,{now:end,estimatedCostPct:99});assert.equal(result.ok,true);assert.equal(result.enabled,false);assert.equal(result.code,'WYCKOFF_ENTRY_CONFIRMED');
+test('volume, movement and depth estimates stay disabled; hourly trend is enabled',()=>{
+ for(const data of [bars,bars.map(b=>({...b,volume:0}))]){
+  const result=assessQualityEntry('BTCUSDT',data,{now:end,estimatedCostPct:99});assert.equal(result.ok,true);assert.equal(result.enabled,true);assert.equal(result.code,'HOURLY_TREND_CONFIRMED');
  }
+ assert.equal(assessQualityEntry('BTCUSDT',bars.map((b,i)=>({...b,close:200-i*.02})),{now:end}).code,'WAIT_HOURLY_TREND');
+ assert.equal(assessQualityEntry('BTCUSDT',bars.map(b=>({...b,close:100})),{now:end}).ok,false);
+ assert.equal(assessQualityEntry('BTCUSDT',bars.slice(-100),{now:end}).code,'WAIT_HOURLY_TREND_DATA');
  assert.equal(assessQualityEntry('RLUSDUSDT',bars,{now:end}).code,'WAIT_STABLECOIN');
 });
 test('ATR is bounded and cannot lower an existing effective protection',()=>{const a=atrPolicy(100,100);assert.equal(a.atrStopPct,2.5);assert.equal(a.atrTrailPct,4);const p={strategyId:'WYCKOFF_5M_V1',entryPrice:100,peakPrice:110,marketRank:1,...atrPolicy(.5,100)};binancePositionExit(p,110);const stop=p.effectiveStopPrice;p.atrTrailPct=4;binancePositionExit(p,109.9);assert.equal(p.effectiveStopPrice,stop);});
