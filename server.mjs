@@ -1,9 +1,10 @@
+import {HOURLY_TREND_RULE} from './lib/binance-hourly-trend.mjs';
 import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
 import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
 import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
-import {QUALITY_POLICY,STABLE_BASES,atr14,atrPolicy} from './lib/binance-quality-policy.mjs';
+import {QUALITY_POLICY,STABLE_BASES,ENTRY_POLICY_VERSION,assessQualityEntry,atr14,atrPolicy} from './lib/binance-quality-policy.mjs';
 import {buildNetTradeJournal} from './lib/net-trade-journal.mjs';
 import {observePositionPeak} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
@@ -701,6 +702,11 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
+  if(reason!=='MANUAL_BUY'){
+    const hourlyTrend=assessQualityEntry(symbol,await candles(symbol));
+    if(!hourlyTrend.ok)throw Error(hourlyTrend.code);
+    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:ENTRY_POLICY_VERSION}};
+  }
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
   if(['spring_retest','wyckoff_confirmation'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
@@ -1341,10 +1347,16 @@ async function evaluateSymbol(s){
       ev.buyReason=tradeControl.paused?'TRADING_PAUSED':'WAIT_NEW_WYCKOFF_SIGNAL';
       if(ev.strategy)ev.strategy.buyConfirmed=false;
     }
-    if(!p&&ev.entryConfirmed){
-      ev.entryFilters={ok:true,code:'ENTRY_FILTERS_DISABLED',enabled:false};
-      // Entry timing changes independently of the fixed 10% / 80%-of-gain exit policy.
-
+    if(!p){
+      ev.entryFilters=assessQualityEntry(s,entryBars);
+      if(ev.entryConfirmed&&!ev.entryFilters.ok){
+        ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';
+        ev.buyReason=ev.entryFilters.code;ev.wyckoffTrade=null;
+        if(ev.strategy)ev.strategy.buyConfirmed=false;
+      }else if(ev.entryConfirmed&&ev.wyckoffTrade){
+        ev.wyckoffTrade.hourlyTrend=ev.entryFilters;
+        ev.wyckoffTrade.entryPolicyVersion=ENTRY_POLICY_VERSION;
+      }
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
@@ -1379,6 +1391,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     buyReason:ev.buyReason,
     entryEligible:ev.entryEligible,
     entryConfirmed:ev.entryConfirmed,
+    entryFilters:ev.entryFilters||null,
     entryBasePrice:ev.entryBasePrice,
     entryTargetPrice:ev.entryTargetPrice,
     entryGainPct:ev.entryGainPct,
@@ -1414,9 +1427,9 @@ function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
   if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?['spring_retest','wyckoff_confirmation'].includes(ev.strategy.entryMode)?ev.strategy.profitProtectionPending?'עצירה 10% פעילה · הגנת רווח תופעל ב־'+new Date(ev.strategy.profitProtectionStartsAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'עצירה 10% ממחיר הקנייה; נשמרים 80% מההפרש לשיא':`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
-  if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
+  if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:'וויקוף אושר · קנייה ללא המתנה לחזרה ל־Spring'};
+  return {code:'BUY_READY',text:'וויקוף ומגמת שעה אושרו · קנייה ללא המתנה לחזרה ל־Spring'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1860,7 +1873,9 @@ async function buildTechnicalDailyHistory(symbol,limit=30){
   for(let i=Math.max(2,c.length-limit);i<c.length;i++){
    const historicalNow=c[i].closeTime+1;
    const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i+1),price:c[i].close,priceAsOf:new Date(historicalNow).toISOString(),now:historicalNow,timeframe:'5m'});
-   rows.push({at:new Date(c[i].closeTime).toISOString(),price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
+   const hourlyTrend=assessQualityEntry(symbol,c.slice(0,i+1),{now:historicalNow});
+   if(ev.entryConfirmed&&!hourlyTrend.ok){ev.entryConfirmed=false;ev.buyReason=hourlyTrend.code;}
+   rows.push({at:new Date(c[i].closeTime).toISOString(),hourlyTrend,price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
   }
   return rows.reverse();
 }
@@ -2109,6 +2124,8 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-mode'&&req.method==='GET'){
     return send(res,{
       mode,
+      hourlyTrendFilter:HOURLY_TREND_RULE,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl,
       demoTradingEnabled:DEMO_TRADING,
@@ -2303,7 +2320,9 @@ const server=http.createServer((req,res)=>{
         rsiExitEnabled:false,
         rsiPeriod:14,
         qualityPolicy:QUALITY_POLICY,
-        entryFiltersEnabled:false,
+        entryFiltersEnabled:true,
+        hourlyTrendFilter:HOURLY_TREND_RULE,
+        entryPolicyVersion:ENTRY_POLICY_VERSION,
         entryMode:'wyckoff_confirmation',
         entryConfirmation:'LIVE_PRICE_AFTER_SPRING',
         waitForConfirmationCandleClose:false,
