@@ -1,0 +1,89 @@
+{
+  "source": "https://data-api.binance.vision/api/v3/klines",
+  "downloadedAt": "2026-10-18T11:03:46.452356+00:00",
+  "start": 1786531800000,
+  "end": 1792320600000,
+  "step": 300000,
+  "files": [
+    {
+      "symbol": "BTCUSDT",
+      "bars": 19296,
+      "sha256": "773185306ddc6fafdd1281bfddb1368e2b092f65ad703bca72fb9168898aab44"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "bars": 19296,
+      "sha256": "e6d6af314dc5a53c7632ab9e19607abad8d8dbe63f5b25cf8f4b081e42c15655"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "bars": 19296,
+      "sha256": "b9a33a3ce6152c94ebfe798dc1e775bd5bb41c2f676f1561274a089f4da0976a"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "bars": 19296,
+      "sha256": "1a628c41fa379866ccfb46373945211eae0d227e2f9674e0b5b9ed685c24c1a2"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "bars": 19296,
+      "sha256": "96f1168d87276d39d3f570cf164dc9e26a9a54ae57e7bb6e4324e6fbd36bc5fe"
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "bars": 19296,
+      "sha256": "dc0baf4f19cc1905f7863ca2c4e19f72cad819692a2509d3616412f79d3ef04c"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "bars": 19296,
+      "sha256": "19908b49bb0d223e63392c2261bd7deee41d8b12fbfcc02be383823f345213ea"
+    },
+    {
+      "symbol": "TRXUSDT",
+      "bars": 19296,
+      "sha256": "6bbe722462fb6c491b0215eca7be1469a8fcfbf8dd8eb0d0518fba5ced3678c3"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "bars": 19296,
+      "sha256": "94380920659b4dc983a54902529afb13483352db80daf18a0e1a6f867a48fe1f"
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "bars": 19296,
+      "sha256": "81bf2f2dd812057590b998255584c4bfdf935eea97b686105635d0ea9595af72"
+    },
+    {
+      "symbol": "LTCUSDT",
+      "bars": 19296,
+      "sha256": "8180db0fcdee6864ef805a3a9697e34533bec3e3dc93f54cb07b759133f8b8fb"
+    },
+    {
+      "symbol": "UNIUSDT",
+      "bars": 19296,
+      "sha256": "c719bb0a58165043a0087ff88c38dc73e6c2a8690efbd1270e40eb034dc35f9f"
+    },
+    {
+      "symbol": "ZECUSDT",
+      "bars": 19296,
+      "sha256": "08b886c55bd4c1d022dc5bf48ff7f2fef0b557cd9e4f65cf2eea14f92021b9fc"
+    },
+    {
+      "symbol": "SEIUSDT",
+      "bars": 19296,
+      "sha256": "729334a1a2cbdec478e0be655e7aa3500541aaeb79cde963af86998cc72a279b"
+    },
+    {
+      "symbol": "SUIUSDT",
+      "bars": 19296,
+      "sha256": "77fe1ec64f170eb6570e634ae15cf1fa40548664714f4cf509cfd58970657d96"
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "bars": 19296,
+      "sha256": "9941a0e07ab52f833f699f8c619d61d28dd98998ae65a3ed92b785c08d9b5ff1"
+    }
+  ]
+}

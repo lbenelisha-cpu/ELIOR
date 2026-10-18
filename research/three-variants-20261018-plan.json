@@ -1,0 +1,30 @@
+{
+  "study": "Wyckoff three-variant portfolio comparison",
+  "protocolVersion": "fixed-before-outcome-computation-v1",
+  "symbols": ["BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT","DOGEUSDT","ADAUSDT","TRXUSDT","LINKUSDT","AVAXUSDT","LTCUSDT","UNIUSDT","ZECUSDT","SEIUSDT","SUIUSDT","TRUMPUSDT"],
+  "universeReason": "Fixed liquid majors plus assets discussed in this account; selected before outcomes, not a historical all-Binance universe",
+  "days": 60,
+  "warmupDays": 7,
+  "discoveryDays": 40,
+  "laterDays": 20,
+  "initialUsdt": 143.62915,
+  "maxPositions": 5,
+  "minimumOrderUsdt": 5,
+  "feeRate": 0.001,
+  "slippage": 0.0005,
+  "analysis": "Closed 5m bars; rolling seven-day Wyckoff with two green candles before peak; next-open executions, no tick reconstruction",
+  "variants": [
+    {"id":"current","trend":false,"exit":"current","label":"וואיקוף קיים"},
+    {"id":"trend","trend":true,"exit":"current","label":"וואיקוף ואישור מגמה"},
+    {"id":"structure","trend":false,"exit":"structure","label":"וואיקוף ויציאה לפי תנודתיות ומבנה"},
+    {"id":"combined","trend":true,"exit":"structure","label":"שילוב — בדיקת תרומה נוספת"}
+  ],
+  "trendRule": "Last completed UTC hourly close > SMA20, SMA20 > SMA50",
+  "currentExit": "10% initial loss stop; 80% gain retention activates after seven days, based on closes observed since entry",
+  "structureExit": "Initial stop entry - 2.5 * entry ATR14, never farther than 10%; ratchet stop to highest observed close - 3 * current ATR14; after gain >= initial risk, two completed 5m closes below preceding 12-bar lowest low trigger exit; no minimum hold",
+  "positionSizing": "Fixed one-fifth initial capital including entry fee; final free slot may use remaining cash after fee. Sale proceeds return to shared cash. No borrowing, one position per coin, new signal after exit required.",
+  "laterPeriod": "Separately restarted portfolio for last20 days, using historical warmup only; all parameters fixed before outcomes. Not a future prospective holdout.",
+  "sensitivity": {"feeRate":0.002,"slippage":0.002},
+  "noOptimization": true,
+  "liveChanges": false
+}
