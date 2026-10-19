@@ -12,6 +12,7 @@
  function open(side){
   if(busy||uncertain||dialog.open)return;
   const c=context();if(c.mode!=='live'||c.capabilities?.version!==1)return;
+  if(window.LEVI_MANUAL_TRADES.connected?.()===false){window.LEVI_MANUAL_TRADES.connect();return;}
   const bal=c.account?.balances?.find(b=>b.asset+'USDT'===c.symbol);
   intent={requestId:crypto.randomUUID(),symbol:c.symbol,side,mode:'live',all:side==='SELL'};uncertain=false;
   get('manualTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+c.symbol+' · LIVE';
@@ -42,7 +43,7 @@
   }finally{busy=false;get('manualTradeSubmit').disabled=false;get('manualTradeCheck').disabled=false;get('manualTradeCancel').disabled=uncertain;get('manualQuoteAmount').disabled=uncertain;refresh();}
  }
  get('manualBuyBtn').onclick=()=>open('BUY');get('manualSellBtn').onclick=()=>open('SELL');get('manualTradeSubmit').onclick=()=>send(false);get('manualTradeCheck').onclick=()=>send(true);get('manualTradeCancel').onclick=close;
- get('manualForgetBtn').onclick=()=>{if(busy||uncertain)return;window.LEVI_MANUAL_TRADES.forget();get('manualTradeHint').textContent='האימות השמור נמחק מהמכשיר. בפעולה הבאה יידרש חיבור מחדש.';};
+ get('manualForgetBtn').onclick=async()=>{if(busy||uncertain)return;try{await window.LEVI_MANUAL_TRADES.forget();get('manualTradeHint').textContent='המכשיר נותק ממסחר';}catch{get('manualTradeHint').textContent='החיבור המקומי נמחק; לא ניתן לאשר ניתוק בשרת כעת.';}};
  dialog.addEventListener('cancel',event=>{if(busy||uncertain)event.preventDefault();});
  setInterval(refresh,1000);refresh();
 })();

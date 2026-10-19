@@ -858,13 +858,7 @@ async function load(){
 }
 
 async function authenticatedControl(url,body){
-  if(!tradeControlToken){
-    const token=prompt('חיבור חד־פעמי של המכשיר למסחר: הזן את BINANCE_CONTROL_TOKEN. הקוד יישמר במכשיר ולא יידרש בכל קנייה או מכירה:');
-    if(!token)return null;
-    const trimmed=token.trim();
-    if(trimmed.length<32){const error=Error('קוד בקרת המסחר חייב להכיל לפחות 32 תווים.');error.status=400;throw error;}
-    tradeControlToken=trimmed;
-  }
+  if(!tradeControlToken){window.LEVI_DEVICE_ACCESS?.open();return null;}
   try{
     const result=await J(url,{
       method:'POST',
@@ -876,7 +870,8 @@ async function authenticatedControl(url,body){
   }catch(e){
     if(/401|Authenticated control required/i.test(e.message)){
       tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();
-      const error=Error('האימות נכשל. יש להגדיר בשרת BINANCE_CONTROL_TOKEN באורך 32 תווים לפחות ולהזין כאן את אותו הקוד.');error.status=401;throw error;
+      window.LEVI_DEVICE_ACCESS?.refresh();
+      const error=Error('חיבור המכשיר אינו תקף. לחץ ״חבר מכשיר למסחר״ לחיבור מחדש בקוד קצר.');error.status=401;throw error;
     }
     throw e;
   }
@@ -983,6 +978,18 @@ document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{pri
 window.LEVI_MANUAL_TRADES={
  context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
  submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
- forget:()=>{tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();},
+ connected:()=>Boolean(tradeControlToken),
+ connect:()=>window.LEVI_DEVICE_ACCESS?.open(),
+ pair:async code=>{
+  if(!/^\d{6}$/.test(code))throw Error('יש להזין שש ספרות');
+  const result=await J(B+'/api/binance-control/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+  if(!result.ok||!/^device-[a-f0-9]{64}$/.test(result.token))throw Error('לא התקבל אישור חיבור תקין');
+  tradeControlToken=result.token;const persistent=window.LEVI_TRADE_AUTH?.remember(tradeControlToken)!==false;
+  return {ok:true,persistent,expiresAt:result.expiresAt};
+ },
+ forget:async()=>{
+  const token=tradeControlToken;tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();
+  if(token)await J(B+'/api/binance-control/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:'{}'});
+ },
  refresh:async()=>{await load();await loadChart(selectedSymbol);}
 };
