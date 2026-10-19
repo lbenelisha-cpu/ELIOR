@@ -1,3 +1,4 @@
+import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
 import {HOURLY_TREND_RULE} from './lib/binance-hourly-trend.mjs';
 import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
 import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
@@ -232,6 +233,7 @@ const dailyCandleCache=new Map();
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
 const TRADE_CONTROL_FILE=process.env.BINANCE_TRADE_CONTROL_FILE||'/var/data/binance-trade-control.json';
+const controlDevices=new DeviceControlSessions(process.env.BINANCE_DEVICE_AUTH_FILE||TRADE_CONTROL_FILE+'.devices.json',{authority:process.env.BINANCE_CONTROL_TOKEN});
 let tradeControl={paused:false,resumedAt:null,pausedAt:null,lastStop:null};
 function saveTradeControl(){
   fs.mkdirSync(path.dirname(TRADE_CONTROL_FILE),{recursive:true});
@@ -2046,13 +2048,20 @@ const server=http.createServer((req,res)=>{
 
   if(req.method==='OPTIONS')return send(res,{},204);
   const protectedControl=req.method==='POST'&&(
-    u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname.startsWith('/api/binance-live/')||
+    u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||
     (mode==='live'&&u.pathname==='/api/binance-agent/evaluate')
   );
-  if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)){
+  if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)&&!controlDevices.authorized(req.headers.authorization)){
     return send(res,{ok:false,error:'Authenticated control required: configure BINANCE_CONTROL_TOKEN (at least 32 characters) and send a Bearer token'},401);
   }
 
+  if(u.pathname==='/api/binance-control/session'&&req.method==='POST'){
+    let body='';req.on('data',chunk=>{body+=chunk;if(body.length>500)req.destroy();});
+    req.on('end',()=>{try{const input=JSON.parse(body||'{}');return send(res,controlDevices.issue(input.code));}catch(error){return send(res,{ok:false,error:error.message},error.status||400);}});return;
+  }
+  if(u.pathname==='/api/binance-control/disconnect'&&req.method==='POST'){
+    controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
+  }
   const sf={
     '/binance-indicators.js':['binance-indicators.js','text/javascript'],
     '/binance-agent.html':['binance-agent.html','text/html'],
@@ -2124,6 +2133,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-mode'&&req.method==='GET'){
     return send(res,{
       mode,
+      deviceAuth:{version:1,enabled:controlDevices.enabled,pairCodeLength:6},
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryPolicyVersion:ENTRY_POLICY_VERSION,
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},

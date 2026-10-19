@@ -10,14 +10,14 @@ test('device authorization survives reload and forgetting removes it',()=>{
  first.clear();assert.equal(auth(storage).read(),null);
 });
 test('storage denial falls back to current-page authorization',()=>{
- const c=vm.createContext({window:{},localStorage:{getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}}});vm.runInContext(read('binance-control-session.js'),c);const a=c.window.LEVI_TRADE_AUTH;a.remember('x'.repeat(40));assert.equal(a.read().length,40);a.clear();assert.equal(a.read(),null);
+ const c=vm.createContext({window:{},localStorage:{getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}}});vm.runInContext(read('binance-control-session.js'),c);const a=c.window.LEVI_TRADE_AUTH;assert.equal(a.remember('x'.repeat(40)),false);assert.equal(a.read().length,40);a.clear();assert.equal(a.read(),null);
 });
 test('saved authentication bypasses prompts and 401 clears it without retrying the order',async()=>{
  const a=auth();a.remember('x'.repeat(40));let calls=0,prompts=0,fail=false;
  const c=vm.createContext({window:{LEVI_TRADE_AUTH:a},prompt:()=>{prompts++;return null;},J:async()=>{calls++;if(fail)throw Error('401');return {ok:true};}});
  vm.runInContext('let tradeControlToken=window.LEVI_TRADE_AUTH.read();'+read('binance-agent.js').split('async function authenticatedControl(')[1].split('async function setMode(')[0].replace(/^/, 'async function authenticatedControl('),c);
  await c.authenticatedControl('/manual',{});assert.equal(prompts,0);assert.equal(calls,1);
- fail=true;await assert.rejects(()=>c.authenticatedControl('/manual',{}),/האימות נכשל/);assert.equal(a.read(),null);assert.equal(calls,2);
+ fail=true;await assert.rejects(()=>c.authenticatedControl('/manual',{}),/חיבור המכשיר אינו תקף/);assert.equal(a.read(),null);assert.equal(calls,2);
 });
 function ui(){
  const elements=new Map();const get=id=>{if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,value:'',textContent:'',open:false,focus(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(){}});return elements.get(id);};
