@@ -988,9 +988,8 @@ window.LEVI_MANUAL_TRADES={
   return {ok:true,persistent,expiresAt:result.expiresAt};
  },
  forget:async()=>{
-  const token=tradeControlToken;
-  try{if(token)await J(B+'/api/binance-control/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:'{}'});}
-  finally{tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();}
+  const token=tradeControlToken;tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();
+  if(token)await J(B+'/api/binance-control/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:'{}'});
  },
  refresh:async()=>{await load();await loadChart(selectedSymbol);}
 };
