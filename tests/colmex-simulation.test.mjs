@@ -39,7 +39,7 @@ test('delayed observations record both timestamps, fees are explicit and cash ac
 });
 test('five slots cap entries, final slot uses remaining cash and invalidated confirmations remain invalid',()=>{
  let s=fresh();for(const symbol of ['AAPL','MSFT','NVDA','AMZN','GOOGL','META'])s=applyStockObservation(s,obs(81,base+60000,symbol));assert.equal(Object.keys(s.positions).length,5);assert.ok(s.cash>0&&s.cash<5);assert.equal(s.assets.META.reason,'NO_FREE_SLOT');
- s=applyStockObservation(s,obs(77,base+2*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');s=applyStockObservation(s,obs(81,base+3*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');
+ s=applyStockObservation(s,obs(108,base+2*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');s=applyStockObservation(s,obs(81,base+3*60000,'META'));assert.equal(s.assets.META.reason,'WYCKOFF_SIGNAL_INVALIDATED');
 });
 test('scheduler persists a single cycle atomically, rotates after provider failures, and does not fetch while closed',async()=>{
  let value=fresh(),version=0,calls=0;const store={async getWithMetadata(){return value?{data:structuredClone(value),etag:String(version)}:null;},async setJSON(k,v,opt){if(opt.onlyIfNew&&value||opt.onlyIfMatch&&opt.onlyIfMatch!==String(version))return {modified:false};value=structuredClone(v);version++;return {modified:true};}};
@@ -50,7 +50,7 @@ test('scheduler persists a single cycle atomically, rotates after provider failu
 });
 
 test('Spring buys below or at first low without reclaim; Binance modules are unchanged',()=>{
- for(const price of [78,79,80]){
+ for(const price of [77,78,79,80]){
   const s=applyStockObservation(fresh(),obs(price));
   assert.equal(s.assets.AAPL.reason,'BUY');
   assert.equal(s.journal[0].reason,'WYCKOFF_SPRING');
