@@ -55,18 +55,16 @@ test('multiple accounts require selection; foreign IDs and arbitrary endpoint pa
  const one=await r.client.snapshot('43');assert.equal(one.selectedAccount.id,'43');assert.equal(r.calls.at(-1).path,'/accounts/43/positions');
 });
 test('declared rate limits extend frontend and server refresh intervals',()=>{assert.equal(refreshInterval({rateLimits:[{rateLimitType:'GET_POSITIONS',measure:'MINUTE',intervalNum:2,limit:1}]}),121000);});
-test('public readiness performs no broker authentication, anonymous private reads and every mutation are blocked',async()=>{
- let made=0,calls=0;const env={COLMEX_API_LOGIN:'owner',COLMEX_API_PASSWORD:'never-return',COLMEX_API_READ_TOKEN:secret};const h=makeHandler({env:()=>env,clientFactory:()=>{made++;return {snapshot:async()=>{calls++;return {connected:true,readOnly:true};}};}});
- const status=await h({httpMethod:'GET',queryStringParameters:{action:'status'}});assert.equal(status.statusCode,200);assert.equal(JSON.parse(status.body).credentialsConfigured,true);assert.equal(made,0);assert(!status.body.includes('never-return'));
- assert.equal((await h({httpMethod:'GET'})).statusCode,401);assert.equal((await h({httpMethod:'GET',headers:{Authorization:'bearer '+secret}})).statusCode,401);
- for(const method of ['POST','DELETE','PATCH','PUT'])assert.equal((await h({httpMethod:method,headers:{Authorization:'Bearer '+secret}})).statusCode,405);
- assert.equal(calls,0);const good={httpMethod:'GET',headers:{Authorization:'Bearer '+secret}};assert.equal((await h(good)).statusCode,200);assert.equal(calls,1);
+test('readiness is public, account reads require no viewing credential, and every mutation remains blocked',async()=>{
+ let made=0,calls=0;const env={COLMEX_API_LOGIN:'owner',COLMEX_API_PASSWORD:'never-return'};const h=makeHandler({env:()=>env,clientFactory:()=>{made++;return {snapshot:async()=>{calls++;return {connected:true,readOnly:true};}};}});
+ const status=await h({httpMethod:'GET',queryStringParameters:{action:'status'}});assert.equal(status.statusCode,200);const ready=JSON.parse(status.body);assert.equal(ready.credentialsConfigured,true);assert.equal(ready.viewCodeRequired,false);assert.equal(ready.accessMode,'public-read-only');assert.equal(made,0);assert(!status.body.includes('never-return'));
+ for(const method of ['POST','DELETE','PATCH','PUT'])assert.equal((await h({httpMethod:method})).statusCode,405);
+ assert.equal(calls,0);const good={httpMethod:'GET'};assert.equal((await h(good)).statusCode,200);assert.equal(calls,1);
  assert.equal((await h({...good,queryStringParameters:{path:'/withdrawals'}})).statusCode,400);
- assert.equal((await h({...good,headers:{Authorization:'Bearer '+secret+' '}})).statusCode,401);
  env.COLMEX_API_PASSWORD='rotated';await h(good);assert.equal(made,2);
 });
-test('private route sanitizes all unknown errors; missing credentials and viewer setup never open access',async()=>{
- const h=makeHandler({env:()=>({COLMEX_API_LOGIN:'a',COLMEX_API_PASSWORD:'b',COLMEX_API_READ_TOKEN:secret}),clientFactory:()=>({snapshot:async()=>{throw Error('password and token must not escape');}})});
- const d=await h({httpMethod:'GET',headers:{Authorization:'Bearer '+secret}});assert.equal(d.statusCode,503);assert(!d.body.includes('must not escape'));assert.equal(JSON.parse(d.body).code,'SERVICE_UNAVAILABLE');
- const empty=makeHandler({env:()=>({})});assert.equal((await empty({httpMethod:'GET'})).statusCode,401);assert.equal(JSON.parse((await empty({httpMethod:'GET',queryStringParameters:{action:'status'}})).body).credentialsConfigured,false);
+test('public read route sanitizes unknown errors and absent broker credentials return a setup error',async()=>{
+ const h=makeHandler({env:()=>({COLMEX_API_LOGIN:'a',COLMEX_API_PASSWORD:'b'}),clientFactory:()=>({snapshot:async()=>{throw Error('password and token must not escape');}})});
+ const d=await h({httpMethod:'GET'});assert.equal(d.statusCode,503);assert(!d.body.includes('must not escape'));assert.equal(JSON.parse(d.body).code,'SERVICE_UNAVAILABLE');
+ const empty=makeHandler({env:()=>({})});assert.equal((await empty({httpMethod:'GET'})).statusCode,503);assert.equal(JSON.parse((await empty({httpMethod:'GET',queryStringParameters:{action:'status'}})).body).credentialsConfigured,false);
 });
