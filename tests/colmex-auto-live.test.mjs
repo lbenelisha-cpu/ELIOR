@@ -50,3 +50,5 @@ test('status uses native deployment, reports old acknowledgement blocked, and ca
  assert.equal(prod.configuration.productionEnvironment,true);assert.equal(prod.configuration.liveAckMatches,false);assert.equal(prod.enabled,false);
  const preview=await (await makeFetchHandler({env,storeFactory})(new Request('https://test/status'),{deploy:{context:'deploy-preview'}})).json();assert.equal(preview.enabled,false);
 });
+
+test('cycle diagnostic allows only fixed error codes and never exposes arbitrary broker messages',async()=>{const {cycleError}=await import('../netlify/functions/colmex-auto-monitor.mjs');assert.equal(cycleError(Error('HISTORY_SCHEMA'),'HISTORY_AND_DETAILS').reason,'HISTORY_SCHEMA');assert.equal(cycleError(Error('secret broker response'),'HISTORY_AND_DETAILS').reason,'CYCLE_FAILED_NO_AUTOMATIC_RETRY_OF_ORDERS');});
