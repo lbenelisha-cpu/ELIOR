@@ -3,7 +3,7 @@ import {AUTO_POLICY,LIVE_ACK,configuredLive,planBuy,brokerBars,ticks} from '../l
 import {initialState,reconcile,runCycle} from '../lib/colmex-auto-runner.mjs';
 import {AutoBroker} from '../lib/colmex-auto-broker.mjs';
 import {lease} from '../lib/colmex-auto-store.mjs';
-import {makeHandler} from '../netlify/functions/colmex-auto-status.mjs';
+import {makeHandler,makeFetchHandler} from '../netlify/functions/colmex-auto-status.mjs';
 const now=Date.parse('2026-10-20T15:00:00Z');
 const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
 const sizes=[{leftRangeLimit:0,tickSize:.01}];
@@ -33,3 +33,5 @@ test('adapter maps live dynamic arrays, rejects wrong account and unknown positi
  const payloads={'/config':{accountDetailsConfig:{columns:[{id:'cashBalance'}]},positionsConfig:{columns:[{id:'id'},{id:'qty'},{id:'side'},{id:'tradableInstrumentId'}]},ordersConfig:{columns:[{id:'id'},{id:'side'},{id:'tradableInstrumentId'}]},ordersHistoryConfig:{columns:[]}},'/accounts':{accounts:[{id:123,type:'live',currency:'USD',status:'ACTIVE'}]},'/accounts/123/state':{accountDetailsData:[500]},'/accounts/123/positions':{positions:[['p','2','buy','1']]},'/accounts/123/orders':{orders:[]},'/accounts/123/ordersHistory':{ordersHistory:[]}};
  const b=new AutoBroker({env,deadline:now+24000,now:()=>now});b.reader.authorize=async()=> 'mock';b.get=async path=>payloads[path];const s=await b.snapshot('123');assert.equal(s.state.cashBalance,500);assert.equal(s.positions[0].qty,'2');payloads['/accounts'].accounts[0].type='demo';await assert.rejects(b.snapshot('123'),/LIVE_ACCOUNT_MISMATCH/);payloads['/accounts'].accounts[0].type='live';payloads['/accounts/123/positions'].positions[0][2]='unknown';await assert.rejects(b.snapshot('123'),/POSITION_SCHEMA/);
 });
+
+test('Fetch entrypoint reads state with native runtime and reports precise configuration without values',async()=>{let reads=0;const h=makeFetchHandler({env,storeFactory:()=>({get:async()=>{reads++;return {state:{lastCycleAt:now,positions:[],checks:{},events:[]}};}})});const r=await h(new Request('https://test/status'),{deploy:{context:'production'}});const d=await r.json();assert.equal(r.status,200);assert.equal(d.runtimeDeployContext,'production');assert.equal(d.configuration.enabledFlag,true);assert.equal(d.configuration.liveAckMatches,true);assert.equal(reads,1);assert.equal((await h(new Request('https://test/status',{method:'POST'}),{})).status,405);assert.equal(reads,1);});
