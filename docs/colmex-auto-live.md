@@ -45,3 +45,7 @@ Broker contract: https://clientapi.cglms.com/traderevolution/v1/swagger-ui/index
 ## Runtime compatibility correction (V2)
 
 Production identity comes from the native handler `context.deploy.context`, not the build-only `process.env.CONTEXT`. Both status and scheduled monitor use the same adapter; preview context always overrides any environment value. The V2 release intentionally requires the updated acknowledgement ending `_V2`, so settings entered for V1 cannot begin trading just because this correction is deployed. The owner must update `COLMEX_AUTO_LIVE_ACK` and redeploy. No other activation setting changes. The status handler also uses Fetch API so Netlify supplies the native Blobs context automatically.
+
+## Discontinuous broker history
+
+An unexpected gap in five-minute broker history starts a new Wyckoff search on the latest contiguous segment. Ordinary close-to-open session gaps retain the existing exchange-session rule. Pivots from opposite sides of a missing candle are never joined, no synthetic candles are created, and fewer than three usable bars waits for history. Status reports discarded/usable counts and the new search boundary. A cooldown-only invocation does not clear the preceding failure or count as a completed market scan.

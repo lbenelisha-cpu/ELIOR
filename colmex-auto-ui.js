@@ -9,6 +9,6 @@ async function refresh(){try{
  badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(d.lastResult?' · '+reason(d.lastResult):'')+(d.halt?' · '+d.halt:'')+(d.lastError?' · הסבב האחרון נכשל; יש לבדוק את החיבור':'');
  positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · כמות ${p.qty} · כניסה $${p.entryPrice} · שיא שנצפה $${p.peakPrice}`);
  if(!d.positions?.length)line(positions,'אין פוזיציות שמנוהלות בידי המנגנון הזה. פוזיציות ידניות מוצגות בחלונית החשבון.');
- checks.replaceChildren();for(const [symbol,c]of Object.entries(d.checks||{}))line(checks,`${symbol} · ${reason(c.reason)} · ${time(c.at)}`);
+ checks.replaceChildren();if(d.historyQuality?.discarded)line(checks,`${d.historyQuality.symbol} · החיפוש התחיל מחדש לאחר פער בהיסטוריה · ${d.historyQuality.usableBars} נרות רצופים זמינים`);for(const [symbol,c]of Object.entries(d.checks||{}))line(checks,`${symbol} · ${reason(c.reason)} · ${time(c.at)}`);
  }catch{badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';positions.replaceChildren();checks.replaceChildren();}}
 refresh();setInterval(refresh,60000);

@@ -11,7 +11,7 @@ export default async function(request,context){
  if(!configuredLive(env))return new Response(null,{status:204});
  const lock=await lease(autoStore(),env.COLMEX_AUTO_ACCOUNT_ID);if(!lock)return new Response(null,{status:204});
  const deadline=Date.now()+24000;
- try{const result=await runCycle({state:lock.state,save:lock.save,broker:new AutoBroker({env,deadline}),env,deadline});lock.state.lastResult=result.reason;lock.state.lastCompletedAt=Date.now();lock.state.lastError=null;await lock.save(lock.state);}
+ try{const result=await runCycle({state:lock.state,save:lock.save,broker:new AutoBroker({env,deadline}),env,deadline});if(result.reason!=='CYCLE_COOLDOWN'){lock.state.lastResult=result.reason;lock.state.lastCompletedAt=Date.now();lock.state.lastError=null;await lock.save(lock.state);}}
  catch(error){lock.state.lastError=cycleError(error,lock.state.stage);await lock.save(lock.state);}
  finally{await lock.release();}
  return new Response(null,{status:204});

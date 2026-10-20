@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {AUTO_POLICY,LIVE_ACK,configuredLive,runtimeEnvironment,planBuy,brokerBars,ticks} from '../lib/colmex-auto-policy.mjs';
+import {AUTO_POLICY,LIVE_ACK,configuredLive,runtimeEnvironment,planBuy,brokerBars,contiguousHistory,entrySignal,ticks} from '../lib/colmex-auto-policy.mjs';
 import {initialState,reconcile,runCycle} from '../lib/colmex-auto-runner.mjs';
 import {AutoBroker} from '../lib/colmex-auto-broker.mjs';
 import {lease} from '../lib/colmex-auto-store.mjs';
@@ -52,3 +52,14 @@ test('status uses native deployment, reports old acknowledgement blocked, and ca
 });
 
 test('cycle diagnostic allows only fixed error codes and never exposes arbitrary broker messages',async()=>{const {cycleError}=await import('../netlify/functions/colmex-auto-monitor.mjs');assert.equal(cycleError(Error('HISTORY_SCHEMA'),'HISTORY_AND_DETAILS').reason,'HISTORY_SCHEMA');assert.equal(cycleError(Error('secret broker response'),'HISTORY_AND_DETAILS').reason,'CYCLE_FAILED_NO_AUTOMATIC_RETRY_OF_ORDERS');});
+
+test('missing historical bars start a new independent contiguous Wyckoff search',()=>{
+ const bars=[0,300000,900000,1200000,1500000].map(t=>({closeTime:now-1500000+t}));
+ const sliced=contiguousHistory(bars);assert.equal(sliced.discarded,2);assert.equal(sliced.bars.length,3);assert.equal(sliced.resetAt,now-600000);assert.equal(bars.length,5);
+ const multiple=contiguousHistory([...bars,{closeTime:now+600000}]);assert.equal(multiple.discarded,5);assert.equal(multiple.bars.length,1);
+ assert.equal(entrySignal(multiple.bars,now+600000,now).ready,false);
+});
+test('normal close-to-open session gaps preserve multiday history',()=>{
+ const times=['2026-10-19T19:55:00Z','2026-10-19T20:00:00Z','2026-10-20T13:35:00Z','2026-10-20T13:40:00Z'].map(Date.parse);
+ const h=contiguousHistory(times.map(closeTime=>({closeTime})));assert.equal(h.discarded,0);assert.equal(h.bars.length,4);
+});
