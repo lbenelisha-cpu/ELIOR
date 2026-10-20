@@ -29,7 +29,7 @@ In Netlify production Functions environment settings, the account owner sets:
 | Variable | Value |
 | --- | --- |
 | `COLMEX_AUTO_ACCOUNT_ID` | Exact numeric LIVE USD account ID shown in the account panel |
-| `COLMEX_AUTO_LIVE_ACK` | `I_ACCEPT_LIVE_100_USD_3_POSITIONS` |
+| `COLMEX_AUTO_LIVE_ACK` | `I_ACCEPT_LIVE_100_USD_3_POSITIONS_V2` |
 | `COLMEX_AUTO_LIVE_ENABLED` | `true` |
 
 Redeploy after environment changes. The owner should verify account permissions, fractional share / lot rules and current broker fee schedule before activation. The page status changes to waiting/monitoring only when all opt-in settings match. It does not guarantee that a trade is eligible or that a worker cycle succeeded: inspect last successful cycle and entry reasons.
@@ -41,3 +41,7 @@ To disable, set `COLMEX_AUTO_LIVE_ENABLED=false` and redeploy. This stops **all*
 Mock-only tests cover disabled and preview behavior, cap and step rounding, manual/pending exposure, actual partial fills, no fills, unknown outcomes, write-ahead persistence failure, cross-invocation leases, externally changed positions, missing stops, seven-day protection, read-only status and no writer retries. Full repository tests are run before publishing. Real financial API requests are not part of verification.
 
 Broker contract: https://clientapi.cglms.com/traderevolution/v1/swagger-ui/index.html (live `/v3/api-docs`); guide: https://guide.traderevolution.com/traderevolution-api/traderevolution-apis/client-api. Credentials authorization follows Colmex's supplied login/password instructions, not generic OAuth sections.
+
+## Runtime compatibility correction (V2)
+
+Production identity comes from the native handler `context.deploy.context`, not the build-only `process.env.CONTEXT`. Both status and scheduled monitor use the same adapter; preview context always overrides any environment value. The V2 release intentionally requires the updated acknowledgement ending `_V2`, so settings entered for V1 cannot begin trading just because this correction is deployed. The owner must update `COLMEX_AUTO_LIVE_ACK` and redeploy. No other activation setting changes. The status handler also uses Fetch API so Netlify supplies the native Blobs context automatically.

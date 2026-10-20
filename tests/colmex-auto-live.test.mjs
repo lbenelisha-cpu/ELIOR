@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {AUTO_POLICY,LIVE_ACK,configuredLive,planBuy,brokerBars,ticks} from '../lib/colmex-auto-policy.mjs';
+import {AUTO_POLICY,LIVE_ACK,configuredLive,runtimeEnvironment,planBuy,brokerBars,ticks} from '../lib/colmex-auto-policy.mjs';
 import {initialState,reconcile,runCycle} from '../lib/colmex-auto-runner.mjs';
 import {AutoBroker} from '../lib/colmex-auto-broker.mjs';
 import {lease} from '../lib/colmex-auto-store.mjs';
@@ -35,3 +35,18 @@ test('adapter maps live dynamic arrays, rejects wrong account and unknown positi
 });
 
 test('Fetch entrypoint reads state with native runtime and reports precise configuration without values',async()=>{let reads=0;const h=makeFetchHandler({env,storeFactory:()=>({get:async()=>{reads++;return {state:{lastCycleAt:now,positions:[],checks:{},events:[]}};}})});const r=await h(new Request('https://test/status'),{deploy:{context:'production'}});const d=await r.json();assert.equal(r.status,200);assert.equal(d.runtimeDeployContext,'production');assert.equal(d.configuration.enabledFlag,true);assert.equal(d.configuration.liveAckMatches,true);assert.equal(reads,1);assert.equal((await h(new Request('https://test/status',{method:'POST'}),{})).status,405);assert.equal(reads,1);});
+
+test('native production context enables only the updated owner acknowledgement; old settings stay disabled',()=>{
+ const values={...env};delete values.CONTEXT;
+ assert.equal(configuredLive(runtimeEnvironment(values,{deploy:{context:'production'}})),true);
+ assert.equal(configuredLive(runtimeEnvironment({...values,COLMEX_AUTO_LIVE_ACK:'I_ACCEPT_LIVE_100_USD_3_POSITIONS'},{deploy:{context:'production'}})),false);
+ assert.equal(configuredLive(runtimeEnvironment(env,{deploy:{context:'deploy-preview'}})),false);
+ assert.equal(configuredLive(runtimeEnvironment(env,{})),false);
+});
+test('status uses native deployment, reports old acknowledgement blocked, and cannot be enabled by env in a preview',async()=>{
+ const old={...env,COLMEX_AUTO_LIVE_ACK:'I_ACCEPT_LIVE_100_USD_3_POSITIONS'};
+ const storeFactory=()=>({get:async()=>null});
+ const prod=await (await makeFetchHandler({env:old,storeFactory})(new Request('https://test/status'),{deploy:{context:'production'}})).json();
+ assert.equal(prod.configuration.productionEnvironment,true);assert.equal(prod.configuration.liveAckMatches,false);assert.equal(prod.enabled,false);
+ const preview=await (await makeFetchHandler({env,storeFactory})(new Request('https://test/status'),{deploy:{context:'deploy-preview'}})).json();assert.equal(preview.enabled,false);
+});

@@ -1,4 +1,4 @@
-import {AUTO_POLICY,LIVE_ACK,configuredLive} from '../../lib/colmex-auto-policy.mjs';
+import {AUTO_POLICY,LIVE_ACK,configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mjs';
 import {autoStore,stateKey} from '../../lib/colmex-auto-store.mjs';
 export function makeHandler({env=process.env,storeFactory=autoStore}={}){return async event=>{
  const response=(code,data)=>({statusCode:code,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
@@ -11,7 +11,8 @@ export function makeHandler({env=process.env,storeFactory=autoStore}={}){return 
  }catch{return response(503,{...base,status:'STATUS_UNAVAILABLE'});}
 };}
 // Fetch-style functions receive the native Blobs context automatically.
-export function makeFetchHandler(options){const handler=makeHandler(options);return async function(request,context){
+export function makeFetchHandler(options={}){return async function(request,context){
+ const handler=makeHandler({...options,env:runtimeEnvironment(options.env||process.env,context)});
  const result=await handler({httpMethod:request.method});
  const data=JSON.parse(result.body);data.runtimeDeployContext=context?.deploy?.context??null;
  return new Response(JSON.stringify(data),{status:result.statusCode,headers:result.headers});

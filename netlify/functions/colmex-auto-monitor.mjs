@@ -1,9 +1,9 @@
-import {configuredLive} from '../../lib/colmex-auto-policy.mjs';
+import {configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mjs';
 import {autoStore,lease} from '../../lib/colmex-auto-store.mjs';
 import {AutoBroker} from '../../lib/colmex-auto-broker.mjs';
 import {runCycle} from '../../lib/colmex-auto-runner.mjs';
-export default async function(){
- const env=process.env;
+export default async function(request,context){
+ const env=runtimeEnvironment(process.env,context);
  if(!configuredLive(env))return new Response(null,{status:204});
  const lock=await lease(autoStore(),env.COLMEX_AUTO_ACCOUNT_ID);if(!lock)return new Response(null,{status:204});
  const deadline=Date.now()+24000;
