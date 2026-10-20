@@ -11,7 +11,7 @@ function render(data){
  select.replaceChildren();const placeholder=node('option','בחר חשבון');placeholder.value='';select.append(placeholder);
  for(const a of data.accounts||[]){const option=node('option',a.name+' · '+a.id+' · '+(a.type||'סוג לא נמסר'));option.value=a.id;select.append(option);}
  select.value=selected?.id||'';select.hidden=(data.accounts||[]).length<2;
- $('brokerConnectionBadge').textContent=selected?'מחובר · קריאה בלבד':'התחברות אומתה · קריאה בלבד';
+ $('brokerConnectionBadge').textContent=selected?'מחובר · תצוגת נתוני חשבון':'התחברות אומתה · תצוגת נתוני חשבון';
  $('brokerAccountStatus').textContent=!data.accounts?.length?'ההתחברות אומתה; קולמקס לא החזירה חשבונות זמינים.':!selected?'בחר חשבון כדי להציג את נתוניו.':'נתוני '+selected.name+' · '+(selected.type==='demo'?'חשבון דמו':selected.type==='live'?'חשבון LIVE':selected.type||'סוג חשבון לא נמסר')+' · סטטוס: '+(selected.status||'לא נמסר');
  $('brokerRefresh').disabled=false;
  if(!selected)return;
@@ -48,7 +48,7 @@ $('brokerAccounts').addEventListener('change',()=>{generation++;controller?.abor
 async function status(){
  try{const r=await fetch('/.netlify/functions/colmex-account?action=status',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();
   enabled=d.credentialsConfigured===true;
-  $('brokerSetupStatus').textContent=enabled?'חיבור אוטומטי לחשבון · קריאה בלבד, ללא קוד צפייה.':'יש להגדיר בשרת את פרטי COLMEX_API_LOGIN ו־COLMEX_API_PASSWORD.';
+  $('brokerSetupStatus').textContent=enabled?'תצוגת נתוני חשבון · חיבור אוטומטי ללא קוד צפייה.':'יש להגדיר בשרת את פרטי COLMEX_API_LOGIN ו־COLMEX_API_PASSWORD.';
   $('brokerRefresh').disabled=!enabled;
   if(enabled)refresh();
  }catch{$('brokerSetupStatus').textContent='בדיקת החיבור אינה זמינה כרגע. רענן את העמוד מאוחר יותר.';}
