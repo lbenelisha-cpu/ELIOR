@@ -1,0 +1,13 @@
+import {AUTO_POLICY,configuredLive} from '../../lib/colmex-auto-policy.mjs';
+import {autoStore,stateKey} from '../../lib/colmex-auto-store.mjs';
+export function makeHandler({env=process.env,storeFactory=autoStore}={}){return async event=>{
+ const response=(code,data)=>({statusCode:code,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
+ if(event.httpMethod!=='GET')return response(405,{error:'READ_ONLY'});
+ const enabled=configuredLive(env),base={policy:AUTO_POLICY,enabled,activation:'SERVER_CONFIGURATION_ONLY',live:true};
+ try{
+  const id=env.COLMEX_AUTO_ACCOUNT_ID;
+  const value=/^\d+$/.test(id||'')?await storeFactory().get(stateKey(id),{type:'json'}):null,s=value?.state;
+  return response(200,{...base,status:!enabled?'DISABLED':s?.halt?'REQUIRES_REVIEW':s?.pending?'PENDING_BROKER_CONFIRMATION':s?.lastCycleAt?'MONITORING':'WAITING_FIRST_CYCLE',lastCycleAt:s?.lastCycleAt??null,lastCompletedAt:s?.lastCompletedAt??null,lastResult:s?.lastResult??null,halt:s?.halt??null,pending:s?.pending?{kind:s.pending.kind,symbol:s.pending.symbol,at:s.pending.at}:null,positions:s?.positions?.map(p=>({symbol:p.symbol,qty:p.qty,entryPrice:p.entryPrice,peakPrice:p.peakPrice,entryAt:p.entryAt,effectiveStopPrice:p.effectiveStopPrice}))||[],checks:s?.checks||{},events:s?.events?.slice(-30)||[],lastError:s?.lastError||null});
+ }catch{return response(503,{...base,status:'STATUS_UNAVAILABLE'});}
+};}
+export const handler=makeHandler();
