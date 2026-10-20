@@ -3,6 +3,7 @@ import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedW
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
 import {initSimulation,simulationMarks,simulationWyckoffHistory} from './colmex-simulation-ui.js?v=20261017-occurrences';
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
+import {syncWatchRows} from './lib/colmex-watch-view.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
 const quotes={},quoteStatus={},quoteNextAt={};let quoteBusy=false;
@@ -27,7 +28,7 @@ function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
 function render(preserveForm=false,preserveChart=false){
  $('#watchCount').textContent=String(state.symbols.length);
- $('#watchList').replaceChildren();for(const s of state.symbols){const b=document.createElement('button');b.className='watch-row'+(s===selected?' active':'');b.type='button';b.setAttribute('aria-pressed',s===selected?'true':'false');const symbol=document.createElement('b');symbol.textContent=s;const price=document.createElement('span');const m=mark(s);price.textContent=m?money(m.price):(quoteStatus[s]||'ממתין לטעינה');if(m)price.title=m.source+(quoteStatus[s]?' · '+quoteStatus[s]:'');b.append(symbol,price);b.onclick=()=>{selected=s;render();loadMarket(false);};$('#watchList').append(b);}
+ syncWatchRows($('#watchList'),state.symbols,{selected,createElement:tag=>document.createElement(tag),onSelect:s=>{selected=s;render();loadMarket(false);},describe:s=>{const m=mark(s);return {text:m?money(m.price):(quoteStatus[s]||'ממתין לטעינה'),title:m?m.source+(quoteStatus[s]?' · '+quoteStatus[s]:''):''};}});
  $('#selectedSymbol').textContent=selected;$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
  $('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
