@@ -611,31 +611,47 @@ async function runBinanceWyckoffScan(candles,rows,position){
   worker.postMessage({candles,rows,position});
  });
 }
-async function loadChart(symbol){
+let chartLoadInFlight=null;
+function loadChart(symbol){
+ const key=[symbol,selectedInterval,selectedRange,currentMode].join(':');
+ if(chartLoadInFlight?.key===key)return chartLoadInFlight.promise;
+ const promise=loadChartRequest(symbol);chartLoadInFlight={key,promise};
+ const clear=()=>{if(chartLoadInFlight?.promise===promise)chartLoadInFlight=null;};
+ promise.then(clear,clear);return promise;
+}
+async function loadChartRequest(symbol){
   const requestId=++chartRequestId;
-  const interval=selectedInterval;
+  const interval=selectedInterval,range=selectedRange;
   const modeAtRequest=currentMode;
-  const contextKey=[symbol,interval,selectedRange,modeAtRequest].join(':');
+  const contextKey=[symbol,interval,range,modeAtRequest].join(':');
   try{
-    $('#chartEmpty')?.classList.add('hidden');
-    const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(selectedInterval)+'&range='+encodeURIComponent(selectedRange));
+    if(chartAnalysisContext!==contextKey){
+      chartCandles=[];chartDecisions=[];
+      const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
+      put('#chartEmpty','טוען נתוני גרף…');$('#chartEmpty')?.classList.remove('hidden');
+    }else $('#chartEmpty')?.classList.add('hidden');
+    const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval)+'&range='+encodeURIComponent(range),{timeoutMs:35000});
+    if(!Array.isArray(d.candles)||!d.candles.length)throw Error('לא התקבלו נרות למטבע ולטווח שנבחרו.');
     put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+('טווח '+({'1D':'יום','2D':'יומיים','3D':'3 ימים','4D':'4 ימים','5D':'5 ימים','1W':'שבוע'}[selectedRange]||selectedRange))+' · MA200');
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
+    $('#chartEmpty')?.classList.add('hidden');
     if(chartAnalysisContext!==contextKey){
       put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
-      chartAnalysisContext=contextKey;selectedWyckoffId=null;
+      chartAnalysisContext=contextKey;selectedWyckoffId=null;chartWyckoffHistory=[];chartWyckoffError=null;
     }
     chartVisibleStartTime=Number(d.visibleStartTime)||0;
     chartCandles=d.candles||[];
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
+    // Price data is visible immediately; historical annotations may finish later.
+    drawCandles(chartCandles);renderCandlePower(d.candleAnalysis);
     try{
     const historyEngine=wyckoffHistoryEngine||await import('/lib/binance-wyckoff-history.mjs?v=20261017-history');
     wyckoffHistoryEngine=historyEngine;
-    const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(selectedRange));
+    const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(range),{timeoutMs:35000});
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode)return;
     const sourceCandles=source.candles||[];
     const closedAt=sourceCandles.filter(b=>b.closed!==false).at(-1)?.closeTime;
-    const cacheKey=[symbol,selectedRange,modeAtRequest,closedAt].join(':');
+    const cacheKey=[symbol,range,modeAtRequest,closedAt].join(':');
     let analysis=wyckoffHistoryCache.get(cacheKey);
     const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};
     if(!analysis){analysis=await runBinanceWyckoffScan(sourceCandles,[...(source.decisions||[]),...(source.actions||[])],position);wyckoffHistoryCache.clear();wyckoffHistoryCache.set(cacheKey,analysis);}
@@ -647,9 +663,15 @@ async function loadChart(symbol){
     renderCandlePower(d.candleAnalysis);
   }catch(e){
     if(requestId!==chartRequestId)return;
-    chartDecisions=[];
-    $('#chartDecisionMarkers')?.replaceChildren();
-    $('#chartEmpty')?.classList.remove('hidden');
+    if(chartAnalysisContext===contextKey&&chartCandles.length){
+      put('#chartLegend','לא ניתן לרענן כעת · מוצגים הנרות מהטעינה האחרונה · '+e.message);
+    }else{
+      chartCandles=[];chartDecisions=[];
+      $('#chartDecisionMarkers')?.replaceChildren();
+      const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
+      put('#chartEmpty','לא ניתן לטעון את הגרף · '+e.message);
+      $('#chartEmpty')?.classList.remove('hidden');
+    }
   }
 }
 
