@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {BrokerMarketReader,brokerChart,brokerQuote,brokerMarketError} from '../lib/colmex-broker-market.mjs';
-import {makeBrokerMarketHandler} from '../lib/colmex-market-endpoints.mjs';
+import {makeBrokerMarketHandler,makeBrokerMarketService} from '../lib/colmex-market-endpoints.mjs';
 import {validStockSnapshot} from '../lib/colmex-market-cache.mjs';
 const start=Date.parse('2026-10-21T13:30:00Z'),now=start+90*60000;
 const history={barDetails:Array.from({length:18},(_,i)=>({t:start+(i+1)*300000,o:100+i,h:102+i,l:99+i,c:101+i,v:10}))};
@@ -47,4 +47,11 @@ test('read failures stay explicit and never claim zero positions or reveal provi
  const chart=makeBrokerMarketHandler('chart',{env:()=>env,readerFactory:()=>({account:async()=>{throw Error('private-details');}})});
  const response=await chart({httpMethod:'GET',queryStringParameters:{symbol:'AMD'}}),data=JSON.parse(response.body);assert.equal(response.statusCode,503);assert.equal(data.code,'BROKER_DATA_UNAVAILABLE');assert.ok(!response.body.includes('private-details'));
  assert.match(brokerMarketError({code:'ACCESS_DENIED'}).error,/הרשאת/);
+});
+
+test('chart and quote routes reuse one authenticated reader and reject unknown views',async()=>{
+ let created=0;const c=client();const service=makeBrokerMarketService({env:()=>env,readerFactory:options=>{created++;return new BrokerMarketReader({...options,client:c,now:()=>now});},cacheRead:async options=>options.fetchData()});
+ const event={httpMethod:'GET',queryStringParameters:{symbol:'AMD',interval:'5min'}};assert.equal((await service(event)).statusCode,200);
+ const quote=await service({httpMethod:'GET',queryStringParameters:{symbol:'AMD',view:'quote'}});assert.equal(quote.statusCode,200);assert.equal(JSON.parse(quote.body).priceKind,'BROKER_BID');assert.equal(created,1);assert.equal(c.calls.filter(p=>p.includes('/instruments?')).length,1);
+ assert.equal((await service({httpMethod:'GET',queryStringParameters:{symbol:'AMD',view:'orders'}})).statusCode,400);
 });

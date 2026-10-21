@@ -166,7 +166,7 @@ async function loadNextWatchQuote(){
  const now=Date.now(),symbol=state.symbols.find(s=>(quoteNextAt[s]||0)<=now&&(!quotes[s]||now-quotes[s].loadedAt>=300000)&&![...pendingMarkets].some(k=>k.startsWith(s+':')));
  if(!symbol)return;quoteBusy=true;quoteStatus[symbol]='טוען מחיר…';render(true,true);
  try{
-  const r=await fetch('/.netlify/functions/colmex-stock-quote?symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();
+  const r=await fetch('/.netlify/functions/colmex-stocks-market?view=quote&symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();
   if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
   quotes[symbol]={...data,loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
  }catch{quoteStatus[symbol]='ממתין לספק · ניסיון חוזר';quoteNextAt[symbol]=Date.now()+65000;}
