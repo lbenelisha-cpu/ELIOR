@@ -7,12 +7,14 @@ test('background account read keeps the previous snapshot visible until its repl
  const r=setup();await flush();const before=r.nodes.get('brokerMetrics').children[0];let resolve;
  r.setResponse({ok:true,json:()=>new Promise(done=>{resolve=done;})});
  const pending=vm.runInContext('refresh()',r.context);await flush();assert.equal(r.nodes.get('brokerMetrics').children[0],before);assert.match(r.nodes.get('brokerAccountStatus').textContent,/מהקריאה הקודמת/);
- resolve(snapshot);await pending;assert.equal(r.nodes.get('brokerMetrics').children.length,6);assert.ok([...r.timers].some(t=>t.ms===60000));
+ resolve(snapshot);await pending;assert.equal(r.nodes.get('brokerMetrics').children.length,7);assert.ok([...r.timers].some(t=>t.ms===60000));
 });
 test('account loads automatically with no viewer credential or authorization header, and deletes previous viewing key',async()=>{
- const r=setup();await flush();assert.equal(r.saved.size,0);assert.equal(r.nodes.get('brokerMetrics').children.length,6);assert.equal(r.calls.length,2);assert.equal(r.calls[1][1].headers,undefined);assert.equal(r.nodes.has('brokerViewForm'),false);
+ const r=setup();await flush();assert.equal(r.saved.size,0);assert.equal(r.nodes.get('brokerMetrics').children.length,7);assert.equal(r.calls.length,2);assert.equal(r.calls[1][1].headers,undefined);assert.equal(r.nodes.has('brokerViewForm'),false);
  const row=r.nodes.get('brokerPositions').children[0].children[1].children[0];assert.equal(row.children[0].textContent,'<img src=x>');assert.equal(row.children[0].children.length,0);
 });
-test('failed broker reads clear old balances, never claim zero positions, and wrong-password errors stop automatic retries',async()=>{
- const r=setup();await flush();r.setResponse({ok:false,status:503,json:async()=>({error:'Connection unavailable',code:'AUTH_DENIED'})});await vm.runInContext('refresh()',r.context);assert.equal(r.nodes.get('brokerMetrics').children.length,0);assert.equal(r.nodes.get('brokerPositions').children.length,0);assert.equal(r.nodes.get('brokerAccountStatus').textContent,'Connection unavailable');assert.equal(r.saved.size,0);assert.equal(r.timers.size,0);
+test('failed broker reads retain dated positions with a stale warning and authentication errors stop retries',async()=>{
+ const r=setup();await flush();r.setResponse({ok:false,status:503,json:async()=>({error:'Connection unavailable',code:'AUTH_DENIED'})});await vm.runInContext('refresh()',r.context);assert.equal(r.nodes.get('brokerMetrics').children.length,7);assert.equal(r.nodes.get('brokerPositions').children.length,1);assert.match(r.nodes.get('brokerAccountStatus').textContent,/מהקריאה הקודמת/);assert.match(r.nodes.get('brokerConnectionBadge').textContent,/העדכון נכשל/);assert.equal(r.saved.size,0);assert.equal(r.timers.size,0);
 });
+
+test('open positions count and per-position P&L include the account currency',async()=>{const r=setup();await flush();assert.equal(r.nodes.get('brokerMetrics').children[6].children[1].textContent,'1');const row=r.nodes.get('brokerPositions').children[0].children[1].children[0];assert.equal(row.children[4].textContent,'1 USD');});

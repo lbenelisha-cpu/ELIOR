@@ -17,15 +17,15 @@ function render(data){
  $('brokerRefresh').disabled=false;
  if(!selected)return;
  currentId=selected.id;const currency=selected.currency||'',state=data.state||{};
- const metrics=[['יתרה ממומשת',state.balance],['יתרה חזויה · כולל רווח והפסד',state.projectedBalance],['כסף זמין למסחר',state.availableFunds],['מזומן בחשבון',state.cashBalance],['רווח / הפסד פתוח נטו',state.openNetPnL],['רווח / הפסד ממומש היום',state.todayNet]];
- for(const [label,v] of metrics){const article=node('article');article.append(node('span',label),node('strong',value(v,currency)));$('brokerMetrics').append(article);}
+ const metrics=[['יתרה ממומשת',state.balance],['יתרה חזויה · כולל רווח והפסד',state.projectedBalance],['כסף זמין למסחר',state.availableFunds],['מזומן בחשבון',state.cashBalance],['רווח / הפסד פתוח נטו',state.openNetPnL],['רווח / הפסד ממומש היום',state.todayNet],['פוזיציות פתוחות',(data.positions||[]).length]];
+ for(const [label,v] of metrics){const article=node('article');article.append(node('span',label),node('strong',value(v,label==='פוזיציות פתוחות'?'':currency)));$('brokerMetrics').append(article);}
  $('brokerReadAt').textContent='קריאת חשבון: '+new Date(data.observedAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})+' · שעון ישראל. מועד הקריאה אינו הבטחה לזמן עדכון הציטוטים אצל הברוקר.';
  const positions=data.positions||[];
  if(!positions.length)$('brokerPositions').append(node('p','אין פוזיציות פתוחות בתשובת הברוקר לחשבון שנבחר.','muted'));
  else {
   const table=node('table'),thead=node('thead'),head=node('tr');for(const label of ['נכס','כיוון','כמות','מחיר כניסה ממוצע','רווח / הפסד פתוח'])head.append(node('th',label));thead.append(head);table.append(thead);const body=node('tbody');
   for(const p of positions){const tr=node('tr');const direction={buy:'LONG',sell:'SHORT',long:'LONG',short:'SHORT'}[String(p.side).toLowerCase()]||String(p.side??'—');
-   for(const v of [p.instrumentName??p.symbol??p.tradableInstrumentId??'—',direction,value(p.qty),value(p.avgPrice),value(p.unrealizedPl)])tr.append(node('td',v));body.append(tr);
+   for(const v of [p.instrumentName??p.symbol??p.tradableInstrumentId??'—',direction,value(p.qty),value(p.avgPrice),value(p.unrealizedPl,currency)])tr.append(node('td',v));body.append(tr);
   }table.append(body);$('brokerPositions').append(table);
  }
  const dl=node('dl');for(const [key,v] of Object.entries(state)){dl.append(node('dt',key),node('dd',v===null?'—':String(v)));}$('brokerFields').append(dl);
@@ -41,7 +41,7 @@ async function refresh(){
   if(!response.ok&&['AUTH_DENIED','AUTH_RESPONSE','ACCESS_DENIED'].includes(data.code))auto=false;
   if(!response.ok)throw Error(data.error||'לא ניתן לקרוא את החשבון');
   render(data);refreshMs=Math.max(60000,Number(data.refreshAfterMs)||60000);
- }catch(e){if(g===generation){clear();$('brokerAccountStatus').textContent=e.name==='AbortError'?'קריאת החשבון ארכה זמן רב. נסה לרענן.':e.message;refreshMs=Math.max(refreshMs,60000);}}
+ }catch(e){if(g===generation){const previous=!!$('brokerReadAt').textContent;if(previous)$('brokerConnectionBadge').textContent='נתונים קודמים · העדכון נכשל';$('brokerAccountStatus').textContent=(e.name==='AbortError'?'קריאת החשבון ארכה זמן רב. נסה לרענן.':e.message)+(previous?' · מוצגים נתונים מהקריאה הקודמת, לא מצב חשבון מאומת כעת.':' · מצב הפוזיציות אינו ידוע.');refreshMs=Math.max(refreshMs,60000);}}
  finally{clearTimeout(timeout);if(g===generation){controller=null;if(enabled&&auto)timer=setTimeout(refresh,refreshMs);}}
 }
 $('brokerRefresh').addEventListener('click',()=>{auto=true;refresh();});
