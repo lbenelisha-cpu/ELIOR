@@ -35,5 +35,5 @@ export async function handler(event){
   }});
   if(sourceInterval!==interval){const bars=aggregateStockCandles(data.bars,interval);if(!bars.length)throw Error('NO_AGGREGATED_BARS');return reply(200,{...data,interval,bars,analysisBars:data.bars,sourceInterval,notice:data.notice+' · נרות '+(interval==='10min'?'10':'15')+' דקות מאוגדים מנרות 5 דקות.'});}
   return reply(200,data);
- }catch(error){return reply(503,{retryAfterSeconds:65,...marketFailure(error)});}
+ }catch(error){const failure=marketFailure(error);return reply(503,{retryAfterSeconds:failure.code==='DAILY_PROVIDER_LIMIT'?Math.ceil((86400000-Date.now()%86400000)/1000)+5:65,...failure});}
 }
