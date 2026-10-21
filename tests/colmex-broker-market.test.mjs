@@ -55,3 +55,9 @@ test('chart and quote routes reuse one authenticated reader and reject unknown v
  const quote=await service({httpMethod:'GET',queryStringParameters:{symbol:'AMD',view:'quote'}});assert.equal(quote.statusCode,200);assert.equal(JSON.parse(quote.body).priceKind,'BROKER_BID');assert.equal(created,1);assert.equal(c.calls.filter(p=>p.includes('/instruments?')).length,1);
  assert.equal((await service({httpMethod:'GET',queryStringParameters:{symbol:'AMD',view:'orders'}})).statusCode,400);
 });
+
+test('validated cached market data remains available when broker authentication is temporarily unavailable',async()=>{
+ let providerCalls=0;const data=brokerChart(history,'AMD','5min',now);
+ const endpoint=makeBrokerMarketHandler('chart',{env:()=>env,readerFactory:()=>({account:async()=>{throw Error('AUTH_DENIED');},chart:async()=>{providerCalls++;throw Error('AUTH_DENIED');}}),cacheRead:async options=>{assert.match(options.key,/:123:AMD:5min$/);assert.ok(options.validate(data));return {...data,cacheState:'PROVIDER_UNAVAILABLE_CACHE'};}});
+ const result=await endpoint({httpMethod:'GET',queryStringParameters:{symbol:'AMD',interval:'5min'}});assert.equal(result.statusCode,200);assert.equal(JSON.parse(result.body).priceAt,data.priceAt);assert.equal(providerCalls,0);
+});
