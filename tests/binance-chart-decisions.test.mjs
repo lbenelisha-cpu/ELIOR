@@ -39,3 +39,16 @@ test('pivot overlay selects the latest confirmed stored setup and never guesses 
  assert.equal(ctx.latestWyckoffSetup([{at,type:'BUY',wyckoffTrade:{initialPeak:12,springLow:9}}]),null);
  const found=ctx.latestWyckoffSetup([{at,type:'BUY',wyckoffTrade:{setup}}]);assert.equal(found.confirmation.time,time);assert.equal(found.initialPeak.price,12);
 });
+
+test('Binance high captions use the upper edge, lows use the lower edge and arrows retain exact anchors',()=>{
+ class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.clientWidth=850;this.clientHeight=560;}append(x){this.children.push(x);}replaceChildren(){this.children=[];}setAttribute(k,v){this[k]=v;}}
+ const root=new Element(),setup=Object.fromEntries(['initialPeak','firstLow','rallyHigh','secondaryTest','springLow','confirmation'].map((key,i)=>[key,{time:time+i*300000,price:100+i}]));
+ const view=Array.from({length:6},(_,i)=>({openTime:time-1+i*300000,closeTime:time+299999+i*300000}));
+ const scope=vm.createContext({Date,document:{querySelector:()=>root,createElement:()=>new Element()},currentAgentData:{agents:[]},selectedSymbol:'BTCUSDT',fmt:String});
+ vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),scope);
+ scope.renderWyckoffPivots(view,[{at,analysisSignal:true,setup}],100,18,p=>300-p,4);
+ const labels=root.children.filter(e=>e.className==='wyckoff-pivot'),arrows=root.children.filter(e=>e.className?.startsWith('wyckoff-arrow '));
+ assert.equal(labels.length,6);assert.equal(arrows.length,6);
+ for(const label of labels)assert.equal(label.style.top,['initialPeak','rallyHigh'].includes(label.dataset.pivot)?'66px':'533px');
+ assert.equal(arrows[0].style.left,'68px');assert.equal(arrows[0].style.top,'200px');assert.equal(arrows[0].className,'wyckoff-arrow points-down');assert.equal(arrows[1].className,'wyckoff-arrow points-up');
+});

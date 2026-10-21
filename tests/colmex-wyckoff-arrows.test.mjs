@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {wyckoffArrowPoints,arrowLayout,drawWyckoffArrows} from '../lib/colmex-wyckoff-arrows.mjs';
+import {wyckoffArrowPoints,arrowLayout,drawWyckoffArrows,wyckoffEdgeBands} from '../lib/colmex-wyckoff-arrows.mjs';
 import {COLMEX_MARK_TYPES} from '../lib/colmex-chart-marks.mjs';
 const start=Date.parse('2026-10-21T13:30:00Z');
 const bars=Array.from({length:10},(_,i)=>({date:new Date(start+i*300000).toISOString()}));
@@ -32,4 +32,12 @@ test('SVG arrows are keyboard accessible and report exact selected point; arrows
  svg.children[0].onclick({stopPropagation(){stopped++;}});assert.equal(selected.price,105);
  svg.children[1].onkeydown({key:'Enter',stopPropagation(){stopped++;},preventDefault(){prevented++;}});assert.equal(selected.price,108);assert.equal(stopped,2);assert.equal(prevented,1);
  assert.ok(svg.children.every(g=>!g.attrs.class));
+});
+
+test('edge bands keep every caption outside the plot, even for dense numbered history',()=>{
+ const points=Array.from({length:12},(_,i)=>wyckoffArrowPoints([],[{setup,number:i+1}],bars,'5min')).flat();
+ const x=()=>400,bounds=wyckoffEdgeBands(points,x),layout=arrowLayout(points,x,()=>bounds.top+125,bounds);
+ assert.equal(layout.length,72);assert.equal(bounds.bottom-bounds.top,250);
+ for(const a of layout){assert.ok(a.above?a.box.bottom<bounds.top:a.box.top>bounds.bottom);assert.ok(a.box.bottom<bounds.height-43);}
+ for(let i=0;i<layout.length;i++)for(let j=0;j<i;j++){const a=layout[i].box,b=layout[j].box;assert.ok(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);}
 });

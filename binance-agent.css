@@ -425,3 +425,8 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 
 /* Unknown/flat P&L is neutral, never a white flashing trade signal. */
 .asset-table tbody tr.active-position.pnl-unknown td,.asset-table tbody tr.active-position.pnl-flat td{animation:none;background:#102334;color:#b6c8db;box-shadow:none}.scanner-freshness{padding:10px 16px;background:#2c2413;color:#ffd387;font-size:12px;line-height:1.6}.scanner-freshness:empty{display:none}
+
+/* Edge captions stay steady; only the marked candle bodies and wicks flash. */
+.wyckoff-arrow{position:absolute;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;transform:translateX(-50%);pointer-events:none;z-index:2}
+.wyckoff-arrow.points-down{border-top:8px solid var(--pivot-color);transform:translate(-50%,-100%)}
+.wyckoff-arrow.points-up{border-bottom:8px solid var(--pivot-color)}
