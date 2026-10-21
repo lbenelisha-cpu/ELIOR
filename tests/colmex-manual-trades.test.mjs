@@ -8,7 +8,7 @@ import {makeManualHandler} from '../netlify/functions/colmex-manual-trade.mjs';
 const now=Date.parse('2026-10-20T16:00:00Z');
 const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123',COLMEX_API_LOGIN:'test',COLMEX_API_PASSWORD:'private',COLMEX_DEVICE_PAIR_CODE:'123456'};
 const request={side:'BUY',symbol:'AAPL',amountUsd:50,requestId:'11111111-1111-4111-8111-111111111111'};
-const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:500},positions:[],orders:[],history:[]});
+const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:1000},positions:[],orders:[],history:[]});
 function broker(){return {writes:[],snapshot:async()=>snapshot(),instruments:async()=>[{name:'AAPL',type:'EQUITY',tradableInstrumentId:1}],details:async()=>({quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000}),quote:async()=>({bp:29.99,ap:30}),history:async()=>({barDetails:[]}),async write(account,intent){this.writes.push(structuredClone(intent));return {orderId:'order'};}};}
 function store(){const rows=new Map();let version=0;return {async get(k){return structuredClone(rows.get(k)?.data??null);},async getWithMetadata(k){return structuredClone(rows.get(k)??null);},async setJSON(k,data,options={}){const previous=rows.get(k);if(options.onlyIfNew&&previous||options.onlyIfMatch&&previous?.etag!==options.onlyIfMatch)return {modified:false};const etag=String(++version);rows.set(k,{data:structuredClone(data),etag});return {modified:true,etag};},async delete(k){rows.delete(k);}};}
 test('one-time pairing locks after five failures, is single-use and binds to account/credentials',async()=>{
@@ -37,7 +37,7 @@ test('unknown write outcome remains pending and a different request cannot place
  await assert.rejects(manualTrade({...args,input:{...request,requestId:'22222222-2222-4222-8222-222222222222'}}),/TRADE_IN_PROGRESS/);
 });
 test('durable save failure prevents broker mutation; invalid amount and exposure are rejected',async()=>{
- assert.equal(manualInput({...request,amountUsd:400}).amountUsd,400);assert.throws(()=>manualInput({...request,amountUsd:400.01}),/INVALID_BUY_AMOUNT/);
+ assert.equal(manualInput({...request,amountUsd:800}).amountUsd,800);assert.throws(()=>manualInput({...request,amountUsd:800.01}),/INVALID_BUY_AMOUNT/);
  const state=initialState(now),b=broker();await assert.rejects(manualTrade({input:request,state,broker:b,env,now:()=>now,deadline:now+24000,save:async s=>{if(s.pending)throw Error('save failed');}}),/save failed/);assert.equal(b.writes.length,0);
  b.snapshot=async()=>({...snapshot(),positions:[{},{},{}]});await assert.rejects(manualTrade({input:request,state:initialState(now),broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}}),/NO_FREE_SLOT/);
 });
