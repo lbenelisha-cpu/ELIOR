@@ -1,8 +1,11 @@
 import {wyckoffArrowPoints,drawWyckoffArrows} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-arrows';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
-import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences} from './lib/colmex-chart-view.mjs?v=20261017-intervals';
+import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261021-separate-paper';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
-import {initSimulation,simulationMarks,simulationWyckoffHistory} from './colmex-simulation-ui.js?v=20261017-occurrences';
+const PAPER_MODE=document.body.dataset.mode==='simulation';
+let paperUI=null;
+const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:[]};
+const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs';
 import {syncWatchRows} from './lib/colmex-watch-view.mjs';
 'use strict';
@@ -11,31 +14,32 @@ const quotes={},quoteStatus={},quoteNextAt={};let quoteBusy=false;
 try{const stored=JSON.parse(localStorage.getItem(KEY+'-quotes')||'{}');for(const [symbol,q] of Object.entries(stored)){if(validSymbol(symbol)&&q?.symbol===symbol&&q.currency==='USD'&&positive(q.price)&&q.source==='Twelve Data'&&Number.isFinite(q.loadedAt)&&q.loadedAt<=Date.now()&&Date.now()-q.loadedAt<86400000)quotes[symbol]=q;}}catch{}
 function saveQuotes(){try{localStorage.setItem(KEY+'-quotes',JSON.stringify(quotes));}catch{}}
 
-const wyckoffHistories={},wyckoffErrors={};
+const wyckoffHistories={},wyckoffErrors={},analysisMarks={};
 const markets={},manualCharts=new Set(),pendingMarkets=new Set();let marketRequest=0;
 const STOCK_NAMES={AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',AMZN:'Amazon',GOOGL:'Alphabet',META:'Meta Platforms',TSLA:'Tesla',AVGO:'Broadcom',JPM:'JPMorgan Chase',NFLX:'Netflix'};
-const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX'];
+const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX','AMD','INTC','PLTR','COIN','ORCL','CRM','ADBE','UBER','DIS','SHOP'];
 let state={symbols:[...DEFAULT_SYMBOLS],positions:{},bars:{},drawings:{}},selected='AAPL';
 try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.symbols)){state.symbols=[...new Set(saved.symbols.filter(s=>typeof s==='string'&&validSymbol(s)))].slice(0,100);for(const s of state.symbols){const p=saved.positions?.[s];if(p&&positive(p.entry)&&positive(p.qty))state.positions[s]={entry:Number(p.entry),qty:Number(p.qty),mark:positive(p.mark)?Number(p.mark):null,updatedAt:p.updatedAt};const drawings=saved.drawings?.[s];if(Array.isArray(drawings))state.drawings[s]=drawings.filter(validDrawing).slice(0,100);const bars=saved.bars?.[s];if(Array.isArray(bars)&&bars.length<=2000&&bars.every(validBar))state.bars[s]=bars;}}}catch{}
-// Populate ten choices while preserving existing watchlist entries and holdings.
-for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=10)break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
+// Populate twenty choices while preserving existing watchlist entries and holdings.
+for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=20)break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
 selected=state.symbols[0];
 function message(s){$('#message').textContent=s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{message('לא ניתן לשמור בדפדפן. הנתונים זמינים כעת בלבד; נסה לצמצם את גודל הייבוא.');return false;}}
 function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);}
-function mark(symbol){const sources=[markets[symbol],quotes[symbol]].filter(Boolean).sort((a,b)=>(Date.parse(b.priceAt)||0)-(Date.parse(a.priceAt)||0));const m=sources[0];const p=state.positions[symbol];if(positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):'זמן נתון לא זמין')+' · ייתכן עיכוב'+(m.loadedAt&&Date.now()-m.loadedAt>=300000?' · נתון קודם, ממתין לרענון':'')};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
+function mark(symbol){const sources=[markets[symbol],quotes[symbol]].filter(Boolean).sort((a,b)=>(Date.parse(b.priceAt)||0)-(Date.parse(a.priceAt)||0));const m=sources[0];const p=state.positions[symbol];if(PAPER_MODE&&positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):'זמן נתון לא זמין')+' · ייתכן עיכוב'+(m.loadedAt&&Date.now()-m.loadedAt>=300000?' · נתון קודם, ממתין לרענון':'')};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
 function pnl(symbol){const p=state.positions[symbol],m=mark(symbol);return p&&m?{value:p.qty*m.price,gain:p.qty*(m.price-p.entry),pct:(m.price/p.entry-1)*100}:null;}
 function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});}
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
 function render(preserveForm=false,preserveChart=false){
  $('#watchCount').textContent=String(state.symbols.length);
  syncWatchRows($('#watchList'),state.symbols,{selected,createElement:tag=>document.createElement(tag),onSelect:s=>{selected=s;render();loadMarket(false);},describe:s=>{const m=mark(s);return {text:m?money(m.price):(quoteStatus[s]||'ממתין לטעינה'),title:m?m.source+(quoteStatus[s]?' · '+quoteStatus[s]:''):''};}});
- $('#selectedSymbol').textContent=selected;$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
+ $('#selectedSymbol').textContent=selected;if(PAPER_MODE)$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
- $('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
+ if(PAPER_MODE){$('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
  const f=$('#positionForm');if(!preserveForm){f.elements.entry.value=p?.entry??'';f.elements.qty.value=p?.qty??'';f.elements.mark.value=p?.mark??'';}
  const symbols=Object.keys(state.positions),results=symbols.map(pnl),complete=results.every(Boolean);$('#positionCount').textContent=String(symbols.length);
  $('#totalValue').textContent=!symbols.length?'—':complete?money(results.reduce((s,p)=>s+p.value,0)):'חסרים מחירים';const gain=results.filter(Boolean).reduce((s,p)=>s+p.gain,0);$('#totalPnl').textContent=!symbols.length?'—':complete?(gain>0?'+':'')+money(gain):'חסרים מחירים';$('#totalPnl').className=symbols.length&&complete?(gain>=0?'profit':'loss'):'';
+ }
  if(!preserveChart)renderChart();
 }
 function validBar(b){return b&&typeof b.date==='string'&&Number.isFinite(Date.parse(b.date))&&['open','high','low','close'].every(k=>positive(b[k]))&&b.high>=Math.max(b.open,b.close)&&b.low<=Math.min(b.open,b.close)&&b.high>=b.low;}
@@ -53,7 +57,7 @@ function renderChart(){
  const chartName=STOCK_NAMES[selected]||markets[selected]?.name||quotes[selected]?.name||selected;
  add('rect',{x:15,y:2,width:745,height:22,rx:4,fill:'#08111f'});
  add('text',{x:25,y:18,fill:'#edf5ff','font-size':16,'font-weight':'bold','data-chart-symbol':selected},chartName===selected?selected:selected+' · '+chartName);
- const sim=manualCharts.has(selected)?{points:[],lines:[],cards:[]}:simulationMarks(selected);const interval=markets[selected]?.interval||$('#marketInterval').value;const history=manualCharts.has(selected)?[]:mergeWyckoffOccurrences(simulationWyckoffHistory(selected),wyckoffHistories[selected]||[]);const occurrences=numberedWyckoffOccurrences(history,bars,interval);const arrowPoints=wyckoffArrowPoints(sim.points,occurrences,bars,interval);const visiblePoints=[...sim.points.filter(p=>!arrowPoints.some(a=>a.id===p.id)).map(point=>({...point,index:markBarIndex(point,bars,interval)})).filter(point=>point.index>=0),...arrowPoints];const entry=state.positions[selected]?.entry,values=bars.flatMap(b=>[b.high,b.low]);for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);let lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const y=p=>275-(p-lo)/(hi-lo)*250,x=i=>20+(i+.5)*730/bars.length;
+ const sim=manualCharts.has(selected)?{points:[],lines:[],cards:[]}:(PAPER_MODE?simulationMarks(selected):analysisMarks[selected]||{points:[],lines:[],cards:[]});const interval=markets[selected]?.interval||$('#marketInterval').value;const history=manualCharts.has(selected)?[]:mergeWyckoffOccurrences(simulationWyckoffHistory(selected),wyckoffHistories[selected]||[]);const occurrences=numberedWyckoffOccurrences(history,bars,interval);const arrowPoints=wyckoffArrowPoints(sim.points,occurrences,bars,interval);const visiblePoints=[...sim.points.filter(p=>!arrowPoints.some(a=>a.id===p.id)).map(point=>({...point,index:markBarIndex(point,bars,interval)})).filter(point=>point.index>=0),...arrowPoints];const entry=PAPER_MODE?state.positions[selected]?.entry:null,values=bars.flatMap(b=>[b.high,b.low]);for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);let lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const y=p=>275-(p-lo)/(hi-lo)*250,x=i=>20+(i+.5)*730/bars.length;
  for(let i=0;i<5;i++){const price=lo+(hi-lo)*i/4;add('line',{x1:15,y1:y(price),x2:760,y2:y(price),stroke:'#21364b'});add('text',{x:775,y:y(price)+4,fill:'#93a8bf','font-size':11},price.toFixed(price<10?4:2));}
  
  bars.forEach((b,i)=>{const marks=visiblePoints.filter(p=>p.index===i),primary=marks.find(p=>p.kind==='peak')||marks.find(p=>p.kind==='buy'||p.kind==='sell')||marks.at(-1),color=primary?.color||(b.close>=b.open?'#67e0ae':'#ff798b'),w=Math.max(2,Math.min(12,730/bars.length*.6));const line=add('line',{x1:x(i),x2:x(i),y1:y(b.high),y2:y(b.low),stroke:color,'stroke-width':primary?2:1});const body=add('rect',{x:x(i)-w/2,y:Math.min(y(b.open),y(b.close)),width:w,height:Math.max(primary?3:1,Math.abs(y(b.open)-y(b.close))),fill:color});
@@ -73,7 +77,7 @@ function renderChart(){
  }
  let previousBadgeY=-Infinity;for(const line of [...sim.lines].sort((a,b)=>y(a.price)-y(b.price))){const badgeY=Math.min(270,Math.max(35,y(line.price),previousBadgeY+16));previousBadgeY=badgeY;add('line',{x1:760,y1:y(line.price),x2:770,y2:badgeY,stroke:line.color});add('rect',{x:766,y:badgeY-10,width:81,height:15,rx:3,fill:'#08111f',stroke:line.color});add('text',{x:843,y:badgeY+1,fill:line.color,'font-size':10,'text-anchor':'end'},money(line.price));}
  for(const card of sim.cards){const button=document.createElement('button');button.type='button';button.className='mark-card secondary';button.style.borderColor=card.color;const name=document.createElement('span'),value=document.createElement('b');name.textContent=card.name;value.textContent=money(card.price)+' USD';value.style.color=card.color;button.append(name,value);if(Number.isFinite(card.at)){const date=document.createElement('small');date.textContent=atTime(card.at);button.append(date);}button.onclick=()=>{$('#chartMarkDetails').textContent=detail(card)+(Number.isFinite(card.at)&&markBarIndex(card,bars,interval)<0?' · הנקודה מחוץ לטווח הנרות המוצג':'');};$('#chartMarkLegend').append(button);}
- if(!sim.cards.length)$('#chartMarkDetails').textContent=manualCharts.has(selected)?'מצב CSV · סימוני סימולציה מוסתרים כדי לא לערבב מקורות נתונים.':'טרם זוהו נקודות וואיקוף או עסקאות עבור המניה הזו; נקודות יופיעו עם התקדמות הבדיקה.';
+ if(!sim.cards.length)$('#chartMarkDetails').textContent=manualCharts.has(selected)?'מצב CSV · סימוני סימולציה מוסתרים כדי לא לערבב מקורות נתונים.':'טרם זוהו נקודות וואיקוף בנתוני הגרף. מצב הכניסה בפועל נקבע בשרת LIVE.';
  $('#wyckoffOccurrenceStatus').textContent='תבניות וואיקוף בטווח המוצג: '+occurrences.length+' · המספור לפי סדר הזמן בטווח היומיים. הזיהוי ממשיך גם בזמן פוזיציה פעילה.'+(wyckoffErrors[selected]?' · חלק מהניתוח אינו זמין: '+wyckoffErrors[selected]:'');
  const showOccurrence=item=>{$('#chartMarkDetails').textContent='וואיקוף '+item.number+' · Spring: '+atTime(item.springAt)+' · '+(item.confirmedAt?'חזרה מעל התמיכה: '+atTime(item.confirmedAt):'Spring זוהה; טרם זוהתה חזרה מעל התמיכה')+' · זיהוי תבנית מהנרות, אינו מעיד על קנייה. '+Object.entries(item.setup).filter(([,p])=>p&&Number.isFinite(p.price)).map(([key,p])=>({initialPeak:'שיא ראשוני',firstLow:'שפל ראשון',rallyHigh:'שיא התאוששות',secondaryTest:'בדיקה חוזרת',springLow:'Spring',confirmation:'אישור חזרה'}[key]||key)+': '+money(p.price)+' USD · '+atTime(p.time)).join(' | ');};
  drawWyckoffArrows({svg,points:arrowPoints,x,y,onSelect:point=>{$('#chartMarkDetails').textContent=(point.number?'וואיקוף '+point.number+' · ':'')+detail(point)+(['buy','sell','peak'].includes(point.kind)?' · עסקת סימולציה; אינו ביצוע בחשבון הברוקר.':' · סימון ניתוח; אינו מעיד על עסקה בפועל.');}});
@@ -81,8 +85,8 @@ function renderChart(){
  add('text',{x:20,y:303,fill:'#93a8bf','font-size':11},bars[0].date);add('text',{x:750,y:303,fill:'#93a8bf','font-size':11,'text-anchor':'end'},bars.at(-1).date);root.append(svg);attachDrawingTools(svg,bars,lo,hi);root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים שני ימי המסחר האחרונים בלבד.');
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
-$('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};
-$('#removePosition').onclick=()=>{delete state.positions[selected];message('הפוזיציה הוסרה מהמעקב בלבד. לא נשלחה פקודת מכירה.');save();render();};
+if(PAPER_MODE)$('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};
+if(PAPER_MODE)$('#removePosition').onclick=()=>{delete state.positions[selected];message('הפוזיציה הוסרה מהמעקב בלבד. לא נשלחה פקודת מכירה.');save();render();};
 $('#csvFile').onchange=async e=>{const file=e.target.files[0],symbol=selected;if(!file)return;try{if(file.size>3000000)throw Error('גודל הקובץ המרבי הוא 3MB.');const bars=parseCandles(await file.text());state.bars[symbol]=bars;manualCharts.add(symbol);message('יובאו '+bars.length+' נרות עבור '+symbol+'. הנתונים אינם מחירים חיים.');save();render();}catch(err){message(err.message);}finally{e.target.value='';}};
 
 async function loadMarket(force=true){
@@ -98,7 +102,7 @@ async function loadMarket(force=true){
   if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
   if(drag||draft||manualCharts.has(symbol)||request!==marketRequest||selected!==symbol||$('#marketInterval').value!==interval)return;
   markets[symbol]={...data,loadedAt:Date.now()};quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
-  if(['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
+  if(['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
  if(request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
  }catch(error){if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=(error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message)+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון.';}
  finally{pendingMarkets.delete(key);}
@@ -168,6 +172,6 @@ $('#refreshWatchQuotes').onclick=()=>{for(const s of state.symbols){quoteNextAt[
 setInterval(loadNextWatchQuote,12500);
 loadNextWatchQuote();
 
-initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!drag&&!draft)renderChart();}});
+if(PAPER_MODE){paperUI=await import('./colmex-simulation-ui.js?v=20261017-occurrences');paperUI.initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!drag&&!draft)renderChart();}});}
 
 startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});
