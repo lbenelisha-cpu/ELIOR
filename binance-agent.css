@@ -422,3 +422,6 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 #deviceAccessStatus{flex-basis:100%;color:#8dddb9}
 
 .brand-links{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px}.platform-switch{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 14px;border:1px solid #74b8ff;border-radius:10px;background:#1e4d78;color:#edf5ff;text-decoration:none;font-size:14px;font-weight:700;white-space:nowrap}.platform-switch:hover{background:#286294}.platform-switch:focus-visible{outline:2px solid #74b8ff;outline-offset:3px}
+
+/* Unknown/flat P&L is neutral, never a white flashing trade signal. */
+.asset-table tbody tr.active-position.pnl-unknown td,.asset-table tbody tr.active-position.pnl-flat td{animation:none;background:#102334;color:#b6c8db;box-shadow:none}.scanner-freshness{padding:10px 16px;background:#2c2413;color:#ffd387;font-size:12px;line-height:1.6}.scanner-freshness:empty{display:none}
