@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import {createMarketLoadGate} from '../lib/colmex-market-loading.mjs';
 import {chartAnalysisMarks} from '../lib/colmex-chart-view.mjs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const script=read('colmex-pro.js');
@@ -12,7 +13,7 @@ async function boot(mode){
  const document={body:{dataset:{mode}},hidden:true,querySelector:s=>nodes.get(s)||null,querySelectorAll:()=>[],createElement:()=>new Element(),addEventListener(){}};
  const saved={symbols:['TSLA'],positions:{TSLA:{entry:351,qty:2,mark:999,updatedAt:'2026-10-21T13:00:00Z'}},drawings:{},bars:{}};
  let paperLoads=0;const watched=[];
- const deps={syncWatchRows:(body,symbols,options)=>watched.push({symbols:[...symbols],tsla:options.describe('TSLA')}),lastTwoTradingDays:()=>[],startCandleFlashing(){},validDrawing:()=>true,loadPaperUI:async()=>{paperLoads++;return {initSimulation(){},simulationMarks:()=>({points:[],cards:[],lines:[]}),simulationWyckoffHistory:()=>[]};}};
+ const deps={createMarketLoadGate,syncWatchRows:(body,symbols,options)=>watched.push({symbols:[...symbols],tsla:options.describe('TSLA')}),lastTwoTradingDays:()=>[],startCandleFlashing(){},validDrawing:()=>true,loadPaperUI:async()=>{paperLoads++;return {initSimulation(){},simulationMarks:()=>({points:[],cards:[],lines:[]}),simulationWyckoffHistory:()=>[]};}};
  const names=[...script.matchAll(/^import \{([^}]+)\} from .*;$/gm)].flatMap(m=>m[1].split(',').map(x=>x.trim()));
  const source=script.replace(/^import .*;\n/gm,'').replace("import('./colmex-simulation-ui.js?v=20261017-occurrences')",'deps.loadPaperUI()');
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;

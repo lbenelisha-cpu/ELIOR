@@ -10,6 +10,6 @@ export async function handler(event){
  if(event.httpMethod!=='GET')return reply(405,{error:'Method not allowed'});
  const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase();
  if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))return reply(400,{error:'סימול לא תקין'});
- try{return reply(200,await cachedStockRead({key:'colmex-quote-last:'+symbol,validate:d=>validStockSnapshot(d,symbol),fetchData:async()=>normalizeStockQuote(await td('quote',{symbol},60),symbol)}));}
+ try{return reply(200,await cachedStockRead({key:'colmex-quote-last:'+symbol,validate:d=>validStockSnapshot(d,symbol),freshMs:55000,fetchData:async()=>normalizeStockQuote(await td('quote',{symbol,prepost:false},60),symbol)}));}
  catch{return reply(503,{error:'המחיר אינו זמין כעת; ייתכן עיכוב או מגבלת ספק. ניסיון חוזר יבוצע בהמשך.'});}
 }
