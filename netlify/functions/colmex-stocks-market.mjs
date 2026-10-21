@@ -1,6 +1,4 @@
-import {aggregateStockCandles} from '../../lib/stock-chart-timeframes.mjs';
-import {cachedStockRead,validStockSnapshot} from '../../lib/colmex-market-cache.mjs';
-import {td} from '../../lib/agent.mjs';
+import {makeBrokerMarketHandler} from '../../lib/colmex-market-endpoints.mjs';
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 const positive=x=>Number.isFinite(Number(x))&&Number(x)>0;
 export function normalizeMarket(series,quote,symbol,interval){
@@ -24,16 +22,4 @@ export function marketFailure(error){
  if(/(limit|credit|quota|מכסת)/i.test(message))return {code:'PROVIDER_LIMIT',error:'ממתין למכסת נתונים פנויה אצל הספק.'};
  return {code:'PROVIDER_UNAVAILABLE',error:'לא ניתן לטעון נרות מהספק כעת.'};
 }
-export async function handler(event){
- if(event.httpMethod!=='GET')return reply(405,{error:'Method not allowed'});
- const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase(),interval=String(event.queryStringParameters?.interval||'1day');
- if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)||!['5min','10min','15min','1h','1day'].includes(interval))return reply(400,{error:'סימול או משך נר לא תקינים'});
- try{
-  const sourceInterval=['10min','15min'].includes(interval)?'5min':interval;
-  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+sourceInterval+(sourceInterval==='5min'?':analysis-v2':''),validate:d=>validStockSnapshot(d,symbol,sourceInterval),freshMs:55000,fetchData:async()=>{
-  return fetchChartSnapshot(td,symbol,sourceInterval);
-  }});
-  if(sourceInterval!==interval){const bars=aggregateStockCandles(data.bars,interval);if(!bars.length)throw Error('NO_AGGREGATED_BARS');return reply(200,{...data,interval,bars,analysisBars:data.bars,sourceInterval,notice:data.notice+' · נרות '+(interval==='10min'?'10':'15')+' דקות מאוגדים מנרות 5 דקות.'});}
-  return reply(200,data);
- }catch(error){const failure=marketFailure(error);return reply(503,{retryAfterSeconds:failure.code==='DAILY_PROVIDER_LIMIT'?Math.ceil((86400000-Date.now()%86400000)/1000)+5:65,...failure});}
-}
+export const handler=makeBrokerMarketHandler('chart');

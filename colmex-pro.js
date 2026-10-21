@@ -12,7 +12,7 @@ import {syncWatchRows} from './lib/colmex-watch-view.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
 const quotes={},quoteStatus={},quoteNextAt={};let quoteBusy=false;
-try{const stored=JSON.parse(localStorage.getItem(KEY+'-quotes')||'{}');for(const [symbol,q] of Object.entries(stored)){if(validSymbol(symbol)&&q?.symbol===symbol&&q.currency==='USD'&&positive(q.price)&&q.source==='Twelve Data'&&Number.isFinite(q.loadedAt)&&q.loadedAt<=Date.now()&&Date.now()-q.loadedAt<86400000)quotes[symbol]=q;}}catch{}
+try{const stored=JSON.parse(localStorage.getItem(KEY+'-quotes')||'{}');for(const [symbol,q] of Object.entries(stored)){if(validSymbol(symbol)&&q?.symbol===symbol&&q.currency==='USD'&&positive(q.price)&&q.source==='Colmex Pro'&&Number.isFinite(q.loadedAt)&&q.loadedAt<=Date.now()&&Date.now()-q.loadedAt<86400000)quotes[symbol]=q;}}catch{}
 function saveQuotes(){try{localStorage.setItem(KEY+'-quotes',JSON.stringify(quotes));}catch{}}
 
 const wyckoffHistories={},wyckoffErrors={},analysisMarks={};
@@ -27,7 +27,7 @@ selected=state.symbols[0];
 function message(s){$('#message').textContent=s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{message('לא ניתן לשמור בדפדפן. הנתונים זמינים כעת בלבד; נסה לצמצם את גודל הייבוא.');return false;}}
 function money(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2}).format(n);}
-function mark(symbol){const sources=[markets[symbol],quotes[symbol]].filter(Boolean).sort((a,b)=>(Date.parse(b.priceAt)||0)-(Date.parse(a.priceAt)||0));const m=sources[0];const p=state.positions[symbol];if(PAPER_MODE&&positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):'זמן נתון לא זמין')+' · ייתכן עיכוב'+(m.loadedAt&&Date.now()-m.loadedAt>=300000?' · נתון קודם, ממתין לרענון':'')};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
+function mark(symbol){const sources=[markets[symbol],quotes[symbol]].filter(Boolean).sort((a,b)=>(Date.parse(b.priceAt||b.observedAt)||0)-(Date.parse(a.priceAt||a.observedAt)||0));const m=sources[0];const p=state.positions[symbol];if(PAPER_MODE&&positive(p?.mark))return {price:Number(p.mark),source:'מחיר ידני · '+new Date(p.updatedAt).toLocaleString('he-IL')};if(m&&!manualCharts.has(symbol))return {price:m.price,source:m.source+' · '+(m.priceKind==='LAST_BAR_CLOSE'?'סגירת נר אחרון · ':m.priceKind==='BROKER_BID'?'Bid · שעת קריאה: ':'מחיר ספק · ')+(m.priceAt?formatMarketTime(m.priceAt):m.observedAt?formatMarketTime(m.observedAt)+' · ללא חותמת זמן לציטוט':'זמן נתון לא זמין')+' · ייתכן עיכוב'+(Number.isFinite(Date.parse(m.priceAt||m.observedAt))&&Date.now()-Date.parse(m.priceAt||m.observedAt)>=300000?' · נתון קודם, ממתין לרענון':'')};const bars=state.bars[symbol];return bars?.length?{price:bars.at(-1).close,source:'CSV · '+bars.at(-1).date}:null;}
 function pnl(symbol){const p=state.positions[symbol],m=mark(symbol);return p&&m?{value:p.qty*m.price,gain:p.qty*(m.price-p.entry),pct:(m.price/p.entry-1)*100}:null;}
 function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});}
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
@@ -100,14 +100,14 @@ async function loadMarket(force=true){
  if(pendingMarkets.has(key))return;
  if(!force&&markets[symbol]?.interval===interval&&Date.now()-markets[symbol].loadedAt<60000){$('#marketStatus').textContent=markets[symbol].notice;return;}
  if(!marketLoadGate.begin(key)){const retryAt=marketLoadGate.retryAt(key);$('#marketStatus').textContent=retryAt>Date.now()?(marketFailures.get(key)||'ממתין למקור הנתונים')+' · ניסיון אוטומטי ב־'+new Date(retryAt).toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem'}):'בקשת הגרף ממתינה לסיום הטעינה הקודמת';return;}
- let succeeded=false,retryAfterMs=65000;const request=++marketRequest;pendingMarkets.add(key);$('#marketStatus').textContent='טוען '+symbol+' מ־Twelve Data…';
+ let succeeded=false,retryAfterMs=65000;const request=++marketRequest;pendingMarkets.add(key);$('#marketStatus').textContent='טוען '+symbol+' מקולמקס־פרו…';
  try{
   const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await response.json();
   if(!response.ok){const error=Error(data.error||'שגיאת מקור נתונים');error.retryAfterMs=Number(data.retryAfterSeconds)*1000;throw error;}
-  if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
+  if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
   succeeded=true;marketFailures.delete(key);if(manualCharts.has(symbol))return;
-  markets[symbol]={...data,loadedAt:Date.now()};if(!quotes[symbol]||(Date.parse(data.priceAt)||0)>=(Date.parse(quotes[symbol].priceAt)||0))quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',loadedAt:Date.now()};if(data.priceKind==='PROVIDER_QUOTE'){quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;}saveQuotes();
-  if(['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
+  markets[symbol]={...data,loadedAt:Date.now()};if(!quotes[symbol]||(Date.parse(data.priceAt)||0)>=(Date.parse(quotes[symbol].priceAt||quotes[symbol].observedAt)||0))quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',observedAt:data.observedAt,loadedAt:Date.now()};if(['PROVIDER_QUOTE','BROKER_BID'].includes(data.priceKind)){quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;}saveQuotes();
+  if(data.analysisBars||['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
  if(!drag&&!draft&&request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
  }catch(error){if(Number.isFinite(error.retryAfterMs)&&error.retryAfterMs>0)retryAfterMs=error.retryAfterMs;const reason=error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message;marketFailures.set(key,reason);if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=reason+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון. '+(retryAfterMs>3600000?'ניסיון נוסף לאחר איפוס המכסה.':'ניסיון אוטומטי בעוד כ־65 שניות.');}
  finally{pendingMarkets.delete(key);marketLoadGate.finish(key,succeeded,retryAfterMs);}
@@ -167,7 +167,7 @@ async function loadNextWatchQuote(){
  if(!symbol)return;quoteBusy=true;quoteStatus[symbol]='טוען מחיר…';render(true,true);
  try{
   const r=await fetch('/.netlify/functions/colmex-stock-quote?symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();
-  if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
+  if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
   quotes[symbol]={...data,loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
  }catch{quoteStatus[symbol]='ממתין לספק · ניסיון חוזר';quoteNextAt[symbol]=Date.now()+65000;}
  finally{quoteBusy=false;render(true,true);}
