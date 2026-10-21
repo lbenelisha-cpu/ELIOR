@@ -37,7 +37,7 @@ test('unknown write outcome remains pending and a different request cannot place
  await assert.rejects(manualTrade({...args,input:{...request,requestId:'22222222-2222-4222-8222-222222222222'}}),/TRADE_IN_PROGRESS/);
 });
 test('durable save failure prevents broker mutation; invalid amount and exposure are rejected',async()=>{
- assert.throws(()=>manualInput({...request,amountUsd:101}),/INVALID_BUY_AMOUNT/);
+ assert.equal(manualInput({...request,amountUsd:400}).amountUsd,400);assert.throws(()=>manualInput({...request,amountUsd:400.01}),/INVALID_BUY_AMOUNT/);
  const state=initialState(now),b=broker();await assert.rejects(manualTrade({input:request,state,broker:b,env,now:()=>now,deadline:now+24000,save:async s=>{if(s.pending)throw Error('save failed');}}),/save failed/);assert.equal(b.writes.length,0);
  b.snapshot=async()=>({...snapshot(),positions:[{},{},{}]});await assert.rejects(manualTrade({input:request,state:initialState(now),broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}}),/NO_FREE_SLOT/);
 });
