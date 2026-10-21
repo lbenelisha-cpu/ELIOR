@@ -14,3 +14,10 @@ test('first load seeds durable history; storage failure never hides a valid prov
  let saved;const result=await cachedStockRead({key:'test',now,validate,store:{read:async()=>null,write:async(k,p)=>{saved=p;}},fetchData:async()=>data});assert.deepEqual(saved.data,data);assert.equal(result.cacheState,'PROVIDER');
  assert.equal((await cachedStockRead({key:'test',now,validate,store:{read:async()=>{throw Error();},write:async()=>{throw Error();}},fetchData:async()=>data})).price,354.72);
 });
+test('fresh intraday snapshots share one read across users, then expire without refreshing their timestamp',async()=>{
+ const open=Date.parse('2026-10-21T14:00:00Z'),savedAt=new Date(open-20000).toISOString();let calls=0;
+ const store={read:async()=>({data,savedAt}),write:async()=>{}};
+ const fetchData=async()=>{calls++;return data;};
+ const cached=await cachedStockRead({key:'chart',store,now:open,validate,freshMs:55000,fetchData});assert.equal(calls,0);assert.equal(cached.cacheState,'RECENT_CACHE');assert.equal(cached.snapshotAt,savedAt);assert.equal(cached.priceAt,data.priceAt);
+ await cachedStockRead({key:'chart',store,now:open+60000,validate,freshMs:55000,fetchData});assert.equal(calls,1);
+});

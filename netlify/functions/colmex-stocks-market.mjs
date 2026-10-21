@@ -13,18 +13,27 @@ export function normalizeMarket(series,quote,symbol,interval){
  const epoch=Number(q?.last_quote_at||q?.timestamp),quoteAt=q&&epoch>0&&epoch*1000<=Date.now()+60000?new Date(epoch*1000).toISOString():null;
  return {symbol,currency:'USD',exchange:series.meta.exchange||null,interval,bars,source:'Twelve Data',price:q?Number(q.close):bars.at(-1).close,priceKind:q?'PROVIDER_QUOTE':'LAST_BAR_CLOSE',priceAt:quoteAt||(q?String(q.datetime||''):bars.at(-1).date),fetchedAt:series.cached_at||null,quoteFetchedAt:q?.cached_at||null,isMarketOpen:typeof q?.is_market_open==='boolean'?q.is_market_open:null,notice:'נתוני ספק חיצוני; ייתכן עיכוב. הנר האחרון עשוי עדיין להתעדכן. לא מחיר ביצוע מקולמקס.'};
 }
+// A chart needs candle history only. Watchlist quotes have their own paced reader.
+export async function fetchChartSnapshot(provider,symbol,interval){
+ const series=await provider('time_series',{symbol,interval,outputsize:interval==='5min'?1000:250,order:'ASC',adjust:'splits',timezone:'UTC',prepost:false},interval==='1day'?1800:60);
+ return normalizeMarket(series,null,symbol,interval);
+}
+export function marketFailure(error){
+ const message=String(error?.message||'');
+ if(/(daily|per day|each day|for the day|today)/i.test(message)&&/(limit|credit|quota|exceed|used)/i.test(message))return {code:'DAILY_PROVIDER_LIMIT',error:'מכסת הנתונים היומית של הספק נוצלה. נתונים שמורים יישארו מוצגים; נדרש חידוש מכסה אצל הספק.'};
+ if(/(limit|credit|quota|מכסת)/i.test(message))return {code:'PROVIDER_LIMIT',error:'ממתין למכסת נתונים פנויה אצל הספק.'};
+ return {code:'PROVIDER_UNAVAILABLE',error:'לא ניתן לטעון נרות מהספק כעת.'};
+}
 export async function handler(event){
  if(event.httpMethod!=='GET')return reply(405,{error:'Method not allowed'});
  const symbol=String(event.queryStringParameters?.symbol||'').toUpperCase(),interval=String(event.queryStringParameters?.interval||'1day');
  if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)||!['5min','10min','15min','1h','1day'].includes(interval))return reply(400,{error:'סימול או משך נר לא תקינים'});
  try{
   const sourceInterval=['10min','15min'].includes(interval)?'5min':interval;
-  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+sourceInterval+(sourceInterval==='5min'?':analysis-v2':''),validate:d=>validStockSnapshot(d,symbol,sourceInterval),fetchData:async()=>{
-  const [series,quote]=await Promise.allSettled([td('time_series',{symbol,interval:sourceInterval,outputsize:sourceInterval==='5min'?1000:250,order:'ASC',adjust:'splits',timezone:'UTC'},sourceInterval==='1day'?1800:60),td('quote',{symbol},60)]);
-  if(series.status!=='fulfilled')throw Error('SERIES_UNAVAILABLE');
-  return normalizeMarket(series.value,quote.status==='fulfilled'?quote.value:null,symbol,sourceInterval);
+  const data=await cachedStockRead({key:'colmex-chart-last:'+symbol+':'+sourceInterval+(sourceInterval==='5min'?':analysis-v2':''),validate:d=>validStockSnapshot(d,symbol,sourceInterval),freshMs:55000,fetchData:async()=>{
+  return fetchChartSnapshot(td,symbol,sourceInterval);
   }});
   if(sourceInterval!==interval){const bars=aggregateStockCandles(data.bars,interval);if(!bars.length)throw Error('NO_AGGREGATED_BARS');return reply(200,{...data,interval,bars,analysisBars:data.bars,sourceInterval,notice:data.notice+' · נרות '+(interval==='10min'?'10':'15')+' דקות מאוגדים מנרות 5 דקות.'});}
   return reply(200,data);
- }catch{return reply(503,{error:'לא ניתן לטעון נתוני שוק כעת. ייתכן שהסימול אינו נתמך או שמכסת הספק נוצלה. נסה שוב או ייבא CSV.'});}
+ }catch(error){return reply(503,{retryAfterSeconds:65,...marketFailure(error)});}
 }
