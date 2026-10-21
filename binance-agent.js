@@ -760,7 +760,7 @@ function drawCandles(candles){
   const priceDigits=autoDigits;
   put('#pricePrecisionValue',priceRangeScale===1?'אוטומטי':fmt(1/priceRangeScale,2)+'×');
 
-  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=94,bottom=112;
+  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=130,bottom=112;
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
@@ -834,9 +834,11 @@ function drawCandles(candles){
   ctx.textAlign='center';
   ctx.fillStyle='#7890a8';
   ctx.font='11px Arial';
+  const axisY=H-bottom+13;ctx.strokeStyle='#607b96';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(left,axisY);ctx.lineTo(W-right,axisY);ctx.stroke();
   for(let i=0;i<labelCount;i++){
     const idx=Math.min(view.length-1,Math.floor(i*(view.length-1)/(labelCount-1)));
-    const c=view[idx],x=left+step*idx;
+    const c=view[idx],x=left+step*(idx+.5);
+    ctx.beginPath();ctx.moveTo(x,axisY);ctx.lineTo(x,axisY+5);ctx.stroke();
     const d=new Date(c.openTime);
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d).split(', ');
     const labelX=Math.max(55,Math.min(W-right-45,x));
