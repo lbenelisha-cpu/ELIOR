@@ -223,7 +223,12 @@ function activeContext(d,currentMode,liveAccount){
   return {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive};
 }
 
-function render(d,currentMode='demo',liveAccount=null){
+function selectScannerAsset(symbol,tr){
+  selectedSymbol=symbol;
+  document.querySelectorAll('#assetsBody tr').forEach(x=>x.classList.toggle('selected',x===tr));
+  updateSelectedAsset(currentAgentData,currentMode,currentLiveAccount);
+}
+function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
   currentAgentData=d;
   const wx=d.wyckoffStats||{};
   put('#wyckoffBuys',wx.buys??0);
@@ -298,7 +303,7 @@ function render(d,currentMode='demo',liveAccount=null){
     selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
   }
 
-  $('#assetsBody').innerHTML=currentVisibleAgents.map(a=>{
+  if(!preserveScanner)window.LEVI_SCANNER_VIEW.update($('#assetsBody'),currentVisibleAgents.map(a=>{
     const s=a.strategy||{};
     const held=isHeld(a);
     const score=Number(a.score||0);
@@ -313,26 +318,18 @@ function render(d,currentMode='demo',liveAccount=null){
       (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
-    return `<tr data-symbol="${a.symbol}" class="${rowClasses}">
-      <td><b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}</td>
-      <td>${fmt(s.price,Math.abs(Number(s.price))<10?8:4)}</td>
-      <td class="${held?pnl.className:''}">${held?pnl.text:'—'}</td>
-      <td class="decision ${String(dec).toLowerCase().replaceAll(' ','-')}">${decisionLabel(dec)}</td>
-    </tr>`;
-  }).join('');
-
-  document.querySelectorAll('#assetsBody tr').forEach(tr=>{
-    tr.onclick=()=>{
-      selectedSymbol=tr.dataset.symbol;
-      document.querySelectorAll('#assetsBody tr').forEach(x=>x.classList.toggle('selected',x===tr));
-      updateSelectedAsset(d,currentMode,liveAccount);
-    };
-  });
+    return {symbol:a.symbol,className:rowClasses,cells:[
+      {html:`<b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
+      {html:fmt(s.price,Math.abs(Number(s.price))<10?8:4)},
+      {className:held?pnl.className:'',html:held?pnl.text:'—'},
+      {className:'decision '+String(dec).toLowerCase().replaceAll(' ','-'),html:decisionLabel(dec)}
+    ]};
+  }),selectScannerAsset);
 
   if(isLive){
     $('#positions').innerHTML=liveBalances.length
       ? liveBalances.map(x=>{const pnl=positionPnlDisplay(x,'USDT');return `<div><b>${x.asset}USDT</b> · כמות ${fmt(x.qty,8)} · שווי ${fmt(x.valueUsdt)} USDT<div class="${pnl.className}">${pnl.text}</div><div class="mini">לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר</div></div>`;}).join('')
-      : '<div class="mini">אין פוזיציות LIVE פעילות.</div>';
+      : liveAccount?'<div class="mini">אין פוזיציות LIVE פעילות.</div>':'<div class="mini">לא ניתן לאמת כעת את הפוזיציות בחשבון LIVE.</div>';
   }else{
     const ps=Object.values(paperPos);
     $('#positions').innerHTML=ps.length
@@ -493,6 +490,7 @@ async function loadLiveAccount(prefetched=null){
     return a;
   }catch(e){
     put('#paperPnl','אין נתוני חשבון');put('#slots','—');
+    const pnlEl=$('#paperPnl');if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,kind==='unknown');
     put('#liveConnected','שגיאה');put('#liveTotalValue','—');put('#liveUsdt','—');put('#liveCanTrade','—');put('#liveAccountType','—');
     $('#liveBalances').innerHTML='<div class="mini">'+e.message+'</div>';
     return null;
@@ -848,6 +846,7 @@ function drawCandles(candles){
 
 let dashboardLoadInFlight=false;
 let dashboardLoaded=false;
+let scannerVerifiedMode=null,scannerVerifiedAt=null;
 async function load(){
   if(dashboardLoadInFlight)return;
   dashboardLoadInFlight=true;
@@ -856,20 +855,25 @@ async function load(){
     const m=await J(MODE);
     mode(m);
     const agent=await J(AGENT);
-    // Render market data independently of the signed account endpoint.
-    render(agent,m.mode,m.mode==='live'?currentLiveAccount:null);
     if(m.mode==='live'){
       let liveData;
-      try{liveData=await J(LIVEACC,{signal:AbortSignal.timeout(15000)});}
+      try{liveData=await J(LIVEACC,{timeoutMs:35000});}
       catch(e){liveData={connected:false,error:e.message};}
       const liveAccount=await loadLiveAccount(liveData);
-      render(agent,'live',liveAccount);
-      if(!liveAccount)put('#status','LIVE · נתוני שוק זמינים · נתוני חשבון אינם זמינים');
-    }
+      render(agent,'live',liveAccount,{preserveScanner:!liveAccount&&scannerVerifiedMode==='live'});
+      if(liveAccount){scannerVerifiedMode='live';scannerVerifiedAt=Date.now();put('#scannerFreshness','');}
+      else{
+        put('#status','LIVE · נתוני שוק זמינים · נתוני חשבון אינם זמינים');
+        put('#scanStatusMessage','נסרקו '+(agent.agents||[]).length+' · נתוני השוק עודכנו · מצב הפוזיציות אינו מאומת כרגע');
+        put('#scannerFreshness',scannerVerifiedMode==='live'?'לא ניתן לעדכן פוזיציות כרגע · הטבלה מציגה את העדכון האחרון מ־'+tradeExecutionTime(scannerVerifiedAt)+' · הנתונים לא אומתו מחדש':'ממתין לנתוני חשבון מאומתים להצגת רווח והפסד.');
+      }
+    }else{scannerVerifiedMode=null;scannerVerifiedAt=null;put('#scannerFreshness','');render(agent,m.mode,null);}
     await loadActionJournal(m.mode);
     dashboardLoaded=true;
   }catch(e){
     put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));
+    currentLiveAccount=null;
+    if(scannerVerifiedMode==='live')put('#scannerFreshness','נתוני הטבלה מהעדכון האחרון · '+tradeExecutionTime(scannerVerifiedAt)+' · החיבור לא אומת מחדש');
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
     put('#tradeControlStatus','מצב המסחר לא אומת · שרת לא זמין');

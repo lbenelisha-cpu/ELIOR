@@ -9,7 +9,7 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   const end=source.indexOf('\nasync function authenticatedControl',start);
   const labels=[];let release;let requests=0;
   const context=vm.createContext({MODE:'mode',AGENT:'agent',LIVEACC:'live',
-    put:(id,label)=>labels.push(label),mode(){},render(){},loadActionJournal:async()=>{},
+    put:(id,label)=>{if(id==='#status')labels.push(label);},mode(){},render(){},loadActionJournal:async()=>{},
     J:async url=>{requests++;if(url==='mode')return {mode:'demo'};return {};},console,
     $:()=>({classList:{remove(){}}})});
   vm.runInContext(source.slice(start,end),context);
@@ -21,7 +21,7 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   context.J=async()=>({});release({mode:'demo'});await pending;
   assert.deepEqual(labels,['מתחבר…']);
 });
-test('LIVE market renders before account completes; account errors do not erase market data',async()=>{
+test('LIVE waits for account completion before rendering, leaving existing scanner intact while the request is pending',async()=>{
  const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
  const start=source.indexOf('let dashboardLoadInFlight='),end=source.indexOf('\nasync function authenticatedControl',start);
  const rendered=[],labels=[];let rejectAccount;
@@ -31,7 +31,7 @@ test('LIVE market renders before account completes; account errors do not erase 
   J:async url=>url==='mode'?{mode:'live'}:url==='agent'?{agents:[{symbol:'BTCUSDT'}]}:new Promise((resolve,reject)=>{rejectAccount=reject;}),console,
   $:()=>({classList:{remove(){}}})});
  vm.runInContext(source.slice(start,end),ctx);const load=vm.runInContext('load()',ctx);
- await new Promise(setImmediate);assert.equal(rendered.length,1);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');
+ await new Promise(setImmediate);assert.equal(rendered.length,0);
  rejectAccount(Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED'));await load;
- assert.equal(rendered.length,2);assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
+ assert.equal(rendered.length,1);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
 });
