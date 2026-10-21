@@ -63,3 +63,24 @@ test('normal close-to-open session gaps preserve multiday history',()=>{
  const times=['2026-10-19T19:55:00Z','2026-10-19T20:00:00Z','2026-10-20T13:35:00Z','2026-10-20T13:40:00Z'].map(Date.parse);
  const h=contiguousHistory(times.map(closeTime=>({closeTime})));assert.equal(h.discarded,0);assert.equal(h.bars.length,4);
 });
+
+test('slow read budget allows twelve seconds but reserves time before cycle deadline',async()=>{
+ const original=AbortSignal.timeout,budgets=[];
+ AbortSignal.timeout=ms=>{budgets.push(ms);return new AbortController().signal;};
+ try {
+  for(const remaining of [27000,5000]){
+   const b=new AutoBroker({env,deadline:now+remaining,now:()=>now,fetchImpl:async()=>({ok:true,status:200,json:async()=>({s:'ok',d:{}})})});
+   await b.reader.json('/config');
+  }
+  assert.deepEqual(budgets,[12000,12000,12000,4000]);
+ }finally{AbortSignal.timeout=original;}
+});
+test('slow snapshot can still analyze; insufficient time never submits a fresh order',async()=>{
+ for(const elapsed of [14000,19500]){
+  let clock=now;const b=fakeBroker(),s=initialState(now-1000);
+  b.snapshot=async()=>{clock+=elapsed;return snapshot();};
+  const result=await runCycle({state:s,save:async()=>{},broker:b,env,now:()=>clock,deadline:now+27000,signal});
+  if(elapsed===14000){assert.equal(b.writes,1);assert.equal(result.reason,'PENDING_BROKER_CONFIRMATION');}
+  else {assert.equal(b.writes,0);assert.equal(result.reason,'CYCLE_DEADLINE');assert.equal(s.pending,null);}
+ }
+});
