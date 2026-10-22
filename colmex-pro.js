@@ -7,7 +7,8 @@ const PAPER_MODE=document.body.dataset.mode==='simulation';
 let paperUI=null;
 const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:[]};
 const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
-import {validDrawing,chartGeometry,moveDrawing} from './lib/colmex-chart-drawings.mjs?v=20261021-edge-axis';
+import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
+import {createWorkbench} from './chart-workbench.js?v=20261022-tools';
 import {syncWatchRows} from './lib/colmex-watch-view.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
@@ -20,7 +21,7 @@ const markets={},manualCharts=new Set(),pendingMarkets=new Set();let marketReque
 const STOCK_NAMES={AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',AMZN:'Amazon',GOOGL:'Alphabet',META:'Meta Platforms',TSLA:'Tesla',AVGO:'Broadcom',JPM:'JPMorgan Chase',NFLX:'Netflix'};
 const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX','AMD','INTC','PLTR','COIN','ORCL','CRM','ADBE','UBER','DIS','SHOP'];
 let state={symbols:[...DEFAULT_SYMBOLS],positions:{},bars:{},drawings:{}},selected='AAPL';
-try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.symbols)){state.symbols=[...new Set(saved.symbols.filter(s=>typeof s==='string'&&validSymbol(s)))].slice(0,100);for(const s of state.symbols){const p=saved.positions?.[s];if(p&&positive(p.entry)&&positive(p.qty))state.positions[s]={entry:Number(p.entry),qty:Number(p.qty),mark:positive(p.mark)?Number(p.mark):null,updatedAt:p.updatedAt};const drawings=saved.drawings?.[s];if(Array.isArray(drawings))state.drawings[s]=drawings.filter(validDrawing).slice(0,100);const bars=saved.bars?.[s];if(Array.isArray(bars)&&bars.length<=2000&&bars.every(validBar))state.bars[s]=bars;}}}catch{}
+try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.symbols)){state.symbols=[...new Set(saved.symbols.filter(s=>typeof s==='string'&&validSymbol(s)))].slice(0,100);for(const s of state.symbols){const p=saved.positions?.[s];if(p&&positive(p.entry)&&positive(p.qty))state.positions[s]={entry:Number(p.entry),qty:Number(p.qty),mark:positive(p.mark)?Number(p.mark):null,updatedAt:p.updatedAt};const drawings=saved.drawings?.[s];if(Array.isArray(drawings))state.drawings[s]=drawings.filter(validShape).slice(0,100);const bars=saved.bars?.[s];if(Array.isArray(bars)&&bars.length<=2000&&bars.every(validBar))state.bars[s]=bars;}}}catch{}
 // Populate twenty choices while preserving existing watchlist entries and holdings.
 for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=20)break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
 selected=state.symbols[0];
@@ -50,10 +51,10 @@ function parseCandles(text){
  const bars=lines.filter(s=>s.trim()).map(line=>{const cells=split(line),bar={};keys.forEach((k,i)=>bar[k]=k==='date'?cells[indices[i]]:Number(cells[indices[i]]));if(!/^\d{4}-\d{2}-\d{2}(?:$|T.*(?:Z|[+-]\d{2}:\d{2})$)/.test(bar.date||'')||!validBar(bar))throw Error('נמצאו תאריך או ערכי נר לא תקינים.');if(Date.parse(bar.date)>Date.now())throw Error('הקובץ מכיל תאריך עתידי.');return bar;}).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
  if(!bars.length||new Set(bars.map(b=>Date.parse(b.date))).size!==bars.length)throw Error('נדרשים נרות ללא תאריכים כפולים.');return bars.slice(-2000);
 }
-let drawTool='select',selectedDrawingId=null,draft=null,drag=null,chartDrawing=null;
+const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
- draft=null;drag=null;chartDrawing=null;
- const root=$('#chart'),bars=lastTwoTradingDays(chartBars(),markets[selected]?.interval||$('#marketInterval').value);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences').replaceChildren();$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){paintDrawings();$('#drawingHelp').textContent='טען נרות לפני הוספת קווים לגרף';const p=document.createElement('p');p.textContent=['1week','1month'].includes($('#marketInterval').value)?'לטווח של שני ימי מסחר בחר נרות 5 דקות, שעה או יום.':'טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
+ if(workbench.busy&&workbench.currentSymbol===selected)return;
+ const root=$('#chart'),bars=lastTwoTradingDays(chartBars(),markets[selected]?.interval||$('#marketInterval').value);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences').replaceChildren();$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){workbench.clear();const p=document.createElement('p');p.textContent=['1week','1month'].includes($('#marketInterval').value)?'לטווח של שני ימי מסחר בחר נרות 5 דקות, שעה או יום.':'טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
  const chartName=STOCK_NAMES[selected]||markets[selected]?.name||quotes[selected]?.name||selected;
  add('rect',{x:15,y:2,width:745,height:22,rx:4,fill:'#08111f'});
@@ -86,7 +87,7 @@ function renderChart(){
  const axisY=bounds.height-43;add('line',{x1:15,x2:760,y1:axisY,y2:axisY,stroke:'#607b96','data-time-axis':'Asia/Jerusalem'});
  const timeFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  const tickCount=Math.min(5,bars.length);for(let tick=0;tick<tickCount;tick++){const i=tickCount===1?0:Math.round(tick*(bars.length-1)/(tickCount-1)),px=x(i),labelX=Math.max(56,Math.min(710,px)),parts=timeFormat.format(new Date(bars[i].date)).split(', ');add('line',{x1:px,x2:px,y1:axisY,y2:axisY+5,stroke:'#607b96'});add('text',{x:labelX,y:axisY+17,fill:'#a9bdd1','font-size':11,'text-anchor':'middle'},parts[0]);add('text',{x:labelX,y:axisY+31,fill:'#a9bdd1','font-size':11,'text-anchor':'middle'},parts[1]||'');}
- root.append(svg);attachDrawingTools(svg,bars,lo,hi,bounds);root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים שני ימי המסחר האחרונים בלבד.');
+ root.append(svg);workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:850,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:750,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · מוצגים שני ימי המסחר האחרונים בלבד.');
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
 if(PAPER_MODE)$('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};
@@ -108,54 +109,15 @@ async function loadMarket(force=true){
   succeeded=true;marketFailures.delete(key);if(manualCharts.has(symbol))return;
   markets[symbol]={...data,loadedAt:Date.now()};if(!quotes[symbol]||(Date.parse(data.priceAt)||0)>=(Date.parse(quotes[symbol].priceAt||quotes[symbol].observedAt)||0))quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',observedAt:data.observedAt,loadedAt:Date.now()};if(['PROVIDER_QUOTE','BROKER_BID'].includes(data.priceKind)){quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;}saveQuotes();
   if(data.analysisBars||['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars);wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
- if(!drag&&!draft&&request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
+ if(!workbench.busy&&request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
  }catch(error){if(Number.isFinite(error.retryAfterMs)&&error.retryAfterMs>0)retryAfterMs=error.retryAfterMs;const reason=error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message;marketFailures.set(key,reason);if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=reason+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון. '+(retryAfterMs>3600000?'ניסיון נוסף לאחר איפוס המכסה.':'ניסיון אוטומטי בעוד כ־65 שניות.');}
  finally{pendingMarkets.delete(key);marketLoadGate.finish(key,succeeded,retryAfterMs);}
 }
 $('#loadMarket').onclick=()=>loadMarket(true);
 $('#marketInterval').onchange=()=>loadMarket(true);
 $('#autoMarket').onchange=()=>{if($('#autoMarket').checked)loadMarket(false);};
-setInterval(()=>{if($('#autoMarket').checked&&!document.hidden&&!drag&&!draft)loadMarket(false);},5000);
+setInterval(()=>{if($('#autoMarket').checked&&!document.hidden&&!workbench.busy)loadMarket(false);},5000);
 
-function drawings(){return state.drawings[selected]||(state.drawings[selected]=[]);}
-function setDrawTool(tool){drawTool=tool;draft=null;for(const b of document.querySelectorAll('[data-draw-tool]'))b.setAttribute('aria-pressed',b.dataset.drawTool===tool?'true':'false');$('#drawingHelp').textContent=tool==='horizontal'?'לחץ על הגרף להצבת קו אופקי במחיר הרצוי.':tool==='trend'?'לחץ על נקודת התחלה ואז על נקודת סיום של הקו.':'בחר קו וגרור להזזה; גרור את העיגולים לשינוי הקצוות. הקווים נשמרים לכל מניה במכשיר הזה.';paintDrawings();}
-function paintDrawings(){
- $('#deleteDrawing').disabled=!drawings().some(d=>d.id===selectedDrawingId);
- if(!chartDrawing)return;const {group,geometry,svg}=chartDrawing;group.replaceChildren();
- const add=(tag,attrs,parent=group)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))e.setAttribute(k,v);parent.append(e);return e;};
- for(const d of [...drawings(),...(draft?[{...draft,id:'draft',type:'trend',points:[draft.points[0],draft.preview||draft.points[0]]}]:[])]){
-  const points=d.points.map(geometry.pointToPixel),horizontal=d.type==='horizontal',x1=horizontal?15:points[0].x,x2=horizontal?760:points[1].x,y1=points[0].y,y2=horizontal?y1:points[1].y;
-  const line=add('line',{x1,x2,y1,y2,stroke:d.color,'stroke-width':d.id===selectedDrawingId?3:2,'pointer-events':'none'});
-  const title=document.createElementNS(svg.namespaceURI,'title');title.textContent=(horizontal?'קו אופקי · ':'קו אלכסוני · ')+d.points.map(p=>p.price.toFixed(4)).join(' → ');line.append(title);
-  if(d.id==='draft')continue;
-  add('line',{x1,x2,y1,y2,stroke:'transparent','stroke-width':18,'data-drawing-id':d.id,class:'drawing-hit','pointer-events':'stroke'});
-  if(d.id===selectedDrawingId){(horizontal?[{x:390,y:y1}]:points).forEach((p,i)=>add('circle',{cx:p.x,cy:p.y,r:7,fill:'#08111f',stroke:d.color,'stroke-width':2,'data-drawing-id':d.id,'data-endpoint':horizontal?'':i,class:'drawing-handle'}));}
- }
-}
-function attachDrawingTools(svg,bars,low,high,bounds){
- const ns=svg.namespaceURI,defs=document.createElementNS(ns,'defs'),clip=document.createElementNS(ns,'clipPath'),rect=document.createElementNS(ns,'rect');clip.id='colmex-drawing-clip';for(const [k,v]of Object.entries({x:15,y:bounds.top,width:745,height:bounds.bottom-bounds.top}))rect.setAttribute(k,v);clip.append(rect);defs.append(clip);svg.append(defs);const group=document.createElementNS(ns,'g');group.setAttribute('clip-path','url(#colmex-drawing-clip)');svg.append(group);svg.setAttribute('tabindex','0');svg.setAttribute('aria-label','גרף נרות עם קווים ניתנים לגרירה. מחק מוחק קו נבחר; חצים מזיזים אותו.');
- const geometry=chartGeometry(bars,low,high,bounds);chartDrawing={svg,group,geometry};
- const pixel=event=>{const point=svg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;return point.matrixTransform(svg.getScreenCTM().inverse());};
- svg.onpointerdown=event=>{
-  if(event.button!==0)return;const p=pixel(event);if(p.x<15||p.x>760||p.y<bounds.top||p.y>bounds.bottom)return;event.preventDefault();svg.focus({preventScroll:true});
-  const hit=event.target.closest('[data-drawing-id]');
-  if(drawTool==='select'&&hit){const d=drawings().find(x=>x.id===hit.dataset.drawingId);if(!d)return;selectedDrawingId=d.id;const endpoint=hit.dataset.endpoint;drag={id:d.id,start:p,original:structuredClone(d),endpoint:endpoint===undefined||endpoint===''?null:Number(endpoint)};svg.setPointerCapture(event.pointerId);paintDrawings();return;}
-  if(drawTool==='select'){selectedDrawingId=null;paintDrawings();return;}
-  const point=geometry.pixelToPoint(p),color=$('#drawingColor').value;
-  if(drawings().length>=100){message('ניתן לשמור עד 100 קווים לכל מניה.');return;}
-  if(drawTool==='trend'&&!draft){draft={color,points:[point],preview:point};$('#drawingHelp').textContent='כעת לחץ על נקודת הסיום של הקו.';paintDrawings();return;}
-  const d={id:crypto.randomUUID(),type:drawTool,color:drawTool==='trend'?draft.color:color,points:drawTool==='trend'?[draft.points[0],point]:[point]};drawings().push(d);selectedDrawingId=d.id;draft=null;save();setDrawTool('select');
- };
- svg.onpointermove=event=>{if(drag){const p=pixel(event),i=drawings().findIndex(d=>d.id===drag.id);if(i<0)return;drawings()[i]=moveDrawing(drag.original,geometry,p.x-drag.start.x,p.y-drag.start.y,drag.endpoint);paintDrawings();}else if(draft){draft.preview=geometry.pixelToPoint(pixel(event));paintDrawings();}};
- svg.onpointerup=event=>{if(drag){drag=null;save();if(svg.hasPointerCapture(event.pointerId))svg.releasePointerCapture(event.pointerId);}};
- svg.onpointercancel=()=>{if(drag){const i=drawings().findIndex(d=>d.id===drag.id);if(i>=0)drawings()[i]=drag.original;drag=null;paintDrawings();}};
- svg.onkeydown=event=>{if(event.key==='Escape'){setDrawTool('select');return;}const d=drawings().find(x=>x.id===selectedDrawingId);if(!d)return;if(['Delete','Backspace'].includes(event.key)){event.preventDefault();deleteSelectedDrawing();}const delta={ArrowLeft:[-3,0],ArrowRight:[3,0],ArrowUp:[0,-3],ArrowDown:[0,3]}[event.key];if(delta){event.preventDefault();state.drawings[selected]=drawings().map(x=>x.id===d.id?moveDrawing(d,geometry,...delta):x);save();paintDrawings();}};
- setDrawTool(drawTool);
-}
-function deleteSelectedDrawing(){state.drawings[selected]=drawings().filter(d=>d.id!==selectedDrawingId);selectedDrawingId=null;save();paintDrawings();}
-for(const button of document.querySelectorAll('[data-draw-tool]'))button.onclick=()=>setDrawTool(button.dataset.drawTool);
-$('#deleteDrawing').onclick=deleteSelectedDrawing;
-$('#drawingColor').oninput=()=>{const d=drawings().find(x=>x.id===selectedDrawingId);if(d){d.color=$('#drawingColor').value;save();paintDrawings();}};
 render();
 loadMarket(false);
 
@@ -177,6 +139,6 @@ $('#refreshWatchQuotes').onclick=()=>{for(const s of state.symbols){quoteNextAt[
 setInterval(loadNextWatchQuote,25000);
 loadNextWatchQuote();
 
-if(PAPER_MODE){paperUI=await import('./colmex-simulation-ui.js?v=20261017-occurrences');paperUI.initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!drag&&!draft)renderChart();}});}
+if(PAPER_MODE){paperUI=await import('./colmex-simulation-ui.js?v=20261017-occurrences');paperUI.initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!workbench.busy)renderChart();}});}
 
 startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});
