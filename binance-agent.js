@@ -36,6 +36,13 @@ let tradeControlWorking=false;
 let moneyUnit='₪';
 let chartCandles=[];
 let chartDecisions=[];
+let chartWorkbench=null;
+import('./chart-workbench.js?v=20261022-tools').then(({createWorkbench})=>{
+ const saved={};try{Object.assign(saved,JSON.parse(localStorage.getItem('levi-binance-chart-tools-v1')||'{}'));}catch{}
+ chartWorkbench=createWorkbench({host:document.querySelector('#priceChart').parentElement,toolbarHost:document.querySelector('#chartTools'),volumeHost:document.querySelector('#chartVolume'),getDrawings:symbol=>saved[symbol]||[],saveDrawings:(items,symbol)=>{saved[symbol]=items;try{localStorage.setItem('levi-binance-chart-tools-v1',JSON.stringify(saved));return true;}catch{return false;}}});
+ drawCandles(chartCandles);
+}).catch(()=>{document.querySelector('#chartTools').textContent='כלי השרטוט לא נטענו; רענן את העמוד.';});
+
 let chartRequestId=0;
 let chartAnalysisContext=null;
 let manualTradeCapabilities=null;
@@ -718,7 +725,7 @@ setInterval(()=>{
 function drawCandles(candles){
   drawIndicators(candles);
   const canvas=$('#priceChart');
-  if(!canvas||!candles.length)return;
+  if(!canvas||!candles.length){chartWorkbench?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -740,7 +747,7 @@ function drawCandles(candles){
   const start=firstVisible<0?candles.length:firstVisible;
   const view=candles.slice(start);
   const viewMas=mas.slice(start);
-  if(!view.length)return;
+  if(!view.length){chartWorkbench?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
@@ -844,6 +851,7 @@ function drawCandles(candles){
     const labelX=Math.max(55,Math.min(W-right-45,x));
     ctx.fillText(parts[0],labelX,H-86);ctx.fillText(parts[1]||'',labelX,H-71);
   }
+  chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
 }
 
 let dashboardLoadInFlight=false;
