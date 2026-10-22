@@ -1,3 +1,4 @@
+import {observeLiveCandle} from './lib/wyckoff-spring-rsi.mjs';
 import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
 import {HOURLY_TREND_RULE} from './lib/binance-hourly-trend.mjs';
 import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
@@ -710,7 +711,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:ENTRY_POLICY_VERSION}};
   }
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
-  if(['spring_retest','wyckoff_confirmation'].includes(meta.wyckoffTrade?.entryMode)){
+  if(['spring_retest','wyckoff_confirmation','spring_rsi_live'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000));
   }
@@ -998,6 +999,7 @@ function startMarketStream(){
       const msg=JSON.parse(raw),m=msg.data||msg,s=String(m.s||'');
       if((m.e==='trade'||!m.e&&m.p!=null)&&streams[s]){
         streams[s].lastPrice=+m.p;
+        streams[s].liveBar=observeLiveCandle(streams[s].liveBar,+m.p,Number(m.E));
         streams[s].lastEventAt=new Date(m.E).toISOString();
         streams[s].status='connected';
         const p=tradingPositions()[s];
@@ -1327,7 +1329,7 @@ async function evaluateSymbol(s){
     if(p?.atrEnabled){const a=atrPolicy(atr14(await candles(s)),Number(streams[s]?.lastPrice));if(a){p.atrValue=a.atrValue;p.atrTrailPct=a.atrTrailPct;}}
     const entryBars=p?[]:await candles(s);
     const livePrice=requireLivePrice(streams[s]);
-    const ev=evaluateDailyTrade({symbol:s,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'wyckoff_confirmation',priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(p){
       if(mode==='live')persistLivePeak(s,p);
@@ -1361,7 +1363,7 @@ async function evaluateSymbol(s){
       }
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
-    ev.decisionPriceSource=ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
+    ev.decisionPriceSource=ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_30':ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
   }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
@@ -1428,10 +1430,10 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?['spring_retest','wyckoff_confirmation'].includes(ev.strategy.entryMode)?ev.strategy.profitProtectionPending?'עצירה 10% פעילה · הגנת רווח תופעל ב־'+new Date(ev.strategy.profitProtectionStartsAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'עצירה 10% ממחיר הקנייה; נשמרים 80% מההפרש לשיא':`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?['spring_retest','wyckoff_confirmation','spring_rsi_live'].includes(ev.strategy.entryMode)?ev.strategy.profitProtectionPending?'עצירה 10% פעילה · הגנת רווח תופעל ב־'+new Date(ev.strategy.profitProtectionStartsAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'עצירה 10% ממחיר הקנייה; נשמרים 80% מההפרש לשיא':`עצירה ${ev.strategy.stopLossPct}% מהכניסה או ירידה ${ev.strategy.trailingStopPct}% מהשיא — דירוג ${ev.strategy.marketRank??'מחוץ לרשימה'}`:'החזקה קודמת ללא שיא ראשוני מתועד — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:'וויקוף ומגמת שעה אושרו · קנייה ללא המתנה לחזרה ל־Spring'};
+  return {code:'BUY_READY',text:'Spring ו־RSI חי 0–30 ומגמת שעה אושרו · קנייה ללא המתנה לסגירת נר'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -1872,9 +1874,9 @@ async function runEvaluation(){
 
 async function buildTechnicalDailyHistory(symbol,limit=30){
   const c=await candles(symbol),rows=[];
-  for(let i=Math.max(2,c.length-limit);i<c.length;i++){
+  for(let i=Math.max(3,c.length-limit);i<c.length;i++){
    const historicalNow=c[i].closeTime+1;
-   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i+1),price:c[i].close,priceAsOf:new Date(historicalNow).toISOString(),now:historicalNow,timeframe:'5m'});
+   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i),price:c[i].close,priceAsOf:new Date(c[i].closeTime).toISOString(),now:c[i].closeTime,timeframe:'5m',entryMode:'spring_rsi_live',liveBar:c[i]});
    const hourlyTrend=assessQualityEntry(symbol,c.slice(0,i+1),{now:historicalNow});
    if(ev.entryConfirmed&&!hourlyTrend.ok){ev.entryConfirmed=false;ev.buyReason=hourlyTrend.code;}
    rows.push({at:new Date(c[i].closeTime).toISOString(),hourlyTrend,price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
@@ -2333,11 +2335,12 @@ const server=http.createServer((req,res)=>{
         entryFiltersEnabled:true,
         hourlyTrendFilter:HOURLY_TREND_RULE,
         entryPolicyVersion:ENTRY_POLICY_VERSION,
-        entryMode:'wyckoff_confirmation',
-        entryConfirmation:'LIVE_PRICE_AFTER_SPRING',
+        entryMode:'spring_rsi_live',
+        entryConfirmation:'LIVE_SPRING_RSI_0_30',
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
-        entrySignalValidityMinutes:20,
+        entrySignalValidityMinutes:null,
+        entryRsi:{period:14,timeframe:'5m',min:0,max:30,includesOpenCandle:true},
         springStopLossPct:10,
         profitGivebackPct:20,
         profitRetentionPct:80,
