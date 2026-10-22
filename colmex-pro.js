@@ -1,3 +1,4 @@
+import {renderRsiChart} from './rsi-chart.js?v=20261022-live-spring-rsi';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
@@ -53,6 +54,7 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
+ renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),markets[selected]?.liveAnalysisBar||null);
  if(workbench.busy&&workbench.currentSymbol===selected)return;
  const root=$('#chart'),bars=lastTwoTradingDays(chartBars(),markets[selected]?.interval||$('#marketInterval').value);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences').replaceChildren();$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){workbench.clear();const p=document.createElement('p');p.textContent=['1week','1month'].includes($('#marketInterval').value)?'לטווח של שני ימי מסחר בחר נרות 5 דקות, שעה או יום.':'טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};

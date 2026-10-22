@@ -63,8 +63,8 @@ test('Spring older than twenty minutes can enter below its low, but used and pre
  const start=now-prices.length*300000;
  const values=prices.map((close,i)=>({datetime:new Date(start+i*300000).toISOString().slice(0,19).replace('T',' '),open:i<2?close-1:close,high:close,low:i<2?close-1:close,close}));
  const series={meta:{symbol:'AAPL',currency:'USD',type:'Common Stock'},values},bars=stockBars(series,'AAPL',now);
- const setup=entrySignal(bars,now+60000,start);assert.equal(setup.ready,true);assert.ok(now+60000-setup.setup.signalTime>20*60000);
- assert.equal(entrySignal(bars,now+60000,setup.setup.signalTime).ready,false);assert.equal(entrySignal(bars,now+60000,start,[setup.setup.patternId]).ready,false);
+ const live={price:60,priceAsOf:now+60000};const setup=entrySignal(bars,now+60000,start,[],live);assert.equal(setup.ready,true);assert.ok(now+60000-setup.setup.signalTime>20*60000);
+ assert.equal(entrySignal(bars,now+60000,setup.setup.signalTime,[],live).ready,false);assert.equal(entrySignal(bars,now+60000,start,[setup.setup.patternId],live).ready,false);
  const sim=applyStockObservation(newSimulation(start),{symbol:'AAPL',series,quote:{symbol:'AAPL',currency:'USD',close:77,last_quote_at:(now+60000)/1000,is_market_open:true},now:now+60000});assert.equal(sim.assets.AAPL.reason,'BUY');
  const state=initialState(start),b=broker();b.quote=async()=>({ap:77,bp:76.99});
  await runCycle({state,broker:b,env,now:()=>now+60000,deadline:now+84000,save:async()=>{},signal:()=>setup});assert.equal(state.pending.kind,'BUY');
