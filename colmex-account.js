@@ -32,6 +32,7 @@ function render(data){
 }
 async function refresh(){
  if(!enabled||controller)return;
+ if(document.hidden){clearTimeout(timer);if(auto)timer=setTimeout(refresh,refreshMs);return;}
  const g=generation,c=new AbortController();controller=c;const timeout=setTimeout(()=>c.abort(),45000);clearTimeout(timer);
  $('brokerAccountStatus').textContent=$('brokerReadAt').textContent?'מעדכן נתוני חשבון · הנתונים מהקריאה הקודמת נשארים עד לסיום העדכון…':'קורא נתוני חשבון מקולמקס…';
  try{
@@ -54,4 +55,5 @@ async function status(){
   if(enabled)refresh();
  }catch{$('brokerSetupStatus').textContent='בדיקת החיבור אינה זמינה כרגע. רענן את העמוד מאוחר יותר.';}
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&enabled&&auto)refresh();});
 status();

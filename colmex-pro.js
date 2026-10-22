@@ -116,7 +116,7 @@ async function loadMarket(force=true){
 $('#loadMarket').onclick=()=>loadMarket(true);
 $('#marketInterval').onchange=()=>loadMarket(true);
 $('#autoMarket').onchange=()=>{if($('#autoMarket').checked)loadMarket(false);};
-setInterval(()=>{if($('#autoMarket').checked&&!document.hidden&&!workbench.busy)loadMarket(false);},5000);
+setInterval(()=>{if($('#autoMarket').checked&&!document.hidden&&!workbench.busy)loadMarket(false);},30000);
 
 render();
 loadMarket(false);

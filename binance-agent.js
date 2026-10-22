@@ -103,6 +103,7 @@ function setDashboardView(view){
   const grid=$('.trading-grid');
   if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
   if(activeView==='portfolio')renderPortfolioView();
+  if(activeView==='journal'||activeView==='portfolio')loadActionJournal(currentMode);
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
     const name=btn.dataset.view||['trade','portfolio','scans','journal'][i];
@@ -858,13 +859,15 @@ let dashboardLoadInFlight=false;
 let dashboardLoaded=false;
 let scannerVerifiedMode=null,scannerVerifiedAt=null;
 async function load(){
-  if(dashboardLoadInFlight)return;
+  if(document.hidden||dashboardLoadInFlight)return;
   dashboardLoadInFlight=true;
   try{
     if(!dashboardLoaded)put('#status','מתחבר…');
     const m=await J(MODE);
     mode(m);
     const agent=await J(AGENT);
+    window.LEVI_AGENT_SNAPSHOT=agent;
+    window.dispatchEvent(new CustomEvent('levi:binance-agent',{detail:agent}));
     if(m.mode==='live'){
       let liveData;
       try{liveData=await J(LIVEACC,{timeoutMs:35000});}
@@ -878,7 +881,7 @@ async function load(){
         put('#scannerFreshness',scannerVerifiedMode==='live'?'לא ניתן לעדכן פוזיציות כרגע · הטבלה מציגה את העדכון האחרון מ־'+tradeExecutionTime(scannerVerifiedAt)+' · הנתונים לא אומתו מחדש':'ממתין לנתוני חשבון מאומתים להצגת רווח והפסד.');
       }
     }else{scannerVerifiedMode=null;scannerVerifiedAt=null;put('#scannerFreshness','');render(agent,m.mode,null);}
-    await loadActionJournal(m.mode);
+    if(activeView==='journal'||activeView==='portfolio')await loadActionJournal(m.mode);
     dashboardLoaded=true;
   }catch(e){
     put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));
@@ -992,7 +995,8 @@ document.querySelectorAll('.range-btn').forEach(btn=>{
 if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).observe($('#priceChart').parentElement);}
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
-setInterval(load,5000);
+setInterval(()=>{if(!document.hidden)load();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
 
 // Keep account detail and recent trades collapsed until explicitly opened.
 document.querySelectorAll('[data-detail-toggle]').forEach(button=>{

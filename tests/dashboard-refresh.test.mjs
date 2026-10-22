@@ -8,7 +8,7 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   const start=source.indexOf('let dashboardLoadInFlight=');
   const end=source.indexOf('\nasync function authenticatedControl',start);
   const labels=[];let release;let requests=0;
-  const context=vm.createContext({MODE:'mode',AGENT:'agent',LIVEACC:'live',
+  const context=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},activeView:"trade",MODE:'mode',AGENT:'agent',LIVEACC:'live',
     put:(id,label)=>{if(id==='#status')labels.push(label);},mode(){},render(){},loadActionJournal:async()=>{},
     J:async url=>{requests++;if(url==='mode')return {mode:'demo'};return {};},console,
     $:()=>({classList:{remove(){}}})});
@@ -25,7 +25,7 @@ test('LIVE waits for account completion before rendering, leaving existing scann
  const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
  const start=source.indexOf('let dashboardLoadInFlight='),end=source.indexOf('\nasync function authenticatedControl',start);
  const rendered=[],labels=[];let rejectAccount;
- const ctx=vm.createContext({MODE:'mode',AGENT:'agent',LIVEACC:'live',currentLiveAccount:null,AbortSignal,
+ const ctx=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},activeView:"trade",MODE:'mode',AGENT:'agent',LIVEACC:'live',currentLiveAccount:null,AbortSignal,
   put:(id,label)=>labels.push(label),mode(){},render:(agent,mode)=>rendered.push({agent,mode}),
   loadActionJournal:async()=>{},loadLiveAccount:async d=>{assert.equal(d.connected,false);return null;},
   J:async url=>url==='mode'?{mode:'live'}:url==='agent'?{agents:[{symbol:'BTCUSDT'}]}:new Promise((resolve,reject)=>{rejectAccount=reject;}),console,

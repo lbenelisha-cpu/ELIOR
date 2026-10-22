@@ -5,7 +5,7 @@ const valueFormat=n=>Number(n).toLocaleString('he-IL',{maximumFractionDigits:2})
 const format=n=>Number(n).toLocaleString('he-IL',{maximumFractionDigits:8});
 let busy=false;
 async function refresh(){
- if(busy)return;busy=true;
+ if(busy||document.hidden||document.getElementById('demoBalanceDetails')?.hidden)return;busy=true;
  status.textContent='טוען יתרות מהחשבון…';total.textContent='— USDT';body.replaceChildren();
  try{
   const r=await fetch(window.binanceReadUrl(base+'/api/binance-demo-account'),{cache:'no-store'}),d=await r.json();
@@ -16,5 +16,8 @@ async function refresh(){
   for(const b of a.balances){const row=document.createElement('tr');for(const v of [b.asset,format(b.free),format(b.locked),b.valueUsdt===null?'מחיר לא זמין':valueFormat(b.valueUsdt)]){const cell=document.createElement('td');cell.textContent=v;row.append(cell);}body.append(row);}
  }catch(e){status.textContent='חשבון הדמו אינו מחובר: '+e.message;}finally{busy=false;}
 }
-document.getElementById('refreshDemoAccount')?.addEventListener('click',refresh);refresh();setInterval(refresh,60000);
+document.getElementById('refreshDemoAccount')?.addEventListener('click',refresh);
+document.querySelector('[data-detail-toggle=demoBalanceDetails]')?.addEventListener('click',refresh);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+refresh();setInterval(refresh,60000);
 })();
