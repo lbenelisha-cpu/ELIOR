@@ -18,7 +18,7 @@ test('scanner quote refresh preserves rows, cells, click handlers and scroll; no
 });
 function loader(){
  const renders=[],labels={};let account={connected:true},failAgent=false,selectedMode='live';
- const context=vm.createContext({Date,currentMode:'live',currentLiveAccount:null,MODE:'/mode',AGENT:'/agent',LIVEACC:'/account',console:{error(){}},
+ const context=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},activeView:"trade",Date,currentMode:'live',currentLiveAccount:null,MODE:'/mode',AGENT:'/agent',LIVEACC:'/account',console:{error(){}},
   J:async(url,options)=>{if(url==='/mode')return {mode:selectedMode};if(url==='/agent'){if(failAgent)throw Error('network');return {agents:[]};}assert.equal(options.timeoutMs,35000);return account?{connected:true,account}:{connected:false};},
   mode:m=>{context.currentMode=m.mode;},
   loadLiveAccount:async data=>data.connected?data.account:null,

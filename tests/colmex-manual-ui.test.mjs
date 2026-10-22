@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';import vm f
 function setup({connected=true,storageFails=false}={}){
  const nodes=new Map(),saved=new Map(),calls=[];if(connected)saved.set('levi-colmex-device-v1','colmex-device-'+ 'a'.repeat(64));
  const element=()=>({textContent:'',value:'',disabled:false,hidden:false,showModal(){this.open=true;},close(){this.open=false;},addEventListener(event,cb){this[event]=cb;}});
- const document={getElementById(id){if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);}};
+ const document={hidden:false,addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);}};
  document.getElementById('selectedSymbol').textContent='AAPL';document.getElementById('colmexTradeAmount').value='50';
  let response={ok:true,status:202,json:async()=>({ok:true,status:'PENDING'})};
  const context=vm.createContext({document,localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>{if(storageFails)throw Error('storage');saved.set(k,v);},removeItem:k=>saved.delete(k)},fetch:async(url,options)=>{calls.push({url,options});return response;},AbortSignal,crypto:{randomUUID:()=> '11111111-1111-4111-8111-111111111111'},setInterval(){}});

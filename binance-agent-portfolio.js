@@ -1,9 +1,7 @@
 
-async function refreshPortfolioPositions(){
+function refreshPortfolioPositions(d=window.LEVI_AGENT_SNAPSHOT){
+  if(!d)return;
   try{
-    const base = window.API_BASE || 'https://levi-binance.2-29-48-20.sslip.io';
-    const r = await fetch(window.binanceReadUrl(base + '/api/binance-agent'),{cache:'no-store'});
-    const d = await r.json();
     const body=document.querySelector('#activePositionsBody');
     if(!body)return;
     const currency=d.paper?.currency||'₪';
@@ -19,5 +17,5 @@ async function refreshPortfolioPositions(){
     }).join('');
   }catch{}
 }
+window.addEventListener('levi:binance-agent',event=>refreshPortfolioPositions(event.detail));
 refreshPortfolioPositions();
-setInterval(refreshPortfolioPositions,30000);

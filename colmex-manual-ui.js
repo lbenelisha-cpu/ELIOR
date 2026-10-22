@@ -77,4 +77,5 @@ $('colmexTradeForm').addEventListener('submit',async event=>{
  try{rememberPending(input);}catch{pending=null;renderAccess();$('colmexTradeResult').textContent='לא ניתן לשמור מזהה בקשה במכשיר. לא נשלחה הוראה.';return;}
  await send(input);
 });
-renderAccess();if(pending)checkPending();setInterval(checkPending,30000);
+renderAccess();if(pending)checkPending();setInterval(()=>{if(!document.hidden)checkPending();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkPending();});
