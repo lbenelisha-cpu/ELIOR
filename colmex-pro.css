@@ -49,3 +49,16 @@ main{width:100%;max-width:2200px;padding:clamp(14px,1.8vw,32px)}
 @media(max-width:1000px){.layout{grid-template-columns:220px minmax(0,1fr)}.panel{padding:16px}.platform-nav{justify-content:flex-start}.platform-nav a{white-space:normal}}
 @media(max-width:760px){.layout,.layout.lower{grid-template-columns:minmax(0,1fr)}.chart-panel{grid-row:1}.watch{grid-row:2}header{align-items:flex-start}.chart{aspect-ratio:auto;height:clamp(280px,55vw,400px)}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-top strong{font-size:26px}.platform-nav a{flex:1 1 140px;text-align:center}.drawing-tools{gap:6px}.drawing-tools button{padding:10px 8px}.chart-mark-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.chip{white-space:normal}}
 @media(max-width:380px){.panel{padding:12px}.stats article{padding:12px}.stats strong{font-size:19px}.market-controls>label,.market-controls>button{max-width:100%}.watch-row{flex-wrap:wrap}.watch-row span{max-width:100%}}
+
+/* One shared card width, including on iPhone: no narrow side column or overflowing SVG. */
+.layout,.layout.lower{grid-template-columns:minmax(0,1fr);width:100%}
+main>section,main>.panel,.market-hours,.layout>.panel{width:100%;max-width:100%;min-width:0;margin-inline:0}
+.chart-panel{grid-row:1}.watch{grid-row:2}
+.chart-panel>*,#chart,#chartVolume,#colmexRsi,#chartTools{min-width:0;max-width:100%}
+#chart,#chartVolume,#colmexRsi,#chartTools{width:100%;margin-inline:0}
+#chart>svg:not(.workbench-overlay){flex:1 1 0%;min-width:0;width:100%;max-width:100%;height:100%}
+#chartVolume svg,#colmexRsi svg{display:block;width:100%;max-width:100%;min-width:0}
+#colmexRsi{overflow:hidden}#colmexRsi p,.chart-panel>p{overflow-wrap:anywhere}
+#watchList{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px;max-height:440px;overflow-y:auto;flex:none}
+.watch-row{margin:0;min-width:0}
+@media(max-width:600px){main{padding-inline:12px}.panel{padding:14px}.broker-account .stats,.stats{grid-template-columns:repeat(2,minmax(0,1fr))}#watchList{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-panel .chart{min-height:240px;height:auto;aspect-ratio:850 / 340}}
