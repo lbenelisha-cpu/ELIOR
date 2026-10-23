@@ -1342,7 +1342,10 @@ async function evaluateSymbol(s){
     if(p?.atrEnabled){const a=atrPolicy(atr14(await candles(s)),Number(streams[s]?.lastPrice));if(a){p.atrValue=a.atrValue;p.atrTrailPct=a.atrTrailPct;}}
     const entryBars=p?[]:await candles(s);
     const livePrice=requireLivePrice(streams[s]);
-    const ev=evaluateDailyTrade({symbol:s,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
+    const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&a.type==='SELL').map(a=>Date.parse(a.at)).filter(Number.isFinite));
+    const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
+    const ev=evaluateDailyTrade({symbol:s,searchAfter:latestSaleAt,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
     ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});
@@ -1354,9 +1357,6 @@ async function evaluateSymbol(s){
     if(ev.wyckoffTrade)ev.wyckoffTrade.marketRank=marketRanks.get(s)??null;
     ev.analysisSignal=ev.strategy?.wyckoff?.buyConfirmed===true;
     ev.analysisReason=ev.buyReason;
-    const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
-    const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&a.type==='SELL').map(a=>Date.parse(a.at)).filter(Number.isFinite));
-    const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
     if(!p && (tradeControl.paused || (entryBoundary>0 && Number(ev.strategy?.wyckoff?.signalTime)>0 && Number(ev.strategy.wyckoff.signalTime)<=entryBoundary))){
       ev.entryConfirmed=false;
       ev.entryEligible=false;

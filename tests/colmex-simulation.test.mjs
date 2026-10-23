@@ -31,7 +31,7 @@ test('stop exits immediately, profit lock waits a week, quotes cannot duplicate 
  const t=base+7*86400000+3*60000;s=applyStockObservation(s,obs(90,t));assert.equal(s.journal.length,2);assert.equal(s.journal[1].reason,'WYCKOFF_GAIN_GIVEBACK_20_PERCENT');assert.equal(s.journal[1].netPnl,null);assert.equal(simulationSummary(s).sells,1);
  assert.equal(applyStockObservation(s,obs(90,t)).journal.length,2);
  let loss=applyStockObservation(fresh(),obs(81));loss=applyStockObservation(loss,obs(72,base+2*60000));assert.equal(loss.journal[1].reason,'WYCKOFF_SPRING_STOP_LOSS_10_PERCENT');assert.equal(loss.assets.AAPL.lastExitAt,base+2*60000);
- loss=applyStockObservation(loss,obs(81,base+3*60000));assert.equal(loss.journal.length,2);assert.equal(loss.assets.AAPL.reason,'PATTERN_ALREADY_USED');
+ loss=applyStockObservation(loss,obs(81,base+3*60000));assert.equal(loss.journal.length,2);assert.equal(loss.assets.AAPL.reason,'SEARCH_PEAK');
 });
 test('delayed observations record both timestamps, fees are explicit and cash accounting reconciles',()=>{
  let a=obs(81);a.now+=60000;let s=applyStockObservation(fresh(10),a);assert.notEqual(s.journal[0].at,s.journal[0].observedAt);assert.equal(s.assets.AAPL.delaySeconds,60);
@@ -61,11 +61,11 @@ test('90-second freshness is measured at receipt, never by backdating the scan',
  const input=obs(81);input.now+=90001;
  const s=applyStockObservation(fresh(),input);assert.equal(s.assets.AAPL.reason,'WAIT_FRESH_MARKET_PRICE');assert.equal(s.journal.length,0);
 });
-test('sale boundary uses the new confirmation, not the initial peak of an unused pattern',()=>{
+test('sale boundary resets the entire search even when an old setup confirms later',()=>{
  const s=fresh();s.assets.AAPL={checks:0,usedPatterns:[],lastExitAt:base-30000,lastPriceAt:null};
- const bought=applyStockObservation(s,obs(81));assert.equal(bought.assets.AAPL.reason,'BUY');
+ const bought=applyStockObservation(s,obs(81));assert.equal(bought.assets.AAPL.reason,'SEARCH_PEAK');assert.equal(bought.journal.length,0);
  const before=fresh();before.assets.AAPL={checks:0,usedPatterns:[],lastExitAt:base+90000,lastPriceAt:null};
- const blocked=applyStockObservation(before,obs(81));assert.equal(blocked.assets.AAPL.reason,'WAIT_NEW_WYCKOFF_SIGNAL');
+ const blocked=applyStockObservation(before,obs(81));assert.equal(blocked.assets.AAPL.reason,'SEARCH_PEAK');assert.equal(blocked.journal.length,0);
 });
 test('realized gains grow the fixed allocation while insufficient cash blocks a full slot',()=>{
  const s=fresh();s.allocation={initialBase:10000,realizedBaseline:0};s.cash=10100;

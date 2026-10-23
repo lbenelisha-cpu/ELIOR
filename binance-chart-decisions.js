@@ -94,12 +94,12 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
  const tradeSetup=agent?.position==='LONG'?agent.strategy?.setup:null;
  const chosen=typeof chartWyckoffHistory!=='undefined'?chartWyckoffHistory.find(x=>x.id===selectedWyckoffId):null;
- const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:latestWyckoffSetup(rows));if(!setup)return;
+ const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:agent?.strategy?.wyckoff);if(!setup)return;
  const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&(!chosen||(setup.initialPeak?.time===tradeSetup.initialPeak?.time&&setup.secondaryTest?.time===tradeSetup.secondaryTest?.time));
  root.dataset.active=String(active);
  const status=document.createElement('span');status.className='wyckoff-setup-status';
  const at=Number(setup.signalTime||setup.confirmation?.time);
- status.textContent=(active?'מסחר פעיל · תבנית הקנייה':'תבנית היסטורית — אין מסחר פעיל בתבנית')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
+ status.textContent=(active?'מסחר פעיל · תבנית הקנייה':chosen?'תבנית היסטורית שנבחרה לעיון':'חיפוש תבנית עדכנית · אין פוזיציה')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
  root.append(status);
  const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
