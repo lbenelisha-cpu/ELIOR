@@ -7,7 +7,7 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
   const start=source.indexOf('let dashboardLoadInFlight=');
   const end=source.indexOf('\nasync function authenticatedControl',start);
-  const labels=[];let release;let requests=0;
+  const labels=[];const releases=[];let requests=0;
   const context=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},activeView:"trade",MODE:'mode',AGENT:'agent',LIVEACC:'live',
     put:(id,label)=>{if(id==='#status')labels.push(label);},mode(){},render(){},loadActionJournal:async()=>{},
     J:async url=>{requests++;if(url==='mode')return {mode:'demo'};return {};},console,
@@ -15,13 +15,13 @@ test('background refresh preserves status and overlapping loads are skipped',asy
   vm.runInContext(source.slice(start,end),context);
   await vm.runInContext('load()',context);await vm.runInContext('load()',context);
   assert.deepEqual(labels,['מתחבר…']);
-  context.J=async()=>{requests++;return new Promise(r=>{release=r;});};
+  context.J=async()=>{requests++;return new Promise(r=>{releases.push(r);});};
   const pending=vm.runInContext('load()',context);const before=requests;
   await vm.runInContext('load()',context);assert.equal(requests,before);
-  context.J=async()=>({});release({mode:'demo'});await pending;
+  context.J=async()=>({});for(const release of releases)release({mode:'demo'});await pending;
   assert.deepEqual(labels,['מתחבר…']);
 });
-test('LIVE waits for account completion before rendering, leaving existing scanner intact while the request is pending',async()=>{
+test('LIVE market first paint proceeds while the signed account is pending, then marks failed verification',async()=>{
  const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
  const start=source.indexOf('let dashboardLoadInFlight='),end=source.indexOf('\nasync function authenticatedControl',start);
  const rendered=[],labels=[];let rejectAccount;
@@ -31,7 +31,7 @@ test('LIVE waits for account completion before rendering, leaving existing scann
   J:async url=>url==='mode'?{mode:'live'}:url==='agent'?{agents:[{symbol:'BTCUSDT'}]}:new Promise((resolve,reject)=>{rejectAccount=reject;}),console,
   $:()=>({classList:{remove(){}}})});
  vm.runInContext(source.slice(start,end),ctx);const load=vm.runInContext('load()',ctx);
- await new Promise(setImmediate);assert.equal(rendered.length,0);
+ await new Promise(setImmediate);assert.equal(rendered.length,1);assert.ok(labels.some(x=>x.includes('מאמת נתוני חשבון')));
  rejectAccount(Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED'));await load;
- assert.equal(rendered.length,1);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
+ assert.equal(rendered.length,2);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
 });

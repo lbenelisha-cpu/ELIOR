@@ -27,9 +27,14 @@ test('changing asset starts its own load and an older completion cannot overwrit
  firstData.resolve(h.data);await a;assert.equal(h.ctx.chartCandles[0].close,100);assert.equal(calls,2);
 });
 test('same-asset refresh failure retains visible candles with an explicit stale-data message',async()=>{
- const h=harness();h.scan.resolve({history:[],error:null});await h.ctx.loadChart('BTCUSDT');h.ctx.J=async()=>{throw Error('timeout');};await h.ctx.loadChart('BTCUSDT');
+ const h=harness();h.scan.resolve({history:[],error:null});await h.ctx.loadChart('BTCUSDT');h.ctx.J=async()=>{throw Error('timeout');};vm.runInContext('chartLastReadAt=0',h.ctx);await h.ctx.loadChart('BTCUSDT');
  assert.equal(h.ctx.chartCandles.length,1);assert.match(h.labels['#chartLegend'],/מהטעינה האחרונה/);assert.equal(h.empty.hidden,true);
 });
 test('empty responses display a reason instead of leaving a blank chart',async()=>{
  const h=harness();h.ctx.J=async()=>({candles:[]});await h.ctx.loadChart('BTCUSDT');assert.equal(h.empty.hidden,false);assert.match(h.labels['#chartEmpty'],/לא התקבלו נרות/);assert.equal(h.events.length,0);
+});
+test('cached public candles paint while the fresh chart request is still pending',async()=>{
+ const h=harness(),fresh=deferred();h.ctx.window={LEVI_CHART_CACHE:{read:()=>({candles:[{close:45}],visibleStartTime:0,savedAt:Date.now()-60000}),write(){}}};h.ctx.J=()=>fresh.promise;
+ const pending=h.ctx.loadChart('BTCUSDT');assert.equal(h.events[0].count,1);assert.equal(h.ctx.chartCandles[0].close,45);assert.match(h.labels['#chartLegend'],/עותק גרף קודם/);
+ fresh.resolve(h.data);h.scan.resolve({history:[],error:null});await pending;assert.equal(h.ctx.chartCandles[0].close,50);
 });
