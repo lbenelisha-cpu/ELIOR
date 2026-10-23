@@ -786,13 +786,14 @@ function drawCandles(candles){
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
   const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
   const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
-  const walletQty=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol)?.qty;
-  const riskPosition=heldNow&&!selectedPosition.accountOnly?{...selectedPosition,qty:currentMode==='live'?walletQty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty}:null;
+  const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
+  const managedPosition=heldNow&&selectedPosition.exitPolicy==='FIXED_TP4_SL1_V1';
+  const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
   const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
   if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop);
   const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
-  put('#positionEntryPrice',heldNow?priceText(selectedPosition.entryPrice):'—');
+  put('#positionEntryPrice',heldNow?priceText(riskPosition?.entryPrice??selectedPosition.entryPrice):'—');
   put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
   put('#positionSellPrice',sellLevel?priceText(sellLevel.price):'—');
   if(sellLevel)vals.push(sellLevel.price);
@@ -853,10 +854,10 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
-    {price:tradeRisk?.target,label:'יעד רווח +4%',color:'#64e1ae'},
-    {price:heldNow?Number(selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
+    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':'יעד רווח +4%',color:'#64e1ae'},
+    {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
-    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?'#ff8494':'#ffbd59'}
+    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
   const labelRows=[];
