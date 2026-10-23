@@ -1,3 +1,5 @@
+import {createExternalCostReader} from './lib/binance-external-cost.mjs';
+const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
 import {rsiSnapshot} from './lib/rsi-screener.mjs';
 import {createChartReader} from './lib/binance-chart-reader.mjs';
 import {observeLiveCandle} from './lib/wyckoff-spring-rsi.mjs';
@@ -839,10 +841,10 @@ async function executeLiveCycle(evals){
 
 let lastDisplayAccount=null,displayAccountPending=null;
 async function getDisplayAccountSnapshot(){
-  if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)>=0&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<10000)return lastDisplayAccount;
-  if(displayAccountPending)return displayAccountPending;
+  if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)>=0&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<10000)return externalCostReader.decorate(lastDisplayAccount);
+  if(displayAccountPending)return externalCostReader.decorate(await displayAccountPending);
   const pending=getLiveAccountSnapshot();displayAccountPending=pending;
-  try{return await pending;}finally{if(displayAccountPending===pending)displayAccountPending=null;}
+  try{return externalCostReader.decorate(await pending);}finally{if(displayAccountPending===pending)displayAccountPending=null;}
 }
 async function getLiveAccountSnapshot(){
   const observedAt=Date.now();
@@ -2332,6 +2334,7 @@ const server=http.createServer((req,res)=>{
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
         rsiScreenerVersion:1,
+        externalCostVersion:1,
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
