@@ -13,7 +13,8 @@ import {observePositionPeak} from './lib/position-high-water.mjs';
 import {chartWindow,aggregateFiveHourCandles} from './lib/chart-timeframes.mjs';
 import {tradeCounts,tradeFeeTotals} from './lib/trade-counts.mjs';
 import {loadFiveMinuteBars,FIVE_MINUTE_MS} from './lib/wyckoff-five-minute-data.mjs';
-import {retainDecision} from './lib/decision-chart-history.mjs';
+import {createDecisionHistoryWriter} from './lib/decision-history-writer.mjs';
+import {retainDecision,compactDecisionHistory} from './lib/decision-chart-history.mjs';
 import {PersistedMarketOrder} from './lib/persisted-market-order.mjs';
 import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} from './lib/wyckoff-live-positions.mjs';
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
@@ -328,17 +329,14 @@ const manualRequests=new ManualTradeRequests(LIVE_LOG_FILE+'.manual');
 const DECISION_HISTORY_FILE=process.env.BINANCE_DECISION_HISTORY_FILE||'/var/data/binance-decision-history.json';
 let decisionHistory={};
 
+const decisionHistoryWriter=createDecisionHistoryWriter({
+ file:DECISION_HISTORY_FILE,
+ snapshot:()=>({...decisionHistory}),
+ onError:error=>console.error('Decision history save failed',error.message)
+});
 function saveDecisionHistory(){
-  try{
-    ensureStateDir();
-    const tmp=DECISION_HISTORY_FILE+'.tmp';
-    fs.writeFileSync(tmp,JSON.stringify(decisionHistory,null,2),'utf8');
-    fs.renameSync(tmp,DECISION_HISTORY_FILE);
-    return true;
-  }catch(e){
-    console.error('Decision history save failed',e.message);
-    return false;
-  }
+  decisionHistoryWriter.schedule();
+  return true;
 }
 
 function loadDecisionHistory(){
@@ -346,7 +344,8 @@ function loadDecisionHistory(){
     ensureStateDir();
     if(!fs.existsSync(DECISION_HISTORY_FILE))return false;
     const raw=JSON.parse(fs.readFileSync(DECISION_HISTORY_FILE,'utf8'));
-    decisionHistory=raw&&typeof raw==='object'?raw:{};
+    decisionHistory=compactDecisionHistory(raw&&typeof raw==='object'?raw:{});
+    saveDecisionHistory();
     return true;
   }catch(e){
     console.error('Decision history load failed',e.message);
@@ -2327,6 +2326,7 @@ const server=http.createServer((req,res)=>{
         entryMode:'spring_rsi_live',
         entryConfirmation:'LIVE_SPRING_RSI_0_30',
         readPerformanceVersion:1,
+        historyPerformanceVersion:1,
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
