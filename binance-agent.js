@@ -104,6 +104,7 @@ function setDashboardView(view){
   if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
   if(activeView==='portfolio')renderPortfolioView();
   if(activeView==='journal'||activeView==='portfolio')loadActionJournal(currentMode);
+  if(activeView==='journal'&&currentAgentData)loadDecisionHistory(selectedSymbol);
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
     const name=btn.dataset.view||['trade','portfolio','scans','journal'][i];
@@ -396,7 +397,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
 
-  await Promise.all([loadChart(a.symbol),loadDecisionHistory(a.symbol)]);
+  await Promise.all([...(activeView==='trade'||activeView==='scans'?[loadChart(a.symbol)]:[]),...(activeView==='journal'?[loadDecisionHistory(a.symbol)]:[])]);
 }
 
 function blockerLabel(b){
@@ -621,9 +622,11 @@ async function runBinanceWyckoffScan(candles,rows,position){
  });
 }
 let chartLoadInFlight=null;
+let chartLastReadKey=null,chartLastReadAt=0;
 function loadChart(symbol){
  const key=[symbol,selectedInterval,selectedRange,currentMode].join(':');
  if(chartLoadInFlight?.key===key)return chartLoadInFlight.promise;
+ if(chartLastReadKey===key&&Date.now()-chartLastReadAt<15000&&chartCandles.length)return Promise.resolve();
  const promise=loadChartRequest(symbol);chartLoadInFlight={key,promise};
  const clear=()=>{if(chartLoadInFlight?.promise===promise)chartLoadInFlight=null;};
  promise.then(clear,clear);return promise;
@@ -639,6 +642,13 @@ async function loadChartRequest(symbol){
       const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
       put('#chartEmpty','טוען נתוני גרף…');$('#chartEmpty')?.classList.remove('hidden');
     }else $('#chartEmpty')?.classList.add('hidden');
+    const cached=typeof window!=='undefined'?window.LEVI_CHART_CACHE?.read(contextKey):null;
+    if(chartAnalysisContext!==contextKey&&cached){
+      chartCandles=cached.candles;chartDecisions=[];chartVisibleStartTime=cached.visibleStartTime;
+      chartAnalysisContext=contextKey;chartWyckoffHistory=[];chartWyckoffError=null;selectedWyckoffId=null;
+      drawCandles(chartCandles);$('#chartEmpty')?.classList.add('hidden');
+      put('#chartLegend','עותק גרף קודם מ־'+new Date(cached.savedAt).toLocaleString('he-IL')+' · ממתין לנתונים עדכניים');
+    }
     const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval)+'&range='+encodeURIComponent(range),{timeoutMs:35000});
     if(!Array.isArray(d.candles)||!d.candles.length)throw Error('לא התקבלו נרות למטבע ולטווח שנבחרו.');
     put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+('טווח '+({'1D':'יום','2D':'יומיים','3D':'3 ימים','4D':'4 ימים','5D':'5 ימים','1W':'שבוע'}[selectedRange]||selectedRange))+' · MA200');
@@ -650,6 +660,8 @@ async function loadChartRequest(symbol){
     }
     chartVisibleStartTime=Number(d.visibleStartTime)||0;
     chartCandles=d.candles||[];
+    chartLastReadKey=contextKey;chartLastReadAt=Date.now();
+    if(typeof window!=='undefined')window.LEVI_CHART_CACHE?.write(contextKey,d);
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
     // Price data is visible immediately; historical annotations may finish later.
     drawCandles(chartCandles);renderCandlePower(d.candleAnalysis);
@@ -866,15 +878,22 @@ async function load(){
   dashboardLoadInFlight=true;
   try{
     if(!dashboardLoaded)put('#status','מתחבר…');
-    const m=await J(MODE);
+    const modeRead=J(MODE);
+    const accountRead=modeRead.then(m=>m.mode==='live'?J(LIVEACC,{timeoutMs:35000}):null).catch(e=>({connected:false,error:e.message}));
+    const [m,agent]=await Promise.all([modeRead,J(AGENT)]);
     mode(m);
-    const agent=await J(AGENT);
     window.LEVI_AGENT_SNAPSHOT=agent;
     window.dispatchEvent(new CustomEvent('levi:binance-agent',{detail:agent}));
     if(m.mode==='live'){
-      let liveData;
-      try{liveData=await J(LIVEACC,{timeoutMs:35000});}
-      catch(e){liveData={connected:false,error:e.message};}
+      // First paint never waits for the slower signed account reader. Refreshes
+      // retain the verified scanner until that reader completes, avoiding flashes.
+      if(!dashboardLoaded){
+        render(agent,'live',null,{preserveScanner:false});
+        put('#status','LIVE · נתוני שוק נטענו · מאמת נתוני חשבון…');
+        put('#scanStatusMessage','נתוני שוק זמינים · ממתין לאימות הפוזיציות בחשבון');
+        put('#scannerFreshness','ממתין לנתוני חשבון מאומתים; נתוני השוק אינם אישור להחזקות.');
+      }
+      const liveData=await accountRead;
       const liveAccount=await loadLiveAccount(liveData);
       render(agent,'live',liveAccount,{preserveScanner:!liveAccount&&scannerVerifiedMode==='live'});
       if(liveAccount){scannerVerifiedMode='live';scannerVerifiedAt=Date.now();put('#scannerFreshness','');}

@@ -27,8 +27,8 @@ function loader(){
  vm.runInContext(src.slice(src.indexOf('let dashboardLoadInFlight='),src.indexOf('\nasync function authenticatedControl(')),context);
  return {context,renders,labels,setAccount:a=>{account=a;},failAgent:()=>{failAgent=true;},setMode:m=>{selectedMode=m;}};
 }
-test('successful live refresh renders once with verified account instead of a provisional unknown-color render',async()=>{
- const u=loader();await u.context.load();assert.equal(u.renders.length,1);assert.equal(u.renders[0].account.connected,true);assert.equal(u.renders[0].options.preserveScanner,false);
+test('first paint shows market data while later refreshes render verified account only',async()=>{
+ const u=loader();await u.context.load();assert.equal(u.renders.length,2);assert.equal(u.renders[0].account,null);assert.equal(u.renders[1].account.connected,true);assert.equal(u.renders[1].options.preserveScanner,false);await u.context.load();assert.equal(u.renders.length,3);
 });
 test('failed account refresh keeps prior scanner visible but clears trading account and explicitly labels stale data',async()=>{
  const u=loader();await u.context.load();u.setAccount(null);await u.context.load();assert.equal(u.renders.at(-1).options.preserveScanner,true);assert.equal(u.context.currentLiveAccount,null);assert.match(u.labels['#scannerFreshness'],/לא אומתו מחדש/);
