@@ -42,3 +42,14 @@ test('chart begins when mode is known even if the agent snapshot has not arrived
  vm.runInContext(source.slice(source.indexOf('let dashboardLoadInFlight='),source.indexOf('\nasync function authenticatedControl')),ctx);
  const task=ctx.load();await new Promise(setImmediate);assert.equal(chartCalls,1);resolveAgent({agents:[]});await task;
 });
+test('stalled or failed mode reader cannot suppress a valid agent snapshot with its own mode',async()=>{
+ const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
+ for(const stalled of [true,false]){
+  const rendered=[];let modeResolve;
+  const ctx=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{},activeView:'trade',MODE:'mode',AGENT:'agent',LIVEACC:'account',currentLiveAccount:null,console,
+   J:async(url,options)=>{assert.equal(options.timeoutMs,35000);if(url==='mode'){if(stalled)return new Promise(r=>modeResolve=r);throw Error('gateway timeout');}if(url==='agent')return {mode:'live',agents:[{symbol:'BTCUSDT'}]};return {connected:false};},
+   mode(){},render:(agent,mode)=>rendered.push(mode),put(){},loadLiveAccount:async()=>null,tradeExecutionTime:()=>'',loadActionJournal:async()=>{},$:()=>null});
+  vm.runInContext(source.slice(source.indexOf('let dashboardLoadInFlight='),source.indexOf('\nasync function authenticatedControl')),ctx);
+  await ctx.load();assert.equal(rendered[0],'live');assert.equal(rendered.length,2);if(modeResolve)modeResolve({mode:'demo'});
+ }
+});

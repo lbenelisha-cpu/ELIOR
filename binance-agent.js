@@ -878,13 +878,20 @@ async function load(){
   dashboardLoadInFlight=true;
   try{
     if(!dashboardLoaded)put('#status','מתחבר…');
-    const modeRead=J(MODE).then(m=>{
-      mode(m);
+    let receivedMode=null,agentMode=null,accountRead=null;
+    const applyMode=m=>{
+      if(!['live','demo'].includes(m?.mode))throw Error('מצב החשבון לא התקבל מהשרת');
+      if(agentMode&&agentMode!==m.mode)return null;
+      receivedMode=m;mode(m);
+      if(m.mode==='live'&&!accountRead)accountRead=J(LIVEACC,{timeoutMs:35000}).catch(e=>({connected:false,error:e.message}));
       if(!dashboardLoaded&&(activeView==='trade'||activeView==='scans')&&typeof loadChart==='function'&&typeof selectedSymbol==='string')loadChart(selectedSymbol);
       return m;
-    });
-    const accountRead=modeRead.then(m=>m.mode==='live'?J(LIVEACC,{timeoutMs:35000}):null).catch(e=>({connected:false,error:e.message}));
-    const [m,agent]=await Promise.all([modeRead,J(AGENT)]);
+    };
+    const modeRead=J(MODE,{timeoutMs:35000}).then(applyMode).catch(()=>null);
+    const agent=await J(AGENT,{timeoutMs:35000});
+    agentMode=['live','demo'].includes(agent.mode)?agent.mode:null;
+    const m=agentMode?(receivedMode?.mode===agentMode?receivedMode:applyMode({mode:agentMode,tradeControl:agent.tradeControl,demoTradingEnabled:agent.config?.demoTradingEnabled===true})):await modeRead;
+    if(!m)throw Error('לא ניתן לאמת את מצב החשבון');
     window.LEVI_AGENT_SNAPSHOT=agent;
     window.dispatchEvent(new CustomEvent('levi:binance-agent',{detail:agent}));
     if(m.mode==='live'){
