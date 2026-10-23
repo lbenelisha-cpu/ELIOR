@@ -878,10 +878,13 @@ async function load(){
   dashboardLoadInFlight=true;
   try{
     if(!dashboardLoaded)put('#status','מתחבר…');
-    const modeRead=J(MODE);
+    const modeRead=J(MODE).then(m=>{
+      mode(m);
+      if(!dashboardLoaded&&(activeView==='trade'||activeView==='scans')&&typeof loadChart==='function'&&typeof selectedSymbol==='string')loadChart(selectedSymbol);
+      return m;
+    });
     const accountRead=modeRead.then(m=>m.mode==='live'?J(LIVEACC,{timeoutMs:35000}):null).catch(e=>({connected:false,error:e.message}));
     const [m,agent]=await Promise.all([modeRead,J(AGENT)]);
-    mode(m);
     window.LEVI_AGENT_SNAPSHOT=agent;
     window.dispatchEvent(new CustomEvent('levi:binance-agent',{detail:agent}));
     if(m.mode==='live'){
