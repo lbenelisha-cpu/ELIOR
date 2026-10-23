@@ -44,7 +44,7 @@ test('Binance high captions use the upper edge, lows use the lower edge and arro
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.clientWidth=850;this.clientHeight=560;}append(x){this.children.push(x);}replaceChildren(){this.children=[];}setAttribute(k,v){this[k]=v;}}
  const root=new Element(),setup=Object.fromEntries(['initialPeak','firstLow','rallyHigh','secondaryTest','springLow','confirmation'].map((key,i)=>[key,{time:time+i*300000,price:100+i}]));
  const view=Array.from({length:6},(_,i)=>({openTime:time-1+i*300000,closeTime:time+299999+i*300000}));
- const scope=vm.createContext({Date,document:{querySelector:()=>root,createElement:()=>new Element()},currentAgentData:{agents:[]},selectedSymbol:'BTCUSDT',fmt:String});
+ const scope=vm.createContext({Date,document:{querySelector:()=>root,createElement:()=>new Element()},currentAgentData:{agents:[{symbol:'BTCUSDT',position:'CASH',strategy:{wyckoff:setup}}]},selectedSymbol:'BTCUSDT',fmt:String});
  vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),scope);
  scope.renderWyckoffPivots(view,[{at,analysisSignal:true,setup}],100,18,p=>300-p,4);
  const labels=root.children.filter(e=>e.className==='wyckoff-pivot'),arrows=root.children.filter(e=>e.className?.startsWith('wyckoff-arrow '));
