@@ -456,7 +456,10 @@ function decisionReasonLabel(r){
     WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',
     WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
-    WYCKOFF_MINIMUM_PROFIT_HOLD:'ממתין 7 ימים מהקנייה להפעלת הגנת הרווח · סטופ 10% פעיל',
+    FIXED_TP4_SL1_HOLD:'יעד רווח 4% · סטופ 1% ממחיר הקנייה',
+    FIXED_TAKE_PROFIT_4_PERCENT:'מכירה · יעד רווח 4%',
+    FIXED_STOP_LOSS_1_PERCENT:'מכירה · סטופ 1%',
+    WYCKOFF_MINIMUM_PROFIT_HOLD:'היסטוריה · המתנה להגנת רווח לפי הכלל הקודם',
     WAIT_WYCKOFF_ENTRY_PRICE:'ממתין למחיר חי מעל השפל הראשון ומתחת ליעד התבנית',
     WYCKOFF_SPRING_RETEST:'קנייה בחזרה ל־Spring לאחר אישור וויקוף',
     WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · ירידה של 10% ממחיר הקנייה',
@@ -755,7 +758,7 @@ setInterval(()=>{
 function drawCandles(candles){
   drawIndicators(candles);
   const canvas=$('#priceChart');
-  if(!canvas||!candles.length){chartWorkbench?.clear();return;}
+  if(!canvas||!candles.length){globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');chartWorkbench?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -783,6 +786,11 @@ function drawCandles(candles){
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
   const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
   const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
+  const walletQty=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol)?.qty;
+  const riskPosition=heldNow&&!selectedPosition.accountOnly?{...selectedPosition,qty:currentMode==='live'?walletQty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty}:null;
+  const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
+  globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
+  if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop);
   const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
   put('#positionEntryPrice',heldNow?priceText(selectedPosition.entryPrice):'—');
   put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
@@ -802,6 +810,7 @@ function drawCandles(candles){
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
   const body=Math.max(.5,Math.min(7,step*.55));
+  if(tradeRisk){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();const rx=left+cw*.72,rw=cw*.28;ctx.fillStyle='rgba(38,197,129,.14)';ctx.fillRect(rx,y(tradeRisk.target),rw,y(tradeRisk.entry)-y(tradeRisk.target));ctx.fillStyle='rgba(244,75,102,.16)';ctx.fillRect(rx,y(tradeRisk.entry),rw,y(tradeRisk.stop)-y(tradeRisk.entry));ctx.restore();}
 
   ctx.font='11px Arial';
   ctx.strokeStyle='rgba(120,145,170,.18)';
@@ -844,9 +853,10 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
+    {price:tradeRisk?.target,label:'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
-    {price:sellLevel?.price,label:'סף מכירה',color:'#ffbd59'}
+    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
   const labelRows=[];

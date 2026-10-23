@@ -9,7 +9,7 @@ const options={price:50,priceAsOf:now,now};
 test('partial Spring buys before close or reclaim, on both platforms',()=>{
  const s=liveSpringRsi(bars,options);assert.equal(s.buyConfirmed,true);assert.ok(s.entryRsi<=30);assert.equal(s.springLow.live,true);assert.ok(s.confirmation.time<base+step);assert.ok(s.price>s.confirmation.price);
  const ev=evaluateDailyTrade({symbol:'TESTUSDT',bars,...options,priceAsOf:new Date(now).toISOString(),timeframe:'5m',entryMode:'spring_rsi_live'});
- assert.equal(ev.rawDecision,'BUY');assert.equal(ev.wyckoffTrade.stopLossPct,10);assert.equal(ev.wyckoffTrade.minProfitHoldMs,7*86400000);assert.doesNotThrow(()=>assertSpringEntryReady(ev.wyckoffTrade,50,now));
+ assert.equal(ev.rawDecision,'BUY');assert.equal(ev.wyckoffTrade.stopLossPct,1);assert.equal(ev.wyckoffTrade.minProfitHoldMs,0);assert.doesNotThrow(()=>assertSpringEntryReady(ev.wyckoffTrade,50,now));
  assert.throws(()=>assertSpringEntryReady(ev.wyckoffTrade,100,now),/WAIT_RSI_0_30/);
  assert.equal(entrySignal(bars,now,base-step,[],options).ready,true);
 });
