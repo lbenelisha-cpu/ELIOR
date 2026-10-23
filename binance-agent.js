@@ -239,6 +239,7 @@ function selectScannerAsset(symbol,tr){
 }
 function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
   currentAgentData=d;
+  if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-binance-rsi',{detail:d.agents||[]}));
   const wx=d.wyckoffStats||{};
   put('#wyckoffBuys',wx.buys??0);
   put('#wyckoffSells',wx.sells??0);
@@ -1065,3 +1066,5 @@ window.LEVI_MANUAL_TRADES={
  },
  refresh:async()=>{await load();await loadChart(selectedSymbol);}
 };
+
+window.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!currentAgentData?.agents?.some(a=>a.symbol===symbol))return;selectScannerAsset(symbol,null);});

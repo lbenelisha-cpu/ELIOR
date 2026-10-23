@@ -26,6 +26,7 @@ function renderMonitor(){
 }
 async function refresh(){if(document.hidden||loading)return;loading=true;refreshButton.disabled=true;try{
  const r=await fetch('/.netlify/functions/colmex-auto-status',{cache:'no-store',signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error();
+ if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-colmex-rsi',{detail:d}));
  latest=d;received.textContent='מצב השרת נקרא במסך: '+time(Date.now());document.getElementById('autoMonitorHistory').replaceChildren();renderMonitor();
  badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt?' · '+d.halt:'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
  positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · כמות ${p.qty} · כניסה $${p.entryPrice} · שיא שנצפה $${p.peakPrice}`);

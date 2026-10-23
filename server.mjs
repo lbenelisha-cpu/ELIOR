@@ -1,3 +1,4 @@
+import {rsiSnapshot} from './lib/rsi-screener.mjs';
 import {createChartReader} from './lib/binance-chart-reader.mjs';
 import {observeLiveCandle} from './lib/wyckoff-spring-rsi.mjs';
 import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
@@ -1341,6 +1342,8 @@ async function evaluateSymbol(s){
     const livePrice=requireLivePrice(streams[s]);
     const ev=evaluateDailyTrade({symbol:s,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
+    const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
+    ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});
     if(p){
       if(mode==='live')persistLivePeak(s,p);
       else if(DEMO_TRADING)demoTrader.save();
@@ -1400,6 +1403,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     position:tradingPositions()[ev.symbol]?'LONG':'CASH',
     decision,
     strategy:ev.strategy,
+    screenRsi:ev.screenRsi||null,
     score:ev.score,
     buyQualified:ev.buyQualified,
     buyReason:ev.buyReason,
@@ -2327,6 +2331,7 @@ const server=http.createServer((req,res)=>{
         entryConfirmation:'LIVE_SPRING_RSI_0_30',
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
+        rsiScreenerVersion:1,
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
