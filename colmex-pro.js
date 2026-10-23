@@ -144,3 +144,5 @@ loadNextWatchQuote();
 if(PAPER_MODE){paperUI=await import('./colmex-simulation-ui.js?v=20261017-occurrences');paperUI.initSimulation({onSelect:symbol=>{if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(true);},onUpdate:()=>{if(!workbench.busy)renderChart();}});}
 
 startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});
+
+globalThis.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!validSymbol(symbol))return;if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(false);});

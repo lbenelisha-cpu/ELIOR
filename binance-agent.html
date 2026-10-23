@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="/binance-agent.css?v=20261021-edge-axis">
-<link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"></head>
+<link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter"></head>
 <body>
   <main class="app-shell">
     <header class="topbar">
@@ -136,6 +136,7 @@
 
         <div id="scanStatusMessage" class="scan-status"></div>
         <div id="scannerFreshness" class="scanner-freshness" role="status"></div>
+      <div id="binanceRsiScreener"></div>
       <div id="strategyDiagnostics" class="scan-diagnostics">אבחון BUY נטען…</div>
 
         <div class="scanner-list">
@@ -384,12 +385,12 @@
   <script src="/binance-control-session.js?v=20261019-device-access"></script>
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
-  <script src="/binance-agent.js?v=20261023-bootstrap-recovery"></script>
+  <script src="/binance-agent.js?v=20261023-rsi-filter"></script>
   <script src="/binance-device-access.js?v=20261019-device-access"></script>
   <script src="/binance-manual-trades.js?v=20261019-device-access"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261022-credit-saving"></script>
 <script src="/binance-market-watch.js?v=20261017-history"></script>
 <script src="/binance-kelly.js?v=20261017-history"></script>
-</body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script></body>
 </html>
