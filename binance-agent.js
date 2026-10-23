@@ -174,6 +174,7 @@ function mode(s){
 function buyReasonLabel(r){
   if(['WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','HOURLY_TREND_CONFIRMED'].includes(r))return decisionReasonLabel(r);
   return ({
+    EXTERNAL_HOLDING:'החזקה מהחשבון · ללא ניהול אוטומטי מתועד',
     QUALIFIED:'מתאים לקנייה',
     NOT_UP:'לא בגל עולה',
     BELOW_MA200:'מתחת ל־MA200',
@@ -220,9 +221,20 @@ function renderMarketStrip(agents){
 }
 
 function activeContext(d,currentMode,liveAccount){
-  const p=d.paper||{},agents=d.agents||[];
+  const p=d.paper||{},agents=[...(d.agents||[])];
   const isLive=currentMode==='live';
   const liveBalances=(liveAccount?.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5);
+  if(isLive&&liveAccount?.connected){
+    const existing=new Set(agents.map(a=>a.symbol));
+    for(const balance of liveBalances){
+      const symbol=balance.asset+'USDT';
+      if(!/^[A-Z0-9]+USDT$/.test(symbol)||existing.has(symbol))continue;
+      agents.push({symbol,position:'LONG',decision:'HOLD',score:0,accountOnly:true,
+        entryConfirmed:false,entryEligible:false,buyQualified:false,buyReason:'EXTERNAL_HOLDING',
+        strategy:{price:Number(balance.usdtPrice)||null}});
+      existing.add(symbol);
+    }
+  }
   const liveHeldSymbols=new Set(liveBalances.map(x=>x.asset+'USDT'));
   const isHeld=a=>isLive&&liveAccount?liveHeldSymbols.has(a.symbol):a.position==='LONG';
   const activeAgents=agents.filter(isHeld);
@@ -238,6 +250,7 @@ function selectScannerAsset(symbol,tr){
   updateSelectedAsset(currentAgentData,currentMode,currentLiveAccount);
 }
 function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
+  d={...d,agents:activeContext(d,currentMode,liveAccount).agents};
   currentAgentData=d;
   if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-binance-rsi',{detail:d.agents||[]}));
   const wx=d.wyckoffStats||{};
@@ -329,7 +342,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return {symbol:a.symbol,className:rowClasses,cells:[
-      {html:`<b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
+      {html:`<b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
       {html:fmt(s.price,Math.abs(Number(s.price))<10?8:4)},
       {className:held?pnl.className:'',html:held?pnl.text:'—'},
       {className:'decision '+String(dec).toLowerCase().replaceAll(' ','-'),html:decisionLabel(dec)}
@@ -387,7 +400,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',d.config?.hourlyTrendFilter?.enabled?'וואיקוף 5 דקות · אישור מגמת שעה · '+buyReasonLabel(a.buyReason):(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות קנייה אינה זמינה ביומן האפליקציה':d.config?.hourlyTrendFilter?.enabled?'וואיקוף 5 דקות · אישור מגמת שעה · '+buyReasonLabel(a.buyReason):(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
