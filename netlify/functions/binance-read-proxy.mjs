@@ -1,6 +1,6 @@
 const UPSTREAM='https://levi-binance.2-29-48-20.sslip.io';
 const READ_PATHS=new Set(['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account']);
-export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account'].includes(path)?25000:10000;
+export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account','/api/binance-mode','/api/binance-agent'].includes(path)?25000:10000;
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 export function readTarget(path){
  if(typeof path!=='string'||path.length>2048||!path.startsWith('/api/'))throw Error('INVALID_PATH');
