@@ -49,7 +49,7 @@ let manualTradeCapabilities=null;
 let chartWyckoffHistory=[],chartWyckoffError=null,selectedWyckoffId=null;
 const wyckoffHistoryCache=new Map();
 let wyckoffHistoryEngine=null;
-function decisionLabel(d){return ({ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_CASH:'ממתין למזומן',WAIT_ACCOUNT:'ממתין לנתוני חשבון',WAIT_ALLOCATION:'ממתין להקצאה',WAIT_LIVE_GATE:'מסחר אינו זמין',WAIT_EXECUTION_ERROR:'שגיאת ביצוע',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
+function decisionLabel(d){return ({ACCOUNT_HOLDING:'מוחזק בחשבון',ACTIVE_LONG:'פוזיציה פעילה',HOLD:'ממתין',BUY:'קנייה',SELL:'מכירה',BUY_READY:'מוכן לקנייה','BUY READY':'מוכן לקנייה',WAIT_NO_SLOT:'אין מקום פנוי','WAIT · NO SLOT':'אין מקום פנוי',WAIT_CASH:'ממתין למזומן',WAIT_ACCOUNT:'ממתין לנתוני חשבון',WAIT_ALLOCATION:'ממתין להקצאה',WAIT_LIVE_GATE:'מסחר אינו זמין',WAIT_EXECUTION_ERROR:'שגיאת ביצוע',WAIT_NO_ROTATION:'ממתין להחלפה','ROTATE READY':'מוכן להחלפה',ROTATE_IN:'נרכש בהחלפה',ROTATE_OUT:'נמכר בהחלפה'})[d]||d||'—';}
 
 function commissionsText(fees){
   if(!Array.isArray(fees))return 'לא תועדו';
@@ -208,7 +208,7 @@ function liveEntryStatus(a,account,maxPositions){
 function decisionFor(a,isHeld,activeCount,maxPositions,weakestActive,rotationGap,isLive,liveAccount=null){
   const s=a.strategy||{};
   if(!isLive)return a.decision==='WAIT_NO_SLOT'?'WAIT · NO SLOT':a.decision;
-  if(isHeld)return s.sellConfirmed?'SELL':'HOLD';
+  if(isHeld)return a.accountOnly?'ACCOUNT_HOLDING':s.sellConfirmed?'SELL':'HOLD';
   return liveEntryStatus(a,liveAccount,maxPositions).decision;
 }
 
@@ -400,7 +400,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות קנייה אינה זמינה ביומן האפליקציה':d.config?.hourlyTrendFilter?.enabled?'וואיקוף 5 דקות · אישור מגמת שעה · '+buyReasonLabel(a.buyReason):(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':d.config?.hourlyTrendFilter?.enabled?'וואיקוף 5 דקות · אישור מגמת שעה · '+buyReasonLabel(a.buyReason):(Number(s.ma)>0&&Number.isFinite(Number(s.ma))?(s.aboveMA?'מעל ממוצע 200':'מתחת לממוצע 200'):'ממוצע 200 לא זמין')+' · '+({UP:'גל עולה',DOWN:'גל יורד'}[s.direction]||'—')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
