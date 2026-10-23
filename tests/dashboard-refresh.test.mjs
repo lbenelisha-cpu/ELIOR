@@ -35,3 +35,10 @@ test('LIVE market first paint proceeds while the signed account is pending, then
  rejectAccount(Error('LIVE_REALIZED_FEE_VALUATION_REQUIRED'));await load;
  assert.equal(rendered.length,2);assert.equal(rendered[0].agent.agents[0].symbol,'BTCUSDT');assert.ok(labels.some(x=>x.includes('נתוני שוק זמינים')));assert.ok(!labels.includes('שרת לא זמין'));
 });
+test('chart begins when mode is known even if the agent snapshot has not arrived',async()=>{
+ const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');let resolveAgent,chartCalls=0;const agent=new Promise(r=>resolveAgent=r);
+ const ctx=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{},activeView:'trade',selectedSymbol:'BTCUSDT',MODE:'mode',AGENT:'agent',LIVEACC:'account',currentLiveAccount:null,console,
+ J:async url=>url==='mode'?{mode:'demo'}:agent,mode(){},loadChart:()=>{chartCalls++;},render(){},put(){},loadActionJournal:async()=>{},$:()=>null});
+ vm.runInContext(source.slice(source.indexOf('let dashboardLoadInFlight='),source.indexOf('\nasync function authenticatedControl')),ctx);
+ const task=ctx.load();await new Promise(setImmediate);assert.equal(chartCalls,1);resolveAgent({agents:[]});await task;
+});

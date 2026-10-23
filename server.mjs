@@ -1,3 +1,4 @@
+import {createChartReader} from './lib/binance-chart-reader.mjs';
 import {observeLiveCandle} from './lib/wyckoff-spring-rsi.mjs';
 import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
 import {HOURLY_TREND_RULE} from './lib/binance-hourly-trend.mjs';
@@ -652,6 +653,7 @@ function floorToStep(value,step){
 }
 
 async function recordLiveFill(order,intent){
+ lastDisplayAccount=null;
  const fills=order.fills||await signedBinanceGet('/api/v3/myTrades',{symbol:intent.params.symbol,orderId:String(order.orderId)});
  pushLiveAction(liveFillAction(order,intent,fills));
 }
@@ -835,7 +837,15 @@ async function executeLiveCycle(evals){
   }
 }
 
+let lastDisplayAccount=null,displayAccountPending=null;
+async function getDisplayAccountSnapshot(){
+  if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)>=0&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<10000)return lastDisplayAccount;
+  if(displayAccountPending)return displayAccountPending;
+  const pending=getLiveAccountSnapshot();displayAccountPending=pending;
+  try{return await pending;}finally{if(displayAccountPending===pending)displayAccountPending=null;}
+}
 async function getLiveAccountSnapshot(){
+  const observedAt=Date.now();
   const [acct,prices,restrictions] = await Promise.all([
     signedBinanceGet('/api/v3/account',{omitZeroBalances:'true'}),
     j('/api/v3/ticker/price'),
@@ -873,7 +883,7 @@ async function getLiveAccountSnapshot(){
   const totalValueUsdt=balances.reduce((sum,x)=>sum+(Number.isFinite(x.valueUsdt)?x.valueUsdt:0),0);
   const fixedAllocation=fixedLiveAllocation(totalValueUsdt);
 
-  return {
+  const snapshot={
     connected:true,
     canTrade:Boolean(acct.canTrade),
     canWithdraw:Boolean(acct.canWithdraw),
@@ -898,8 +908,9 @@ async function getLiveAccountSnapshot(){
     takerCommission:acct.takerCommission,
     apiRestrictions:restrictions,
     tradingGate:liveTradingGate(restrictions),
-    updatedAt:new Date().toISOString()
+    updatedAt:new Date(observedAt).toISOString()
   };
+  lastDisplayAccount=snapshot;return snapshot;
 }
 
 function isEligibleSymbol(x){
@@ -2045,6 +2056,7 @@ const send=(res,o,c=200)=>{
   res.end(JSON.stringify(o));
 };
 
+const displayChartReader=createChartReader(j);
 const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
@@ -2190,7 +2202,7 @@ const server=http.createServer((req,res)=>{
     if(!KEYS_CONFIGURED){
       return send(res,{connected:false,error:'Binance API keys are not configured'},503);
     }
-    getLiveAccountSnapshot()
+    getDisplayAccountSnapshot()
       .then(account=>send(res,{connected:true,account}))
       .catch(e=>send(res,{connected:false,error:e.message},502));
     return;
@@ -2245,34 +2257,11 @@ const server=http.createServer((req,res)=>{
     if(!allowedRanges.has(range))return send(res,{ok:false,error:'Invalid range'},400);
 
     const now=Date.now();
-    const {visibleStartTime,fetchStartTime,sourceInterval}=chartWindow(interval,range,now);
+    const {visibleStartTime}=chartWindow(interval,range,now);
     const startTime=visibleStartTime;
 
     (async()=>{
-      const rows=[];
-      let cursor=fetchStartTime;
-      let pages=0;
-
-      while(cursor<now && pages<15){
-        const batch=await j('/api/v3/klines?symbol='+encodeURIComponent(symbol)
-          +'&interval='+encodeURIComponent(sourceInterval)
-          +'&limit=1000&startTime='+cursor+'&endTime='+now);
-
-        if(!Array.isArray(batch)||!batch.length)break;
-        rows.push(...batch);
-
-        const next=Number(batch.at(-1)?.[6]||0)+1;
-        if(!Number.isFinite(next)||next<=cursor)break;
-        cursor=next;
-        pages++;
-        if(batch.length<1000)break;
-      }
-
-      let candles=rows.map(x=>({
-        openTime:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closeTime:+x[6],closed:+x[6]<now
-      }));
-
-      if(interval==='5h')candles=aggregateFiveHourCandles(candles);
+      const {candles}=await displayChartReader.read(symbol,interval,range);
       const decisions=(decisionHistory[symbol]||[]).filter(x=>Date.parse(x.at)>=startTime&&x.mode===mode);
       const actions=(mode==='live'?liveActionLog:DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).filter(x=>x.symbol===symbol&&Date.parse(x.at)>=startTime);
       send(res,{ok:true,symbol,interval,range,visibleStartTime,candles,decisions,actions,decisionMode:mode,candleAnalysis:analyzeCandlePower(candles,10)});
@@ -2337,6 +2326,7 @@ const server=http.createServer((req,res)=>{
         entryPolicyVersion:ENTRY_POLICY_VERSION,
         entryMode:'spring_rsi_live',
         entryConfirmation:'LIVE_SPRING_RSI_0_30',
+        readPerformanceVersion:1,
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
