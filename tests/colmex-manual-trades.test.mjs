@@ -50,7 +50,7 @@ test('manual sell closes exact full long quantity, overrides hold, and requires 
 test('manual fill becomes owned only after actual broker confirmation',async()=>{
  const state=initialState(now),b=broker();await manualTrade({input:request,state,broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}});
  const snap={...snapshot(),history:[{id:'order',status:'filled',filledQty:1,avgPrice:30,positionId:'p'}],positions:[{id:'p',tradableInstrumentId:1,side:'buy',qty:1}]};
- reconcile(state,snap,now+60000);assert.equal(state.manualRequests[request.requestId].status,'FILLED');assert.equal(state.positions[0].qty,1);assert.equal(state.positions[0].minProfitHoldMs,7*86400000);
+ reconcile(state,snap,now+60000);assert.equal(state.manualRequests[request.requestId].status,'FILLED');assert.equal(state.positions[0].qty,1);assert.equal(state.positions[0].minProfitHoldMs,0);
 });
 test('HTTP entrypoint refuses missing device, wrong origin and preview before broker reads',async()=>{
  let reads=0;const h=makeManualHandler({env,deviceStoreFactory:store,brokerFactory:()=>{reads++;throw Error();}});

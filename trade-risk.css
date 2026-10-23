@@ -1,0 +1,4 @@
+.trade-risk-table{position:absolute;z-index:4;top:32px;left:20px;max-width:calc(100% - 40px);background:#081522ed;border:1px solid #3c5874;border-radius:7px;padding:5px 8px;direction:rtl;font:11px Arial,sans-serif;pointer-events:none;box-sizing:border-box;color:#e7f0fa}
+.trade-risk-table[hidden]{display:none}.trade-risk-table table{width:100%;border-collapse:collapse;white-space:nowrap}.trade-risk-table caption{font-size:10px;text-align:right;color:#bed0e0;padding:0 0 3px}.trade-risk-table td{padding:2px 6px;text-align:right;border:0;background:transparent}.trade-risk-table .profit{color:#64e1ae}.trade-risk-table .loss{color:#ff8494}.trade-risk-table small{display:block;font-size:9px;color:#afc0d3;padding-top:3px}
+#chart{position:relative}
+@media(max-width:480px){.trade-risk-table{left:8px;max-width:calc(100% - 16px);font-size:10px;padding:3px 5px}.trade-risk-table td{padding:2px 4px}}
