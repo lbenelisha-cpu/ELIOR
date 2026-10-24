@@ -78,3 +78,14 @@ test('temporary price outages retain display pivots only; valid resets and modes
  ctx.rememberWyckoffDisplay([{...agent,strategy:null}],'live');
  assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live'),null);
 });
+
+test('first render during an outage uses the retained server setup without making it fresh',()=>{
+ const setup={phase:'RALLY_HIGH',initialPeak:{price:.1885,time},firstLow:{price:.1839,time}};
+ const agent={symbol:'ENA_STARTUSDT',decision:'WAIT_DATA',execution:'ERROR',staleData:true,strategy:{wyckoff:setup},buyQualified:false};
+ ctx.rememberWyckoffDisplay([agent],'live');
+ assert.equal(ctx.displayedWyckoffSetup(agent.symbol,'live').setup,setup);
+ assert.equal(ctx.displayedWyckoffSetup(agent.symbol,'live').stale,true);
+ assert.equal(agent.buyQualified,false);
+ ctx.rememberWyckoffDisplay([{...agent,decision:'HOLD',execution:'IDLE',staleData:false,strategy:{wyckoff:{phase:'SEARCH_PEAK'}}}],'live');
+ assert.equal(ctx.displayedWyckoffSetup(agent.symbol,'live').setup.initialPeak,undefined);
+});
