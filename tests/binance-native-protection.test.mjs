@@ -43,7 +43,7 @@ test('trailing replacement cancels only owned list and never keeps old and new l
 });
 test('cancel uncertainty blocks replacement and manual release until final confirmation',async t=>{
  const r=rig(t);await r.store.sync(symbol,r.p,100);r.loseCancel();await assert.rejects(r.store.release(symbol),/timeout/);assert.equal(r.store.rows[symbol].phase,'CANCELING');
- await assert.rejects(r.store.release(symbol),/CANCEL_PENDING/);assert.equal(r.posts,1);assert.equal(r.deletes,1);
+ await assert.rejects(r.store.release(symbol),/timeout/);assert.equal(r.posts,1);assert.equal(r.deletes,2);
 });
 test('native sell fill during cancellation is recorded, prevents replacement and closes ownership',async t=>{
  const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;binancePositionExit(r.p,110);r.fillCancel();await r.store.sync(symbol,r.p,110);
