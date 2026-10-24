@@ -93,7 +93,8 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const root=document.querySelector('#wyckoffPivots');if(!root)return;root.replaceChildren();
  const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
  const tradeSetup=agent?.position==='LONG'?agent.strategy?.setup:null;
- const chosen=typeof chartWyckoffHistory!=='undefined'?chartWyckoffHistory.find(x=>x.id===selectedWyckoffId):null;
+ const latest=typeof chartWyckoffHistory!=='undefined'&&typeof wyckoffHistoryEngine!=='undefined'?wyckoffHistoryEngine?.visibleBinanceOccurrences(chartWyckoffHistory,view).at(-1):null;
+ const chosen=latest&&latest.id===selectedWyckoffId?latest:null;
  const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:agent?.strategy?.wyckoff);if(!setup)return;
  const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&(!chosen||(setup.initialPeak?.time===tradeSetup.initialPeak?.time&&setup.secondaryTest?.time===tradeSetup.secondaryTest?.time));
  root.dataset.active=String(active);
@@ -104,6 +105,13 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
  const colors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
+ const plotRight=left+step*view.length,gap=10,captionRows={top:{x:left,y:66},bottom:{x:left,y:height-27}};
+ const risk=document.querySelector('#binanceTradeRisk');
+ const rootBox=root.getBoundingClientRect?.(),riskBox=risk&&!risk.hidden?risk.getBoundingClientRect?.():null;
+ if(rootBox&&riskBox&&riskBox.bottom>rootBox.top+48){
+  if(plotRight-(riskBox.right-rootBox.left)-gap>=220)captionRows.top.x=Math.max(left,riskBox.right-rootBox.left+gap);
+  else captionRows.top.y=Math.max(66,riskBox.bottom-rootBox.top+20);
+ }
  for(const [key,label] of points){
   const p=setup[key];if(!p||!(Number(p.price)>0))continue;
   const stamp=Number(p.time)-(key==='confirmation'&&p.live?0:1);const index=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(index<0)continue;
@@ -111,11 +119,11 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   button.style.setProperty('--pivot-color',colors[key]);button.dataset.pivot=key;
   const anchorX=left+step*(index+.5),anchorY=y(Number(p.price));
   const above=['initialPeak','rallyHigh'].includes(key);
-  const edgePoints=points.filter(([kind])=>['initialPeak','rallyHigh'].includes(kind)===above),slot=edgePoints.findIndex(([kind])=>kind===key);
-  const plotRight=left+step*view.length,labelWidth=Math.max(30,(plotRight-left)/edgePoints.length-6);
-  const labelX=left+(plotRight-left)*(slot+.5)/edgePoints.length;
-  const labelY=above?66:height-27;
-  button.style.width=labelWidth+'px';
+  button.textContent=label;button.style.width='max-content';button.style.maxWidth=Math.max(30,plotRight-left)+'px';root.append(button);
+  const labelWidth=Math.min(Math.max(30,plotRight-left),button.getBoundingClientRect?.().width||label.length*7+20);
+  const row=above?captionRows.top:captionRows.bottom;
+  if(row.x+labelWidth>plotRight&&row.x>left){row.x=left;row.y+=above?34:-34;}
+  const labelX=row.x+labelWidth/2,labelY=row.y;row.x+=labelWidth+gap;
   const arrow=document.createElement('span');arrow.className='wyckoff-arrow '+(above?'points-down':'points-up');arrow.style.setProperty('--pivot-color',colors[key]);arrow.style.left=anchorX+'px';arrow.style.top=anchorY+'px';root.append(arrow);
   const connector=document.createElement('span');connector.className='wyckoff-connector';
   connector.style.setProperty('--pivot-color',colors[key]);
@@ -125,16 +133,16 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   connector.style.transform='rotate('+Math.atan2(boxY-lineY,labelX-anchorX)+'rad)';root.append(connector);
   button.style.left=labelX+'px';button.style.top=labelY+'px';
   button.textContent=label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
-  button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};root.append(button);
+  button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};
  }
 }
 
 function renderNumberedWyckoff(view,step,left,y,digits){
  const overlay=document.querySelector('#wyckoffOccurrences'),list=document.querySelector('#wyckoffOccurrenceList'),summary=document.querySelector('#wyckoffOccurrenceSummary');
  if(!overlay||!list||!summary||!wyckoffHistoryEngine)return;
- const items=wyckoffHistoryEngine.visibleBinanceOccurrences(chartWyckoffHistory,view);
+ const items=wyckoffHistoryEngine.visibleBinanceOccurrences(chartWyckoffHistory,view).slice(-1);
  overlay.replaceChildren();
- summary.textContent='תבניות וואיקוף בטווח: '+items.length+' · ניתוח נרות 5 דקות, גם בזמן פוזיציה פעילה'+(chartWyckoffError?' · שחזור חלקי: '+chartWyckoffError:'');
+ summary.textContent=(items.length?'מוצגת תבנית וואיקוף האחרונה בלבד':'אין תבנית וואיקוף בטווח')+' · ניתוח נרות 5 דקות, גם בזמן פוזיציה פעילה'+(chartWyckoffError?' · שחזור חלקי: '+chartWyckoffError:'');
  const detail=item=>{
   selectedWyckoffId=item.id;drawCandles(chartCandles);
   const panel=document.querySelector('#chartDecisionDetails');if(!panel)return;
@@ -146,9 +154,16 @@ function renderNumberedWyckoff(view,step,left,y,digits){
  const lanes=[];
  for(const item of items){
   const x=left+step*(item.index+.5);let lane=lanes.findIndex(last=>x-last>=28);if(lane<0)lane=lanes.length;lanes[lane]=x;
-  const b=document.createElement('button');b.type='button';b.className='wyckoff-occurrence';b.textContent=item.number;b.style.left=x+'px';b.style.top=(94+lane*25)+'px';
+  let flagY=94+lane*25;
+  const origin=overlay.getBoundingClientRect?.();
+  if(origin){
+   const risk=document.querySelector('#binanceTradeRisk');
+   const obstacles=[...(document.querySelectorAll?.('.wyckoff-pivot')||[]),...(risk&&!risk.hidden?[risk]:[])].map(e=>e.getBoundingClientRect?.()).filter(Boolean);
+   for(let pass=0;pass<obstacles.length+1;pass++)for(const box of obstacles)if(x+12>box.left-origin.left&&x-12<box.right-origin.left&&flagY+23>box.top-origin.top&&flagY<box.bottom-origin.top)flagY=box.bottom-origin.top+8;
+  }
+  const b=document.createElement('button');b.type='button';b.className='wyckoff-occurrence';b.textContent=item.number;b.style.left=x+'px';b.style.top=flagY+'px';
   b.title='תבנית '+item.number+' · Spring · '+new Date(item.springAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});b.setAttribute('aria-label',b.title);b.onclick=()=>detail(item);overlay.append(b);
-  const line=document.createElement('span');line.className='wyckoff-occurrence-line';const yy=y(Number(item.setup.springLow.price)),yy0=117+lane*25;line.style.left=x+'px';line.style.top=Math.min(yy,yy0)+'px';line.style.height=Math.abs(yy-yy0)+'px';overlay.append(line);
+  const line=document.createElement('span');line.className='wyckoff-occurrence-line';const yy=y(Number(item.setup.springLow.price)),yy0=flagY+23;line.style.left=x+'px';line.style.top=Math.min(yy,yy0)+'px';line.style.height=Math.abs(yy-yy0)+'px';overlay.append(line);
  }
  const key=selectedSymbol+':'+selectedInterval+':'+items.map(x=>x.id+':'+x.springAt+':'+x.confirmedAt).join('|');
  if(list.dataset.key!==key){list.dataset.key=key;list.replaceChildren();for(const item of items){const b=document.createElement('button');b.type='button';b.className='analysis-marker signal';b.textContent='וואיקוף '+item.number+' · '+new Date(item.springAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});b.onclick=()=>detail(item);list.append(b);}}
