@@ -1,3 +1,4 @@
+import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
 const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
 import {rsiSnapshot} from './lib/rsi-screener.mjs';
@@ -280,6 +281,7 @@ const tradingPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
   for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p);
+  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,stopPrice:r.stop,takeProfitPrice:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
  }
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
@@ -332,6 +334,14 @@ function loadPaperState(){
 
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
+const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
+ get:signedBinanceGet,post:signedBinancePost,del:signedBinanceDelete,info:symbolExchangeInfo,
+ position:symbol=>tradingPositions()[symbol],
+ price:symbol=>requireLivePrice(streams[symbol],Date.now(),15000),
+ persistFloor:(symbol,p)=>persistLivePeak(symbol,p),
+ free:async symbol=>Number((await getLiveAccountSnapshot()).balances.find(b=>b.asset===symbol.slice(0,-4))?.free||0),
+ onFill:recordLiveFill
+});
 const manualRequests=new ManualTradeRequests(LIVE_LOG_FILE+'.manual');
 const DECISION_HISTORY_FILE=process.env.BINANCE_DECISION_HISTORY_FILE||'/var/data/binance-decision-history.json';
 let decisionHistory={};
@@ -591,12 +601,13 @@ async function signedBinanceGet(pathname,params={}){
 
   const body=await r.json().catch(()=>({}));
   if(!r.ok){
-    throw Error(body?.msg||('Binance '+r.status));
+    const e=Error(body?.msg||('Binance '+r.status));e.status=r.status;e.code=body?.code??null;throw e;
   }
   return body;
 }
 
-async function signedBinancePost(pathname,params={}){
+async function signedBinanceDelete(pathname,params={}){return signedBinancePost(pathname,params,'DELETE');}
+async function signedBinancePost(pathname,params={},method='POST'){
   if(!KEYS_CONFIGURED)throw Error('Binance API keys are not configured');
 
   const timestamp=await binanceServerTime();
@@ -611,7 +622,7 @@ async function signedBinancePost(pathname,params={}){
 
   const url='https://api.binance.com'+pathname+'?'+query.toString()+'&signature='+signature;
   const r=await fetch(url,{
-    method:'POST',
+    method,
     headers:{'X-MBX-APIKEY':BINANCE_API_KEY},
     cache:'no-store',
     signal:AbortSignal.timeout(15000)
@@ -664,6 +675,8 @@ async function recordLiveFill(order,intent){
  pushLiveAction(liveFillAction(order,intent,fills));
 }
 async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
+  if(nativeProtection.uncertain())throw Error('NATIVE_PROTECTION_PENDING_RECONCILIATION');
+  if(nativeProtection.rows[symbol]){if(tradingPositions()[symbol])throw Error('LIVE position is already held');await nativeProtection.release(symbol);}
   const restrictions=await getApiRestrictions();
   const gate=liveTradingGate(restrictions);
   if(!gate.ready)throw Error('LIVE trading gate is not enabled');
@@ -673,6 +686,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   if(!info||info.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false){
     throw Error('LIVE symbol is not available for Spot trading: '+symbol);
   }
+  if(info.ocoAllowed!==true||!info.orderTypes?.includes('TAKE_PROFIT')||!info.orderTypes?.includes('STOP_LOSS'))throw Error('NATIVE_PROTECTION_NOT_SUPPORTED');
   if(info.quoteOrderQtyMarketAllowed===false){
     throw Error('LIVE quoteOrderQty market buy is not supported: '+symbol);
   }
@@ -709,6 +723,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     throw e;
   }
 
+  if(quoteUsdt*.988<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
   const precision=Math.min(8,Number(info.quoteAssetPrecision??8));
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
@@ -724,7 +739,10 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000));
   }
 
-  return liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  try{await nativeProtection.sync(symbol,tradingPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
+  catch(error){console.error('LIVE native protection pending',symbol,error.message);order.protectionWarning=error.message;}
+  return order;
 }
 
 async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
@@ -733,6 +751,9 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
   if(!gate.ready)throw Error('LIVE trading gate is not enabled');
   if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for this API key');
 
+  const managedBefore=tradingPositions()[symbol];
+  await nativeProtection.release(symbol); // Confirm both children final before unlocking/selling.
+  if(managedBefore&&!tradingPositions()[symbol])return {status:'CLOSED_AT_BROKER',symbol};
   const base=symbol.endsWith('USDT')?symbol.slice(0,-4):symbol;
   const acct=await getLiveAccountSnapshot();
   const bal=acct.balances.find(x=>x.asset===base);
@@ -830,6 +851,7 @@ async function executeLiveCycle(evals){
     if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
   }
   if(tradeControl.paused)return;
+  if(Object.entries(tradingPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
   for(const ev of evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade)){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
@@ -1954,6 +1976,20 @@ setInterval(async()=>{
     }
   }
   }finally{exitMonitorInFlight=false;}
+},1000).unref();
+let nativeProtectionCursor=0;
+setInterval(()=>{
+ if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
+ liveExecution.automatic(async()=>{
+  if(liveOrders.pending)return; // Recover market execution before any bracket work.
+  const symbols=[...new Set([...Object.keys(nativeProtection.rows),...Object.keys(tradingPositions())])];
+  if(!symbols.length)return;
+  const symbol=symbols[nativeProtectionCursor++%symbols.length],p=tradingPositions()[symbol];
+  const gate=liveTradingGate(await getApiRestrictions());
+  if(!gate.ready||gate.withdrawalsEnabled)return;
+  let price=null;try{price=requireLivePrice(streams[symbol],Date.now(),15000);}catch{}
+  await nativeProtection.sync(symbol,p,price);
+ }).catch(error=>console.error('LIVE native protection failed',error.message));
 },1000).unref();
 setInterval(refreshUniverse,300000).unref();
 

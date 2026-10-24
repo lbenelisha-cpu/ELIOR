@@ -5,7 +5,7 @@ cd /opt/levi-binance
 stage=$(mktemp -d /tmp/levi-trailing-profit.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/lib"
-files=(server.mjs lib/fixed-trade-exit.mjs lib/trailing-profit-exit.mjs lib/binance-position-exit.mjs lib/wyckoff-evaluation.mjs lib/wyckoff-live-positions.mjs lib/binance-manual-trades.mjs lib/binance-demo-trader.mjs binance-agent.html binance-agent.js binance-agent.css binance-chart-decisions.js trade-risk.js trade-risk.css)
+files=(server.mjs lib/binance-native-protection.mjs lib/fixed-trade-exit.mjs lib/trailing-profit-exit.mjs lib/binance-position-exit.mjs lib/wyckoff-evaluation.mjs lib/wyckoff-live-positions.mjs lib/binance-manual-trades.mjs lib/binance-demo-trader.mjs binance-agent.html binance-agent.js binance-agent.css binance-chart-decisions.js trade-risk.js trade-risk.css)
 existing=()
 for file in "${files[@]}"; do
   git show "$revision:$file" > "$stage/$file"
@@ -24,5 +24,5 @@ rollback() {
 systemctl restart levi-binance || rollback
 sleep 2
 systemctl is-active --quiet levi-binance || rollback
-echo "Trailing profit installed: SL -1%, activate at +4%, floor +4%, peak minus one percentage point. Applies to existing managed positions too. Backup: $backup"
+echo "Native TP +50% and trailing profit installed: SL -1%, activate at +4%, floor +4%, peak minus one percentage point. Applies to existing managed positions too. Backup: $backup"
 echo "Installer submitted no order. Running trading service may immediately close positions already beyond thresholds."

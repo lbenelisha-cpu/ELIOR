@@ -43,9 +43,9 @@ test('Colmex updates both broker thresholds and reconciles both before new work'
  const p={id:'p',tradableInstrumentId:1,qty:2,side:'buy',stopLoss:90,takeProfit:110};
  const broker={snapshot:async()=>({positions:[p],orders:[],history:[]}),quote:async()=>({bp:101}),write:async(a,i)=>{written=structuredClone(i);return {};}};
  await runCycle({state:s,save:async()=>{},broker,env,now:()=>now});
- assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,99);assert.equal(written.takeProfit,null);
+ assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,99);assert.equal(written.takeProfit,150);
  reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:110}],orders:[],history:[]},now+1);assert.ok(s.pending);
- reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:null}],orders:[],history:[]},now+2);assert.equal(s.pending,null);
+ reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:150}],orders:[],history:[]},now+2);assert.equal(s.pending,null);
  s.pending=written;reconcile(s,{positions:[],orders:[],history:[]},now+3);assert.equal(s.pending,null);assert.equal(s.positions.length,0);
 });
 test('broker adapter submits documented absolute SL and TP together, without retry',async()=>{
