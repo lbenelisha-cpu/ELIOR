@@ -1,4 +1,4 @@
-import {renderRsiChart} from './rsi-chart.js?v=20261022-live-spring-rsi';
+import {renderRsiChart} from './rsi-chart.js?v=20261024-current-rsi';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
@@ -55,7 +55,9 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
- renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),markets[selected]?.liveAnalysisBar||null);
+ const rsiQuote=quotes[selected],rsiLive=markets[selected]?.liveAnalysisBar,quoteAt=Date.parse(rsiQuote?.observedAt||rsiQuote?.priceAt);
+ const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
+ renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),freshRsiLive||null);
  if(workbench.busy&&workbench.currentSymbol===selected)return;
  const root=$('#chart'),bars=lastTwoTradingDays(chartBars(),markets[selected]?.interval||$('#marketInterval').value);$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences').replaceChildren();$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){workbench.clear();const p=document.createElement('p');p.textContent=['1week','1month'].includes($('#marketInterval').value)?'לטווח של שני ימי מסחר בחר נרות 5 דקות, שעה או יום.':'טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
@@ -146,7 +148,7 @@ async function loadNextWatchQuote(){
   if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
   quotes[symbol]={...data,loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
  }catch{quoteStatus[symbol]='ממתין לספק · ניסיון חוזר';quoteNextAt[symbol]=Date.now()+65000;}
- finally{quoteBusy=false;render(true,true);}
+ finally{quoteBusy=false;render(true,true);if(symbol===selected)renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),quotes[selected]?.priceKind==='BROKER_BID'?{date:new Date(Math.floor(Date.parse(quotes[selected].observedAt)/300000)*300000).toISOString(),close:quotes[selected].price,observedAt:Date.parse(quotes[selected].observedAt)}:null);}
  const ready=state.symbols.filter(s=>mark(s)).length;$('#watchQuoteStatus').textContent='מחירים מוצגים: '+ready+'/'+state.symbols.length+' · טעינה מדורגת · ייתכן עיכוב';
 }
 $('#refreshWatchQuotes').onclick=()=>{for(const s of state.symbols){quoteNextAt[s]=0;if(quotes[s])quotes[s].loadedAt=0;}$('#autoMarket').checked=true;loadNextWatchQuote();};

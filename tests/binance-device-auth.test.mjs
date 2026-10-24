@@ -46,3 +46,19 @@ test('actual HTTP guard accepts a paired device, rejects anonymous trades and re
  assert.equal(request('/api/binance-live/manual',{},token).status,401);
  assert.equal(request('/api/binance-mode',{},master).body.acceptedByGuard,true);
 });
+test('owner configured fixed code survives repeated connections and restart, is hashed, and has one-year sessions',()=>{
+ const h=setup(),p=createDevicePairCode(h.file,{now:h.now(),reusable:true,code:'123456'});assert.equal(p.expiresAt,null);
+ const tokens=Array.from({length:12},()=>h.auth.issue('123456').token);for(const token of tokens)assert.equal(h.auth.authorized('Bearer '+token),true);
+ const restarted=new DeviceControlSessions(h.file,{authority:master,now:h.now});assert.equal(restarted.issue('123456').ok,true);assert(!fs.readFileSync(h.file+'.pair','utf8').includes('123456'));
+ h.advance(181*86400000);assert.equal(restarted.authorized('Bearer '+tokens[0]),true);h.advance(185*86400000);assert.equal(restarted.authorized('Bearer '+tokens[0]),false);
+});
+test('fixed code wrong attempts cool down and recover without replacing the code; revocation remains per device',()=>{
+ const h=setup();createDevicePairCode(h.file,{now:h.now(),reusable:true,code:'654321'});const a=h.auth.issue('654321'),b=h.auth.issue('654321');
+ for(let i=0;i<5;i++)assert.throws(()=>h.auth.issue('000000'));assert.throws(()=>h.auth.issue('654321'),e=>e.status===429);
+ h.advance(15*60000);assert.equal(h.auth.issue('654321').ok,true);h.auth.revoke('Bearer '+a.token);assert.equal(h.auth.authorized('Bearer '+a.token),false);assert.equal(h.auth.authorized('Bearer '+b.token),true);
+ assert.equal(h.auth.authorized('Bearer 654321'),false);
+});
+test('fixed code CLI accepts owner input without echoing its plaintext into command output',async()=>{
+ const {spawnSync}=await import('node:child_process');const h=setup(),code='093782';const out=spawnSync(process.execPath,['scripts/binance-device-pair.mjs','--permanent','--code-stdin'],{cwd:new URL('..',import.meta.url),env:{...process.env,BINANCE_DEVICE_AUTH_FILE:h.file},input:code,encoding:'utf8'});
+ assert.equal(out.status,0,out.stderr);assert.equal(out.stdout.includes(code),false);assert.equal(h.auth.issue(code).ok,true);
+});

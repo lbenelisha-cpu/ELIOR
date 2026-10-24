@@ -2,7 +2,7 @@
  const get=id=>document.getElementById(id),dialog=get('deviceConnectionDialog');if(!dialog)return;
  let busy=false,persistent=true;
  function refresh(){const c=window.LEVI_MANUAL_TRADES,connected=c?.connected?.()===true;get('manualConnectBtn').hidden=connected;get('deviceAccessStatus').textContent=connected?(persistent?'המכשיר מחובר למסחר · קנייה ומכירה ללא הזנת קוד':'חיבור זמני בלבד · הדפדפן חוסם שמירת נתונים'):'המכשיר אינו מחובר למסחר';}
- function open(){if(busy)return;get('devicePairCode').value='';get('devicePairResult').textContent='הזן את הקוד הקצר שהופק במסוף השרת. זהו חיבור מכשיר בלבד; לא תתבצע עסקה.';if(!dialog.open)dialog.showModal();get('devicePairCode').focus();}
+ function open(){if(busy)return;get('devicePairCode').value='';get('devicePairResult').textContent='הזן את קוד החיבור הקבוע. אפשר להשתמש באותו קוד במכשירים נוספים. החיבור אינו מבצע עסקה.';if(!dialog.open)dialog.showModal();get('devicePairCode').focus();}
  async function connect(){
   if(busy)return;const code=get('devicePairCode').value.trim();
   if(!/^\d{6}$/.test(code)){get('devicePairResult').textContent='יש להזין שש ספרות';return;}

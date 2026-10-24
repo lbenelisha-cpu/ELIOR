@@ -18,7 +18,7 @@
   get('manualTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+c.symbol+' · LIVE';
   get('manualAmountRow').hidden=side!=='BUY';get('manualQuoteAmount').value='';
   get('manualTradeSummary').textContent=side==='BUY'?'יתרה זמינה: '+Number(c.account?.usdtFree||0).toLocaleString('he-IL',{maximumFractionDigits:8})+' USDT · תקרה לפעולה: '+c.capabilities.maxOrderUsdt+' USDT. קנייה ידנית פותחת פוזיציה חדשה, ללא המתנה לאישור וואיקוף.':'תימכר כל הכמות הזמינה של '+c.symbol+': '+Number(bal?.free||0).toLocaleString('he-IL',{maximumFractionDigits:12})+'. כמות נעולה אינה זמינה; עשויה להישאר שארית קטנה עקב מגבלות בייננס.';
-  get('manualTradePolicy').textContent=side==='BUY'?'לאחר הביצוע יחולו חוקי המכירה הקיימים: עצירה 10% ממחיר הקנייה והגנת רווח לאחר 7 ימים. נדרש מקום פנוי מתוך '+c.capabilities.maxPositions+' פוזיציות.':'זו מכירה ידנית מיידית של המטבע הזה, גם לפני תום תקופת ההחזקה. קנייה אוטומטית חוזרת תדרוש תבנית וואיקוף חדשה.';
+  get('manualTradePolicy').textContent=side==='BUY'?'לאחר הביצוע יחולו חוקי המכירה שנשמרו ב־SETTINGS, כולל יעד הרווח והסטופ. נדרש מקום פנוי מתוך '+c.capabilities.maxPositions+' פוזיציות.':'זו מכירה ידנית מיידית של המטבע הזה, גם לפני תום תקופת ההחזקה. קנייה אוטומטית חוזרת תדרוש תבנית וואיקוף חדשה.';
   get('manualTradeResult').textContent='המחיר ייקבע בזמן ביצוע פקודת השוק. לא נשלחה עסקה.';
   get('manualTradeSubmit').textContent=side==='BUY'?'קנה':'נסה למכור שוב';get('manualTradeSubmit').hidden=false;
   get('manualTradeCheck').hidden=true;get('manualTradeCancel').disabled=false;dialog.showModal();if(side==='BUY')get('manualQuoteAmount').focus();else{get('manualTradeSubmit').hidden=true;send(false);}
