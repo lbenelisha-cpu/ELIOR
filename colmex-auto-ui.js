@@ -3,15 +3,29 @@ const badge=document.getElementById('autoLiveBadge'),status=document.getElementB
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
 let latest=null,loading=false;
 const labels={CYCLE_ERROR:'הסבב נכשל · נדרשת בדיקה',DISABLED:'כבוי · לא נשלחות הוראות',REQUIRES_REVIEW:'נעצר לבדיקת הוראה אצל הברוקר',PENDING_BROKER_CONFIRMATION:'ממתין לאישור ביצוע מהברוקר',MONITORING:'המעקב האוטומטי מופעל',WAITING_FIRST_CYCLE:'ממתין לסבב הראשון',STATUS_UNAVAILABLE:'לא ניתן לאמת מצב כרגע'};
-const reasons={WAIT_RSI_0_30:'ממתין ל־RSI חי בין 0 ל־30 בנקודת Spring',WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',WAIT_FRESH_PRICE:'ממתין למחיר חי עדכני',PATTERN_ALREADY_USED:'תבנית וואיקוף כבר נוצלה · ממתין לחדשה',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשת הרשאת מסחר והוראות הגנה אצל הברוקר',WAIT_NEXT_CYCLE:'ממתין לשעות המסחר או לסבב הבא',CYCLE_DEADLINE:'הבדיקה נדחתה לסבב הבא',INSTRUMENT_UNAVAILABLE_OR_AMBIGUOUS:'המניה אינה זמינה או שיש כמה זירות מסחר',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מ־800 דולר',UNKNOWN_QUANTITY_RULES:'לא התקבלו מגבלות כמות תקינות',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן זמין כולל רזרבה',EXISTING_POSITION_OR_ORDER:'כבר קיימת פוזיציה או הוראה במניה',WAIT_BROKER_QUOTE:'ממתין לציטוט תקין מהברוקר',WAIT_CURRENT_5M_BARS:'ממתין לנרות עדכניים',WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לתבנית וואיקוף חדשה',SIGNAL_PRICE_INVALIDATED:'המחיר כבר אינו מתאים לאישור',UNSUPPORTED_INSTRUMENT:'הנכס או מצב המסחר אינו נתמך',OUTSIDE_REGULAR_SESSION:'מחוץ לשעות המסחר הרגילות',WAIT_WYCKOFF:'ממתין לוואיקוף',SEARCH_PEAK:'מחפש שיא ראשוני',FIRST_LOW:'מחפש שפל ראשון',RALLY_HIGH:'מחפש שיא התאוששות',SECONDARY_TEST:'ממתין לבדיקה חוזרת',CONSOLIDATION:'ממתין להשלמת דשדוש',SPRING:'בודק Spring',READY:'עבר את בדיקות הכניסה',PENDING_BROKER_CONFIRMATION:'ממתין לאישור ביצוע מהברוקר'};
+const reasons={PREPARATION_CANDIDATE:'מועמדת לבדיקה בפתיחה · לפי הנר האחרון',INCOMPLETE_LAST_SESSION:'חסרים נרות עד סגירת המסחר האחרונה',PREPARATION_DATA_UNAVAILABLE:'נתוני הכנה אינם זמינים',SIGNALLED:'אישור היסטורי · נדרש Spring עדכני',WAIT_RSI_0_30:'ממתין ל־RSI חי בין 0 ל־30 בנקודת Spring',WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',WAIT_FRESH_PRICE:'ממתין למחיר חי עדכני',PATTERN_ALREADY_USED:'תבנית וואיקוף כבר נוצלה · ממתין לחדשה',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשת הרשאת מסחר והוראות הגנה אצל הברוקר',WAIT_NEXT_CYCLE:'ממתין לשעות המסחר או לסבב הבא',CYCLE_DEADLINE:'הבדיקה נדחתה לסבב הבא',INSTRUMENT_UNAVAILABLE_OR_AMBIGUOUS:'המניה אינה זמינה או שיש כמה זירות מסחר',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מ־800 דולר',UNKNOWN_QUANTITY_RULES:'לא התקבלו מגבלות כמות תקינות',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן זמין כולל רזרבה',EXISTING_POSITION_OR_ORDER:'כבר קיימת פוזיציה או הוראה במניה',WAIT_BROKER_QUOTE:'ממתין לציטוט תקין מהברוקר',WAIT_CURRENT_5M_BARS:'ממתין לנרות עדכניים',WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לתבנית וואיקוף חדשה',SIGNAL_PRICE_INVALIDATED:'המחיר כבר אינו מתאים לאישור',UNSUPPORTED_INSTRUMENT:'הנכס או מצב המסחר אינו נתמך',OUTSIDE_REGULAR_SESSION:'מחוץ לשעות המסחר הרגילות',WAIT_WYCKOFF:'ממתין לוואיקוף',SEARCH_PEAK:'מחפש שיא ראשוני',FIRST_LOW:'מחפש שפל ראשון',RALLY_HIGH:'מחפש שיא התאוששות',SECONDARY_TEST:'ממתין לבדיקה חוזרת',CONSOLIDATION:'ממתין להשלמת דשדוש',SPRING:'בודק Spring',READY:'עבר את בדיקות הכניסה',PENDING_BROKER_CONFIRMATION:'ממתין לאישור ביצוע מהברוקר'};
 const reason=r=>reasons[r]||r;
 const time=t=>t?new Date(t).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'טרם בוצעה בדיקה';
 function line(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);}
+function renderPreparation(){
+ const root=document.getElementById('preparationRows'),summary=document.getElementById('preparationSummary');if(!root||!summary)return;
+ const p=latest?.preparation,rows=p?.rows||{},symbols=latest?.policy?.symbols||[];
+ const good=symbols.filter(s=>rows[s]&&!rows[s].error).length,candidates=symbols.filter(s=>rows[s]?.candidate);
+ summary.textContent=`${good} מתוך ${symbols.length} מניות נותחו · ${candidates.length} מועמדות לפי הנר האחרון · ניתוח הכנה בלבד`+(p?.lastCheckedAt?' · בדיקה אחרונה: '+time(p.lastCheckedAt):' · ממתין לסריקה מחוץ לשעות המסחר');
+ root.replaceChildren();
+ for(const symbol of symbols){
+  const r=rows[symbol],tr=document.createElement('tr');
+  tr.dataset.state=r?.error||r?.complete===false?'old':r?'checked':'unseen';
+  for(const value of [symbol,r?(r.reason==='WAIT_RSI_0_30'?'RSI בסגירה מחוץ לטווח 0–30':reason(r.error||r.reason)):'ממתין לסריקת הכנה',Number.isFinite(r?.rsi)?r.rsi.toFixed(2):'—',r?.dataAt?time(r.dataAt):'—',r?.checkedAt?time(r.checkedAt):'—']){const td=document.createElement('td');td.textContent=value;tr.append(td);}
+  root.append(tr);
+ }
+}
 function renderMonitor(){
  if(!latest)return;
+ renderPreparation();
  const view=monitorView(latest);
  const messages={disabled:'המעקב כבוי בשרת',error:'תקלה או עצירה · יש לבדוק את מצב השרת',waiting:'טרם תועד סבב שהושלם',stale:'לא תועד סבב שהושלם בחמש הדקות האחרונות',recent:'התקבל סבב שרת שהושלם לאחרונה'};
- health.textContent=messages[view.health];health.dataset.health=view.health;
+ health.textContent=messages[view.health]+(latest.lastResult==='OUTSIDE_REGULAR_SESSION'?' · השוק סגור; ניתוח ההכנה מוצג בטבלה הנפרדת':'');health.dataset.health=view.health;
  summary.textContent=`סבב שרת אחרון שהושלם: ${time(view.completed)} · ${view.age===null?'':`לפני ${Math.floor(view.age/60000)} דקות · `}תועדה בדיקה ל־${view.checked} מתוך ${view.total} מניות`;
  checks.replaceChildren();
  for(const row of view.rows){
