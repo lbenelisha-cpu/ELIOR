@@ -11,10 +11,11 @@ const request={side:'BUY',symbol:'AAPL',amountUsd:50,requestId:'11111111-1111-41
 const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:1000},positions:[],orders:[],history:[]});
 function broker(){return {writes:[],snapshot:async()=>snapshot(),instruments:async()=>[{name:'AAPL',type:'EQUITY',tradableInstrumentId:1}],details:async()=>({quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000}),quote:async()=>({bp:29.99,ap:30}),history:async()=>({barDetails:[]}),async write(account,intent){this.writes.push(structuredClone(intent));return {orderId:'order'};}};}
 function store(){const rows=new Map();let version=0;return {async get(k){return structuredClone(rows.get(k)?.data??null);},async getWithMetadata(k){return structuredClone(rows.get(k)??null);},async setJSON(k,data,options={}){const previous=rows.get(k);if(options.onlyIfNew&&previous||options.onlyIfMatch&&previous?.etag!==options.onlyIfMatch)return {modified:false};const etag=String(++version);rows.set(k,{data:structuredClone(data),etag});return {modified:true,etag};},async delete(k){rows.delete(k);}};}
-test('one-time pairing locks after five failures, is single-use and binds to account/credentials',async()=>{
- const s=store();for(let i=0;i<5;i++)await assert.rejects(pairDevice(s,env,'000000',now),/PAIR_CODE_INVALID/);await assert.rejects(pairDevice(s,env,'123456',now),/PAIR_CODE_EXPIRED_OR_USED/);
+test('fixed code is reusable across devices, rate limited and bound to account/credentials',async()=>{
+ const s=store();for(let i=0;i<5;i++)await assert.rejects(pairDevice(s,env,'000000',now),/PAIR_CODE_INVALID/);await assert.rejects(pairDevice(s,env,'123456',now),/PAIR_CODE_COOLDOWN/);
  const good=store(),device=await pairDevice(good,env,'123456',now);await requireDevice(good,env,'Bearer '+device.token,now);
- await assert.rejects(pairDevice(good,env,'123456',now),/PAIR_CODE_EXPIRED_OR_USED/);
+ const second=await pairDevice(good,env,'123456',now);assert.notEqual(second.token,device.token);await requireDevice(good,env,'Bearer '+device.token,now);await requireDevice(good,env,'Bearer '+second.token,now);
+ await pairDevice(s,env,'123456',now+15*60000);
  await assert.rejects(requireDevice(good,{...env,COLMEX_API_PASSWORD:'rotated'},'Bearer '+device.token,now),/DEVICE_REQUIRED/);
  await assert.rejects(requireDevice(good,env,'Bearer '+device.token,device.expiresAt),/DEVICE_REQUIRED/);
  await assert.rejects(pairDevice(store(),{...env,CONTEXT:'deploy-preview'},'123456',now),/PAIRING_NOT_CONFIGURED/);

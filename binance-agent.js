@@ -655,6 +655,7 @@ function loadChart(symbol){
  promise.then(clear,clear);return promise;
 }
 async function loadChartRequest(symbol){
+  globalThis.LEVI_RSI_BADGE?.setBinance(symbol);
   const requestId=++chartRequestId;
   const interval=selectedInterval,range=selectedRange;
   const modeAtRequest=currentMode;
@@ -694,6 +695,8 @@ async function loadChartRequest(symbol){
     const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(range),{timeoutMs:35000});
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode)return;
     const sourceCandles=source.candles||[];
+    if(typeof window!=='undefined')window.LEVI_RSI_BADGE_SOURCE={symbol,bars:sourceCandles};
+    globalThis.LEVI_RSI_BADGE?.setBinance(symbol,sourceCandles);
     const closedAt=sourceCandles.filter(b=>b.closed!==false).at(-1)?.closeTime;
     const cacheKey=[symbol,range,modeAtRequest,closedAt].join(':');
     let analysis=wyckoffHistoryCache.get(cacheKey);
@@ -725,7 +728,7 @@ function drawIndicators(candles){
   for(const [key,name,color,bounds,levels] of [['rsi','RSI (14)','#bb90ff',[0,100],[30,70]],['roc','ROC (12)','#40d5de',null,[0]]]){
     const show=$('#show'+key.toUpperCase())?.checked;
     const panel=$('#'+key+'Panel');if(panel)panel.hidden=!show;
-    if(show)engine.drawIndicator($('#'+key+'Chart'),values[key].slice(-120),{name,color,bounds,levels});
+    if(show){const series=key==='rsi'?(globalThis.LEVI_RSI_BADGE?.series()||(selectedInterval==='5m'?values.rsi:[])):values[key];engine.drawIndicator($('#'+key+'Chart'),series.slice(-120),{name:key==='rsi'?name+' · 5 דקות':name,color,bounds,levels});}
   }
 }
 function chartSellLevel(data,liveAccount,mode,symbol){
@@ -1098,3 +1101,7 @@ window.LEVI_MANUAL_TRADES={
 };
 
 window.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!currentAgentData?.agents?.some(a=>a.symbol===symbol))return;selectScannerAsset(symbol,null);});
+
+window.addEventListener?.('levi-rsi-history-needed',()=>{if(!document.hidden)loadChart(selectedSymbol);});
+
+window.addEventListener?.('trade-device-expired',()=>{tradeControlToken=null;window.LEVI_DEVICE_ACCESS?.refresh();});

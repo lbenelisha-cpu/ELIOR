@@ -1,7 +1,7 @@
 const $=id=>document.getElementById(id),TOKEN_KEY='levi-colmex-device-v1',PENDING_KEY='levi-colmex-manual-pending-v1';
 let token=null,pending=null,busy=false;
 try{token=localStorage.getItem(TOKEN_KEY);pending=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}catch{}
-const messages={DEVICE_REQUIRED:'יש לחבר את המכשיר פעם אחת בקוד קצר.',PAIRING_NOT_CONFIGURED:'יש להגדיר ב־Netlify קוד חיבור חד־פעמי COLMEX_DEVICE_PAIR_CODE בן 6 ספרות ולפרסם מחדש.',PAIR_CODE_INVALID:'קוד החיבור אינו נכון.',PAIR_CODE_EXPIRED_OR_USED:'הקוד נוצל, פג או נחסם. יש להגדיר קוד חדש בשרת.',PAIR_CODE_RETRY:'בקשת חיבור נוספת מתבצעת. נסה שוב.',TRADE_IN_PROGRESS:'פעולת מסחר אחרת מתבצעת. המתן לסיומה.',LIVE_NOT_ENABLED:'מסחר LIVE אינו מופעל בשרת.',INVALID_BUY_AMOUNT:'יש להזין סכום גדול מאפס ועד 800 דולר.',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות.',NO_UNIQUE_LONG_POSITION:'לא נמצאה פוזיציית LONG יחידה במניה זו.',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מהסכום שבחרת.',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן לקנייה ולרזרבה של 5 דולר.',OUTSIDE_REGULAR_SESSION:'קנייה זמינה בשעות המסחר הרגילות בארה״ב.',EXISTING_POSITION_OR_ORDER:'קיימת פוזיציה או הוראה במניה שמונעת את הפעולה.',INSTRUMENT_UNAVAILABLE:'המניה אינה זמינה באופן חד־משמעי אצל הברוקר.',REQUIRES_REVIEW:'פעולה קודמת דורשת בדיקה אצל הברוקר.',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשות הרשאות מסחר וסטופ אצל הברוקר.'};
+const messages={DEVICE_REQUIRED:'יש לחבר את המכשיר פעם אחת בקוד קצר.',PAIRING_NOT_CONFIGURED:'יש להגדיר ב־Netlify קוד חיבור קבוע COLMEX_DEVICE_PAIR_CODE בן 6 ספרות ולפרסם מחדש.',PAIR_CODE_INVALID:'קוד החיבור אינו נכון.',PAIR_CODE_EXPIRED_OR_USED:'קוד החיבור אינו פעיל. בדוק את הגדרת השרת.',PAIR_CODE_COOLDOWN:'יותר מדי ניסיונות. אפשר להשתמש באותו קוד שוב בעוד 15 דקות.',PAIR_CODE_RETRY:'בקשת חיבור נוספת מתבצעת. נסה שוב.',TRADE_IN_PROGRESS:'פעולת מסחר אחרת מתבצעת. המתן לסיומה.',LIVE_NOT_ENABLED:'מסחר LIVE אינו מופעל בשרת.',INVALID_BUY_AMOUNT:'יש להזין סכום גדול מאפס ועד 800 דולר.',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות.',NO_UNIQUE_LONG_POSITION:'לא נמצאה פוזיציית LONG יחידה במניה זו.',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מהסכום שבחרת.',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן לקנייה ולרזרבה של 5 דולר.',OUTSIDE_REGULAR_SESSION:'קנייה זמינה בשעות המסחר הרגילות בארה״ב.',EXISTING_POSITION_OR_ORDER:'קיימת פוזיציה או הוראה במניה שמונעת את הפעולה.',INSTRUMENT_UNAVAILABLE:'המניה אינה זמינה באופן חד־משמעי אצל הברוקר.',REQUIRES_REVIEW:'פעולה קודמת דורשת בדיקה אצל הברוקר.',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשות הרשאות מסחר וסטופ אצל הברוקר.'};
 const explain=code=>messages[code]||'הפעולה לא אושרה: '+code;
 function say(text){$('colmexManualStatus').textContent=text;}
 function renderAccess(){
@@ -79,3 +79,7 @@ $('colmexTradeForm').addEventListener('submit',async event=>{
 });
 renderAccess();if(pending)checkPending();setInterval(()=>{if(!document.hidden)checkPending();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkPending();});
+
+globalThis.addEventListener?.('trade-device-connected',()=>{try{token=localStorage.getItem(TOKEN_KEY);}catch{}renderAccess();});
+
+globalThis.addEventListener?.('trade-device-expired',()=>{token=null;renderAccess();});

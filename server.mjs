@@ -2076,6 +2076,14 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/app-settings.js':['app-settings.js','text/javascript'],
+    '/market-power-panel.js':['market-power-panel.js','text/javascript'],
+    '/rsi-current-badge.js':['rsi-current-badge.js','text/javascript'],
+    '/binance-control-session.js':['binance-control-session.js','text/javascript'],
+    '/binance-device-access.js':['binance-device-access.js','text/javascript'],
+    '/binance-manual-trades.js':['binance-manual-trades.js','text/javascript'],
+    '/lib/wyckoff-spring-rsi.mjs':['lib/wyckoff-spring-rsi.mjs','text/javascript'],
+    '/lib/wyckoff-strategy.mjs':['lib/wyckoff-strategy.mjs','text/javascript'],
     '/binance-indicators.js':['binance-indicators.js','text/javascript'],
     '/binance-agent.html':['binance-agent.html','text/html'],
     '/binance-agent.js':['binance-agent.js','text/javascript'],
