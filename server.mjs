@@ -1,3 +1,4 @@
+import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
 const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
@@ -1977,11 +1978,34 @@ setInterval(async()=>{
   }
   }finally{exitMonitorInFlight=false;}
 },1000).unref();
+let manualAdoptionAt=0,manualAdoptionCursor=0;
+async function adoptManualBinanceHolding(){
+ if(Date.now()-manualAdoptionAt<30000)return;
+ manualAdoptionAt=Date.now();
+ const account=await getLiveAccountSnapshot(),positions=tradingPositions();
+ const candidates=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&b.valueUsdt>=5&&!positions[b.asset+'USDT']&&!nativeProtection.rows[b.asset+'USDT']);
+ for(const b of candidates.length?[candidates[manualAdoptionCursor++%candidates.length]]:[]){
+  const symbol=b.asset+'USDT';
+  try{
+   const gate=liveTradingGate(await getApiRestrictions());if(!gate.ready||gate.withdrawalsEnabled)return;
+   const info=await symbolExchangeInfo(symbol);
+   if(info?.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false||info.ocoAllowed!==true||!info.orderTypes?.includes('TAKE_PROFIT')||!info.orderTypes?.includes('STOP_LOSS'))throw Error('MANUAL_HOLDING_PROTECTION_UNSUPPORTED');
+   const trades=await signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000});
+   const latest=await getLiveAccountSnapshot(),balance=latest.balances.find(x=>x.asset===b.asset);
+   if(!balance||Math.abs(balance.qty-b.qty)>Math.max(1e-8,b.qty*1e-6))continue;
+   const prior=tradingPositions()[symbol];
+   const action=externalBinanceEntry(balance,trades,Date.now(),prior);
+   if(action){pushLiveAction(action);if(!SYMBOLS.includes(symbol)){initUniverse([...SYMBOLS,symbol]);startMarketStream();}console.log('Manual holding enrolled',symbol);}
+  }catch(error){console.error('Manual holding adoption blocked',symbol,error.message);}
+  break; // Bound network work under the execution lock; next holding on next pass.
+ }
+}
 let nativeProtectionCursor=0;
 setInterval(()=>{
  if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
  liveExecution.automatic(async()=>{
   if(liveOrders.pending)return; // Recover market execution before any bracket work.
+  await adoptManualBinanceHolding();
   const symbols=[...new Set([...Object.keys(nativeProtection.rows),...Object.keys(tradingPositions())])];
   if(!symbols.length)return;
   const symbol=symbols[nativeProtectionCursor++%symbols.length],p=tradingPositions()[symbol];
