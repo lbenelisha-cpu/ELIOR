@@ -46,3 +46,25 @@ test('real closed-session cycle scans with a full portfolio, without consuming s
  const r=await runCycle({state:s,broker,env,save:async()=>{},now:()=>now});assert.equal(r.reason,'OUTSIDE_REGULAR_SESSION');assert.equal(s.preparation.rows.AAPL.candidate,true);assert.deepEqual(s.used,[]);assert.equal(s.pending,null);
  const h=makeHandler({env,storeFactory:()=>({get:async()=>({state:s})})});const d=JSON.parse((await h({httpMethod:'GET'})).body);assert.equal(d.preparation.rows.AAPL.executionReady,false);assert.deepEqual(d.checks,{});
 });
+
+test('complete close is reused for six hours, a new close invalidates immediately',async()=>{
+ const state=initialState(now);state.preparation={version:'CLOSED_MARKET_WYCKOFF_V1',rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,analyzePreparation(history(),{symbol,now})]))};
+ let reads=0;const broker={instruments:async()=>{reads++;return [];}};
+ await runPreparationCycle({state,broker,account:'123',save:async()=>{},now:()=>now+35*60000});assert.equal(reads,0);
+ await runPreparationCycle({state,broker,account:'123',save:async()=>{},now:()=>now+6*3600000});assert.equal(reads,1);
+ const fresh=initialState(now);fresh.preparation={version:'CLOSED_MARKET_WYCKOFF_V1',rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,{...analyzePreparation(history(),{symbol,now}),checkedAt:Date.parse('2026-10-26T19:59:00Z')}]))};
+ await runPreparationCycle({state:fresh,broker,account:'123',save:async()=>{},now:()=>Date.parse('2026-10-26T20:01:00Z')});assert.equal(reads,2);
+});
+test('closed empty snapshot cache expires, and pending work or market opening bypasses it',async()=>{
+ const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
+ let t=now,reads=0;const broker={snapshot:async()=>{reads++;return {positions:[],orders:[],history:[],account:{},state:{}};},instruments:async()=>[],write:()=>assert.fail('no order')};
+ const s=initialState(now),run=()=>runCycle({state:s,broker,env,save:async()=>{},now:()=>t});
+ await run();assert.equal(reads,1);t+=60000;await run();assert.equal(reads,1);t=now+5*60000;await run();assert.equal(reads,2);
+ t+=60000;s.pending={kind:'STOP',positionId:'unknown',at:t,stopLoss:10};await run();assert.equal(reads,3);
+ s.pending=null;s.closedEmptySnapshotAt=Date.parse('2026-10-26T13:29:00Z');s.lastCycleAt=null;t=Date.parse('2026-10-26T13:30:00Z');await run();assert.equal(reads,4);
+});
+test('broker orders and known positions never qualify for empty account caching',async()=>{
+ const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
+ let reads=0,t=now;const s=initialState(now),broker={snapshot:async()=>{reads++;return {positions:[],orders:[{side:'buy'}],history:[],account:{},state:{}};},instruments:async()=>[]};
+ await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});t+=60000;await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});assert.equal(reads,2);assert.equal(s.closedEmptySnapshotAt,null);
+});
