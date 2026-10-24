@@ -85,3 +85,6 @@ test('server never sends a second market sell when native reconciliation already
  let owned=true,sent=0;const c={nativeProtection:{release:async()=>{owned=false;}},getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),tradingPositions:()=>owned?{[symbol]:{qty:2}}:{},getLiveAccountSnapshot:async()=>{throw Error('must not attempt wallet sale');},liveOrders:{submit:async()=>sent++}};
  vm.createContext(c);vm.runInContext(fn,c);assert.equal((await c.placeLiveMarketSell(symbol,'MANUAL_SELL',{sellAllBalance:true})).status,'CLOSED_AT_BROKER');assert.equal(sent,0);
 });
+test('changing configured TP replaces an active bracket even when stop and quantity are unchanged',async t=>{
+ const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;applyTrailingExitPolicy(r.p,{takeProfitPct:20,stopLossPct:1,profitActivationPct:4,trailingGapPp:1});await r.store.sync(symbol,r.p,100);assert.equal(r.posts,2);assert.equal(r.deletes,1);assert.equal(r.last.aboveStopPrice,'120');
+});
