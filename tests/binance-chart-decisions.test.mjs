@@ -44,8 +44,9 @@ test('Binance high captions use the upper edge, lows use the lower edge and arro
  class Element{constructor(){this.children=[];this.dataset={};this.style={setProperty(){}};this.clientWidth=850;this.clientHeight=560;}append(x){this.children.push(x);}replaceChildren(){this.children=[];}setAttribute(k,v){this[k]=v;}}
  const root=new Element(),setup=Object.fromEntries(['initialPeak','firstLow','rallyHigh','secondaryTest','springLow','confirmation'].map((key,i)=>[key,{time:time+i*300000,price:100+i}]));
  const view=Array.from({length:6},(_,i)=>({openTime:time-1+i*300000,closeTime:time+299999+i*300000}));
- const scope=vm.createContext({Date,document:{querySelector:()=>root,createElement:()=>new Element()},currentAgentData:{agents:[{symbol:'BTCUSDT',position:'CASH',strategy:{wyckoff:setup}}]},selectedSymbol:'BTCUSDT',fmt:String});
+ const scope=vm.createContext({Date,document:{querySelector:()=>root,createElement:()=>new Element()},currentAgentData:{agents:[{symbol:'BTCUSDT',position:'CASH',strategy:{wyckoff:setup}}]},selectedSymbol:'BTCUSDT',currentMode:'live',fmt:String});
  vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),scope);
+ scope.rememberWyckoffDisplay(scope.currentAgentData.agents,scope.currentMode);
  scope.renderWyckoffPivots(view,[{at,analysisSignal:true,setup}],100,18,p=>300-p,4);
  const labels=root.children.filter(e=>e.className==='wyckoff-pivot'),arrows=root.children.filter(e=>e.className?.startsWith('wyckoff-arrow '));
  assert.equal(labels.length,6);assert.equal(arrows.length,6);
@@ -60,4 +61,20 @@ test('only the latest numbered Wyckoff flag and detail button remain visible',()
  const scope=vm.createContext({Date,document:{querySelector:s=>nodes[s],createElement:()=>new Element()},wyckoffHistoryEngine:{visibleBinanceOccurrences:()=>items},chartWyckoffHistory:items,chartWyckoffError:null,selectedSymbol:'BTCUSDT',selectedInterval:'5m',fmt:String});
  vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),scope);scope.renderNumberedWyckoff([],10,18,p=>p,2);
  const flags=overlay.children.filter(e=>e.className==='wyckoff-occurrence');assert.equal(flags.length,1);assert.equal(flags[0].textContent,5);assert.equal(list.children.length,1);assert.match(summary.textContent,/האחרונה בלבד/);assert.equal(items.length,5);
+});
+test('temporary price outages retain display pivots only; valid resets and modes stay authoritative',()=>{
+ const setup={phase:'FIRST_LOW',initialPeak:{price:.1885,time},firstLow:{price:.1839,time}};
+ const agent={symbol:'ENAUSDT',decision:'HOLD',execution:'IDLE',strategy:{wyckoff:setup}};
+ ctx.rememberWyckoffDisplay([agent],'live');
+ ctx.rememberWyckoffDisplay([{symbol:'ENAUSDT',decision:'WAIT_DATA',execution:'ERROR',analysisError:'Fresh connected Binance price required; entry evaluation paused',strategy:null}],'live');
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live').setup,setup);
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live').stale,true);
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','demo'),null);
+ assert.equal(ctx.displayedWyckoffSetup('BTCUSDT','live'),null);
+ assert.equal(agent.strategy.wyckoff,setup);
+ ctx.rememberWyckoffDisplay([{...agent,strategy:{wyckoff:{phase:'SEARCH_PEAK'}}}],'live');
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live').setup.initialPeak,undefined);
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live').stale,false);
+ ctx.rememberWyckoffDisplay([{...agent,strategy:null}],'live');
+ assert.equal(ctx.displayedWyckoffSetup('ENAUSDT','live'),null);
 });

@@ -251,6 +251,7 @@ function selectScannerAsset(symbol,tr){
 }
 function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
   d={...d,agents:activeContext(d,currentMode,liveAccount).agents};
+  rememberWyckoffDisplay(d.agents,currentMode);
   currentAgentData=d;
   if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-binance-rsi',{detail:d.agents||[]}));
   const wx=d.wyckoffStats||{};
@@ -834,7 +835,7 @@ function drawCandles(candles){
   }
 
   const flashingIndices=new Set(),candleColors=new Map();
-  const candleSetup=heldNow?selectedPosition.setup:latestWyckoffSetup(chartDecisions);
+  const candleSetup=heldNow?selectedPosition.setup:displayedWyckoffSetup(selectedSymbol,currentMode)?.setup;
   const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
   const markCandle=(stamp,color,active)=>{const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0){candleColors.set(i,color);if(active)flashingIndices.add(i);}};
   for(const item of chartWyckoffHistory)for(const [key,color] of Object.entries(pivotColors)){const p=item.setup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,false);}
