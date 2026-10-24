@@ -32,20 +32,20 @@ test('chart only renders real fixed-policy positions with known quantity; money 
 });
 const now=Date.parse('2026-10-20T15:00:00Z'),env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
 function owned(){return {...position(),id:'p',instrumentId:1,symbol:'AAPL',tickSize:[{leftRangeLimit:0,tickSize:.01}]};}
-test('Colmex migrates owned position, closes full quantity at target with zero hold',async()=>{
- const s=initialState(now);s.positions=[{...owned(),exitPolicy:'SPRING_GAIN_LOCK_80_STOP_10_V1',minProfitHoldMs:604800000}];let written;
- const broker={snapshot:async()=>({positions:[{id:'p',tradableInstrumentId:1,qty:2,side:'buy',stopLoss:90}],orders:[],history:[]}),quote:async()=>({bp:104}),write:async(a,i)=>{written=structuredClone(i);return {};}};
+test('Colmex migrates owned position and closes full quantity at trailing floor',async()=>{
+ const s=initialState(now);s.positions=[{...owned(),peakPrice:110,exitPolicy:'SPRING_GAIN_LOCK_80_STOP_10_V1',minProfitHoldMs:604800000}];let written;
+ const broker={snapshot:async()=>({positions:[{id:'p',tradableInstrumentId:1,qty:2,side:'buy',stopLoss:90}],orders:[],history:[]}),quote:async()=>({bp:109}),write:async(a,i)=>{written=structuredClone(i);return {};}};
  await runCycle({state:s,save:async()=>{},broker,env,now:()=>now});
- assert.equal(written.kind,'CLOSE');assert.equal(written.qty,2);assert.equal(written.reason,'FIXED_TAKE_PROFIT_4_PERCENT');
+ assert.equal(written.kind,'CLOSE');assert.equal(written.qty,2);assert.equal(written.reason,'PROFIT_FLOOR4_TRAIL1PP_EXIT');
 });
 test('Colmex updates both broker thresholds and reconciles both before new work',async()=>{
  const s=initialState(now);s.positions=[owned()];let written;
  const p={id:'p',tradableInstrumentId:1,qty:2,side:'buy',stopLoss:90,takeProfit:110};
  const broker={snapshot:async()=>({positions:[p],orders:[],history:[]}),quote:async()=>({bp:101}),write:async(a,i)=>{written=structuredClone(i);return {};}};
  await runCycle({state:s,save:async()=>{},broker,env,now:()=>now});
- assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,99);assert.equal(written.takeProfit,104);
+ assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,99);assert.equal(written.takeProfit,null);
  reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:110}],orders:[],history:[]},now+1);assert.ok(s.pending);
- reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:104}],orders:[],history:[]},now+2);assert.equal(s.pending,null);
+ reconcile(s,{positions:[{...p,stopLoss:99,takeProfit:null}],orders:[],history:[]},now+2);assert.equal(s.pending,null);
  s.pending=written;reconcile(s,{positions:[],orders:[],history:[]},now+3);assert.equal(s.pending,null);assert.equal(s.positions.length,0);
 });
 test('broker adapter submits documented absolute SL and TP together, without retry',async()=>{

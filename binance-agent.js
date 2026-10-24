@@ -456,6 +456,10 @@ function decisionReasonLabel(r){
     WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',
     WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    WAIT_PROFIT_ACTIVATION_4_PERCENT:'סטופ 1% · ממתין לרווח 4% להפעלת נגרר',
+    PROFIT_FLOOR4_TRAIL1PP_HOLD:'רצפת רווח 4% · נגרר נקודת אחוז מהשיא',
+    PROFIT_FLOOR4_TRAIL1PP_EXIT:'מכירה · הגנת רווח נגררת',
+    TRAIL_STOP_LOSS_1_PERCENT:'מכירה · סטופ הפסד 1%',
     FIXED_TP4_SL1_HOLD:'יעד רווח 4% · סטופ 1% ממחיר הקנייה',
     FIXED_TAKE_PROFIT_4_PERCENT:'מכירה · יעד רווח 4%',
     FIXED_STOP_LOSS_1_PERCENT:'מכירה · סטופ 1%',
@@ -787,7 +791,7 @@ function drawCandles(candles){
   const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
   const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
   const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
-  const managedPosition=heldNow&&selectedPosition.exitPolicy==='FIXED_TP4_SL1_V1';
+  const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'].includes(selectedPosition.exitPolicy);
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
   const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
@@ -854,10 +858,10 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
-    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':'יעד רווח +4%',color:'#64e1ae'},
+    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +4%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
-    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?'#ff8494':'#ffbd59'}
+    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
   const labelRows=[];
