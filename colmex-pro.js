@@ -10,7 +10,8 @@ const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:
 const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261022-tools';
-import {syncWatchRows} from './lib/colmex-watch-view.mjs';
+import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261024-watch50';
+import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
 const quotes={},quoteStatus={},quoteNextAt={};let quoteBusy=false;
@@ -21,11 +22,11 @@ let liveSearchState={positions:[],after:{}};
 const wyckoffHistories={},wyckoffErrors={},analysisMarks={};
 const markets={},manualCharts=new Set(),pendingMarkets=new Set();let marketRequest=0;const marketLoadGate=createMarketLoadGate(),marketFailures=new Map();
 const STOCK_NAMES={AAPL:'Apple',MSFT:'Microsoft',NVDA:'NVIDIA',AMZN:'Amazon',GOOGL:'Alphabet',META:'Meta Platforms',TSLA:'Tesla',AVGO:'Broadcom',JPM:'JPMorgan Chase',NFLX:'Netflix'};
-const DEFAULT_SYMBOLS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','AVGO','JPM','NFLX','AMD','INTC','PLTR','COIN','ORCL','CRM','ADBE','UBER','DIS','SHOP'];
+const DEFAULT_SYMBOLS=PAPER_MODE?COLMEX_WATCH_SYMBOLS.slice(0,20):COLMEX_WATCH_SYMBOLS;
 let state={symbols:[...DEFAULT_SYMBOLS],positions:{},bars:{},drawings:{}},selected='AAPL';
 try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved&&Array.isArray(saved.symbols)){state.symbols=[...new Set(saved.symbols.filter(s=>typeof s==='string'&&validSymbol(s)))].slice(0,100);for(const s of state.symbols){const p=saved.positions?.[s];if(p&&positive(p.entry)&&positive(p.qty))state.positions[s]={entry:Number(p.entry),qty:Number(p.qty),mark:positive(p.mark)?Number(p.mark):null,updatedAt:p.updatedAt};const drawings=saved.drawings?.[s];if(Array.isArray(drawings))state.drawings[s]=drawings.filter(validShape).slice(0,100);const bars=saved.bars?.[s];if(Array.isArray(bars)&&bars.length<=2000&&bars.every(validBar))state.bars[s]=bars;}}}catch{}
-// Populate twenty choices while preserving existing watchlist entries and holdings.
-for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=20)break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
+// Include the server watchlist while preserving custom entries and local data.
+for(const symbol of DEFAULT_SYMBOLS){if(state.symbols.length>=(PAPER_MODE?20:100))break;if(!state.symbols.includes(symbol))state.symbols.push(symbol);}
 selected=state.symbols[0];
 function message(s){$('#message').textContent=s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));return true;}catch{message('לא ניתן לשמור בדפדפן. הנתונים זמינים כעת בלבד; נסה לצמצם את גודל הייבוא.');return false;}}
@@ -141,7 +142,7 @@ loadMarket(false);
 // A paced queue shares the provider's existing eight-request/minute guard.
 async function loadNextWatchQuote(){
  if(quoteBusy||document.hidden||!$('#autoMarket').checked||!marketLoadGate.quoteAllowed())return;
- const now=Date.now(),symbol=state.symbols.find(s=>(quoteNextAt[s]||0)<=now&&(!quotes[s]||now-quotes[s].loadedAt>=300000)&&![...pendingMarkets].some(k=>k.startsWith(s+':')));
+ const now=Date.now(),symbol=nextWatchQuote(state.symbols,{quotes,nextAt:quoteNextAt,blocked:new Set([...pendingMarkets].map(k=>k.split(':')[0])),now});
  if(!symbol)return;quoteBusy=true;quoteStatus[symbol]='טוען מחיר…';render(true,true);
  try{
   const r=await fetch('/.netlify/functions/colmex-stocks-market?view=quote&symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();

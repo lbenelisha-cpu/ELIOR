@@ -1,5 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
 import {createMarketLoadGate} from '../lib/colmex-market-loading.mjs';
+import {COLMEX_WATCH_SYMBOLS} from '../lib/colmex-watch-universe.mjs';
+import {nextWatchQuote} from '../lib/colmex-watch-view.mjs';
 import {chartAnalysisMarks} from '../lib/colmex-chart-view.mjs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const script=read('colmex-pro.js');
@@ -13,7 +15,7 @@ async function boot(mode){
  const document={body:{dataset:{mode}},hidden:true,querySelector:s=>nodes.get(s)||null,querySelectorAll:()=>[],createElement:()=>new Element(),addEventListener(){}};
  const saved={symbols:['TSLA'],positions:{TSLA:{entry:351,qty:2,mark:999,updatedAt:'2026-10-21T13:00:00Z'}},drawings:{},bars:{}};
  let paperLoads=0;const watched=[];
- const deps={renderRsiChart(){},createMarketLoadGate,syncWatchRows:(body,symbols,options)=>watched.push({symbols:[...symbols],tsla:options.describe('TSLA')}),lastTwoTradingDays:()=>[],startCandleFlashing(){},validShape:()=>true,createWorkbench:()=>({busy:false,clear(){},update(){}}),loadPaperUI:async()=>{paperLoads++;return {initSimulation(){},simulationMarks:()=>({points:[],cards:[],lines:[]}),simulationWyckoffHistory:()=>[]};}};
+ const deps={COLMEX_WATCH_SYMBOLS,nextWatchQuote,renderRsiChart(){},createMarketLoadGate,syncWatchRows:(body,symbols,options)=>watched.push({symbols:[...symbols],tsla:options.describe('TSLA')}),lastTwoTradingDays:()=>[],startCandleFlashing(){},validShape:()=>true,createWorkbench:()=>({busy:false,clear(){},update(){}}),loadPaperUI:async()=>{paperLoads++;return {initSimulation(){},simulationMarks:()=>({points:[],cards:[],lines:[]}),simulationWyckoffHistory:()=>[]};}};
  const names=[...script.matchAll(/^import \{([^}]+)\} from .*;$/gm)].flatMap(m=>m[1].split(',').map(x=>x.trim()));
  const source=script.replace(/^import .*;\n/gm,'').replace("import('./colmex-simulation-ui.js?v=20261017-occurrences')",'deps.loadPaperUI()');
  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
@@ -22,7 +24,7 @@ async function boot(mode){
  return {nodes,paperLoads,watched,html};
 }
 test('LIVE page starts without paper DOM, never loads simulation and ignores local paper prices',async()=>{
- const r=await boot('live');assert.equal(r.paperLoads,0);assert.equal(r.nodes.has('#simulationSummary'),false);assert.equal(r.nodes.has('#positionForm'),false);assert.equal(r.nodes.has('#brokerAccount'),true);assert.equal(r.nodes.get('#watchCount').textContent,'20');assert.equal(r.nodes.get('#selectedPrice').textContent,'—');assert.ok(!r.watched[0].tsla.text.includes('999'));assert.match(r.html,/href="\/colmex-simulation.html"/);
+ const r=await boot('live');assert.equal(r.paperLoads,0);assert.equal(r.nodes.has('#simulationSummary'),false);assert.equal(r.nodes.has('#positionForm'),false);assert.equal(r.nodes.has('#brokerAccount'),true);assert.equal(r.nodes.get('#watchCount').textContent,'50');assert.equal(r.nodes.get('#selectedPrice').textContent,'—');assert.ok(!r.watched[0].tsla.text.includes('999'));assert.match(r.html,/href="\/colmex-simulation.html"/);
 });
 test('separate simulation page retains history and local records, without live account or execution controls',async()=>{
  const r=await boot('simulation');assert.equal(r.paperLoads,1);assert.equal(r.nodes.has('#simulationJournal'),true);assert.equal(r.nodes.has('#positionForm'),true);assert.equal(r.nodes.has('#brokerAccount'),false);assert.equal(r.nodes.has('#colmexManualBuy'),false);assert.ok(r.nodes.get('#selectedPrice').textContent.includes('999'));assert.doesNotMatch(r.html,/src="\/colmex-(?:account|manual-ui|auto-ui)\.js/);
