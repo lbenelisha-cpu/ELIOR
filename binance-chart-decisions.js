@@ -85,6 +85,21 @@ function renderChartDecisionMarkers(ctx,view,allCandles,rows,step,left,top,inter
  };
 }
 
+// Presentation-only snapshots. Never copied into agents or execution eligibility.
+const displayedWyckoffSetups=new Map();
+function rememberWyckoffDisplay(agents,mode){
+ for(const agent of agents||[]){
+  const key=mode+':'+agent.symbol;
+  const unavailable=!!agent.analysisError||agent.execution==='ERROR'||agent.decision==='WAIT_DATA'||agent.buyReason==='WAIT_FRESH_PRICE';
+  if(unavailable){const prior=displayedWyckoffSetups.get(key);if(prior)prior.stale=true;continue;}
+  const setup=agent.strategy?.wyckoff;
+  // A successful empty/new search is authoritative: do not revive old pivots.
+  if(setup)displayedWyckoffSetups.set(key,{setup,stale:false});
+  else displayedWyckoffSetups.delete(key);
+ }
+}
+function displayedWyckoffSetup(symbol,mode){return displayedWyckoffSetups.get(mode+':'+symbol)||null;}
+
 function latestWyckoffSetup(rows){
  const candidates=rows.filter(r=>(r.analysisSignal===true||r.entryConfirmed===true||r.type==='BUY')&&(r.setup?.springLow||r.wyckoffTrade?.setup?.springLow)).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
  return candidates[0]?.setup||candidates[0]?.wyckoffTrade?.setup||null;
@@ -95,12 +110,14 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  const tradeSetup=agent?.position==='LONG'?agent.strategy?.setup:null;
  const latest=typeof chartWyckoffHistory!=='undefined'&&typeof wyckoffHistoryEngine!=='undefined'?wyckoffHistoryEngine?.visibleBinanceOccurrences(chartWyckoffHistory,view).at(-1):null;
  const chosen=latest&&latest.id===selectedWyckoffId?latest:null;
- const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:agent?.strategy?.wyckoff);if(!setup)return;
+ const display=displayedWyckoffSetup(selectedSymbol,currentMode);
+ const setup=chosen?.setup||(tradeSetup?.springLow?tradeSetup:display?.setup);if(!setup)return;
  const active=agent?.position==='LONG'&&!!tradeSetup?.springLow&&(!chosen||(setup.initialPeak?.time===tradeSetup.initialPeak?.time&&setup.secondaryTest?.time===tradeSetup.secondaryTest?.time));
  root.dataset.active=String(active);
  const status=document.createElement('span');status.className='wyckoff-setup-status';
  const at=Number(setup.signalTime||setup.confirmation?.time);
  status.textContent=(active?'מסחר פעיל · תבנית הקנייה':chosen?'תבנית היסטורית שנבחרה לעיון':'חיפוש תבנית עדכנית · אין פוזיציה')+(at?' · '+new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'');
+ if(!active&&!chosen&&display?.stale)status.textContent='נתונים לא עדכניים · מוצגים סימוני הניתוח האחרון · אין אישור קנייה חדש';
  root.append(status);
  const width=root.clientWidth,height=root.clientHeight;
  const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
