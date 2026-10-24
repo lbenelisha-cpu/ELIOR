@@ -46,3 +46,14 @@ test('close-only histories and intraday observations cannot masquerade as daily 
  assert.throws(()=>evaluateWyckoff(daily(prices).map(({date,close})=>({date,close}))),/DAILY_HIGH_LOW_REQUIRED/);
  assert.throws(()=>evaluateWyckoff(prices.map((close,i)=>({closeTime:Date.UTC(2020,0,1)+i*3600000,close,high:close,low:close}))),/DAILY_TIMEFRAME_REQUIRED/);
 });
+
+test('exceeding recovery high preserves secondary-test and consolidation pivots',()=>{
+ const secondary=daily(prices.slice(0,8));secondary[7].high=93;
+ const a=evaluateWyckoff(secondary);
+ assert.equal(a.phase,'CONSOLIDATION');assert.equal(a.initialPeak.price,100);assert.equal(a.firstLow.price,80);assert.equal(a.rallyHigh.price,92);
+ const consolidation=daily(prices.slice(0,11));consolidation[9].high=94;
+ const b=evaluateWyckoff(consolidation);assert.equal(b.phase,'CONSOLIDATION');assert.equal(b.rallyHigh.price,92);
+ assert.equal(evaluateWyckoff([...consolidation,...daily(prices).slice(11)]).buyConfirmed,true);
+ const invalid=secondary.map((bar,i)=>i===7?{...bar,high:100}:bar);
+ assert.equal(evaluateWyckoff(invalid).phase,'SEARCH_PEAK');
+});

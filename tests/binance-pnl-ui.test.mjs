@@ -6,7 +6,7 @@ const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf
 function setup(){
  const elements=new Map();const element=s=>{if(!elements.has(s))elements.set(s,{innerHTML:'',textContent:'',classList:{add(){},toggle(){}}});return elements.get(s);};
  const context={window:{LEVI_SCANNER_VIEW:{update:(body,rows)=>{body.innerHTML=rows.map(row=>`<tr class="${row.className}">${row.cells.map(cell=>`<td class="${cell.className||''}">${cell.html}</td>`).join('')}</tr>`).join('');}}},$:element,put:(s,v)=>element(s).textContent=v,fmt:(v,d=2)=>Number(v).toFixed(d),moneyUnit:'USDT',selectedSymbol:'ACEUSDT',activeView:'trade',currentVisibleAgents:[],document:{querySelectorAll:()=>[]},requestAnimationFrame(){},updateSelectedAsset(){}};
- vm.createContext(context);vm.runInContext(source.slice(source.indexOf('function decisionLabel('),source.indexOf('function rotationGapText(')),context);
+ vm.createContext(context);vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),context);vm.runInContext(source.slice(source.indexOf('function decisionLabel('),source.indexOf('function rotationGapText(')),context);
  return {context,elements,element};
 }
 function data(direction,pnl){return {paper:{currency:'USDT',positions:{ACEUSDT:{symbol:'ACEUSDT',entryPrice:1,allocationIls:100,qty:100,pnlIls:pnl,pnlPct:pnl}},activePositions:1,maxPositions:10},config:{},agents:[{symbol:'ACEUSDT',position:'LONG',decision:'ACTIVE_LONG',score:90,strategy:{price:1,direction},blocker:{text:'active'}}]};}
