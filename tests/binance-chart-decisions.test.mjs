@@ -49,6 +49,15 @@ test('Binance high captions use the upper edge, lows use the lower edge and arro
  scope.renderWyckoffPivots(view,[{at,analysisSignal:true,setup}],100,18,p=>300-p,4);
  const labels=root.children.filter(e=>e.className==='wyckoff-pivot'),arrows=root.children.filter(e=>e.className?.startsWith('wyckoff-arrow '));
  assert.equal(labels.length,6);assert.equal(arrows.length,6);
+ for(const label of labels)assert.equal(label.style.width,'max-content');
  for(const label of labels)assert.equal(label.style.top,['initialPeak','rallyHigh'].includes(label.dataset.pivot)?'66px':'533px');
  assert.equal(arrows[0].style.left,'68px');assert.equal(arrows[0].style.top,'200px');assert.equal(arrows[0].className,'wyckoff-arrow points-down');assert.equal(arrows[1].className,'wyckoff-arrow points-up');
+});
+test('only the latest numbered Wyckoff flag and detail button remain visible',()=>{
+ class Element{constructor(){this.children=[];this.dataset={};this.style={};}append(x){this.children.push(x);}replaceChildren(){this.children=[];}setAttribute(){}}
+ const overlay=new Element(),list=new Element(),summary=new Element(),items=Array.from({length:5},(_,i)=>({id:String(i),number:i+1,index:i,springAt:time+i*300000,setup:{springLow:{price:100}}}));
+ const nodes={'#wyckoffOccurrences':overlay,'#wyckoffOccurrenceList':list,'#wyckoffOccurrenceSummary':summary};
+ const scope=vm.createContext({Date,document:{querySelector:s=>nodes[s],createElement:()=>new Element()},wyckoffHistoryEngine:{visibleBinanceOccurrences:()=>items},chartWyckoffHistory:items,chartWyckoffError:null,selectedSymbol:'BTCUSDT',selectedInterval:'5m',fmt:String});
+ vm.runInContext(fs.readFileSync(new URL('../binance-chart-decisions.js',import.meta.url),'utf8'),scope);scope.renderNumberedWyckoff([],10,18,p=>p,2);
+ const flags=overlay.children.filter(e=>e.className==='wyckoff-occurrence');assert.equal(flags.length,1);assert.equal(flags[0].textContent,5);assert.equal(list.children.length,1);assert.match(summary.textContent,/האחרונה בלבד/);assert.equal(items.length,5);
 });
