@@ -81,3 +81,5 @@ renderAccess();if(pending)checkPending();setInterval(()=>{if(!document.hidden)ch
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkPending();});
 
 globalThis.addEventListener?.('trade-device-connected',()=>{try{token=localStorage.getItem(TOKEN_KEY);}catch{}renderAccess();});
+
+globalThis.addEventListener?.('trade-device-expired',()=>{token=null;renderAccess();});
