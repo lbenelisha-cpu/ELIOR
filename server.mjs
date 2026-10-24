@@ -23,7 +23,7 @@ import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} f
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from './lib/wyckoff-evaluation.mjs';
 import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
-import {FIXED_EXIT_POLICY,applyFixedExitPolicy} from './lib/fixed-trade-exit.mjs';
+import {TRAILING_EXIT_POLICY,applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
@@ -279,11 +279,11 @@ const tradingPositions=()=>{
  if(mode==='live'){
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
-  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyFixedExitPolicy(p);
+  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p);
   return positions;
  }
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
- for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyFixedExitPolicy(p);
+ for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p);
  return positions;
 };
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
@@ -758,11 +758,12 @@ function persistLivePeak(symbol, position){
   // Newer purchases start a separate entry and may update their own peak.
   if(tradingPositions()[symbol]?.entryAt!==position.entryAt)return;
   const buy=liveActionLog[buyIndex];
-  const policyChanged=['atrValue','atrTrailPct','effectiveStopPrice'].some(k=>Number(position[k]||0)!==Number(buy.wyckoffTrade[k]||0));
+  const policyChanged=position.exitPolicy!==buy.wyckoffTrade.exitPolicy||['atrValue','atrTrailPct','effectiveStopPrice'].some(k=>Number(position[k]||0)!==Number(buy.wyckoffTrade[k]||0));
   if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice&&!policyChanged)return;
   for(const key of ['atrValue','atrTrailPct','effectiveStopPrice'])if(Number.isFinite(Number(position[key])))buy.wyckoffTrade[key]=Number(position[key]);
   buy.wyckoffTrade.peakPrice=position.peakPrice;
   buy.wyckoffTrade.peakAt=position.peakAt||null;
+  for(const key of ['exitPolicy','profitFloorArmed','activationPrice','trailingGapPp'])if(position[key]!=null)buy.wyckoffTrade[key]=position[key];
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
 }
 
@@ -1450,7 +1451,7 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===FIXED_EXIT_POLICY?'יעד רווח 4% · סטופ 1% ממחיר הקנייה · פעילים מיד':'פוזיציה קודמת — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===TRAILING_EXIT_POLICY?'סטופ 1% · מרווח 4%: רצפה 4% ונגרר נקודת אחוז מהשיא':'פוזיציה קודמת — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
   return {code:'BUY_READY',text:'Spring ו־RSI חי 0–30 ומגמת שעה אושרו · קנייה ללא המתנה לסגירת נר'};
@@ -2345,9 +2346,13 @@ const server=http.createServer((req,res)=>{
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
         entryRsi:{period:14,timeframe:'5m',min:0,max:30,includesOpenCandle:true},
-        exitPolicy:FIXED_EXIT_POLICY,
+        exitPolicy:TRAILING_EXIT_POLICY,
         fixedExitVersion:1,
-        takeProfitPct:4,
+        takeProfitPct:null,
+        profitActivationPct:4,
+        profitFloorPct:4,
+        trailingGapPp:1,
+        trailingExitVersion:1,
         springStopLossPct:1,
         profitGivebackPct:null,
         profitRetentionPct:null,
