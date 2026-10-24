@@ -25,19 +25,19 @@ test('already-used patterns and missing history cannot become preparation candid
  assert.throws(()=>analyzePreparation({barDetails:[]},{symbol:'AAPL',now}),/WAIT_RSI_DATA/);
  assert.equal(analyzePreparation(h,{symbol:'AAPL',now,after:closed}).candidate,false);
 });
-test('closed-market rotation covers all ten even after one failure and throttles successful histories',async()=>{
+test('closed-market rotation covers all fifty even after one failure and throttles successful histories',async()=>{
  const state=initialState(now),catalog=AUTO_POLICY.symbols.map((name,i)=>({name,type:'EQUITY',tradableInstrumentId:i+1}));
- let t=now,calls=0,saves=0;
- const broker={instruments:async()=>catalog,history:async id=>{calls++;if(id===1)throw Error('private broker error');return history();},quote(){throw Error('no quote allowed');},write(){throw Error('no order allowed');}};
+ let t=now,calls=0,saves=0,catalogCalls=0;
+ const broker={instruments:async()=>{catalogCalls++;return catalog;},history:async id=>{calls++;if(id===1)throw Error('private broker error');return history();},quote(){throw Error('no quote allowed');},write(){throw Error('no order allowed');}};
  for(let i=0;i<10;i++,t+=60000)await runPreparationCycle({state,broker,save:async()=>saves++,account:'123',now:()=>t});
- assert.equal(state.preparation.checked,10);assert.equal(calls,10);assert.equal(saves,10);
- assert.equal(state.preparation.rows.AAPL.error,'PREPARATION_DATA_UNAVAILABLE');assert.equal(state.preparation.candidates.length,9);
+ assert.equal(state.preparation.checked,50);assert.equal(calls,50);assert.equal(saves,50);assert.equal(catalogCalls,10);
+ assert.equal(state.preparation.rows.AAPL.error,'PREPARATION_DATA_UNAVAILABLE');assert.equal(state.preparation.candidates.length,49);
  assert.deepEqual(state.used,[]);assert.deepEqual(state.positions,[]);assert.equal(state.pending,null);
  const r=await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>Date.parse('2026-10-26T15:00:00Z')});
- assert.equal(r.reason,'PREPARATION_MARKET_OPEN');assert.equal(calls,10);
+ assert.equal(r.reason,'PREPARATION_MARKET_OPEN');assert.equal(calls,50);
  // Retry the failed stock once; successful stocks stay cached until their 30-minute interval.
- await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>t});assert.equal(calls,11);
- await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>t+60000});assert.equal(calls,11);
+ await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>t});assert.equal(calls,51);
+ await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>t+60000});assert.equal(calls,51);
 });
 test('real closed-session cycle scans with a full portfolio, without consuming signals or writing orders',async()=>{
  const s=initialState(now),env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
