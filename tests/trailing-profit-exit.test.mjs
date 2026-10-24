@@ -9,7 +9,7 @@ import {LIVE_ACK} from '../lib/colmex-auto-policy.mjs';
 const pos=()=>applyTrailingExitPolicy({strategyId:'WYCKOFF_5M_V1',entryPrice:100,qty:2,peakPrice:100});
 test('activation is not a take-profit sale; peak +10% protects +9 percentage points',()=>{
  const p=pos();assert.equal(binancePositionExit(p,103.99).sell,false);assert.equal(p.effectiveStopPrice,99);
- assert.equal(binancePositionExit(p,104).sell,false);assert.equal(p.effectiveStopPrice,104);assert.equal(p.targetPrice,null);
+ assert.equal(binancePositionExit(p,104).sell,false);assert.equal(p.effectiveStopPrice,104);assert.equal(p.targetPrice,150);
  assert.equal(binancePositionExit(p,110).sell,false);assert.equal(p.effectiveStopPrice,109);assert.equal(p.trailingGapPp,1);
  assert.equal(binancePositionExit(p,109).reason,'PROFIT_FLOOR4_TRAIL1PP_EXIT');
 });
@@ -21,7 +21,7 @@ test('loss boundary, fixed profit floor, high-water ratchet and restart survive 
 });
 test('fills anchor initial stop and activation to actual execution, not intent price',()=>{
  const r=liveFillAction({executedQty:'2',cummulativeQuoteQty:'200',status:'FILLED',orderId:1},{params:{symbol:'ABCUSDT',side:'BUY'},at:new Date().toISOString(),meta:{wyckoffTrade:{...pos(),entryPrice:105}}},[]);
- assert.equal(r.wyckoffTrade.entryPrice,100);assert.equal(r.wyckoffTrade.activationPrice,104);assert.equal(r.wyckoffTrade.effectiveStopPrice,99);assert.equal(r.wyckoffTrade.targetPrice,null);
+ assert.equal(r.wyckoffTrade.entryPrice,100);assert.equal(r.wyckoffTrade.activationPrice,104);assert.equal(r.wyckoffTrade.effectiveStopPrice,99);assert.equal(r.wyckoffTrade.targetPrice,150);
 });
 test('chart displays active trailing floor rather than a fixed profit ceiling',()=>{
  const c={};vm.runInNewContext(fs.readFileSync(new URL('../trade-risk.js',import.meta.url),'utf8'),c);const p=pos();binancePositionExit(p,110);
@@ -42,14 +42,14 @@ async function cycle(bid,peakPrice=100,brokerStop=99,takeProfit=null){
  const p={id:'p',tradableInstrumentId:1,side:'buy',qty:2,stopLoss:brokerStop,takeProfit};
  await runCycle({state,save:async()=>{},env,now:()=>now,broker:{snapshot:async()=>({account:{tradingRules:{}},state:{},positions:[p],orders:[],history:[]}),quote:async()=>({bp:bid}),write:async(a,i)=>{written=structuredClone(i);return {};}}});return {state,written,p};
 }
-test('Colmex clears old fixed TP and raises broker SL to +9% at a +10% observed peak',async()=>{
- const {written,state,p}=await cycle(110,100,99,104);assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,109);assert.equal(written.takeProfit,null);
+test('Colmex replaces old fixed TP with +50% and raises broker SL to +9% at a +10% observed peak',async()=>{
+ const {written,state,p}=await cycle(110,100,99,104);assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,109);assert.equal(written.takeProfit,150);
  reconcile(state,{positions:[{...p,stopLoss:109,takeProfit:104}],orders:[],history:[]},now+1);assert.ok(state.pending);
- reconcile(state,{positions:[{...p,stopLoss:109,takeProfit:null}],orders:[],history:[]},now+2);assert.equal(state.pending,null);
+ reconcile(state,{positions:[{...p,stopLoss:109,takeProfit:150}],orders:[],history:[]},now+2);assert.equal(state.pending,null);
 });
 test('Colmex does not sell merely at +4%, retains old SL at exact boundary, and never lowers a broker stop',async()=>{
- assert.equal((await cycle(104)).written,undefined);
- const clear=await cycle(104,100,99,104);assert.equal(clear.written.kind,'PROTECTION');assert.equal(clear.written.stopLoss,99);assert.equal(clear.written.takeProfit,null);
+ assert.equal((await cycle(104,100,99,150)).written,undefined);
+ const clear=await cycle(104,100,99,104);assert.equal(clear.written.kind,'PROTECTION');assert.equal(clear.written.stopLoss,99);assert.equal(clear.written.takeProfit,150);
  const raised=await cycle(110,100,109.5,104);assert.equal(raised.written.stopLoss,109.5);
  const closed=await cycle(109,110);assert.equal(closed.written.kind,'CLOSE');assert.equal(closed.written.qty,2);
 });

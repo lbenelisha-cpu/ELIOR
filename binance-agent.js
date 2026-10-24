@@ -460,6 +460,8 @@ function decisionReasonLabel(r){
     PROFIT_FLOOR4_TRAIL1PP_HOLD:'רצפת רווח 4% · נגרר נקודת אחוז מהשיא',
     PROFIT_FLOOR4_TRAIL1PP_EXIT:'מכירה · הגנת רווח נגררת',
     TRAIL_STOP_LOSS_1_PERCENT:'מכירה · סטופ הפסד 1%',
+    BROKER_TAKE_PROFIT_50_PERCENT:'מכירה · יעד רווח 50%',
+    BROKER_STOP_LOSS:'מכירה · סטופ אצל הברוקר',
     FIXED_TP4_SL1_HOLD:'יעד רווח 4% · סטופ 1% ממחיר הקנייה',
     FIXED_TAKE_PROFIT_4_PERCENT:'מכירה · יעד רווח 4%',
     FIXED_STOP_LOSS_1_PERCENT:'מכירה · סטופ 1%',
