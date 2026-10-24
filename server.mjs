@@ -1,3 +1,5 @@
+import {analyzeCandlePower} from './lib/candle-power.mjs';
+import {DEFAULT_TRADE_SETTINGS,validateTradeSettings} from './lib/trade-settings.mjs';
 import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
@@ -281,12 +283,12 @@ const tradingPositions=()=>{
  if(mode==='live'){
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
-  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p);
+  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
   for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,stopPrice:r.stop,takeProfitPrice:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
  }
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
- for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p);
+ for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
  return positions;
 };
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
@@ -333,6 +335,9 @@ function loadPaperState(){
   }
 }
 
+const SETTINGS_FILE=process.env.BINANCE_SETTINGS_FILE||'/var/data/binance-trade-settings.json';
+let tradeSettings=fs.existsSync(SETTINGS_FILE)?JSON.parse(fs.readFileSync(SETTINGS_FILE,'utf8')):{revision:0,values:{...DEFAULT_TRADE_SETTINGS}};
+tradeSettings.values=validateTradeSettings(tradeSettings.values);
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
@@ -673,6 +678,7 @@ function floorToStep(value,step){
 async function recordLiveFill(order,intent){
  lastDisplayAccount=null;
  const fills=order.fills||await signedBinanceGet('/api/v3/myTrades',{symbol:intent.params.symbol,orderId:String(order.orderId)});
+ if(intent.params.side==='BUY'&&intent.meta?.wyckoffTrade)intent={...intent,meta:{...intent.meta,wyckoffTrade:{...intent.meta.wyckoffTrade,exitSettings:tradeSettings.values}}};
  pushLiveAction(liveFillAction(order,intent,fills));
 }
 async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
@@ -785,7 +791,7 @@ function persistLivePeak(symbol, position){
   for(const key of ['atrValue','atrTrailPct','effectiveStopPrice'])if(Number.isFinite(Number(position[key])))buy.wyckoffTrade[key]=Number(position[key]);
   buy.wyckoffTrade.peakPrice=position.peakPrice;
   buy.wyckoffTrade.peakAt=position.peakAt||null;
-  for(const key of ['exitPolicy','profitFloorArmed','activationPrice','trailingGapPp'])if(position[key]!=null)buy.wyckoffTrade[key]=position[key];
+  for(const key of ['exitPolicy','exitSettings','profitFloorArmed','activationPrice','trailingGapPp'])if(position[key]!=null)buy.wyckoffTrade[key]=position[key];
   if(!saveLiveActionLog())throw Error('LIVE_PEAK_PERSISTENCE_FAILED');
 }
 
@@ -1375,6 +1381,7 @@ async function evaluateSymbol(s){
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
     const ev=evaluateDailyTrade({symbol:s,searchAfter:latestSaleAt,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
+    if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
     const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
     ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});
     if(p){
@@ -1994,7 +2001,7 @@ async function adoptManualBinanceHolding(){
    const latest=await getLiveAccountSnapshot(),balance=latest.balances.find(x=>x.asset===b.asset);
    if(!balance||Math.abs(balance.qty-b.qty)>Math.max(1e-8,b.qty*1e-6))continue;
    const prior=tradingPositions()[symbol];
-   const action=externalBinanceEntry(balance,trades,Date.now(),prior);
+   const action=externalBinanceEntry(balance,trades,Date.now(),prior,tradeSettings.values);
    if(action){pushLiveAction(action);if(!SYMBOLS.includes(symbol)){initUniverse([...SYMBOLS,symbol]);startMarketStream();}console.log('Manual holding enrolled',symbol);}
   }catch(error){console.error('Manual holding adoption blocked',symbol,error.message);}
   break; // Bound network work under the execution lock; next holding on next pass.
@@ -2018,102 +2025,6 @@ setInterval(()=>{
 setInterval(refreshUniverse,300000).unref();
 
 
-function analyzeCandlePower(candles,lookback=10){
-  const rows=(Array.isArray(candles)?candles:[]).slice(-Math.max(3,lookback));
-  const analyzed=rows.map((c,index)=>{
-    const open=Number(c.open),high=Number(c.high),low=Number(c.low),close=Number(c.close),volume=Number(c.volume||0);
-    const range=Math.max(high-low,Number.EPSILON);
-    const body=Math.abs(close-open);
-    const upper=Math.max(0,high-Math.max(open,close));
-    const lower=Math.max(0,Math.min(open,close)-low);
-    const bodyRatio=body/range;
-    const upperRatio=upper/range;
-    const lowerRatio=lower/range;
-    const closeLocation=(close-low)/range;
-    const changePct=open?((close/open)-1)*100:0;
-
-    let state='NEUTRAL',reason='נר מאוזן';
-    if(close>open && bodyRatio>=0.45 && closeLocation>=0.68){
-      state='BUYERS_STRONG'; reason='גוף ירוק משמעותי וסגירה קרובה לגבוה';
-    }else if(close<open && bodyRatio>=0.45 && closeLocation<=0.32){
-      state='SELLERS_STRONG'; reason='גוף אדום משמעותי וסגירה קרובה לנמוך';
-    }else if(lowerRatio>=0.42 && closeLocation>=0.55){
-      state='BUYERS_REJECTION'; reason='פתיל תחתון ארוך — קונים דחו את הירידה';
-    }else if(upperRatio>=0.42 && closeLocation<=0.45){
-      state='SELLERS_REJECTION'; reason='פתיל עליון ארוך — מוכרים דחו את העלייה';
-    }else if(close>open){
-      state='BUYERS_EDGE'; reason='יתרון קל לקונים';
-    }else if(close<open){
-      state='SELLERS_EDGE'; reason='יתרון קל למוכרים';
-    }
-
-    const buyerPoints=
-      (close>=open?25:0)+
-      Math.max(0,Math.min(35,closeLocation*35))+
-      Math.max(0,Math.min(25,lowerRatio*50))+
-      (state==='BUYERS_STRONG'?15:state==='BUYERS_REJECTION'?12:state==='BUYERS_EDGE'?6:0);
-    const sellerPoints=
-      (close<=open?25:0)+
-      Math.max(0,Math.min(35,(1-closeLocation)*35))+
-      Math.max(0,Math.min(25,upperRatio*50))+
-      (state==='SELLERS_STRONG'?15:state==='SELLERS_REJECTION'?12:state==='SELLERS_EDGE'?6:0);
-
-    return {
-      index:index+1,
-      openTime:Number(c.openTime||0),
-      closeTime:Number(c.closeTime||0),
-      open,high,low,close,volume,
-      changePct,
-      bodyPct:bodyRatio*100,
-      upperWickPct:upperRatio*100,
-      lowerWickPct:lowerRatio*100,
-      closeLocationPct:closeLocation*100,
-      state,reason,
-      buyerPoints:Math.round(buyerPoints*10)/10,
-      sellerPoints:Math.round(sellerPoints*10)/10
-    };
-  });
-
-  let higherHighs=0,higherLows=0,lowerHighs=0,lowerLows=0;
-  for(let i=1;i<rows.length;i++){
-    if(Number(rows[i].high)>Number(rows[i-1].high))higherHighs++; else if(Number(rows[i].high)<Number(rows[i-1].high))lowerHighs++;
-    if(Number(rows[i].low)>Number(rows[i-1].low))higherLows++; else if(Number(rows[i].low)<Number(rows[i-1].low))lowerLows++;
-  }
-
-  const buyerScore=analyzed.reduce((a,x)=>a+x.buyerPoints,0);
-  const sellerScore=analyzed.reduce((a,x)=>a+x.sellerPoints,0);
-  const structureUp=higherHighs+higherLows;
-  const structureDown=lowerHighs+lowerLows;
-
-  let trend='SIDEWAYS';
-  if(structureUp>=structureDown+3 && buyerScore>sellerScore)trend='UP';
-  else if(structureDown>=structureUp+3 && sellerScore>buyerScore)trend='DOWN';
-
-  const buyerCandles=analyzed.filter(x=>x.state.startsWith('BUYERS')).length;
-  const sellerCandles=analyzed.filter(x=>x.state.startsWith('SELLERS')).length;
-  const neutralCandles=Math.max(0,analyzed.length-buyerCandles-sellerCandles);
-
-  let control='BALANCED';
-  if(buyerCandles>=7 && sellerCandles<=3)control='BUYERS';
-  else if(sellerCandles>=7 && buyerCandles<=3)control='SELLERS';
-
-  return {
-    lookback:analyzed.length,
-    trend,
-    control,
-    buyerCandles,
-    sellerCandles,
-    neutralCandles,
-    buyerScore:Math.round(buyerScore*10)/10,
-    sellerScore:Math.round(sellerScore*10)/10,
-    higherHighs,higherLows,lowerHighs,lowerLows,
-    explanation:
-      trend==='UP'?'מבנה המחיר נוטה לשיאים ושפלים עולים':
-      trend==='DOWN'?'מבנה המחיר נוטה לשיאים ושפלים יורדים':
-      'אין כרגע רצף מספיק ברור של שיאים ושפלים',
-    candles:analyzed
-  };
-}
 
 const send=(res,o,c=200)=>{
   res.writeHead(c,{
@@ -2126,19 +2037,37 @@ const send=(res,o,c=200)=>{
   res.end(JSON.stringify(o));
 };
 
+const powerCache=new Map();
 const displayChartReader=createChartReader(j);
 const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
   if(req.method==='OPTIONS')return send(res,{},204);
   const protectedControl=req.method==='POST'&&(
-    u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||
+    u.pathname==='/api/binance-settings'||u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||
     (mode==='live'&&u.pathname==='/api/binance-agent/evaluate')
   );
   if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)&&!controlDevices.authorized(req.headers.authorization)){
     return send(res,{ok:false,error:'Authenticated control required: configure BINANCE_CONTROL_TOKEN (at least 32 characters) and send a Bearer token'},401);
   }
 
+  if(u.pathname==='/api/binance-settings'){
+   if(req.method==='GET')return send(res,{ok:true,...tradeSettings});
+   if(req.method!=='POST')return send(res,{ok:false},405);
+   let text='';req.on('data',chunk=>{text+=chunk;if(text.length>2000)req.destroy();});
+   req.on('end',async()=>{try{const input=JSON.parse(text);await liveExecution.manual(async()=>{
+    if(input.revision!==tradeSettings.revision)throw Error('SETTINGS_CHANGED_RELOAD');
+    const next={revision:tradeSettings.revision+1,values:validateTradeSettings(input.values),updatedAt:new Date().toISOString()};
+    fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(next),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);tradeSettings=next;
+   });send(res,{ok:true,...tradeSettings});}catch(e){send(res,{ok:false,error:e.message},400);}});return;
+  }
+  if(u.pathname==='/api/binance-market-power'&&req.method==='GET'){
+   const symbol=u.searchParams.get('symbol'),interval=u.searchParams.get('interval')||'1d';
+   if(!/^[A-Z0-9]+USDT$/.test(symbol||'')||!['1h','1d','1w','1M'].includes(interval))return send(res,{ok:false,error:'INVALID_INTERVAL'},400);
+   const key=symbol+':'+interval,old=powerCache.get(key);
+   if(!old||Date.now()-old.at>60000){if(powerCache.size>64)powerCache.delete(powerCache.keys().next().value);const promise=j('/api/v3/klines?symbol='+symbol+'&interval='+interval+'&limit=12').then(rows=>({ok:true,symbol,interval,analysis:analyzeCandlePower(rows.filter(r=>Number(r[6])<Date.now()).map(r=>({openTime:+r[0],closeTime:+r[6],open:+r[1],high:+r[2],low:+r[3],close:+r[4],volume:+r[5]}))),asOf:new Date().toISOString()}));powerCache.set(key,{at:Date.now(),promise});promise.catch(()=>powerCache.delete(key));}
+   powerCache.get(key).promise.then(data=>send(res,data)).catch(e=>send(res,{ok:false,error:e.message},503));return;
+  }
   if(u.pathname==='/api/binance-control/session'&&req.method==='POST'){
     let body='';req.on('data',chunk=>{body+=chunk;if(body.length>500)req.destroy();});
     req.on('end',()=>{try{const input=JSON.parse(body||'{}');return send(res,controlDevices.issue(input.code));}catch(error){return send(res,{ok:false,error:error.message},error.status||400);}});return;

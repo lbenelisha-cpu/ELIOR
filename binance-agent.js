@@ -687,7 +687,7 @@ async function loadChartRequest(symbol){
     if(typeof window!=='undefined')window.LEVI_CHART_CACHE?.write(contextKey,d);
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
     // Price data is visible immediately; historical annotations may finish later.
-    drawCandles(chartCandles);renderCandlePower(d.candleAnalysis);
+    drawCandles(chartCandles);globalThis.LEVI_MARKET_POWER?.load(selectedSymbol);
     try{
     const historyEngine=wyckoffHistoryEngine||await import('/lib/binance-wyckoff-history.mjs?v=20261017-history');
     wyckoffHistoryEngine=historyEngine;
@@ -704,7 +704,7 @@ async function loadChartRequest(symbol){
     }catch(historyError){if(requestId!==chartRequestId)return;const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};chartWyckoffHistory=wyckoffHistoryEngine?wyckoffHistoryEngine.mergeBinanceRecorded([],chartDecisions,position):[];chartWyckoffError=historyError.message;}
     if(requestId!==chartRequestId)return;
     drawCandles(chartCandles);
-    renderCandlePower(d.candleAnalysis);
+    globalThis.LEVI_MARKET_POWER?.load(selectedSymbol);
   }catch(e){
     if(requestId!==chartRequestId)return;
     if(chartAnalysisContext===contextKey&&chartCandles.length){
@@ -860,10 +860,10 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
-    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +4%':'יעד רווח +4%',color:'#64e1ae'},
+    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+tradeRisk.activation+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
-    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −1%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
+    {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −'+tradeRisk.sl+'%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
   const labelRows=[];

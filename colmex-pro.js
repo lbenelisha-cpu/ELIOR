@@ -107,6 +107,7 @@ if(PAPER_MODE)$('#removePosition').onclick=()=>{delete state.positions[selected]
 $('#csvFile').onchange=async e=>{const file=e.target.files[0],symbol=selected;if(!file)return;try{if(file.size>3000000)throw Error('גודל הקובץ המרבי הוא 3MB.');const bars=parseCandles(await file.text());state.bars[symbol]=bars;manualCharts.add(symbol);message('יובאו '+bars.length+' נרות עבור '+symbol+'. הנתונים אינם מחירים חיים.');save();render();}catch(err){message(err.message);}finally{e.target.value='';}};
 
 async function loadMarket(force=true){
+ globalThis.LEVI_MARKET_POWER?.load(selected);
  const symbol=selected,interval=$('#marketInterval').value,key=symbol+':'+interval;
  if(force)manualCharts.delete(symbol);
  if(manualCharts.has(symbol)){ $('#marketStatus').textContent='מצב CSV · רענן נתוני שוק כדי לחזור לספק החיצוני';return; }
@@ -115,6 +116,7 @@ async function loadMarket(force=true){
  if(!marketLoadGate.begin(key)){const retryAt=marketLoadGate.retryAt(key);$('#marketStatus').textContent=retryAt>Date.now()?(marketFailures.get(key)||'ממתין למקור הנתונים')+' · ניסיון אוטומטי ב־'+new Date(retryAt).toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem'}):'בקשת הגרף ממתינה לסיום הטעינה הקודמת';return;}
  let succeeded=false,retryAfterMs=65000;const request=++marketRequest;pendingMarkets.add(key);$('#marketStatus').textContent='טוען '+symbol+' מקולמקס־פרו…';
  try{
+  globalThis.LEVI_MARKET_POWER?.load(symbol);
   const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await response.json();
   if(!response.ok){const error=Error(data.error||'שגיאת מקור נתונים');error.retryAfterMs=Number(data.retryAfterSeconds)*1000;throw error;}
   if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
