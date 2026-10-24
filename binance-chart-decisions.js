@@ -91,7 +91,13 @@ function rememberWyckoffDisplay(agents,mode){
  for(const agent of agents||[]){
   const key=mode+':'+agent.symbol;
   const unavailable=!!agent.analysisError||agent.execution==='ERROR'||agent.decision==='WAIT_DATA'||agent.buyReason==='WAIT_FRESH_PRICE';
-  if(unavailable){const prior=displayedWyckoffSetups.get(key);if(prior)prior.stale=true;continue;}
+  if(unavailable){
+   const prior=displayedWyckoffSetups.get(key);
+   const retained=agent.strategy?.wyckoff;
+   if(prior)prior.stale=true;
+   else if(retained)displayedWyckoffSetups.set(key,{setup:retained,stale:true});
+   continue;
+  }
   const setup=agent.strategy?.wyckoff;
   // A successful empty/new search is authoritative: do not revive old pivots.
   if(setup)displayedWyckoffSetups.set(key,{setup,stale:false});
