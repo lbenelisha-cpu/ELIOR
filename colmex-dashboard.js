@@ -6,12 +6,13 @@ const price=v=>v>0?Number(v).toLocaleString('en-US',{maximumSignificantDigits:7}
 const signed=v=>v===null||v===undefined?'—':(v>0?'+':'')+n(v);
 const time=t=>t?new Date(t).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'טרם אומת';
 const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
-let account=window.LEVI_COLMEX_ACCOUNT||null,status=null,statusFailed=false,market=null;
+let account=window.LEVI_COLMEX_ACCOUNT||null,status=window.LEVI_COLMEX_STATUS?.data||null,statusFailed=window.LEVI_COLMEX_STATUS?.error||false,market=window.LEVI_COLMEX_MARKET||null;
 function health(id,kind,message){$(id).dataset.state=kind;$(id).textContent=message;}
 function render(){
  const now=Date.now(),data=account?.data,fresh=data?.selectedAccount&&!account.error&&Date.parse(data.observedAt)<=now+5000&&now-Date.parse(data.observedAt)<180000;
- health('colmexAccountHealth',fresh?'good':account?.error?'warning':'unknown',fresh?'החשבון מעודכן':account?.error?'עדכון החשבון נכשל':'ממתין לנתוני חשבון');
+ health('colmexAccountHealth',fresh?'good':account?.error?'warning':'unknown',fresh?'החשבון מעודכן':account?.error?'החשבון אינו מאומת':data?.selectionRequired?'יש לבחור חשבון בפירוט':'ממתין לנתוני חשבון');
  txt('colmexSnapshotAt',fresh?'חשבון '+(data.selectedAccount?.name||data.selectedAccount?.id||'נבחר')+' · '+time(data.observedAt):account?.error?'החיבור מתעכב · היתרה והפוזיציות אינן מאומתות כרגע':'הנתונים יופיעו עם קבלת תשובת הברוקר');
+ const currency=data?.selectedAccount?.currency||'USD';txt('colmexEquityLabel','שווי החשבון · '+currency);txt('colmexCashLabel','מזומן בחשבון · '+currency);txt('colmexPnlLabel','רווח / הפסד פתוח נטו · '+currency);
  txt('colmexEquity',fresh?n(data.state?.projectedBalance??data.state?.balance):'—');txt('colmexCash',fresh?n(data.state?.cashBalance):'—');
  txt('colmexOpenPnl',fresh?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=fresh&&Number(data.state?.openNetPnL)<0?'negative':'positive';
  txt('colmexSlotCount',fresh?(data.positions||[]).length+' / '+(status?.policy?.maxPositions||3):'—');
@@ -48,8 +49,10 @@ window.addEventListener('levi:colmex-market',e=>{market=e.detail;render();});
 $('colmexCollapseAll').onclick=()=>document.querySelectorAll('main details[open]').forEach(d=>d.open=false);
 $('colmexOpenChart').onclick=()=>{$('colmexChartPanel').open=true;$('colmexChartPanel').scrollIntoView({behavior:'smooth',block:'start'});};
 $('colmexOpenAccount').onclick=()=>{$('colmexAccountDetails').open=true;$('colmexAccountDetails').scrollIntoView({behavior:'smooth',block:'start'});};
+const marketPower=$('marketPowerSettingsPanel');if(marketPower)document.querySelector('#colmexChartPanel > .disclosure-content').append(marketPower);
 const settings=$('openAppSettings');if(settings){$('colmexHeaderActions').append(settings);settings.textContent='⚙ הגדרות';}
 function calculate(e){e?.preventDefault();const form=$('colmexScenario'),input=Object.fromEntries(new FormData(form)),r=stockScenario(input),host=$('colmexScenarioResults');host.replaceChildren();txt('colmexScenarioError',r.error||'');if(r.error)return;
  for(const [label,value,cls] of [['כמות מניות שלמות',n(r.quantity),''],['רווח ביעד אחרי העלויות שהוזנו','$'+signed(r.targetPnl),r.targetPnl>0?'positive':'negative'],['תוצאה בסטופ אחרי העלויות שהוזנו','$'+signed(r.stopPnl),'negative'],['מחיר איזון','$'+price(r.breakEven),''],['יחס רווח / סיכון',r.ratio===null?'אין רווח נטו ביעד':n(r.ratio)+' : 1',''],['עלות כולל עמלת קנייה','$'+n(r.debit),'']]){const item=el('article');item.append(el('span',label),el('strong',value,cls));host.append(item);}}
 $('colmexScenario').addEventListener('submit',calculate);
+$('colmexScenario').addEventListener('input',()=>{$('colmexScenarioResults').replaceChildren();txt('colmexScenarioError','הזן את התרחיש ולחץ על חשב.');});
 render();setInterval(()=>{if(!document.hidden)render();},15000);

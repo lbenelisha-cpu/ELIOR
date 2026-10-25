@@ -87,10 +87,19 @@ test('risk intents reserve the account even after the main intent is resolved',a
 });
 test('broker adapter isolates missing history while critical snapshots still fail closed',async()=>{
  const cols=names=>({columns:names.map(id=>({id}))}),config={accountDetailsConfig:cols(['availableCash']),positionsConfig:cols(['id','tradableInstrumentId','side','qty']),ordersConfig:cols(['id','tradableInstrumentId','side']),ordersHistoryConfig:cols(['id','status'])};
- let fail='/ordersHistory',calls=[];
- const fetchImpl=async(url)=>{const path=new URL(url).pathname.replace('/traderevolution/v1','');calls.push(path);if(path.endsWith(fail))throw Error('timeout');const d=path==='/authorize'?{access_token:'fixture-token',expiration:now/1000+3600}:path==='/config'?config:path==='/accounts'?{accounts:[{id:'123',type:'live',currency:'USD',status:'ACTIVE'}]}:path.endsWith('/state')?{accountDetailsData:[1000]}:path.endsWith('/positions')?{positions:[['p',1,'buy',2]]}:path.endsWith('/orders')?{orders:[]}:{ordersHistory:[]};return new Response(JSON.stringify({s:'ok',d}),{status:200});};
+ let fail='/ordersHistory',calls=[],malformed=false;
+ const fetchImpl=async(url)=>{const path=new URL(url).pathname.replace('/traderevolution/v1','');calls.push(path);if(path.endsWith(fail))throw Error('timeout');const d=path==='/authorize'?{access_token:'fixture-token',expiration:now/1000+3600}:path==='/config'?config:path==='/accounts'?{accounts:[{id:'123',type:'live',currency:'USD',status:'ACTIVE'}]}:path.endsWith('/state')?{accountDetailsData:[1000]}:path.endsWith('/positions')?{positions:[['p',1,'buy',2]]}:path.endsWith('/orders')?{orders:[]}:{ordersHistory:malformed?[[]]:[]};return new Response(JSON.stringify({s:'ok',d}),{status:200});};
  const b=new AutoBroker({env,deadline:now+27000,now:()=>now,fetchImpl});
  const s=await b.snapshot('123');assert.equal(s.historyAvailable,false);assert.equal(s.positions.length,1);
  calls=[];const lightweight=await b.snapshot('123',{includeHistory:false});assert.equal(lightweight.historyAvailable,true);assert.equal(calls.some(p=>p.endsWith('/ordersHistory')),false);
+ fail='/never';malformed=true;assert.equal((await b.snapshot('123')).historyAvailable,false);
  fail='/positions';await assert.rejects(b.snapshot('123'),/NETWORK/);
+});
+
+
+test('failed storage writes are tagged so the worker cannot retry an unsaved order as error state',async()=>{
+ const store=memoryStore(null),l=await lease(store,'123',()=>now),write=store.setJSON;let calls=0;
+ store.setJSON=async(...args)=>{if(++calls===1)throw Error('storage unavailable');return write(...args);};
+ l.state.pending=pending();await assert.rejects(l.save(l.state),e=>e.statePersistenceFailure===true&&e.message==='STATE_SAVE_FAILED');
+ await l.release();assert.equal(store.read().state.pending,null);
 });

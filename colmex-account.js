@@ -54,8 +54,8 @@ async function status(){
   enabled=d.credentialsConfigured===true;
   $('brokerSetupStatus').textContent=enabled?'תצוגת נתוני חשבון · חיבור אוטומטי ללא קוד צפייה.':'יש להגדיר בשרת את פרטי COLMEX_API_LOGIN ו־COLMEX_API_PASSWORD.';
   $('brokerRefresh').disabled=!enabled;
-  if(enabled)refresh();
- }catch{$('brokerSetupStatus').textContent='בדיקת החיבור אינה זמינה כרגע. רענן את העמוד מאוחר יותר.';}
+  if(enabled)refresh();else publish(null,'חיבור החשבון אינו מוגדר בסביבה הזו');
+ }catch{publish(null,'בדיקת החיבור אינה זמינה');$('brokerSetupStatus').textContent='בדיקת החיבור אינה זמינה כרגע. רענן את העמוד מאוחר יותר.';}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&enabled&&auto)refresh();});
 status();

@@ -4,7 +4,7 @@ import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colme
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
 import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261023-rolling';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
-function publishMarket(data){if(typeof window!=='undefined'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}
+function publishMarket(data){if(typeof window!=='undefined'){window.LEVI_COLMEX_MARKET=data;if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}}
 const PAPER_MODE=document.body.dataset.mode==='simulation';
 let paperUI=null;
 const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:[]};
