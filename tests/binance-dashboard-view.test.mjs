@@ -27,3 +27,7 @@ test('unmanaged holdings do not acquire illustrative stop and target levels',()=
  const d=fixture();d.agent.agents[0].strategy={};d.account.balances[0].pnlIls=null;
  const u=ui(d);assert.equal(u.text('overviewPnl'),'—');assert.match(u.text('positionMapContent'),/אין רמות הגנה להצגה/);assert.doesNotMatch(u.text('positionMapContent'),/אומתו בבורסה/);
 });
+test('a native standalone stop labels the profit target as server-managed',()=>{
+ const d=fixture(),p=d.agent.agents[0].strategy.brokerProtection;p.mode='STOP_ONLY';p.takeProfitPrice=null;d.agent.config.liveState.softwareTargets=['BTCUSDT'];
+ const u=ui(d);assert.match(u.text('positionMapContent'),/יעד במעקב השרת/);assert.match(u.text('positionMapContent'),/יעד הרווח תלוי בפעילות השרת/);assert.doesNotMatch(u.text('positionMapContent'),/מחירי ההגנה אומתו בבורסה/);
+});
