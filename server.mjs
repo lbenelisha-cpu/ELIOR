@@ -287,7 +287,7 @@ const liveManagedPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
   for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
-  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,stopPrice:r.stop,takeProfitPrice:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
+  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,mode:r.mode||'OCO',stopPrice:r.stop,takeProfitPrice:r.mode==='STOP_ONLY'?null:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
 };
 const tradingPositions=()=>{
@@ -446,7 +446,7 @@ function liveReadiness(){
  const checked=Date.parse(liveStateHealth.reconciliation.checkedAt);
  const reconciled=liveStateHealth.reconciliation.ready&&Number.isFinite(checked)&&Date.now()-checked<60000;
  return {...liveStateHealth,ready:liveStateHealth.journalReady&&reconciled&&!liveOrders.pending&&!nativeProtection.uncertain()&&!missingProtection.length,
-  missingProtection,pendingOrder:!!liveOrders.pending,managedPositions:Object.keys(positions).length};
+  softwareTargets:Object.keys(positions).filter(s=>nativeProtection.rows[s]?.phase==='ACTIVE'&&nativeProtection.rows[s]?.mode==='STOP_ONLY'),missingProtection,pendingOrder:!!liveOrders.pending,managedPositions:Object.keys(positions).length};
 }
 async function reconcileLiveHoldings(){
  if(!liveStateHealth.journalReady)throw Error(liveStateHealth.journalError||'LIVE_JOURNAL_UNAVAILABLE');
@@ -2099,6 +2099,7 @@ setInterval(()=>{
   if(!gate.ready||gate.withdrawalsEnabled)return;
   let price=null;try{price=requireLivePrice(streams[symbol],Date.now(),15000);}catch{}
   await nativeProtection.sync(symbol,p,price);
+  if(nativeProtection.rows[symbol]?.phase==='ACTIVE'&&!liveReadiness().missingProtection.length&&/Filter failure: PERCENT_PRICE/.test(liveStateHealth.lastExecutionError?.error||''))liveStateHealth.lastExecutionError=null;
  }).catch(error=>recordLiveError(null,error));
 },1000).unref();
 setInterval(refreshUniverse,300000).unref();

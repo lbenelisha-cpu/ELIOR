@@ -46,9 +46,10 @@ function renderPosition(summary,fresh){
   const protection=s?.brokerProtection;
   const verified=snapshot.mode==='live'&&managed&&snapshot.agent.config?.liveState?.ready===true&&protection?.status==='ACTIVE'&&finite(protection.verifiedAt)>Date.now()-60000;
   const stop=managed?finite(verified?protection.stopPrice:s.effectiveStopPrice):null;
-  const target=managed?finite(verified?protection.takeProfitPrice:s.entryPrice*(1+(s.takeProfitPct??50)/100)):null;
+  const serverTarget=verified&&protection.mode==='STOP_ONLY';
+  const target=managed?finite(verified&&!serverTarget?protection.takeProfitPrice:s.entryPrice*(1+(s.takeProfitPct??50)/100)):null;
   const grid=node('div',null,'position-prices');
-  for(const [label,value,cls]of [['כניסה',entry,''],['מחיר נוכחי',current,''],['סטופ',stop,'negative'],['יעד רווח',target,'positive']]){
+  for(const [label,value,cls]of [['כניסה',entry,''],['מחיר נוכחי',current,''],['סטופ',stop,'negative'],[serverTarget?'יעד במעקב השרת':'יעד רווח',target,'positive']]){
     const item=node('div');item.append(node('span',label),node('b',price(value),cls));grid.append(item);
   }host.append(grid);
   if(entry>0&&current>0&&stop>0&&target>stop){
@@ -58,7 +59,7 @@ function renderPosition(summary,fresh){
     for(const [v,cls]of [[stop,'stop'],[entry,'entry'],[target,'target'],[current,'current']]){const marker=node('i',null,cls);marker.style.left=pct(v)+'%';rail.append(marker);}host.append(rail);
     host.append(node('p','מרחק מהמחיר הנוכחי: סטופ '+number((stop/current-1)*100)+'% · יעד '+signed((target/current-1)*100)+'%','map-distances'));
   }
-  host.append(node('p',verified?'● מחירי ההגנה אומתו בבורסה':snapshot.mode==='demo'?'סימולציה · רמות מתוכננות, ללא הגנה בחשבון LIVE':managed?'הגנות הבורסה טרם אומתו · הרמות מוצגות לפי הגדרות הפוזיציה':'לא אומתה פוזיציה מנוהלת · אין רמות הגנה להצגה',verified?'map-note positive':'map-note'));
+  host.append(node('p',verified?(serverTarget?'● הסטופ אומת בבורסה · יעד הרווח תלוי בפעילות השרת':'● מחירי ההגנה אומתו בבורסה'):snapshot.mode==='demo'?'סימולציה · רמות מתוכננות, ללא הגנה בחשבון LIVE':managed?'הגנות הבורסה טרם אומתו · הרמות מוצגות לפי הגדרות הפוזיציה':'לא אומתה פוזיציה מנוהלת · אין רמות הגנה להצגה',verified?'map-note positive':'map-note'));
   host.append(node('small','המחירים לפני עמלות; מחיר הביצוע עשוי להיות שונה.'));
 }
 
