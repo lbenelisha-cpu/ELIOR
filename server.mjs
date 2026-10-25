@@ -1,3 +1,4 @@
+import {createSearchBoundaries} from './lib/wyckoff-search-boundary.mjs';
 import {analyzeCandlePower} from './lib/candle-power.mjs';
 import {DEFAULT_TRADE_SETTINGS,validateTradeSettings} from './lib/trade-settings.mjs';
 import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
@@ -1362,6 +1363,7 @@ function scoreStrategy(st){
   );
 }
 
+const rsiSearchBoundaries=createSearchBoundaries(process.env.BINANCE_RSI_SEARCH_BOUNDARIES_FILE||'/var/data/binance-rsi-search-boundaries.json');
 async function evaluateSymbol(s){
   try{
     let p=tradingPositions()[s]||null;
@@ -1379,8 +1381,9 @@ async function evaluateSymbol(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&a.type==='SELL').map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,searchAfter:latestSaleAt,bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
+    if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
     if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
     const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
     ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});

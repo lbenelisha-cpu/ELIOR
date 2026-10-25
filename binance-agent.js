@@ -462,6 +462,7 @@ function decisionReasonLabel(r){
     WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
     WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
     WYCKOFF_SPRING_RSI_LIVE:'Spring ו־RSI חי בין 0 ל־30 · ללא המתנה לסגירת נר',
+    SPRING_REJECTED_RSI_HIGH:'התבנית נפסלה: RSI מעל 30 ב־Spring · מחפש שיא חדש',
     WAIT_RSI_0_30:'ממתין ל־RSI חי בין 0 ל־30 בנקודת Spring',
     WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',
     WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',

@@ -37,3 +37,13 @@ test('ticks replace a live candle, retain its range, ignore out of order events 
  const a=observeLiveCandle(null,80,now),b=observeLiveCandle(a,50,now+1000),c=observeLiveCandle(b,60,now+2000);
  assert.equal(c.low,50);assert.equal(c.high,80);assert.equal(c.close,60);assert.equal(observeLiveCandle(c,100,now),c);assert.equal(observeLiveCandle(c,90,base+step).low,90);
 });
+test('high RSI at Spring clears pivots and cannot reuse that setup after RSI falls',()=>{
+ const opt={...options,price:85,liveBar:{openTime:base,high:86,low:50},resetHighRsi:true};
+ const rejected=liveSpringRsi(bars,opt);
+ assert.ok(rejected.entryRsi>30);assert.equal(rejected.entryReason,'SPRING_REJECTED_RSI_HIGH');
+ assert.equal(rejected.phase,'SEARCH_PEAK');assert.equal(rejected.initialPeak,undefined);assert.equal(rejected.springLow,undefined);
+ const later=liveSpringRsi(bars,{...options,price:50,after:rejected.searchAfter,resetHighRsi:true});
+ assert.equal(later.buyConfirmed,false);assert.equal(later.initialPeak,undefined);
+ const early=liveSpringRsi(bars,{...options,price:85,resetHighRsi:true});
+ assert.notEqual(early.entryReason,'SPRING_REJECTED_RSI_HIGH');
+});
