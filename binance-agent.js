@@ -275,6 +275,15 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   const rotationGap=Number(d.config?.rotationScoreGap||20);
   const maxPositions=Number(currentMode==='live'?(d.config?.maxPositions||5):(p.maxPositions||10));
 
+  const warning=$('#unmanagedHoldingWarning');
+  if(warning){
+    const unverified=isLive&&liveAccount?.connected?liveBalances.filter(b=>{
+      const a=agents.find(a=>a.symbol===b.asset+'USDT');
+      return !['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'].includes(a?.strategy?.exitPolicy);
+    }):[];
+    warning.hidden=!unverified.length;
+    warning.textContent=unverified.length?'נדרש טיפול · ניהול והגנות לא אומתו: '+unverified.map(b=>b.asset).join(', ')+' · קיימת יתרה בחשבון ללא פוזיציה מנוהלת מתועדת. אין להסתמך על מכירה אוטומטית. יש לבדוק פקודות הגנה בבייננס.':'';
+  }
   renderMarketStrip(agents);
 
   const sd=d.config?.strategyDiagnostics||{};
