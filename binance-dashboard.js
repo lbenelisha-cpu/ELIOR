@@ -3,10 +3,13 @@ import {finite,tradeScenario,allocationParts,accountSummary,protectionState} fro
 const $=id=>document.getElementById(id);
 const number=(v,d=2)=>finite(v)===null?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
 const price=v=>finite(v)>0?Number(v).toLocaleString('en-US',{maximumSignificantDigits:8}):'—';
-const signed=v=>finite(v)===null?'—':(v>0?'+':'')+number(v);
+const signed=(v,d=2)=>finite(v)===null?'—':(v>0?'+':'')+number(v,d);
 const text=(id,value)=>{const e=$(id);if(e)e.textContent=value;};
 const node=(tag,content,cls)=>{const e=document.createElement(tag);if(content!=null)e.textContent=content;if(cls)e.className=cls;return e;};
 let snapshot=window.LEVI_DASHBOARD_SNAPSHOT||null, selected=null;
+const menu=document.querySelector('.dashboard-menu'),settings=$('openAppSettings');
+if(menu&&settings){const utilities=node('div',null,'header-utilities');menu.replaceWith(utilities);utilities.append(settings,menu);settings.textContent='⚙ הגדרות';}
+
 
 function renderHealth(){
   const connected=window.LEVI_MANUAL_TRADES?.connected?.()===true;
@@ -99,12 +102,12 @@ function calculate(event){
   text('scenarioError',r.error||'');const host=$('scenarioResults');host.replaceChildren();host.hidden=!!r.error;
   if(r.error)return;
   const grid=node('div',null,'scenario-result-grid');
-  for(const [label,value,cls]of [['במחיר היעד',signed(r.targetPnl)+' USDT',r.targetPnl>0?'positive':'negative'],['במחיר הסטופ',signed(r.stopPnl)+' USDT','negative'],['יחס רווח לסיכון',r.ratio===null?'אין רווח נטו ביעד':number(r.ratio)+' : 1',''],['מחיר איזון אחרי עמלות',price(r.breakEven),'']]){
+  for(const [label,value,cls]of [['במחיר היעד',signed(r.targetPnl,4)+' USDT',r.targetPnl>0?'positive':'negative'],['במחיר הסטופ',signed(r.stopPnl,4)+' USDT','negative'],['יחס רווח לסיכון',r.ratio===null?'אין רווח נטו ביעד':number(r.ratio)+' : 1',''],['מחיר איזון אחרי עמלות',price(r.breakEven),'']]){
     const card=node('div',null,'scenario-result');card.append(node('span',label),node('strong',value,cls));grid.append(card);
   }host.append(grid);
   const bars=node('div',null,'scenario-bars');
   const max=Math.max(Math.abs(r.targetPnl),Math.abs(r.stopPnl));
-  for(const [label,value]of [['תוצאה ביעד',r.targetPnl],['תוצאה בסטופ',r.stopPnl]]){const row=node('div');row.append(node('span',label));const track=node('div',null,'scenario-bar-track'),bar=node('i',null,value>0?'gain':'loss');bar.style.width=Math.abs(value)/max*100+'%';track.append(bar);row.append(track,node('b',signed(value)));bars.append(row);}host.append(bars);
+  for(const [label,value]of [['תוצאה ביעד',r.targetPnl],['תוצאה בסטופ',r.stopPnl]]){const row=node('div');row.append(node('span',label));const track=node('div',null,'scenario-bar-track'),bar=node('i',null,value>0?'gain':'loss');bar.style.width=Math.abs(value)/max*100+'%';track.append(bar);row.append(track,node('b',signed(value,4)));bars.append(row);}host.append(bars);
   host.append(node('p','כמות משוערת: '+price(r.quantity)+' · חיוב כולל עמלת קנייה: '+number(r.debit)+' USDT · סך עמלות בתרחיש היעד: '+number(r.targetFees,4)+' USDT','mini'));
 }
 form.addEventListener('submit',calculate);

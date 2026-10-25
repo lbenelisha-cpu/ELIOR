@@ -176,6 +176,7 @@ function mode(s){
   $('#liveBtn')?.classList.toggle('active',!isDemo);
   $('#liveAccountCard')?.classList.toggle('hidden',isDemo);
   $('#resetPaperBtn')?.classList.toggle('hidden',!isDemo||demoTradingEnabled);
+  $('#binanceDemoBalanceCard')?.classList.toggle('hidden',!isDemo);
   $('#demoTradesSection')?.classList.toggle('hidden',!isDemo);
   $('#demoRealtimePositionsSection')?.classList.toggle('hidden',!isDemo);
   put('#refreshBtn',isDemo?'בדוק עכשיו':'רענן LIVE');
