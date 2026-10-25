@@ -1,3 +1,4 @@
+import {balancedUniverse,isBstock} from './lib/balanced-universe.mjs';
 import {createSearchBoundaries} from './lib/wyckoff-search-boundary.mjs';
 import {analyzeCandlePower} from './lib/candle-power.mjs';
 import {DEFAULT_TRADE_SETTINGS,validateTradeSettings} from './lib/trade-settings.mjs';
@@ -963,7 +964,7 @@ async function selectUniverse(){
   // Scan the real Binance Spot market independently from what the Demo account
   // currently supports. Execution compatibility is handled separately.
   if(MANUAL_SYMBOLS.length){
-    return MANUAL_SYMBOLS.slice(0,UNIVERSE_SIZE);
+    return balancedUniverse(MANUAL_SYMBOLS,UNIVERSE_SIZE,async symbol=>(await candles(symbol)).length>=MAP+5);
   }
 
   const [info,tickers]=await Promise.all([
@@ -985,15 +986,7 @@ async function selectUniverse(){
     )
     .sort((a,b)=>+b.quoteVolume-+a.quoteVolume);
 
-  const selected=[];
-  for(const x of ranked){
-    if(selected.length>=UNIVERSE_SIZE)break;
-    try{
-      const c=await candles(x.symbol);
-      if(c.length>=MAP+5)selected.push(x.symbol);
-    }catch{}
-  }
-  return selected;
+  return balancedUniverse(ranked,UNIVERSE_SIZE,async symbol=>(await candles(symbol)).length>=MAP+5);
 }
 
 function initUniverse(symbols){
@@ -2307,6 +2300,7 @@ const server=http.createServer((req,res)=>{
         slotIls:SLOT,
         longOnly:true,
         universeSize:UNIVERSE_SIZE,
+        universeMix:{policy:'HALF_CRYPTO_HALF_BSTOCKS',targetEach:Math.floor(UNIVERSE_SIZE/2),stocks:SYMBOLS.filter(isBstock).length,crypto:SYMBOLS.filter(s=>!isBstock(s)).length,includesHeldPositions:true},
         universeMethod:MANUAL_SYMBOLS.length?'manual':'top USDT spot by 24h quote volume',
         rotationEnabled:ROTATION_ENABLED,
         rotationMinScore:ROTATION_MIN_SCORE,
