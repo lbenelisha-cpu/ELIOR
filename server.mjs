@@ -34,6 +34,7 @@ import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/bina
 import {TRAILING_EXIT_POLICY,applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
+import {protectionPrice} from './lib/binance-protection-price.mjs';
 import {controlAuthorized} from './lib/binance-control-auth.mjs';
 import {getDemoAccount} from './lib/binance-demo-account.mjs';
 import WebSocket from "ws";
@@ -348,7 +349,7 @@ const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
  get:signedBinanceGet,post:signedBinancePost,del:signedBinanceDelete,info:symbolExchangeInfo,
  position:symbol=>liveManagedPositions()[symbol],
- price:symbol=>requireLivePrice(streams[symbol],Date.now(),15000),
+ price:symbol=>protectionPrice(symbol,streams[symbol],j),
  persistFloor:(symbol,p)=>persistLivePeak(symbol,p),
  free:async symbol=>Number((await getLiveAccountSnapshot()).balances.find(b=>b.asset===symbol.slice(0,-4))?.free||0),
  onFill:recordLiveFill
