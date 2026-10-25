@@ -32,7 +32,7 @@ test('Binance journal persistence retains policy, armed state and floor for a re
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),start=source.indexOf('function persistLivePeak('),end=source.indexOf('const liveExecution=',start);
  let writes=0;const p=pos();p.entryAt='2026-10-20T15:00:00Z';binancePositionExit(p,110);
  const buy={type:'BUY',symbol:'ABCUSDT',wyckoffTrade:{exitPolicy:'FIXED_TP4_SL1_V1',entryAt:p.entryAt,peakPrice:100}};
- const ctx={liveActionLog:[buy],tradingPositions:()=>({ABCUSDT:p}),saveLiveActionLog:()=>{writes++;return true;}};vm.runInNewContext(source.slice(start,end)+';persistLivePeak("ABCUSDT",p);',{...ctx,p});
+ const ctx={liveActionLog:[buy],liveManagedPositions:()=>({ABCUSDT:p}),saveLiveActionLog:()=>{writes++;return true;}};vm.runInNewContext(source.slice(start,end)+';persistLivePeak("ABCUSDT",p);',{...ctx,p});
  assert.equal(writes,1);const restored=JSON.parse(JSON.stringify(buy.wyckoffTrade));assert.equal(restored.exitPolicy,TRAILING_EXIT_POLICY);assert.equal(restored.profitFloorArmed,true);assert.equal(restored.effectiveStopPrice,109);
  applyTrailingExitPolicy({...restored,entryPrice:100});assert.equal(restored.peakPrice,110);
 });

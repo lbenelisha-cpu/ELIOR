@@ -8,7 +8,7 @@ async function refresh(){
  if(busy||document.hidden||document.getElementById('demoBalanceDetails')?.hidden)return;busy=true;
  status.textContent='טוען יתרות מהחשבון…';total.textContent='— USDT';body.replaceChildren();
  try{
-  const r=await fetch(window.binanceReadUrl(base+'/api/binance-demo-account'),{cache:'no-store'}),d=await r.json();
+  const r=await fetch(window.binanceReadUrl(base+'/api/binance-demo-account'),{headers:window.binanceReadHeaders?.(base+'/api/binance-demo-account'),cache:'no-store'}),d=await r.json();
   if(!r.ok||!d.connected)throw Error(d.error||'לא ניתן לקרוא יתרות');
   const a=d.account;
   total.textContent=(a.unpricedAssets.length?'שווי חלקי: ':'')+valueFormat(a.totalValueUsdt)+' USDT';

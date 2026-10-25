@@ -1,3 +1,4 @@
+import {withLiveSafety} from './helpers/live-safety.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {BinanceNativeProtection,nativeProtectionPlan} from '../lib/binance-native-protection.mjs';
@@ -66,9 +67,9 @@ test('activation at exact +4% does not cancel a valid old stop or place an immed
 test('software fallback also exits at +50%, while +4% remains activation only',()=>{
  const p=applyTrailingExitPolicy({strategyId:'WYCKOFF_5M_V1',entryPrice:100,qty:1});assert.equal(binancePositionExit(p,104).sell,false);assert.equal(binancePositionExit(p,150).reason,'BROKER_TAKE_PROFIT_50_PERCENT');
 });
-test('failed persistence sends no order and stale quote after cancellation sends no replacement',async t=>{
+test('failed persistence sends no order and stale quote before cancellation preserves the old bracket',async t=>{
  const a=rig(t);a.store.save=()=>{throw Error('disk')};await assert.rejects(a.store.sync(symbol,a.p,100),/disk/);assert.equal(a.posts,0);
- const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;binancePositionExit(r.p,110);r.api.price=()=>{throw Error('STALE_LIVE_PRICE')};await assert.rejects(r.store.sync(symbol,r.p,110),/STALE/);assert.equal(r.posts,1);assert.equal(r.deletes,1);
+ const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;binancePositionExit(r.p,110);r.api.price=()=>{throw Error('STALE_LIVE_PRICE')};await assert.rejects(r.store.sync(symbol,r.p,110),/STALE/);assert.equal(r.posts,1);assert.equal(r.deletes,0);
 });
 test('tiny token trigger prices are sent as decimal strings without scientific notation',()=>{
  const small={...info,filters:[...info.filters.filter(f=>f.filterType!=='PRICE_FILTER'),{filterType:'PRICE_FILTER',tickSize:'0.00000001',minPrice:'0.00000001',maxPrice:'1000'}]};
@@ -77,13 +78,13 @@ test('tiny token trigger prices are sent as decimal strings without scientific n
 });
 test('server manual market sale waits for bracket cancellation and rereads unlocked quantity',async()=>{
  const {default:vm}=await import('node:vm');const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketSell('),source.indexOf('function persistLivePeak('));
- let released=false,sent;const c={nativeProtection:{release:async()=>{released=true;}},getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),tradingPositions:()=>({[symbol]:{qty:2}}),getLiveAccountSnapshot:async()=>{assert.equal(released,true);return {balances:[{asset:'ABC',free:2,qty:2,usdtPrice:100}]};},symbolExchangeInfo:async()=>({...info,quoteAsset:'USDT'}),manualSellQuantity:()=> '2',liveOrders:{submit:async p=>{sent=p;return {status:'FILLED'};}},signedBinancePost(){},recordLiveFill(){}};
- vm.createContext(c);vm.runInContext(fn,c);await c.placeLiveMarketSell(symbol,'MANUAL_SELL',{sellAllBalance:true});assert.equal(sent.quantity,'2');
+ let released=false,sent;const c={nativeProtection:{rows:{[symbol]:{params:{quantity:'2'}}},release:async()=>{released=true;}},getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),liveManagedPositions:()=>({[symbol]:{qty:2}}),getLiveAccountSnapshot:async()=>{return {balances:[{asset:'ABC',free:released?2:0,locked:released?0:2,qty:2,usdtPrice:100}]};},symbolExchangeInfo:async()=>({...info,quoteAsset:'USDT'}),manualSellQuantity:()=> '2',liveOrders:{submit:async p=>{sent=p;return {status:'FILLED'};}},signedBinancePost(){},recordLiveFill(){}};
+ vm.createContext(c);vm.runInContext(fn,withLiveSafety(c));await c.placeLiveMarketSell(symbol,'MANUAL_SELL',{sellAllBalance:true});assert.equal(sent.quantity,'2');
 });
 test('server never sends a second market sell when native reconciliation already closed the position',async()=>{
  const {default:vm}=await import('node:vm');const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketSell('),source.indexOf('function persistLivePeak('));
- let owned=true,sent=0;const c={nativeProtection:{release:async()=>{owned=false;}},getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),tradingPositions:()=>owned?{[symbol]:{qty:2}}:{},getLiveAccountSnapshot:async()=>{throw Error('must not attempt wallet sale');},liveOrders:{submit:async()=>sent++}};
- vm.createContext(c);vm.runInContext(fn,c);assert.equal((await c.placeLiveMarketSell(symbol,'MANUAL_SELL',{sellAllBalance:true})).status,'CLOSED_AT_BROKER');assert.equal(sent,0);
+ let owned=true,sent=0;const c={nativeProtection:{reconcile:async()=>{owned=false;}},getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),liveManagedPositions:()=>owned?{[symbol]:{qty:2}}:{},getLiveAccountSnapshot:async()=>{throw Error('must not attempt wallet sale');},liveOrders:{submit:async()=>sent++}};
+ vm.createContext(c);vm.runInContext(fn,withLiveSafety(c));assert.equal((await c.placeLiveMarketSell(symbol,'MANUAL_SELL',{sellAllBalance:true})).status,'CLOSED_AT_BROKER');assert.equal(sent,0);
 });
 test('changing configured TP replaces an active bracket even when stop and quantity are unchanged',async t=>{
  const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;applyTrailingExitPolicy(r.p,{takeProfitPct:20,stopLossPct:1,profitActivationPct:4,trailingGapPp:1});await r.store.sync(symbol,r.p,100);assert.equal(r.posts,2);assert.equal(r.deletes,1);assert.equal(r.last.aboveStopPrice,'120');

@@ -1,10 +1,16 @@
 const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://levi-binance.2-29-48-20.sslip.io';
 window.API_BASE=B;
 window.binanceReadUrl=url=>{
-  if(['localhost','127.0.0.1'].includes(window.location.hostname))return url;
+  if(['localhost','127.0.0.1'].includes(window.location.hostname)||window.location.origin===new URL(B).origin)return url;
   const target=new URL(url,window.location.origin);
   const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
   return target.origin===new URL(B).origin&&paths.includes(target.pathname)?'/.netlify/functions/binance-read-proxy?path='+encodeURIComponent(target.pathname+target.search):url;
+};
+window.binanceReadHeaders=url=>{
+ const target=new URL(url,window.location.origin);
+ if(target.origin!==new URL(B).origin||!target.pathname.startsWith('/api/binance-'))return {};
+ const token=window.LEVI_TRADE_AUTH?.read();
+ return token?{Authorization:'Bearer '+token}:{};
 };
 const MODE=B+'/api/binance-mode';
 const TRADE_CONTROL=B+'/api/binance-trade-control';
@@ -120,10 +126,11 @@ async function J(u,o={}){
   const timer=setTimeout(()=>controller.abort(new DOMException('השרת לא השיב בזמן.','TimeoutError')),timeoutMs);
   try{
     const requestUrl=String(options.method||'GET').toUpperCase()==='GET'?window.binanceReadUrl(u):u;
-    const r=await fetch(requestUrl,{cache:'no-store',...options,signal:controller.signal});
+    const headers={...(String(options.method||'GET').toUpperCase()==='GET'?window.binanceReadHeaders?.(u):{}),...options.headers};
+    const r=await fetch(requestUrl,{cache:'no-store',...options,headers,signal:controller.signal});
     if(!r.ok){
       let x={};try{x=await r.json()}catch{}
-      const error=Error(x.error||`HTTP ${r.status}`);error.status=r.status;error.response=x;throw error;
+      const error=Error(x.error||`HTTP ${r.status}`);error.status=r.status;error.response=x;error.authToken=headers.Authorization?.replace(/^Bearer /,'')||null;throw error;
     }
     return await r.json();
   }finally{
@@ -137,15 +144,16 @@ function renderTradeControlStatus(s){
   if(!el)return;
   const known=typeof s.tradeControl?.paused==='boolean';
   const paused=s.tradeControl?.paused===true;
-  const active=known&&!paused;
+  const health=s.liveState,blocked=s.mode==='live'&&health&&health.ready!==true;
+  const active=known&&!paused&&!blocked;
   const executable=s.mode==='demo'||(s.liveTradingEnabled===true&&s.autoExecution===true);
   el.classList.toggle('trading-active',active&&executable);
   el.classList.toggle('trading-paused',known&&paused);
   const since=paused?s.tradeControl?.pausedAt:s.tradeControl?.resumedAt;
   const timestamp=Date.parse(since);
-  const label=!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
+  const label=blocked?'קניות חסומות · '+(!health.journalReady?'יומן העסקאות דורש בדיקה':health.pendingOrder?'ממתין לאימות פקודה':health.reconciliation?.error?'לא ניתן לאמת את נתוני החשבון':health.missingProtection?.length?'הגנת בורסה טרם אומתה':'ממתין להתאמת חשבון'):!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
   const minutes=Number.isFinite(timestamp)?Math.max(0,Math.floor((Date.now()-timestamp)/60000)):null;
-  el.textContent=label+(minutes===null?' · זמן שינוי לא זמין':' · מאז '+new Date(timestamp).toLocaleString('he-IL')+' · '+minutes+' דקות');
+  el.textContent=label+(minutes===null?' · זמן שינוי לא זמין':' · מאז '+new Date(timestamp).toLocaleString('he-IL')+' · '+minutes+' דקות')+(s.mode==='demo'&&health?.managedPositions>0?' · ניהול החזקות LIVE ממשיך ברקע':'');
 }
 
 function mode(s){
@@ -157,8 +165,11 @@ function mode(s){
   renderTradeControlStatus(s);
   const paused=s.tradeControl?.paused===true;
   const stopButton=$('#stopTradingBtn'),startButton=$('#startTradingBtn');
-  if(stopButton){stopButton.hidden=paused;stopButton.disabled=tradeControlWorking;}
+  if(stopButton){stopButton.hidden=false;stopButton.disabled=tradeControlWorking;}
   if(startButton){startButton.hidden=!paused;startButton.disabled=tradeControlWorking;}
+  const pauseButton=$('#pauseBuysBtn'),resumeButton=$('#resumeBuysBtn');
+  if(pauseButton){pauseButton.hidden=paused;pauseButton.disabled=tradeControlWorking;}
+  if(resumeButton){resumeButton.hidden=!paused;resumeButton.disabled=tradeControlWorking;}
   $('#demoBtn')?.classList.toggle('active',isDemo);
   $('#liveBtn')?.classList.toggle('active',!isDemo);
   $('#liveAccountCard')?.classList.toggle('hidden',isDemo);
@@ -935,7 +946,7 @@ async function load(){
     const modeRead=J(MODE,{timeoutMs:35000}).then(applyMode).catch(()=>null);
     const agent=await J(AGENT,{timeoutMs:35000});
     agentMode=['live','demo'].includes(agent.mode)?agent.mode:null;
-    const m=agentMode?(receivedMode?.mode===agentMode?receivedMode:applyMode({mode:agentMode,tradeControl:agent.tradeControl,demoTradingEnabled:agent.config?.demoTradingEnabled===true})):await modeRead;
+    const m=agentMode?(receivedMode?.mode===agentMode?receivedMode:applyMode({mode:agentMode,tradeControl:agent.tradeControl,liveState:agent.config?.liveState,demoTradingEnabled:agent.config?.demoTradingEnabled===true})):await modeRead;
     if(!m)throw Error('לא ניתן לאמת את מצב החשבון');
     window.LEVI_AGENT_SNAPSHOT=agent;
     window.dispatchEvent(new CustomEvent('levi:binance-agent',{detail:agent}));
@@ -966,7 +977,8 @@ async function load(){
     if(scannerVerifiedMode==='live')put('#scannerFreshness','נתוני הטבלה מהעדכון האחרון · '+tradeExecutionTime(scannerVerifiedAt)+' · החיבור לא אומת מחדש');
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
-    put('#tradeControlStatus','מצב המסחר לא אומת · שרת לא זמין');
+    put('#tradeControlStatus',e.status===401?'נדרש חיבור מכשיר לצפייה בחשבון':'מצב המסחר לא אומת · שרת לא זמין');
+    if(e.status===401&&e.authToken===tradeControlToken){tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();}
     console.error(e);
   }finally{
     dashboardLoadInFlight=false;
@@ -1011,7 +1023,7 @@ async function sendTradeControl(action){
   tradeControlWorking=true;
   $('#stopTradingBtn').disabled=true;
   $('#startTradingBtn').disabled=true;
-  put('#tradeControlStatus',action==='stop'?'מבצע עצירה וסגירת פוזיציות…':'מחדש מסחר…');
+  put('#tradeControlStatus',action==='stop'?'מבצע עצירה וסגירת פוזיציות…':action==='pause'?'משהה קניות · ניהול היציאות ממשיך…':'מחדש מסחר…');
   try{
     const r=await authenticatedControl(TRADE_CONTROL,{action});
     if(r===null)return;
@@ -1031,6 +1043,8 @@ async function sendTradeControl(action){
 }
 $('#stopTradingBtn').onclick=()=>sendTradeControl('stop');
 $('#startTradingBtn').onclick=()=>sendTradeControl('start');
+if($('#pauseBuysBtn'))$('#pauseBuysBtn').onclick=()=>sendTradeControl('pause');
+if($('#resumeBuysBtn'))$('#resumeBuysBtn').onclick=()=>sendTradeControl('resume');
 
 $('#demoBtn').onclick=()=>setMode('demo');
 $('#liveBtn').onclick=()=>setMode('live');

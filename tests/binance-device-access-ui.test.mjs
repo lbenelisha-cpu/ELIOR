@@ -4,7 +4,7 @@ function storage(){const values=new Map(),c=vm.createContext({window:{},localSto
 test('pairing is saved before any trade and survives a subsequent business rejection without another code',async()=>{
  const auth=storage(),calls=[],token='device-'+'a'.repeat(64);let rejectTrade=false;
  const c=vm.createContext({window:{LEVI_TRADE_AUTH:auth},B:'https://example.test',tradeControlToken:null,J:async(url,options)=>{calls.push({url,...options});if(url.endsWith('/session'))return {ok:true,token,expiresAt:'2027-01-01'};if(rejectTrade)throw Object.assign(Error('NO_CASH'),{status:400});return {ok:true};}});
- const source=read('binance-agent.js');vm.runInContext(source.slice(source.indexOf('async function authenticatedControl('),source.indexOf('async function setMode(')),c);vm.runInContext(source.slice(source.indexOf('window.LEVI_MANUAL_TRADES={')),c);
+ const source=read('binance-agent.js');vm.runInContext(source.slice(source.indexOf('async function authenticatedControl('),source.indexOf('async function setMode(')),c);vm.runInContext(source.slice(source.indexOf('window.LEVI_MANUAL_TRADES={'),source.indexOf("window.addEventListener?.('levi-rsi-select'")),c);
  await c.window.LEVI_MANUAL_TRADES.pair('012345');assert.equal(calls.length,1);assert(calls[0].url.endsWith('/session'));assert.equal(auth.read(),token);assert.equal(c.tradeControlToken,token);
  rejectTrade=true;const result=await c.window.LEVI_MANUAL_TRADES.submit({side:'SELL'});assert.equal(result.ok,false);assert.equal(auth.read(),token);assert.equal(calls[1].headers.Authorization,'Bearer '+token);
  assert.doesNotMatch(source,/prompt\(/);

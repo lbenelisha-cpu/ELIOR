@@ -15,7 +15,7 @@ test('partial Spring buys before close or reclaim, on both platforms',()=>{
 });
 test('RSI zero and thirty are inclusive; live replacement is checked again at execution',()=>{
  const closes=[100,103,96,...Array(11).fill(96)];assert.equal(rsiSeries([...closes,96]).at(-1),30);
- const trade={rsiCloses:closes,rsiBucket:base,targetPrice:200};assert.doesNotThrow(()=>assertLiveSpringRsi(trade,96,now));assert.throws(()=>assertLiveSpringRsi(trade,96.01,now),/WAIT_RSI_0_30/);
+ const trade={rsiCloses:closes,rsiBucket:base,initialPeak:180,targetPrice:200};assert.doesNotThrow(()=>assertLiveSpringRsi(trade,96,now));assert.throws(()=>assertLiveSpringRsi(trade,96.01,now),/WAIT_RSI_0_30/);
  assert.equal(rsiSeries(Array.from({length:15},(_,i)=>100-i)).at(-1),0);assert.equal(rsiSeries(Array(15).fill(50)).at(-1),50);
  assert.throws(()=>assertLiveSpringRsi(trade,96,base+step),/WAIT_CURRENT_5M_BARS/);
 });
