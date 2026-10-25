@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="/binance-agent.css?v=20261024-latest-labels-20261021-edge-axis">
 <link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
-  <link rel="stylesheet" href="/binance-dashboard.css?v=20261025-visual">
+  <link rel="stylesheet" href="/binance-dashboard.css?v=20261026-platform-tabs">
 </head>
 <body>
   <main class="app-shell">
@@ -23,7 +23,12 @@
         </div>
       </div>
 
-      <nav class="topnav">
+      <nav class="platform-tabs" aria-label="פלטפורמת מסחר">
+        <a href="/binance-agent.html" aria-current="page">Binance</a>
+        <a href="/colmex-pro.html">Colmex Pro</a>
+      </nav>
+
+      <nav class="topnav" aria-label="תצוגות בבייננס">
         <button class="nav-pill active" data-view="trade">סקירה</button>
         <button class="nav-pill" data-view="portfolio">התיק שלי</button>
         <button class="nav-pill" data-view="scans">סריקות</button>
