@@ -1116,3 +1116,13 @@ window.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if
 window.addEventListener?.('levi-rsi-history-needed',()=>{if(!document.hidden)loadChart(selectedSymbol);});
 
 window.addEventListener?.('trade-device-expired',()=>{tradeControlToken=null;window.LEVI_DEVICE_ACCESS?.refresh();});
+
+// Display-only search; scanner updates and execution continue independently.
+function filterAssetRows(){
+ const input=document.querySelector('#assetSearch'),body=document.querySelector('#assetsBody');if(!input||!body)return;
+ const query=input.value.toUpperCase().replace(/[\s/\-]/g,'');let shown=0,total=0;
+ for(const row of body.querySelectorAll('tr')){total++;const match=!query||row.textContent.toUpperCase().replace(/[\s/\-]/g,'').includes(query);row.hidden=!match;if(match)shown++;}
+ const status=document.querySelector('#assetSearchStatus');if(status)status.textContent=query?(shown?'מוצגים '+shown+' מתוך '+total:'לא נמצא ברשימת המעקב · נסה סימול אחר'):'';
+}
+const assetSearchInput=document.querySelector('#assetSearch');
+if(assetSearchInput){assetSearchInput.addEventListener('input',filterAssetRows);new MutationObserver(filterAssetRows).observe(document.querySelector('#assetsBody'),{childList:true,subtree:true,characterData:true});}
