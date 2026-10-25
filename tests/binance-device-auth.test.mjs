@@ -27,7 +27,8 @@ test('a device limit keeps eight recent credentials and does not preserve an evi
 });
 test('public capability and pairing route do not remove authorization from real trading endpoints',()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
- assert.match(source,/protectedControl&&!controlAuthorized\(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN\)&&!controlDevices.authorized\(req.headers.authorization\)/);
+ assert.match(source,/const authorized=controlAuthorized\(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN\)\|\|controlDevices.authorized\(req.headers.authorization\)/);
+ assert.match(source,/if\(protectedControl&&!authorized\)/);
  assert.match(source,/u.pathname.startsWith\('\/api\/binance-live\/'\)/);
  const a=source.indexOf("if(u.pathname==='/api/binance-control/session'"),b=source.indexOf("if(u.pathname==='/api/binance-control/disconnect'",a),pair=source.slice(a,b);
  assert.match(pair,/controlDevices.issue\(input.code\)/);assert.doesNotMatch(pair,/placeLiveMarket|liveOrders|executeManualTrade/);

@@ -1,3 +1,4 @@
+import {withLiveSafety} from './helpers/live-safety.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 import {assessHourlyTrend} from '../lib/binance-hourly-trend.mjs';
 import {makeFeatures} from '../lib/portfolio-variant-study.mjs';
@@ -26,6 +27,6 @@ test('live hourly values match the fixed simulation gate on completed hours',()=
 });
 test('automatic submission rechecks the hourly gate before order intent; no failed gate can post an order',async()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketBuy('),source.indexOf('async function placeLiveMarketSell('));
- let posts=0;const c=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},tradingPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['MARKET','TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:10}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry:()=>({ok:false,code:'WAIT_HOURLY_TREND'}),candles:async()=>[],liveOrders:{submit:async()=>posts++}});
- vm.runInContext(fn,c);await assert.rejects(()=>c.placeLiveMarketBuy('BTCUSDT',10),/WAIT_HOURLY_TREND/);assert.equal(posts,0);
+ let posts=0;const c=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},liveManagedPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['MARKET','TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:10}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry:()=>({ok:false,code:'WAIT_HOURLY_TREND'}),candles:async()=>[],liveOrders:{submit:async()=>posts++}});
+ vm.runInContext(fn,withLiveSafety(c));await assert.rejects(()=>c.placeLiveMarketBuy('BTCUSDT',10),/WAIT_HOURLY_TREND/);assert.equal(posts,0);
 });

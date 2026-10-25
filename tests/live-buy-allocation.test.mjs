@@ -1,3 +1,4 @@
+import {withLiveSafety} from './helpers/live-safety.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 import {liveNextBuyAllocation} from '../lib/live-buy-allocation.mjs';
 const wallet=(count,cash=23.81606844)=>({usdtFree:cash,fixedPositionUsdt:28.72583,balances:Array.from({length:count},(_,i)=>({asset:'COIN'+i,valueUsdt:28}))});
@@ -18,10 +19,10 @@ test('cash assets and sold dust do not turn the fourth slot into the last slot',
 });
 test('the actual submission recalculates the last-slot amount using the fresh funding snapshot',async()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');const start=source.indexOf('async function placeLiveMarketBuy('),end=source.indexOf('async function placeLiveMarketSell(',start);
- let sent;const context=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},tradingPositions:()=>({}),assessQualityEntry:()=>({ok:true}),candles:async()=>[],ENTRY_POLICY_VERSION:'test',liveNextBuyAllocation,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,
+ let sent;const context=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},liveManagedPositions:()=>({}),assessQualityEntry:()=>({ok:true}),candles:async()=>[],ENTRY_POLICY_VERSION:'test',liveNextBuyAllocation,LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,
   getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true,withdrawalsEnabled:false}),
   symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['MARKET','TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',quoteAssetPrecision:8,filters:[{filterType:'MIN_NOTIONAL',minNotional:'5'}]}),
   getLiveAccountSnapshot:async()=>wallet(4),recordLiveFill(){},liveOrders:{submit:async p=>{sent=p;return {status:"FILLED"};}}});
- vm.runInContext(source.slice(start,end),context);await context.placeLiveMarketBuy('SUIUSDT',28.72583);
+ vm.runInContext(source.slice(start,end),withLiveSafety(context));await context.placeLiveMarketBuy('SUIUSDT',28.72583);
  assert.ok(Number(sent.quoteOrderQty)<24);assert.ok(Number(sent.quoteOrderQty)*1.002<=23.81606844);assert.equal(sent.side,'BUY');
 });

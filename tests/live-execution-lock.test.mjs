@@ -1,3 +1,4 @@
+import {withLiveSafety} from './helpers/live-safety.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -33,8 +34,8 @@ test('idle exit monitor observes price and peaks without any exchange request; t
  const fn=source.slice(source.indexOf('async function executeLiveCycle('),source.indexOf('async function getLiveAccountSnapshot('));
  let calls=0,peaks=0,stop=false,sales=0;
  const position={entryPrice:100,peakPrice:100};
- const context=vm.createContext({mode:'live',nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},LIVE:true,AUTO_EXECUTION:true,liveOrders:{pending:null,recover:async()=>{}},tradingPositions:()=>({BNBUSDT:position}),streams:{BNBUSDT:{lastEventAt:Date.now()}},requireLivePrice:()=>101,observePositionPeak:()=>peaks++,persistLivePeak(){},wyckoffExit:()=>({sell:stop,reason:'STOP'}),tradeControl:{paused:false},liveActionLog:[],getApiRestrictions:async()=>{calls++;return {};},liveTradingGate:()=>({ready:true}),signedBinanceGet(){},recordLiveFill(){},getLiveAccountSnapshot:async()=>({balances:[{asset:'BNB',qty:1,valueUsdt:100}]}),marketRanks:new Map(),placeLiveMarketSell:async()=>sales++});
- vm.runInContext(fn,context);const evals=[{ok:true,symbol:'BNBUSDT'}];
+ const context=vm.createContext({mode:'live',nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},LIVE:true,AUTO_EXECUTION:true,liveOrders:{pending:null,recover:async()=>{}},liveManagedPositions:()=>({BNBUSDT:position}),streams:{BNBUSDT:{lastEventAt:Date.now()}},requireLivePrice:()=>101,observePositionPeak:()=>peaks++,persistLivePeak(){},wyckoffExit:()=>({sell:stop,reason:'STOP'}),tradeControl:{paused:false},liveActionLog:[],getApiRestrictions:async()=>{calls++;return {};},liveTradingGate:()=>({ready:true}),signedBinanceGet(){},recordLiveFill(){},getLiveAccountSnapshot:async()=>({balances:[{asset:'BNB',qty:1,valueUsdt:100}]}),marketRanks:new Map(),placeLiveMarketSell:async()=>sales++});
+ vm.runInContext(fn,withLiveSafety(context));const evals=[{ok:true,symbol:'BNBUSDT'}];
  await context.executeLiveCycle(evals);assert.equal(calls,0);assert.equal(peaks,1);
  stop=true;await context.executeLiveCycle(evals);assert.equal(calls,1);assert.equal(sales,1);
 });

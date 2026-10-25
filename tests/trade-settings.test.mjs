@@ -35,7 +35,7 @@ test('settings GET is read-only; invalid settings never acquire lease or send br
  assert.equal((await r.request({revision:0,values:{takeProfitPct:-5}})).status,400);assert.deepEqual(r.events,['AUTH']);
 });
 test('Binance settings route is authenticated and persists before replacing active configuration',()=>{
- const s=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');assert.match(s,/protectedControl=req.method==='POST'[\s\S]*u.pathname==='\/api\/binance-settings'/);
+ const s=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');assert.match(s,/protectedControl=\(privateRead&&!notificationRead\)\|\|req.method==='POST'[\s\S]*u.pathname==='\/api\/binance-settings'/);
  const a=s.indexOf("if(u.pathname==='/api/binance-settings')"),b=s.indexOf("if(u.pathname==='/api/binance-market-power'",a),route=s.slice(a,b);assert.ok(route.indexOf('renameSync')<route.indexOf('tradeSettings=next'));assert.match(route,/input.revision!==tradeSettings.revision/);
 });
 test('hour/day/week/month market power excludes forming candles and sorts broker history',()=>{

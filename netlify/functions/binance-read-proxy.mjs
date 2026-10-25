@@ -14,7 +14,7 @@ export function createReadProxy(fetcher=fetch){return async event=>{
  if(event.httpMethod!=='GET')return reply(405,{error:'קריאת נתונים בלבד'});
  let target;try{target=readTarget(event.queryStringParameters?.path);}catch{return reply(400,{error:'נתיב קריאה לא תקין'});}
  try{
-  const r=await fetcher(target,{method:'GET',headers:{Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(readTimeoutMs(target.pathname))});
+  const r=await fetcher(target,{method:'GET',headers:{Accept:'application/json',...(/^Bearer [A-Za-z0-9_-]{32,256}$/.test(event.headers?.authorization||event.headers?.Authorization||'')?{Authorization:event.headers.authorization||event.headers.Authorization}:{})},redirect:'error',signal:AbortSignal.timeout(readTimeoutMs(target.pathname))});
   const contentType=r.headers.get('content-type')||'';
   if(!contentType.includes('application/json'))return reply(502,{error:'שרת הנתונים החזיר תשובה לא תקינה'});
   const data=await r.json();return reply(r.status,data);

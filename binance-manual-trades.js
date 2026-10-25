@@ -5,7 +5,7 @@
  const context=()=>window.LEVI_MANUAL_TRADES?.context()||{};
  function refresh(){
   const c=context(),ready=c.mode==='live'&&c.capabilities?.version===1,held=c.account?.balances?.find(b=>b.asset+'USDT'===c.symbol);
-  get('manualForgetBtn').disabled=busy||uncertain;get('manualBuyBtn').disabled=busy||!ready;get('manualSellBtn').disabled=busy||!ready||!(Number(held?.free)>0);
+  get('manualForgetBtn').disabled=busy||uncertain;get('manualBuyBtn').disabled=busy||!ready;get('manualSellBtn').disabled=busy||!ready||!(Number(held?.qty??(Number(held?.free||0)+Number(held?.locked||0)))>0);
   get('manualTradeHint').textContent=!ready?(c.mode!=='live'?'קנייה ומכירה ידניות זמינות ב־LIVE בלבד':'נדרש עדכון שרת להפעלת קנייה ומכירה ידניות'):'מסחר מהיר · '+c.symbol+' · מכירה בלחיצה אחת של כל הכמות הזמינה';
  }
  function close(){if(!busy&&!uncertain){dialog.close();intent=null;}}
@@ -17,7 +17,7 @@
   intent={requestId:crypto.randomUUID(),symbol:c.symbol,side,mode:'live',all:side==='SELL'};uncertain=false;
   get('manualTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+c.symbol+' · LIVE';
   get('manualAmountRow').hidden=side!=='BUY';get('manualQuoteAmount').value='';
-  get('manualTradeSummary').textContent=side==='BUY'?'יתרה זמינה: '+Number(c.account?.usdtFree||0).toLocaleString('he-IL',{maximumFractionDigits:8})+' USDT · תקרה לפעולה: '+c.capabilities.maxOrderUsdt+' USDT. קנייה ידנית פותחת פוזיציה חדשה, ללא המתנה לאישור וואיקוף.':'תימכר כל הכמות הזמינה של '+c.symbol+': '+Number(bal?.free||0).toLocaleString('he-IL',{maximumFractionDigits:12})+'. כמות נעולה אינה זמינה; עשויה להישאר שארית קטנה עקב מגבלות בייננס.';
+  get('manualTradeSummary').textContent=side==='BUY'?'יתרה זמינה: '+Number(c.account?.usdtFree||0).toLocaleString('he-IL',{maximumFractionDigits:8})+' USDT · תקרה לפעולה: '+c.capabilities.maxOrderUsdt+' USDT. קנייה ידנית פותחת פוזיציה חדשה, ללא המתנה לאישור וואיקוף.':'תימכר כל הכמות הזמינה של '+c.symbol+': '+Number(bal?.qty??(Number(bal?.free||0)+Number(bal?.locked||0))).toLocaleString('he-IL',{maximumFractionDigits:12})+'. השרת ישחרר הגנות שהבוט מנהל לפני המכירה. נעילות אחרות לא יבוטלו; עשויה להישאר שארית קטנה עקב מגבלות בייננס.';
   get('manualTradePolicy').textContent=side==='BUY'?'לאחר הביצוע יחולו חוקי המכירה שנשמרו ב־SETTINGS, כולל יעד הרווח והסטופ. נדרש מקום פנוי מתוך '+c.capabilities.maxPositions+' פוזיציות.':'זו מכירה ידנית מיידית של המטבע הזה, גם לפני תום תקופת ההחזקה. קנייה אוטומטית חוזרת תדרוש תבנית וואיקוף חדשה.';
   get('manualTradeResult').textContent='המחיר ייקבע בזמן ביצוע פקודת השוק. לא נשלחה עסקה.';
   get('manualTradeSubmit').textContent=side==='BUY'?'קנה':'נסה למכור שוב';get('manualTradeSubmit').hidden=false;

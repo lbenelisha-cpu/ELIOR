@@ -1,3 +1,5 @@
+import {LiveWalletReconciler} from './lib/live-wallet-reconciliation.mjs';
+import {readLiveJournal} from './lib/live-journal.mjs';
 import {balancedUniverse,isBstock} from './lib/balanced-universe.mjs';
 import {createSearchBoundaries} from './lib/wyckoff-search-boundary.mjs';
 import {analyzeCandlePower} from './lib/candle-power.mjs';
@@ -281,14 +283,15 @@ const demoTrader=new DemoTrader({
   trailActivatePct:0
 });
 const livePeakMemory=new Map();
-const tradingPositions=()=>{
- if(mode==='live'){
+const liveManagedPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
   for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
-  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,stopPrice:r.stop,takeProfitPrice:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
+  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,stopPrice:r.stop,takeProfitPrice:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
- }
+};
+const tradingPositions=()=>{
+ if(mode==='live')return liveManagedPositions();
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
  return positions;
@@ -344,7 +347,7 @@ const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-a
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
  get:signedBinanceGet,post:signedBinancePost,del:signedBinanceDelete,info:symbolExchangeInfo,
- position:symbol=>tradingPositions()[symbol],
+ position:symbol=>liveManagedPositions()[symbol],
  price:symbol=>requireLivePrice(streams[symbol],Date.now(),15000),
  persistFloor:(symbol,p)=>persistLivePeak(symbol,p),
  free:async symbol=>Number((await getLiveAccountSnapshot()).balances.find(b=>b.asset===symbol.slice(0,-4))?.free||0),
@@ -427,12 +430,62 @@ function resetExperimentStateOnce(){
 }
 
 let liveActionLog=[];
+const liveWalletReconciler=new LiveWalletReconciler();
+const liveStateHealth={journalReady:false,journalError:null,reconciliation:{ready:false,checkedAt:null,pending:[]},lastExecutionError:null};
+function recordLiveError(symbol,error){
+ liveStateHealth.lastExecutionError={symbol:symbol||null,error:error.message,at:new Date().toISOString()};
+ if(symbol&&agents[symbol])agents[symbol].lastError=error.message;
+ console.error('LIVE execution error',symbol||'',error.message);
+}
+function liveReadiness(){
+ const positions=liveManagedPositions();
+ const missingProtection=Object.entries(positions).filter(([symbol,p])=>{
+  const r=nativeProtection.rows[symbol],quantity=Number(r?.params?.quantity);
+  return r?.phase!=='ACTIVE'||r.entryAt!==p.entryAt||r.hasUnsettledFill||!(r.verifiedAt>0)||Date.now()-r.verifiedAt>60000||!(r.quantityStep>0)||quantity>p.qty+1e-12||p.qty-quantity>=r.quantityStep;
+ }).map(([symbol])=>symbol);
+ const checked=Date.parse(liveStateHealth.reconciliation.checkedAt);
+ const reconciled=liveStateHealth.reconciliation.ready&&Number.isFinite(checked)&&Date.now()-checked<60000;
+ return {...liveStateHealth,ready:liveStateHealth.journalReady&&reconciled&&!liveOrders.pending&&!nativeProtection.uncertain()&&!missingProtection.length,
+  missingProtection,pendingOrder:!!liveOrders.pending,managedPositions:Object.keys(positions).length};
+}
+async function reconcileLiveHoldings(){
+ if(!liveStateHealth.journalReady)throw Error(liveStateHealth.journalError||'LIVE_JOURNAL_UNAVAILABLE');
+ try{
+  await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+  for(const [symbol,r] of Object.entries(nativeProtection.rows)){
+   if(r.phase==='CANCELING')await nativeProtection.release(symbol);
+   else if(r.phase==='CREATING')await nativeProtection.reconcile(symbol);
+  }
+  let account=await getLiveAccountSnapshot(),positions=liveManagedPositions(),queried=false;
+  // Resolve owned bracket fills before a wallet reduction can be classified as external.
+  for(const [symbol,p] of Object.entries(positions)){
+   const qty=account.balances.find(b=>b.asset+'USDT'===symbol)?.qty||0;
+   if(qty<p.qty&&nativeProtection.rows[symbol]){await nativeProtection.reconcile(symbol);queried=true;}
+  }
+  if(nativeProtection.uncertain())throw Error('NATIVE_PROTECTION_PENDING_RECONCILIATION');
+  if(queried)account=await getLiveAccountSnapshot();
+  positions=liveManagedPositions();
+  const unsettled=Object.keys(positions).filter(s=>nativeProtection.rows[s]?.hasUnsettledFill);
+  const result=liveWalletReconciler.observe(account,Object.fromEntries(Object.entries(positions).filter(([s])=>!unsettled.includes(s))));
+  if(result.adjustments.length){
+   const previous=liveActionLog;
+   liveActionLog=[...result.adjustments,...previous];
+   if(!saveLiveActionLog()){liveActionLog=previous;throw Error('LIVE_EXECUTION_JOURNAL_UNAVAILABLE');}
+   lastDisplayAccount=null;
+  }
+  const unmanaged=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&b.valueUsdt>=5&&!liveManagedPositions()[b.asset+'USDT']).map(b=>b.asset+'USDT');
+  liveStateHealth.reconciliation={ready:result.ready&&!unmanaged.length&&!unsettled.length,checkedAt:result.checkedAt,pending:result.pending,unmanaged,unsettled,adjustments:result.adjustments.length,error:null};
+  return account;
+ }catch(error){liveStateHealth.reconciliation={...liveStateHealth.reconciliation,ready:false,error:error.message};throw error;}
+}
+
 const LIVE_ALLOCATION_FILE=LIVE_LOG_FILE+'.allocation';
 let liveAllocation=null;
 function liveRealizedPnl(actions){
   const inventory=new Map();let realized=0;
   const seen=new Set();
   for(const a of [...actions].reverse()){
+    if(a.type==='POSITION_RECONCILIATION')throw Error('LIVE_ACCOUNT_RECONCILIATION_REQUIRED');
     const id=a.orderId==null?null:a.symbol+':'+a.type+':'+a.orderId;
     if(id&&seen.has(id))continue;if(id)seen.add(id);
     const qty=Number(a.qty),amount=Number(a.amountUsdt);
@@ -467,7 +520,7 @@ function fixedLiveAllocation(total){
   let realized;
   try{realized=liveRealizedPnl(liveActionLog);}
   catch(e){
-    if(e.message!=='LIVE_REALIZED_FEE_VALUATION_REQUIRED')throw e;
+    if(!['LIVE_REALIZED_FEE_VALUATION_REQUIRED','LIVE_ACCOUNT_RECONCILIATION_REQUIRED'].includes(e.message))throw e;
     // Unknown third-asset fees suspend profit reinvestment, not wallet reads or exits.
     // Preserve the recorded capital and allocation; never treat unknown fees as zero.
     const value={...liveAllocation,positionUsdt:liveAllocation.baseUsdt/LIVE_MAX_POSITIONS,maxPositions:LIVE_MAX_POSITIONS};
@@ -503,6 +556,7 @@ function saveLiveActionLog(){
     fs.renameSync(tmp,LIVE_LOG_FILE);
     return true;
   }catch(e){
+    liveStateHealth.journalReady=false;liveStateHealth.journalError='LIVE_JOURNAL_WRITE_FAILED';
     console.error('Live action log save failed',e.message);
     return false;
   }
@@ -510,12 +564,11 @@ function saveLiveActionLog(){
 
 function loadLiveActionLog(){
   try{
-    ensureStateDir();
-    if(!fs.existsSync(LIVE_LOG_FILE))return false;
-    const raw=JSON.parse(fs.readFileSync(LIVE_LOG_FILE,'utf8'));
-    liveActionLog=Array.isArray(raw)?raw:[];
+    liveActionLog=readLiveJournal(LIVE_LOG_FILE);
+    liveStateHealth.journalReady=true;liveStateHealth.journalError=null;
     return true;
   }catch(e){
+    liveStateHealth.journalReady=false;liveStateHealth.journalError=e.message;
     console.error('Live action log load failed',e.message);
     return false;
   }
@@ -684,8 +737,10 @@ async function recordLiveFill(order,intent){
  pushLiveAction(liveFillAction(order,intent,fills));
 }
 async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
+  await reconcileLiveHoldings();
+  if(!liveReadiness().ready)throw Error('LIVE_STATE_NOT_READY');
   if(nativeProtection.uncertain())throw Error('NATIVE_PROTECTION_PENDING_RECONCILIATION');
-  if(nativeProtection.rows[symbol]){if(tradingPositions()[symbol])throw Error('LIVE position is already held');await nativeProtection.release(symbol);}
+  if(nativeProtection.rows[symbol]){if(liveManagedPositions()[symbol])throw Error('LIVE position is already held');await nativeProtection.release(symbol);}
   const restrictions=await getApiRestrictions();
   const gate=liveTradingGate(restrictions);
   if(!gate.ready)throw Error('LIVE trading gate is not enabled');
@@ -745,40 +800,59 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
   if(['spring_retest','wyckoff_confirmation','spring_rsi_live'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
-    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000));
+    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
 
   const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
-  try{await nativeProtection.sync(symbol,tradingPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
-  catch(error){console.error('LIVE native protection pending',symbol,error.message);order.protectionWarning=error.message;}
+  try{await nativeProtection.sync(symbol,liveManagedPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
+  catch(error){recordLiveError(symbol,error);order.protectionWarning=error.message;}
   return order;
 }
 
 async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
-  const restrictions=await getApiRestrictions();
-  const gate=liveTradingGate(restrictions);
+  const restrictions=await getApiRestrictions(),gate=liveTradingGate(restrictions);
   if(!gate.ready)throw Error('LIVE trading gate is not enabled');
   if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for this API key');
-
-  const managedBefore=tradingPositions()[symbol];
-  await nativeProtection.release(symbol); // Confirm both children final before unlocking/selling.
-  if(managedBefore&&!tradingPositions()[symbol])return {status:'CLOSED_AT_BROKER',symbol};
+  if(liveOrders.pending)throw Error('LIVE_ORDER_PENDING_RECONCILIATION');
+  if(!liveStateHealth.journalReady)throw Error('LIVE_JOURNAL_UNAVAILABLE');
+  const managedBefore=liveManagedPositions()[symbol];
+  // Reconcile first: an owned native order may have already sold the holding.
+  await nativeProtection.reconcile(symbol);
+  if(managedBefore&&!liveManagedPositions()[symbol])return {status:'CLOSED_AT_BROKER',symbol};
   const base=symbol.endsWith('USDT')?symbol.slice(0,-4):symbol;
-  const acct=await getLiveAccountSnapshot();
-  const bal=acct.balances.find(x=>x.asset===base);
-  if(!bal||!(bal.free>0))throw Error('No free balance to sell for '+base);
-
   const info=await symbolExchangeInfo(symbol);
-  const lot=info?.filters?.find(x=>x.filterType==='LOT_SIZE');
   if(!info||info.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false)throw Error('המטבע אינו זמין למסחר Spot');
-  const trackedQty=Number(tradingPositions()[symbol]?.qty||0);
   const sellAll=reason==='MANUAL_SELL'&&meta.sellAllBalance===true;
+  const before=await getLiveAccountSnapshot(),balance=before.balances.find(x=>x.asset===base);
+  const ownLocked=Number(nativeProtection.rows[symbol]?.params?.quantity||0);
+  const available=Math.min(Number(balance?.qty||0),Number(balance?.free||0)+ownLocked);
+  const trackedQty=Number(liveManagedPositions()[symbol]?.qty||0);
   if(!sellAll&&!(trackedQty>0))throw Error('No tracked Wyckoff quantity to sell');
-  const qty=sellAll?manualSellQuantity(bal,info):floorToStep(Math.min(bal.free,trackedQty),Number(lot?.stepSize||0));
-  if(!(Number(qty)>0))throw Error('Sell quantity is below LOT_SIZE');
-  const dustThresholdUsdt=Math.max(5,...(info.filters||[]).filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType)).map(f=>Number(f.minNotional)||0));
-
-  return liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  // Validate supported quantity and notional before removing a working bracket.
+  manualSellQuantity({...balance,free:sellAll?available:Math.min(available,trackedQty)},info);
+  let released=false;
+  try{
+    await nativeProtection.release(symbol);released=true;
+    if(managedBefore&&!liveManagedPositions()[symbol])return {status:'CLOSED_AT_BROKER',symbol};
+    const acct=await getLiveAccountSnapshot(),bal=acct.balances.find(x=>x.asset===base);
+    const remaining=Number(liveManagedPositions()[symbol]?.qty||0);
+    const qty=manualSellQuantity({...bal,free:sellAll?Number(bal?.free||0):Math.min(Number(bal?.free||0),remaining)},info);
+    const dustThresholdUsdt=Math.max(5,...(info.filters||[]).filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType)).map(f=>Number(f.minNotional)||0));
+    return await liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  }catch(error){
+    // A timed-out sale might have executed. Never re-arm over an unknown order.
+    if(released&&!liveOrders.pending&&liveStateHealth.journalReady){
+      try{
+        const p=liveManagedPositions()[symbol];
+        if(p){
+          await nativeProtection.sync(symbol,p,requireLivePrice(streams[symbol],Date.now(),15000));
+          if(nativeProtection.rows[symbol]?.phase!=='ACTIVE')throw Error('NATIVE_PROTECTION_RESTORE_UNCONFIRMED');
+        }
+      }catch(restoreError){error.protectionError=restoreError.message;}
+    }
+    recordLiveError(symbol,Error(error.message+(error.protectionError?' · '+error.protectionError:'')));
+    throw error;
+  }
 }
 
 function persistLivePeak(symbol, position){
@@ -786,7 +860,7 @@ function persistLivePeak(symbol, position){
   if(buyIndex<0)return;
   // A sale closes this journal entry even if rounded dust remains in the wallet.
   // Newer purchases start a separate entry and may update their own peak.
-  if(tradingPositions()[symbol]?.entryAt!==position.entryAt)return;
+  if(liveManagedPositions()[symbol]?.entryAt!==position.entryAt)return;
   const buy=liveActionLog[buyIndex];
   const policyChanged=position.exitPolicy!==buy.wyckoffTrade.exitPolicy||['atrValue','atrTrailPct','effectiveStopPrice'].some(k=>Number(position[k]||0)!==Number(buy.wyckoffTrade[k]||0));
   if(Number(buy.wyckoffTrade.peakPrice||0)>=position.peakPrice&&!policyChanged)return;
@@ -822,14 +896,14 @@ async function executeManualTrade(body){
   isUncertain:request=>liveOrders.pending?.meta?.manualRequestId===request.requestId
  }));
 }
-async function executeLiveCycle(evals){
-  if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
+async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
+  if(!LIVE||!AUTO_EXECUTION||!liveStateHealth.journalReady)return;
   // Most one-second cycles only observe peaks. Do not reserve network work
   // (and block manual execution) unless a sale, entry, or recovery is needed.
   let needsExecution=Boolean(liveOrders.pending);
   for(const ev of evals){
     if(!ev.ok)continue;
-    const saved=tradingPositions()[ev.symbol];
+    const saved=liveManagedPositions()[ev.symbol];
     if(saved){
       let price;
       try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
@@ -837,7 +911,7 @@ async function executeLiveCycle(evals){
       persistLivePeak(ev.symbol,saved);
       if(wyckoffExit(saved,price).sell)needsExecution=true;
     }
-    if(!tradeControl.paused&&ev.entryConfirmed&&ev.wyckoffTrade&&!saved&&
+    if(allowEntries&&!tradeControl.paused&&ev.entryConfirmed&&ev.wyckoffTrade&&!saved&&
       !liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))needsExecution=true;
   }
   if(!needsExecution)return;
@@ -850,17 +924,22 @@ async function executeLiveCycle(evals){
   const sold=new Set();
   for(const ev of evals){
     if(!ev.ok||!owned(ev.symbol))continue;
-    const saved=tradingPositions()[ev.symbol];
+    const saved=liveManagedPositions()[ev.symbol];
     if(!saved)continue;
     saved.marketRank=marketRanks.get(ev.symbol)??null;
     let price;try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
     observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
     const exit=wyckoffExit(saved,price);
     persistLivePeak(ev.symbol,saved);
-    if(exit.sell){await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
+    if(exit.sell){
+      try{await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
+      catch(error){recordLiveError(ev.symbol,error);if(liveOrders.pending||nativeProtection.uncertain()||!liveStateHealth.journalReady)throw error;}
+    }
   }
-  if(tradeControl.paused)return;
-  if(Object.entries(tradingPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
+  if(!allowEntries||tradeControl.paused)return;
+  account=await reconcileLiveHoldings();
+  if(!liveReadiness().ready)return;
+  if(Object.entries(liveManagedPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
   for(const ev of evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade)){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
@@ -890,6 +969,8 @@ async function getLiveAccountSnapshot(){
     getApiRestrictions()
   ]);
 
+  if(!Array.isArray(acct?.balances)||!Array.isArray(prices))throw Error('LIVE_ACCOUNT_RESPONSE_INVALID');
+  for(const b of acct.balances)if(!b.asset||![b.free,b.locked].every(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))&&Number(v)>=0))throw Error('LIVE_ACCOUNT_BALANCE_INVALID');
   const priceMap=new Map((prices||[]).map(x=>[String(x.symbol||''),Number(x.price||0)]));
 
   const balances=(acct.balances||[])
@@ -992,7 +1073,7 @@ async function selectUniverse(){
 function initUniverse(symbols){
   marketRanks.clear();
   symbols.forEach((s,i)=>marketRanks.set(s,i+1));
-  SYMBOLS=[...new Set([...symbols,...Object.keys(tradingPositions())])];
+  SYMBOLS=[...new Set([...symbols,...Object.keys(tradingPositions()),...Object.keys(liveManagedPositions())])];
   const activeSymbols=new Set(SYMBOLS);
   for(const cache of [dailyCandleCache,minuteCandleState,microCandleState,entryTrackingState,livePeakState]){
     for(const symbol of cache.keys())if(!activeSymbols.has(symbol))cache.delete(symbol);
@@ -1090,7 +1171,7 @@ async function fetchHistoricalDaily(symbol,startMs,endMs=Date.now()){
     const r=await j(`/api/v3/klines?symbol=${encodeURIComponent(symbol)}&interval=1d&limit=1000&startTime=${cursor}&endTime=${end}`);
     if(!Array.isArray(r)||!r.length)break;
     for(const x of r){
-      rows.push({closeTime:+x[6],close:+x[4]});
+      rows.push({openTime:+x[0],closeTime:+x[6],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]});
     }
     const next=+r.at(-1)[6]+1;
     if(next<=cursor)break;
@@ -1372,7 +1453,7 @@ async function evaluateSymbol(s){
     const entryBars=p?[]:await candles(s);
     const livePrice=requireLivePrice(streams[s]);
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
-    const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&a.type==='SELL').map(a=>Date.parse(a.at)).filter(Number.isFinite));
+    const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
     const ev=evaluateDailyTrade({symbol:s,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
@@ -1834,7 +1915,7 @@ async function runEvaluation(){
   try{
     await maybeExecuteLive(evals);
   }catch(e){
-    console.error('LIVE execution cycle failed',e.message);
+    recordLiveError(null,e);
   }
 
   // Final UI reconciliation after any trades/rotations.
@@ -1957,19 +2038,19 @@ setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message))
 // Exit monitoring does not wait for the 100-symbol daily-candle scan.
 let exitMonitorInFlight=false;
 setInterval(async()=>{
-  if(mode==='live'){try{for(const [symbol,p] of Object.entries(tradingPositions()))persistLivePeak(symbol,p);}catch(error){console.error('LIVE peak persistence failed',error.message);return;}}
+  if(LIVE&&AUTO_EXECUTION&&liveStateHealth.journalReady){try{for(const [symbol,p] of Object.entries(liveManagedPositions()))persistLivePeak(symbol,p);}catch(error){console.error('LIVE peak persistence failed',error.message);return;}}
   if(exitMonitorInFlight)return;exitMonitorInFlight=true;
   try{
-  if(mode==='live'){
+  if(LIVE&&AUTO_EXECUTION&&liveStateHealth.journalReady){
    if(!LIVE||!AUTO_EXECUTION)return;
-   try{await maybeExecuteLive(Object.entries(tradingPositions()).map(([symbol,p])=>{
+   try{await maybeExecuteLive(Object.entries(liveManagedPositions()).map(([symbol,p])=>{
       try{
         const price=requireLivePrice(streams[symbol],Date.now(),15000);
         const ev=evaluateDailyTrade({symbol,bars:[],price,priceAsOf:streams[symbol].lastEventAt,position:p,timeframe:'5m',exitEvaluator:wyckoffExit});
         return ev;
       }catch(error){return {ok:false,symbol,error:error.message};}
     }));}catch(e){console.error('LIVE exit monitor failed',e.message);}
-   return;
+   if(mode==='live')return;
   }
   if(!DEMO_TRADING||mode!=='demo')return;
   if(!await demoTrader.monitorExits())return;
@@ -1985,7 +2066,7 @@ let manualAdoptionAt=0,manualAdoptionCursor=0;
 async function adoptManualBinanceHolding(){
  if(Date.now()-manualAdoptionAt<30000)return;
  manualAdoptionAt=Date.now();
- const account=await getLiveAccountSnapshot(),positions=tradingPositions();
+ const account=await getLiveAccountSnapshot(),positions=liveManagedPositions();
  const candidates=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&b.valueUsdt>=5&&!positions[b.asset+'USDT']&&!nativeProtection.rows[b.asset+'USDT']);
  for(const b of candidates.length?[candidates[manualAdoptionCursor++%candidates.length]]:[]){
   const symbol=b.asset+'USDT';
@@ -1996,7 +2077,7 @@ async function adoptManualBinanceHolding(){
    const trades=await signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000});
    const latest=await getLiveAccountSnapshot(),balance=latest.balances.find(x=>x.asset===b.asset);
    if(!balance||Math.abs(balance.qty-b.qty)>Math.max(1e-8,b.qty*1e-6))continue;
-   const prior=tradingPositions()[symbol];
+   const prior=liveManagedPositions()[symbol];
    const action=externalBinanceEntry(balance,trades,Date.now(),prior,tradeSettings.values);
    if(action){pushLiveAction(action);if(!SYMBOLS.includes(symbol)){initUniverse([...SYMBOLS,symbol]);startMarketStream();}console.log('Manual holding enrolled',symbol);}
   }catch(error){console.error('Manual holding adoption blocked',symbol,error.message);}
@@ -2005,18 +2086,20 @@ async function adoptManualBinanceHolding(){
 }
 let nativeProtectionCursor=0;
 setInterval(()=>{
- if(mode!=='live'||!LIVE||!AUTO_EXECUTION)return;
+ if(!LIVE||!AUTO_EXECUTION||!liveStateHealth.journalReady)return;
  liveExecution.automatic(async()=>{
-  if(liveOrders.pending)return; // Recover market execution before any bracket work.
-  await adoptManualBinanceHolding();
-  const symbols=[...new Set([...Object.keys(nativeProtection.rows),...Object.keys(tradingPositions())])];
+  await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+  const interval=liveStateHealth.reconciliation.ready?30000:2000;
+  if(Date.now()-(Date.parse(liveStateHealth.reconciliation.checkedAt)||0)>=interval)await reconcileLiveHoldings();
+  if(mode==='live')await adoptManualBinanceHolding();
+  const symbols=[...new Set([...Object.keys(nativeProtection.rows),...Object.keys(liveManagedPositions())])];
   if(!symbols.length)return;
-  const symbol=symbols[nativeProtectionCursor++%symbols.length],p=tradingPositions()[symbol];
+  const symbol=symbols[nativeProtectionCursor++%symbols.length],p=liveManagedPositions()[symbol];
   const gate=liveTradingGate(await getApiRestrictions());
   if(!gate.ready||gate.withdrawalsEnabled)return;
   let price=null;try{price=requireLivePrice(streams[symbol],Date.now(),15000);}catch{}
   await nativeProtection.sync(symbol,p,price);
- }).catch(error=>console.error('LIVE native protection failed',error.message));
+ }).catch(error=>recordLiveError(null,error));
 },1000).unref();
 setInterval(refreshUniverse,300000).unref();
 
@@ -2039,11 +2122,15 @@ const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
   if(req.method==='OPTIONS')return send(res,{},204);
-  const protectedControl=req.method==='POST'&&(
-    u.pathname==='/api/binance-settings'||u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||
-    (mode==='live'&&u.pathname==='/api/binance-agent/evaluate')
+  const authorized=controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)||controlDevices.authorized(req.headers.authorization);
+  const privateRead=req.method==='GET'&&u.pathname.startsWith('/api/binance-')&&!['/api/binance-mode','/api/binance-market-power'].includes(u.pathname);
+  // The scheduled notifier needs only these two reads, never trading authority.
+  const notificationRead=req.method==='GET'&&['/api/binance-action-log','/api/binance-agent'].includes(u.pathname)&&process.env.BINANCE_PUSH_READ_TOKEN!==process.env.BINANCE_CONTROL_TOKEN&&controlAuthorized(req.headers.authorization,process.env.BINANCE_PUSH_READ_TOKEN);
+  const protectedControl=(privateRead&&!notificationRead)||req.method==='POST'&&(
+    u.pathname==='/api/binance-settings'||u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||u.pathname==='/api/binance-universe/refresh'||u.pathname==='/api/binance-paper/reset'||
+    u.pathname==='/api/binance-agent/evaluate'
   );
-  if(protectedControl&&!controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)&&!controlDevices.authorized(req.headers.authorization)){
+  if(protectedControl&&!authorized){
     return send(res,{ok:false,error:'Authenticated control required: configure BINANCE_CONTROL_TOKEN (at least 32 characters) and send a Bearer token'},401);
   }
 
@@ -2072,6 +2159,16 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/binance-chart-cache.js':['binance-chart-cache.js','text/javascript'],
+    '/binance-chart-decisions.js':['binance-chart-decisions.js','text/javascript'],
+    '/binance-kelly.js':['binance-kelly.js','text/javascript'],
+    '/binance-market-watch.js':['binance-market-watch.js','text/javascript'],
+    '/binance-scanner-view.js':['binance-scanner-view.js','text/javascript'],
+    '/chart-workbench.css':['chart-workbench.css','text/css'],
+    '/lib/rsi-screener.mjs':['lib/rsi-screener.mjs','text/javascript'],
+    '/rsi-screener-init.js':['rsi-screener-init.js','text/javascript'],
+    '/rsi-screener.css':['rsi-screener.css','text/css'],
+    '/rsi-screener.js':['rsi-screener.js','text/javascript'],
     '/app-settings.js':['app-settings.js','text/javascript'],
     '/market-power-panel.js':['market-power-panel.js','text/javascript'],
     '/rsi-current-badge.js':['rsi-current-badge.js','text/javascript'],
@@ -2100,11 +2197,16 @@ const server=http.createServer((req,res)=>{
     let body='';
     req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy();});
     req.on('end',async()=>{
-      try{
-        if(liveExecution.busy)return send(res,{ok:false,error:'פעולת מסחר מתבצעת כעת. המתן לסיומה.'},409);
+      try{await liveExecution.manual(async()=>{
         const action=JSON.parse(body||'{}').action;
-        if(!['stop','start'].includes(action))return send(res,{ok:false,error:'Invalid action'},400);
+        if(!['stop','start','pause','resume'].includes(action))return send(res,{ok:false,error:'Invalid action'},400);
+        if(action==='pause'||action==='resume'){
+          if(action==='resume'&&mode==='live'){await reconcileLiveHoldings();if(!liveReadiness().ready)throw Error('LIVE_STATE_NOT_READY');}
+          tradeControl={...tradeControl,paused:action==='pause',[action==='pause'?'pausedAt':'resumedAt']:new Date().toISOString()};
+          saveTradeControl();return send(res,{ok:true,tradeControl});
+        }
         if(action==='start'){
+          if(mode==='live'){await reconcileLiveHoldings();if(!liveReadiness().ready)throw Error('LIVE_STATE_NOT_READY');}
           // Remain stopped until previous positions are actually closed.
           if(DEMO_TRADING && Object.keys(demoTrader.state.positions).length)
             return send(res,{ok:false,error:'יש פוזיציות דמו שלא נסגרו. יש להשלים עצירה לפני התחלה.'},409);
@@ -2117,8 +2219,7 @@ const server=http.createServer((req,res)=>{
         tradeControl.paused=true;
         tradeControl.pausedAt=new Date().toISOString();
         saveTradeControl();
-        // Wait for in-flight evaluation and order cycles to finish before liquidating.
-        if(evaluationInFlight)await evaluationInFlight;
+        // The execution lock excludes orders and protection replacement for the entire liquidation.
         const sold=[],failed=[];
         if(mode==='live'){
           if(!LIVE || !AUTO_EXECUTION)return send(res,{ok:false,tradeControl,error:'LIVE execution is not enabled; no liquidation was attempted'},409);
@@ -2144,7 +2245,7 @@ const server=http.createServer((req,res)=>{
         tradeControl.lastStop={at:new Date().toISOString(),sold,failed};
         saveTradeControl();
         return send(res,{ok:failed.length===0,tradeControl,sold,failed},failed.length?207:200);
-      }catch(e){return send(res,{ok:false,tradeControl,error:e.message},500);}
+      });}catch(e){return send(res,{ok:false,tradeControl,error:e.message},500);}
     });
     return;
   }
@@ -2153,12 +2254,13 @@ const server=http.createServer((req,res)=>{
     return send(res,{
       mode,
       deviceAuth:{version:1,enabled:controlDevices.enabled,pairCodeLength:6},
+      liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryPolicyVersion:ENTRY_POLICY_VERSION,
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
-      tradeControl,
+      tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
-      demoTradingError:demoTrader.error,
+      demoTradingError:authorized?demoTrader.error:null,
       liveTradingEnabled:LIVE,
       autoExecution:AUTO_EXECUTION,
       keysConfigured:KEYS_CONFIGURED,
@@ -2283,7 +2385,7 @@ const server=http.createServer((req,res)=>{
       tradeControl,
       symbols:SYMBOLS,
       streams,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
       paper:accountSnapshot(),
       universeStatus,
       universeError,
@@ -2328,6 +2430,9 @@ const server=http.createServer((req,res)=>{
         rsiPeriod:14,
         qualityPolicy:QUALITY_POLICY,
         entryFiltersEnabled:true,
+        entryCostFilterEnabled:false,
+        volumeFilterEnabled:false,
+        liveState:liveReadiness(),
         hourlyTrendFilter:HOURLY_TREND_RULE,
         entryPolicyVersion:ENTRY_POLICY_VERSION,
         entryMode:'spring_rsi_live',
@@ -2342,12 +2447,12 @@ const server=http.createServer((req,res)=>{
         entryRsi:{period:14,timeframe:'5m',min:0,max:30,includesOpenCandle:true},
         exitPolicy:TRAILING_EXIT_POLICY,
         fixedExitVersion:1,
-        takeProfitPct:null,
-        profitActivationPct:4,
-        profitFloorPct:4,
-        trailingGapPp:1,
+        takeProfitPct:tradeSettings.values.takeProfitPct,
+        profitActivationPct:tradeSettings.values.profitActivationPct,
+        profitFloorPct:tradeSettings.values.profitActivationPct,
+        trailingGapPp:tradeSettings.values.trailingGapPp,
         trailingExitVersion:1,
-        springStopLossPct:1,
+        springStopLossPct:tradeSettings.values.stopLossPct,
         profitGivebackPct:null,
         profitRetentionPct:null,
         minProfitHoldMinutes:0,
@@ -2362,7 +2467,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-agent/evaluate'&&req.method==='POST'){
     evalAll().then(()=>send(res,{
       ok:true,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
       paper:accountSnapshot()
     })).catch(e=>send(res,{ok:false,error:e.message},502));
     return;
@@ -2385,22 +2490,14 @@ const server=http.createServer((req,res)=>{
     return;
   }
 
-  if(u.pathname==='/'||u.pathname==='/health'){
-    return send(res,{
-      ok:true,
-      mode,
-      symbols:SYMBOLS,
-      paper:accountSnapshot(),
-      universeStatus,
-      universeError
-    });
-  }
+  if(u.pathname==='/'||u.pathname==='/health')return send(res,{ok:true,service:'levi-binance'});
+  if(u.pathname==='/api/binance-readiness')return send(res,{ok:true,liveState:liveReadiness()});
 
   send(res,{error:'Not found'},404);
 });
 
 server.listen(PORT,'0.0.0.0',async()=>{
-  console.log('Server',PORT);
+  console.log('Server',server.address().port);
   loadTradeControl();
   loadPaperState();
   loadLiveActionLog();
