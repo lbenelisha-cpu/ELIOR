@@ -108,6 +108,7 @@ function setDashboardView(view){
   });
   const grid=$('.trading-grid');
   if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
+  if(activeView==='scans'&&$('#scannerSection'))$('#scannerSection').open=true;
   if(activeView==='portfolio')renderPortfolioView();
   if(activeView==='journal'||activeView==='portfolio')loadActionJournal(currentMode);
   if(activeView==='journal'&&currentAgentData)loadDecisionHistory(selectedSymbol);
@@ -115,6 +116,7 @@ function setDashboardView(view){
   document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
     const name=btn.dataset.view||['trade','portfolio','scans','journal'][i];
     btn.classList.toggle('active',name===activeView);
+    if(name===activeView)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current');
   });
 }
 
@@ -257,6 +259,7 @@ function activeContext(d,currentMode,liveAccount){
 
 function selectScannerAsset(symbol,tr){
   selectedSymbol=symbol;
+  if($('#chartSection'))$('#chartSection').open=true;
   document.querySelectorAll('#assetsBody tr').forEach(x=>x.classList.toggle('selected',x===tr));
   updateSelectedAsset(currentAgentData,currentMode,currentLiveAccount);
 }
@@ -385,6 +388,11 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   if(activeView==='portfolio')renderPortfolioView();
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   updateSelectedAsset(d,currentMode,liveAccount);
+  if(typeof CustomEvent==='function'){
+    const detail={agent:d,account:liveAccount,mode:currentMode,receivedAt:Date.now()};
+    window.LEVI_DASHBOARD_SNAPSHOT=detail;
+    window.dispatchEvent(new CustomEvent('levi:binance-dashboard',{detail}));
+  }
 }
 
 function rotationGapText(a,d,currentMode,liveAccount){
@@ -406,6 +414,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
+  put('#chartSectionLabel',a.symbol+' · נרות, RSI ותבנית וויקוף');
   const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+a.symbol);
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
@@ -432,7 +441,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
 
-  await Promise.all([...(activeView==='trade'||activeView==='scans'?[loadChart(a.symbol)]:[]),...(activeView==='journal'?[loadDecisionHistory(a.symbol)]:[])]);
+  await Promise.all([...((activeView==='trade'||activeView==='scans')&&$('#chartSection')?.open!==false?[loadChart(a.symbol)]:[]),...(activeView==='journal'?[loadDecisionHistory(a.symbol)]:[])]);
 }
 
 function blockerLabel(b){
@@ -940,7 +949,7 @@ async function load(){
       if(agentMode&&agentMode!==m.mode)return null;
       receivedMode=m;mode(m);
       if(m.mode==='live'&&!accountRead)accountRead=J(LIVEACC,{timeoutMs:35000}).catch(e=>({connected:false,error:e.message}));
-      if(!dashboardLoaded&&(activeView==='trade'||activeView==='scans')&&typeof loadChart==='function'&&typeof selectedSymbol==='string')loadChart(selectedSymbol);
+      if(!dashboardLoaded&&$('#chartSection')?.open!==false&&(activeView==='trade'||activeView==='scans')&&typeof loadChart==='function'&&typeof selectedSymbol==='string')loadChart(selectedSymbol);
       return m;
     };
     const modeRead=J(MODE,{timeoutMs:35000}).then(applyMode).catch(()=>null);
@@ -979,6 +988,11 @@ async function load(){
     control?.classList.remove('trading-active','trading-paused');
     put('#tradeControlStatus',e.status===401?'נדרש חיבור מכשיר לצפייה בחשבון':'מצב המסחר לא אומת · שרת לא זמין');
     if(e.status===401&&e.authToken===tradeControlToken){tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();}
+    if(typeof CustomEvent==='function'){
+      const detail={error:true,unauthorized:e.status===401,mode:currentMode,receivedAt:window.LEVI_DASHBOARD_SNAPSHOT?.receivedAt||null};
+      window.LEVI_DASHBOARD_SNAPSHOT=detail;
+      window.dispatchEvent(new CustomEvent('levi:binance-dashboard',{detail}));
+    }
     console.error(e);
   }finally{
     dashboardLoadInFlight=false;
@@ -1140,3 +1154,13 @@ function filterAssetRows(){
 }
 const assetSearchInput=document.querySelector('#assetSearch');
 if(assetSearchInput){assetSearchInput.addEventListener('input',filterAssetRows);new MutationObserver(filterAssetRows).observe(document.querySelector('#assetsBody'),{childList:true,subtree:true,characterData:true});}
+
+// Opening display panels never changes trading mode or sends an order.
+document.getElementById('chartSection')?.addEventListener('toggle',event=>{
+  if(event.target.open){loadChart(selectedSymbol);requestAnimationFrame(()=>drawCandles(chartCandles));}
+});
+window.addEventListener('levi-dashboard-select',event=>{
+  if(!currentAgentData?.agents?.some(a=>a.symbol===event.detail))return;
+  setDashboardView('trade');selectScannerAsset(event.detail,null);
+  document.getElementById('chartSection')?.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+});
