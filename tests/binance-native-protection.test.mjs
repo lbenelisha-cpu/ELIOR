@@ -29,6 +29,19 @@ test('native OCO uses actual fill, market triggers, +50% target, -1% stop and ro
  assert.throws(()=>nativeProtectionPlan(symbol,p,100,{...info,ocoAllowed:false},2),/NOT_SUPPORTED/);
  assert.throws(()=>nativeProtectionPlan(symbol,p,100,info,.001),/LOCKED_ELSEWHERE/);
 });
+test('large BTC trigger prices retain tick precision without binary floating-point tails',()=>{
+ const btc={...info,symbol:'BTCUSDT',filters:info.filters.map(f=>f.filterType==='PRICE_FILTER'?{...f,tickSize:'0.01000000',maxPrice:'1000000'}:f.filterType==='LOT_SIZE'?{...f,stepSize:'0.00001000',minQty:'0.00001000'}:f)};
+ const p=applyTrailingExitPolicy({entryPrice:80621.23,qty:.00032967,peakPrice:80621.23});
+ const plan=nativeProtectionPlan('BTCUSDT',p,80621.23,btc,.00032967);
+ assert.equal(plan.params.aboveStopPrice,'120931.85');assert.equal(plan.params.belowStopPrice,'79815.02');assert.equal(plan.params.quantity,'0.00032');
+ assert.match(plan.params.aboveStopPrice,/^\d+\.\d{2}$/);assert.match(plan.params.belowStopPrice,/^\d+\.\d{2}$/);
+});
+test('integer lot and tick formatting preserves significant trailing zeros',()=>{
+ const integer={...info,filters:info.filters.map(f=>f.filterType==='PRICE_FILTER'?{...f,tickSize:'10.00000000'}:f.filterType==='LOT_SIZE'?{...f,stepSize:'1.00000000',minQty:'1'}:f)};
+ const p=applyTrailingExitPolicy({entryPrice:100,qty:1000,peakPrice:100});
+ const plan=nativeProtectionPlan(symbol,p,100,integer,1000);
+ assert.equal(plan.params.quantity,'1000');assert.equal(plan.params.aboveStopPrice,'150');assert.equal(plan.params.belowStopPrice,'100');
+});
 test('create persisted first; restart queries same IDs without a second create on unknown outcome',async t=>{
  const r=rig(t);r.loseCreate();await assert.rejects(r.store.sync(symbol,r.p,100),/timeout/);assert.equal(r.posts,1);assert.equal(JSON.parse(fs.readFileSync(r.file))[symbol].phase,'CREATING');
  const restored=new BinanceNativeProtection(r.file,r.api);await restored.sync(symbol,r.p,100);assert.equal(r.posts,1);assert.equal(restored.rows[symbol].phase,'ACTIVE');
