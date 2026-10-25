@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Binance Wave Agent V6</title>
+  <title>LEVI · Binance | תמונת מצב</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="/binance-agent.css?v=20261024-latest-labels-20261021-edge-axis">
 <link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
+  <link rel="stylesheet" href="/binance-dashboard.css?v=20261025-visual">
 </head>
 <body>
   <main class="app-shell">
@@ -16,20 +17,20 @@
       <div class="brand-block">
         <div class="brand-mark">◈</div>
         <div>
-          <div class="brand-title">LEVI · BINANCE WAVE</div>
+          <div class="brand-title">LEVI <span>INVEST</span></div>
           <div class="brand-links"><a class="tradingview-link" href="https://www.tradingview.com/chart/?trade-now=BINANCE&amp;trade-now-source=broker_profile" target="_blank" rel="noopener noreferrer" title="פתיחת חיבור Binance ב־TradingView; ההתחברות מתבצעת שם">חבר חשבון ב־TradingView ↗</a><a class="platform-switch" href="/colmex-pro.html">מעבר לקולמקס־פרו ←</a><a href="/push.html" class="tradingview-link">🔔 הפעל התראות לאייפון</a></div>
-          <div class="brand-sub">וויקוף · נרות 5 דקות · ניהול יציאה לפי SETTINGS</div>
+          <div class="brand-sub">Binance · מעקב, תכנון ומסחר</div>
         </div>
       </div>
 
       <nav class="topnav">
-        <button class="nav-pill active">מסחר</button>
-        <button class="nav-pill">תיק</button>
-        <button class="nav-pill">סריקות</button>
-        <button class="nav-pill">יומן פעולות</button>
+        <button class="nav-pill active" data-view="trade">סקירה</button>
+        <button class="nav-pill" data-view="portfolio">התיק שלי</button>
+        <button class="nav-pill" data-view="scans">סריקות</button>
+        <button class="nav-pill" data-view="journal">יומן פעולות</button>
       </nav>
 
-      <details class="dashboard-menu"><summary class="refresh">פירוט · תפריט מסחר</summary>
+      <details class="dashboard-menu"><summary class="refresh">ניהול המסחר</summary>
       <div class="top-actions">
         <div id="status" class="status">מתחבר…</div>
         <div class="trade-control-buttons">
@@ -46,17 +47,41 @@
       </div>
       </details>
     </header>
-    <p><a href="/binance-research.html" style="color:#8ec5ff">מחקר מטבעות · השוואת שיטות בתיק סימולציה נפרד</a></p>
-
-    <section class="market-strip app-view trade-view">
-      <div><span>BTC</span><strong id="tickerBTC">—</strong></div>
-      <div><span>ETH</span><strong id="tickerETH">—</strong></div>
-      <div><span>SOL</span><strong id="tickerSOL">—</strong></div>
-      <div><span>BNB</span><strong id="tickerBNB">—</strong></div>
-      <div><span>AAVE</span><strong id="tickerAAVE">—</strong></div>
+    <section class="overview" aria-labelledby="overviewTitle">
+      <div class="overview-heading">
+        <div><p class="eyebrow">התמונה הגדולה</p><h1 id="overviewTitle">התיק שלך, במבט אחד.</h1><p class="overview-sub">המספרים החשובים כאן. כל השאר נפתח לפי הצורך.</p></div>
+        <div class="overview-connection"><span id="overviewMode" class="mode-tag">ממתין לחיבור</span><button id="overviewConnect" type="button">חיבור מכשיר</button><span id="overviewUpdated">טרם התקבלו נתונים</span></div>
+      </div>
+      <div id="overviewHealth" class="health-banner" role="status"><span class="health-dot" aria-hidden="true"></span><span id="overviewHealthText">ממתין לאימות מצב החשבון</span></div>
+      <div class="overview-metrics">
+        <article class="metric-card featured"><span>שווי התיק <small id="overviewCurrency"></small></span><strong id="overviewValue">—</strong><small id="overviewValueNote">לפי נתוני החשבון</small><svg class="metric-art" viewBox="0 0 120 50" aria-hidden="true"><circle cx="24" cy="50" r="46" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="32" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="18" fill="none" stroke="currentColor"/></svg></article>
+        <article class="metric-card"><span>מזומן זמין</span><strong id="overviewCash">—</strong><small>יתרה זמינה להקצאה</small></article>
+        <article class="metric-card"><span id="overviewPnlLabel">רווח / הפסד לא ממומש</span><strong id="overviewPnl">—</strong><small id="overviewPnlNote">ממתין לעלות קנייה מאומתת</small></article>
+        <article class="metric-card"><span>פוזיציות פעילות</span><strong id="overviewSlots">—</strong><div id="overviewSlotDots" class="slot-dots" aria-hidden="true"></div><small>ללא שאריות קטנות</small></article>
+      </div>
+      <div class="overview-visuals app-view trade-view portfolio-view">
+        <article class="allocation-card"><div class="section-kicker">חלוקת התיק</div><div class="allocation-layout"><div id="allocationRing" class="allocation-ring" role="img" aria-label="חלוקת תיק טרם זמינה"><div><strong id="allocationPercent">—</strong><span>מזומן זמין</span></div></div><div class="allocation-legend"><p><i class="cash-key"></i>מזומן זמין <b id="allocationCash">—</b></p><p><i class="asset-key"></i>נכסים ויתרות נעולות <b id="allocationOther">—</b></p><small id="allocationNote">יוצג לאחר אימות נתוני החשבון</small></div></div></article>
+        <article class="position-map"><div class="position-map-head"><div><div class="section-kicker">מפת הפוזיציה</div><h2 id="positionMapTitle">ממתין לפוזיציות</h2></div><label class="visually-hidden" for="positionMapSelect">בחר פוזיציה למפת המחירים</label><select id="positionMapSelect" hidden></select></div><div id="positionMapContent"><p class="quiet-empty">כאן יוצגו מחיר הכניסה, המחיר הנוכחי וגבולות ההגנה של פוזיציה פעילה.</p></div><button type="button" id="positionMapChart" class="text-action" hidden>פתיחת הגרף והניתוח ←</button></article>
+      </div>
     </section>
 
-    <details class="account-menu"><summary class="refresh">פירוט · מצב החשבון</summary>
+    <div class="workspace-heading"><h2>סביבת העבודה</h2><button id="collapseDashboard" type="button" class="text-action">סגור את כל הפירוט</button></div>
+    <details id="scenarioSection" class="panel dashboard-fold app-view trade-view portfolio-view">
+      <summary><span class="fold-icon" aria-hidden="true">±</span><span><b>מחשבון תרחיש</b><small>כמה נשאר אחרי עמלות, ומה הסיכון?</small></span><span class="fold-state" aria-hidden="true"></span></summary>
+      <div class="fold-body"><p class="scenario-note">כלי המחשה בלבד · אינו שולח פקודות ואינו משנה את הגדרות המסחר.</p>
+        <form id="scenarioForm" class="scenario-form" novalidate>
+          <label>סכום קנייה (USDT, לפני עמלה)<input id="scenarioAmount" type="number" min="0" step="any" inputmode="decimal" placeholder="למשל 100" required></label>
+          <label>מחיר כניסה (USDT)<input id="scenarioEntry" type="number" min="0" step="any" inputmode="decimal" placeholder="מחיר לנכס" required></label>
+          <label>מחיר יעד (USDT)<input id="scenarioTarget" type="number" min="0" step="any" inputmode="decimal" placeholder="מעל מחיר הכניסה" required></label>
+          <label>מחיר סטופ (USDT)<input id="scenarioStop" type="number" min="0" step="any" inputmode="decimal" placeholder="מתחת למחיר הכניסה" required></label>
+          <label>עמלה לכל צד (%)<input id="scenarioFee" type="number" min="0" max="5" step="any" inputmode="decimal" value="0.1" required></label>
+          <button type="submit" class="scenario-submit">חשב תרחיש</button>
+        </form><p class="mini">0.1% היא הנחת המחשה הניתנת לשינוי. החישוב מניח עמלה ב־USDT, ללא החלקת מחיר או עיגול כמות.</p>
+        <div id="scenarioError" role="status"></div><div id="scenarioResults" hidden aria-live="polite"></div>
+      </div>
+    </details>
+    <details class="dashboard-fold market-fold app-view trade-view"><summary><span class="fold-icon" aria-hidden="true">↗</span><span><b>מחירי שוק</b><small>חמשת המטבעות במעקב</small></span><span class="fold-state" aria-hidden="true"></span></summary><section class="market-strip"><div><span>BTC</span><strong id="tickerBTC">—</strong></div><div><span>ETH</span><strong id="tickerETH">—</strong></div><div><span>SOL</span><strong id="tickerSOL">—</strong></div><div><span>BNB</span><strong id="tickerBNB">—</strong></div><div><span>AAVE</span><strong id="tickerAAVE">—</strong></div></section></details>
+    <details class="account-menu dashboard-fold" id="accountDetails"><summary><span class="fold-icon" aria-hidden="true">◫</span><span><b>פירוט החשבון</b><small>יתרות, עמלות והקצאה לפוזיציה</small></span><span class="fold-state" aria-hidden="true"></span></summary>
     <section class="account-strip">
       <article>
         <span>שווי תיק</span>
@@ -111,14 +136,14 @@
 
     </details>
 
-    <details id="kellyLearningDetails" class="panel">
+    <details id="kellyLearningDetails" class="panel dashboard-fold app-view portfolio-view" hidden>
       <summary>פירוט · כלל קלי · מצב לימוד</summary>
       <p>חישוב בלבד לחשבון LIVE. הקצאת העסקאות בפועל נשארת קבועה.</p>
       <p data-kelly-status aria-live="polite">טרם נטען.</p>
       <button type="button" data-kelly-refresh>רענן חישוב</button>
     </details>
 
-    <details id="marketWatchDetails" class="panel">
+    <details id="marketWatchDetails" class="panel dashboard-fold app-view scans-view" hidden>
       <summary>פירוט · כל שוק Spot מול USDT וחסימות כניסה ב־24 שעות</summary>
       <p data-watch-status aria-live="polite">מעקב נפרד · אינו מרחיב את המסחר האוטומטי.</p>
       <label>תצוגה <select><option value="recorded">חסימות ואישורים שנרשמו בפועל · 24 שעות</option><option value="replay">שחזור לפי סגירות נרות בלבד · ללא אישורי מחיר חי · 24 שעות</option><option value="latest">מצב אחרון לכל זוג שנבדק</option></select></label>
@@ -129,7 +154,7 @@
     </details>
 
     <section class="trading-grid">
-      <aside class="panel scanner-panel">
+      <details class="panel scanner-panel dashboard-fold" id="scannerSection"><summary><span class="fold-icon" aria-hidden="true">⌕</span><span><b>טבלת סריקת השוק</b><small>חיפוש נכס ותנאי הכניסה שלו</small></span><span class="fold-state" aria-hidden="true"></span></summary><div class="fold-body">
         <div class="panel-title-row">
           <div>
             <h2>סריקת שוק</h2>
@@ -159,9 +184,9 @@
             <tbody id="assetsBody"></tbody>
           </table>
         </div>
-      </aside>
+      </div></details>
 
-      <section class="panel chart-panel">
+      <details class="panel chart-panel dashboard-fold" id="chartSection"><summary><span class="fold-icon" aria-hidden="true">⌁</span><span><b>גרף וניתוח הנכס</b><small id="chartSectionLabel">נרות, RSI ותבנית וויקוף</small></span><span class="fold-state" aria-hidden="true"></span></summary><div class="fold-body">
         <div class="selected-asset-head">
           <div>
             <div class="selected-symbol-row">
@@ -220,7 +245,7 @@
         <div id="rsiPanel" class="indicator-panel"><h3 class="indicator-heading rsi-heading">RSI (14) · מדד עוצמה יחסית</h3><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
         <div id="rocPanel" class="indicator-panel"><h3 class="indicator-heading roc-heading">ROC (12) · שיעור שינוי המחיר (%)</h3><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
         <p class="mini">RSI (14) של 5 דקות בין 0 ל־30 יחד עם Spring: תנאי כניסה גם בנר פתוח. בתצוגת משך נר אחר ה־RSI משתנה בהתאם. ROC לתצוגה בלבד.</p>
-        <div class="chart-analysis" aria-label="ניתוחי וויקוף על הגרף">
+        <details class="chart-analysis dashboard-fold" aria-label="ניתוחי וויקוף על הגרף"><summary>ניתוחי וויקוף והסבר הסימונים</summary>
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
           <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; כל שלב מסומן בצבע ייחודי; נרות תבנית הקנייה מהבהבים בזמן פוזיציה פעילה בלבד; תבנית היסטורית מוצגת ללא הבהוב ועם תאריך; הגרף מציג את הטווח שבחרת. נקודות אישור שמחוץ לטווח אינן מוצגות. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
           <p class="mini">מוני העסקאות מבוססים על היומן הזמין. שארית מתחת לסף המתועד אינה פוזיציה פעילה.</p>
@@ -230,7 +255,7 @@
           <div id="wyckoffOccurrenceList" class="chart-analysis-markers"></div>
           <div id="chartDecisionMarkers" class="chart-analysis-markers"></div>
           <div id="chartDecisionDetails" aria-live="polite">בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.</div>
-        </div>
+        </details>
         <p class="mini">🔵 נקודת קנייה במחיר הביצוע · נר כחול מהבהב: השיא שנקלט מאז הקנייה · לחץ על נקודה למחיר ולזמן.</p>
         <div class="chart-footer" aria-label="מחירי הפוזיציה"><div><span>מחיר קנייה בפועל</span><strong id="positionEntryPrice">—</strong></div><div><span>שיא מאז הקנייה</span><strong id="positionPeakPrice">—</strong></div><div><span>סף מכירה נוכחי</span><strong id="positionSellPrice">—</strong></div></div>
         <p id="currentSellLevel" class="mini" aria-live="polite">סף מכירה: בחר פוזיציה פעילה</p>
@@ -264,9 +289,9 @@
           <div id="candlePowerRows" class="candle-power-rows"></div>
           <div class="candle-learning-note">מצב לימוד בלבד — הניתוח הזה עדיין לא משנה BUY / SELL.</div>
         </div>
-      </section>
+      </div></details>
 
-<aside class="panel action-panel">
+<details class="panel action-panel dashboard-fold" id="positionDetails"><summary><span class="fold-icon" aria-hidden="true">◎</span><span><b>פרטי הנכס וכללי המסחר</b><small>פירוט ההחלטה והאסטרטגיה</small></span><span class="fold-state" aria-hidden="true"></span></summary><div class="fold-body">
         <div class="panel-title-row">
           <h2 id="portfolioTitle">סימולציה פנימית · נפרדת מ־Binance</h2>
         </div>
@@ -300,10 +325,10 @@
           <p><b>קנייה:</b> נרות 5 דקות סגורים כולל פתילים: שיא → שפל ראשון → התאוששות → בדיקה משנית → לפחות 3 נרות דשדוש → שפל נמוך יותר → חציית השפל הראשון במחיר החי לאחר זיהוי Spring, ללא המתנה לסגירת נר נוסף.</p>
           <p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
         </div>
-      </aside>
+      </div></details>
     </section>
 
-      <section class="panel" id="binanceDemoBalanceCard">
+      <section class="panel app-view portfolio-view" id="binanceDemoBalanceCard" hidden>
 <div class="panel-title-row"><h2>יתרות חשבון הדמו ב־Binance</h2><button type="button" class="refresh" data-detail-toggle="demoBalanceDetails" aria-controls="demoBalanceDetails" aria-expanded="false">פירוט</button></div>
 <div id="demoBalanceDetails" hidden>
 <p id="demoAccountStatus">טוען יתרות מהחשבון…</p>
@@ -324,7 +349,7 @@
       <div id="portfolioViewContent" class="portfolio-view-content"></div>
     </section>
 
-    <section class="panel app-view journal-view">
+    <details class="panel app-view journal-view dashboard-fold" hidden><summary>היסטוריית החלטות · פתיחה / סגירה</summary>
       <div class="panel-title-row">
         <div>
           <h2>היסטוריית החלטות · <span id="decisionHistorySymbol">—</span></h2>
@@ -334,9 +359,9 @@
       <div id="decisionHistory" class="decision-history">
         <div class="mini">טוען היסטוריית החלטות…</div>
       </div>
-    </section>
+    </details>
 
-    <section class="lower-grid app-view journal-view portfolio-view">
+    <section class="lower-grid app-view journal-view portfolio-view" hidden>
       <section class="panel">
         <div class="panel-title-row">
           <h2 id="positionsTitle">פוזיציות פעילות · DEMO</h2>
@@ -353,7 +378,7 @@
       </section>
     </section>
 
-    <section id="demoTradesSection" class="panel">
+    <section id="demoTradesSection" class="panel app-view portfolio-view" hidden>
       <div class="panel-title-row">
         <h2>10 עסקאות אחרונות</h2>
         <button type="button" class="refresh" data-detail-toggle="paperHistory" aria-controls="paperHistory" aria-expanded="false">פירוט</button>
@@ -361,11 +386,11 @@
       <div id="paperHistory" class="paper-history" hidden></div>
     </section>
 
-    <section id="demoRealtimePositionsSection" class="panel">
+    <section id="demoRealtimePositionsSection" class="panel app-view portfolio-view" hidden>
       <div class="panel-title-row">
         <h2>פוזיציות פעילות – שווי בזמן אמת</h2>
       </div>
-      <div class="asset-table-wrap">
+      <details class="dashboard-fold"><summary>טבלת הפוזיציות · פתיחה / סגירה</summary><div class="asset-table-wrap">
         <table class="asset-table wide-table">
           <thead>
             <tr>
@@ -382,8 +407,9 @@
             <tr><td colspan="7">אין פוזיציות פעילות.</td></tr>
           </tbody>
         </table>
-      </div>
+      </div></details>
     </section>
+    <p class="research-link"><a href="/binance-research.html">מחקר מטבעות · סביבת סימולציה נפרדת ↗</a></p>
   </main>
 
   <dialog id="deviceConnectionDialog" aria-labelledby="deviceConnectionTitle"><h2 id="deviceConnectionTitle">חיבור מכשיר למסחר</h2><p>הזן את הקוד הקבוע שהוגדר בשרת. אותו קוד מתאים גם למכשיר נוסף. החיבור נשמר עד שנה; אין קוד בכל פעולה.</p><label>קוד חיבור — שש ספרות<input id="devicePairCode" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" dir="ltr"></label><p id="devicePairResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="devicePairSubmit" type="button">חבר מכשיר</button><button id="devicePairCancel" type="button">סגור</button></div></dialog>
@@ -394,12 +420,12 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261024-settings"></script>
-  <script src="/binance-agent.js?v=20261025-stability"></script>
+  <script src="/binance-agent.js?v=20261025-visual"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261025-stability"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261024-current-rsi"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261025-stability"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261024-current-rsi"></script><script type="module" src="/binance-dashboard.js?v=20261025-visual"></script></body>
 </html>
