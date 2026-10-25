@@ -37,7 +37,7 @@ function render(){
  const currency=data?.selectedAccount?.currency||'USD';txt('colmexEquityLabel','שווי החשבון · '+currency);txt('colmexCashLabel','מזומן בחשבון · '+currency);txt('colmexPnlLabel','רווח / הפסד פתוח נטו · '+currency);
  txt('colmexMode',!data?.selectedAccount?'חשבון ברוקר':data.selectedAccount.type==='demo'?'DEMO · חשבון דמו':data.selectedAccount.type==='live'?'LIVE · חשבון אמיתי':'חשבון מחובר');
  txt('colmexEquity',fresh?n(data.state?.projectedBalance??data.state?.balance):'—');txt('colmexCash',fresh?n(data.state?.cashBalance):'—');
- txt('colmexOpenPnl',fresh?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=fresh&&Number(data.state?.openNetPnL)<0?'negative':'positive';
+ txt('colmexOpenPnl',fresh?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=!fresh||!Number(data.state?.openNetPnL)?'unknown':Number(data.state.openNetPnL)<0?'negative':'positive';
  txt('colmexSlotCount',fresh?(data.positions||[]).length+' / '+(status?.policy?.maxPositions||3):'—');
  $('colmexSlots').replaceChildren(...Array.from({length:status?.policy?.maxPositions||3},(_,i)=>el('i',null,fresh&&i<(data.positions||[]).length?'used':'')));
  const monitor=status&&!statusFailed?monitorView(status,now):null;
@@ -45,7 +45,7 @@ function render(){
  const marketHealth=marketHealthView(market,now);health('colmexMarketHealth',marketHealth.kind,marketHealth.label);
  txt('colmexPolicy',status?.policy?`${status.policy.symbols.length} מניות במעקב · עד $${status.policy.notionalUsd} למניה · ${status.policy.maxPositions} פוזיציות`:'50 מניות במעקב · עד $800 למניה · 3 פוזיציות');
  const prepared=!statusFailed&&status?.preparation?.rows||{},checked=Object.values(prepared).filter(r=>!r.error&&r.complete!==false).length,total=status?.policy?.symbols?.length||50;
- const pct=Math.min(100,checked/total*100);$('colmexScanRing').style.setProperty('--scan-angle',pct*3.6+'deg');txt('colmexScanCount',checked+' / '+total);
+ const pct=Math.min(100,checked/total*100);$('colmexScanRing').style.setProperty('--scan-angle',pct*3.6+'deg');txt('colmexScanCount',(status&&!statusFailed?checked:'—')+' / '+total);
  txt('colmexScanNote',status&&!statusFailed?'הכנה לפי הנרות הסגורים · '+time(status.preparation?.lastCheckedAt):'ממתין לסיכום הסריקה');
  txt('colmexChecksCount',monitor?`${monitor.checked} / ${monitor.total}`:'—');
  txt('colmexProtectionAt',status&&!statusFailed?'בדיקת ברוקר אחרונה: '+time(status.lastBrokerSnapshotAt):'מצב ההגנות טרם אומת');
