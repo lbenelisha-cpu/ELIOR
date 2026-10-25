@@ -35,3 +35,14 @@ button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,s
 .app-settings{display:contents}.header-utilities{display:flex;align-items:center;gap:8px}#openAppSettings{border:1px solid #344d57;background:#132630;color:#daeceb;border-radius:10px;padding:10px 12px;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.topnav{grid-row:auto;grid-column:auto}
 @media(max-width:1100px){.topnav{grid-row:2;grid-column:1/-1}}
 @media(max-width:700px){.header-utilities{gap:6px}#openAppSettings{font-size:11px;padding:10px 8px}.brand-title{font-size:16px}.brand-sub{max-width:150px}.topbar{gap:12px}.brand-mark{width:30px;height:30px}}
+
+/* Match the Colmex platform switcher; retain Binance's internal views below. */
+.topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);row-gap:16px}
+.topbar>.brand-block{grid-column:1;grid-row:1}.topbar>.header-utilities,.topbar>.dashboard-menu{grid-column:3;grid-row:1;justify-self:end}
+.platform-tabs{grid-column:2;grid-row:1;display:flex;gap:6px;direction:ltr;justify-content:center}
+.platform-tabs a{padding:10px 17px;border:1px solid transparent;border-radius:25px;color:#b4c7c8;font-size:13px;white-space:nowrap;text-decoration:none}
+.platform-tabs [aria-current="page"]{background:#25463f;border-color:#416d61;color:#a1efda}
+.platform-tabs a:hover{background:#203b35;color:#c7f7e9}.platform-tabs a:focus-visible{outline:2px solid #7ae7d2;outline-offset:4px}
+.topbar>.topnav{grid-row:2;grid-column:1/-1;justify-content:center;border-top:1px solid #263a43;padding-top:13px}
+@media(max-width:1000px){.topbar{grid-template-columns:minmax(0,1fr) auto}.topbar>.header-utilities,.topbar>.dashboard-menu{grid-column:2}.platform-tabs{grid-row:2;grid-column:1/-1}.topbar>.topnav{grid-row:3}}
+@media(max-width:440px){.brand-block>div:last-child{min-width:0}.brand-sub{max-width:100%}.platform-tabs a{padding:10px 17px}.topbar>.topnav{gap:3px}.topbar .nav-pill{padding:10px 7px;font-size:11px}}
