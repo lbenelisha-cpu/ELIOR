@@ -29,6 +29,8 @@ Older selective-file installers do not package this complete release. Use a comp
 
 The backend now rejects unauthenticated private reads. Existing paired devices reuse their saved token. Other devices must use the existing pairing flow. Refresh the page after the coordinated release. The proxy does not bypass this requirement.
 
+Before enabling the coordinated release, configure the same `BINANCE_PUSH_READ_TOKEN` on the VM service and in Netlify's production Functions environment. Generate a dedicated random 32-byte hex value, distinct from `BINANCE_CONTROL_TOKEN`; never put it in browser assets, build output, logs or source control. It authorizes only GET `/api/binance-action-log` and `/api/binance-agent`, never account reads or trading commands. The scheduled notifier fails closed when this credential is missing. Verify its authenticated poll succeeds after release; do not silently leave existing notifications disabled.
+
 Before switching the service, record the current code revision and back up durable state for investigation. Confirm the existing journal is present and readable. Stop the old process before switching code so it cannot run mixed module versions. Starting the updated service with LIVE and AUTO_EXECUTION enabled continues the user's configured trading, and can execute exits already triggered by current prices. This preparation has not started or changed the production service.
 
 ## Post-release acceptance
@@ -40,6 +42,7 @@ Before switching the service, record the current code revision and back up durab
 5. Confirm the scanner's RSI includes the current candle when fresh data is present and that the existing paired phone can read the account/journal.
 6. Confirm pause-only leaves exits active. Viewing DEMO must not stop LIVE protection monitoring.
 7. Confirm private endpoints reject a request without a token, while the authenticated proxy and device flow work.
+8. Confirm the scheduled notification function can read its two feeds with its dedicated credential, reports a successful poll, and is rejected for account reads and all trading controls.
 
 Do not perform a test trade solely to validate deployment without the user's authorization.
 

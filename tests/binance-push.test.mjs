@@ -26,9 +26,21 @@ test('expired device is removed and overlapping deliveries claim each event once
  const store=memory(),args={events:binanceTradeEvents({live:[fill]},now),devices:[device()],store,now};let sends=0;const send=async()=>{sends++;};await Promise.all([deliverBinanceEvents({...args,send,remove:async()=>{}}),deliverBinanceEvents({...args,send,remove:async()=>{}})]);assert.equal(sends,1);
  let removed=[];const result=await deliverBinanceEvents({...args,store:memory(),send:async()=>{throw {statusCode:410};},remove:async k=>removed.push(k)});assert.equal(result.expired,1);assert.deepEqual(removed,['device-0']);
 });
-test('cloud polling uses GET only, runs without browser, and leaves legacy devices alone',async()=>{
- const requests=[],store=memory();await pollBinanceNotifications({devices:[device()],store,now,fetcher:async(url,opts)=>{requests.push({url,opts});return {ok:true,json:async()=>({live:[fill]})};},send:async()=>{},remove:async()=>{}});assert.equal(requests.length,1);assert.equal(requests[0].opts.method,'GET');assert.match(requests[0].url,/api\/binance-action-log$/);assert.equal(store.data.get('status').data.accepted,1);
+test('cloud polling uses authenticated GET only, runs without browser, and leaves legacy devices alone',async()=>{
+ const readToken='notifications-'.padEnd(64,'n'),requests=[],store=memory();await pollBinanceNotifications({devices:[device()],store,readToken,now,fetcher:async(url,opts)=>{requests.push({url,opts});return {ok:true,json:async()=>({live:[fill]})};},send:async()=>{},remove:async()=>{}});assert.equal(requests.length,1);assert.equal(requests[0].opts.method,'GET');assert.match(requests[0].url,/api\/binance-action-log$/);assert.equal(requests[0].opts.headers.Authorization,'Bearer '+readToken);assert.equal(requests[0].opts.redirect,'error');assert.equal(store.data.get('status').data.accepted,1);assert(!JSON.stringify([...store.data]).includes(readToken));
  await pollBinanceNotifications({devices:[{subscription}],store,now,fetcher:async()=>{throw Error('must not fetch');}});assert.equal(store.data.get('status').data.devices,0);
+});
+test('missing notification credential fails before fetching or sending and stores only a generic failure',async()=>{
+ for(const readToken of [undefined,'short','x'.repeat(40)+'\n']){
+  const store=memory();await assert.rejects(pollBinanceNotifications({devices:[device()],store,readToken,now,fetcher:async()=>assert.fail('must not fetch'),send:async()=>assert.fail('must not send')}),/BINANCE_PUSH_READ_TOKEN_REQUIRED/);
+  assert.equal(store.data.get('status').data.error,'BINANCE_READ_OR_PUSH_UNAVAILABLE');
+ }
+});
+test('both signal and trade feeds carry the dedicated credential and rejected authentication sends nothing',async()=>{
+ const readToken='notifications-'.padEnd(64,'n'),requests=[],store=memory(),d={...device(),topics:['binance-trades','binance-signals']};
+ await assert.rejects(pollBinanceNotifications({devices:[d],store,readToken,now,fetcher:async(url,options)=>{requests.push({url,options});return {ok:false,status:401};},send:async()=>assert.fail('must not send')}),/BINANCE_READ_UNAVAILABLE/);
+ assert.equal(requests.length,2);for(const r of requests){assert.equal(r.options.headers.Authorization,'Bearer '+readToken);assert.equal(r.options.method,'GET');assert.equal(new URL(r.url).origin,'https://levi-binance.2-29-48-20.sslip.io');}
+ assert.equal(store.data.get('status').data.error,'BINANCE_READ_OR_PUSH_UNAVAILABLE');
 });
 test('notification clicks route trades into Binance and reject external navigation',async()=>{
  const handlers={},opened=[],shown=[];const ctx=vm.createContext({URL,self:{addEventListener:(name,fn)=>handlers[name]=fn,registration:{showNotification:async(...args)=>shown.push(args)}},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}});vm.runInContext(fs.readFileSync(new URL('../push-sw.js',import.meta.url),'utf8'),ctx);let pending;const waitUntil=p=>{pending=p;};handlers.push({data:{json:()=>({title:'BUY',url:'/binance-agent.html'})},waitUntil});await pending;assert.equal(shown[0][1].data.url,'/binance-agent.html');handlers.notificationclick({notification:{data:{url:'https://evil.example'},close(){}},waitUntil});await pending;assert.deepEqual(opened,['/push.html']);

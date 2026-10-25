@@ -2124,7 +2124,9 @@ const server=http.createServer((req,res)=>{
   if(req.method==='OPTIONS')return send(res,{},204);
   const authorized=controlAuthorized(req.headers.authorization,process.env.BINANCE_CONTROL_TOKEN)||controlDevices.authorized(req.headers.authorization);
   const privateRead=req.method==='GET'&&u.pathname.startsWith('/api/binance-')&&!['/api/binance-mode','/api/binance-market-power'].includes(u.pathname);
-  const protectedControl=privateRead||req.method==='POST'&&(
+  // The scheduled notifier needs only these two reads, never trading authority.
+  const notificationRead=req.method==='GET'&&['/api/binance-action-log','/api/binance-agent'].includes(u.pathname)&&process.env.BINANCE_PUSH_READ_TOKEN!==process.env.BINANCE_CONTROL_TOKEN&&controlAuthorized(req.headers.authorization,process.env.BINANCE_PUSH_READ_TOKEN);
+  const protectedControl=(privateRead&&!notificationRead)||req.method==='POST'&&(
     u.pathname==='/api/binance-settings'||u.pathname==='/api/binance-mode'||u.pathname==='/api/binance-trade-control'||u.pathname==='/api/binance-control/disconnect'||u.pathname.startsWith('/api/binance-live/')||u.pathname==='/api/binance-universe/refresh'||u.pathname==='/api/binance-paper/reset'||
     u.pathname==='/api/binance-agent/evaluate'
   );

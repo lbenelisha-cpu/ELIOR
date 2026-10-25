@@ -8,12 +8,13 @@ import {fileURLToPath} from 'node:url';
 import {createDevicePairCode} from '../lib/binance-device-auth.mjs';
 import {createReadProxy} from '../netlify/functions/binance-read-proxy.mjs';
 const root=fileURLToPath(new URL('..',import.meta.url)),token='test-authority-'.padEnd(40,'x');
-async function serverRig(t,{journal='[]'}={}){
+async function serverRig(t,{journal='[]',pushReadToken}={}){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'binance-http-'));
  const source=fs.readFileSync(path.join(root,'server.mjs'),'utf8'),env={...process.env};
  for(const key of Object.keys(env))if(key.startsWith('BINANCE_')||key==='AUTO_EXECUTION')delete env[key];
  for(const [,key] of source.matchAll(/process\.env\.(BINANCE_[A-Z0-9_]+_FILE)/g))env[key]=path.join(dir,key+'.json');
  Object.assign(env,{PORT:'0',BINANCE_CONTROL_TOKEN:token,BINANCE_MODE:'live',BINANCE_LIVE_TRADING_ENABLED:'false',AUTO_EXECUTION:'false',BINANCE_API_KEY:'test-unused',BINANCE_API_SECRET:'test-unused',BINANCE_DEMO_TRADING_ENABLED:'false'});
+ if(pushReadToken!==undefined)env.BINANCE_PUSH_READ_TOKEN=pushReadToken;
  fs.writeFileSync(env.BINANCE_LIVE_LOG_FILE,journal);
  const child=spawn(process.execPath,['--import',path.join(root,'tests/helpers/no-network.mjs'),path.join(root,'server.mjs')],{cwd:root,env,stdio:['ignore','pipe','pipe']});
  let logs='';child.stderr.on('data',d=>{logs=(logs+d).slice(-4000)});
@@ -46,6 +47,18 @@ test('corrupt live journal keeps server observable but trading readiness closed 
  const state=await(await r.read('/api/binance-readiness')).json();assert.equal(state.liveState.ready,false);assert.equal(state.liveState.journalReady,false);
  assert.equal(fs.readFileSync(r.env.BINANCE_LIVE_LOG_FILE,'utf8'),'{broken');
  assert.equal((await r.post('/api/binance-trade-control',{action:'resume'})).status,500);
+});
+test('scheduled notification credential permits only the two GET feeds and never grants control or account access',async t=>{
+ const pushReadToken='notification-only-'.padEnd(64,'p'),r=await serverRig(t,{pushReadToken});
+ for(const endpoint of ['/api/binance-action-log','/api/binance-agent']){
+  assert.equal((await r.read(endpoint,pushReadToken)).status,200);
+  assert.equal((await r.read(endpoint,'wrong-token')).status,401);
+  assert.equal((await r.read(endpoint,null)).status,401);
+ }
+ for(const endpoint of ['/api/binance-live-account','/api/binance-settings','/api/binance-readiness','/api/binance-control/disconnect'])assert.equal((await r.read(endpoint,pushReadToken)).status,401);
+ for(const endpoint of ['/api/binance-live/manual','/api/binance-trade-control','/api/binance-settings','/api/binance-mode','/api/binance-agent/evaluate','/api/binance-control/disconnect'])assert.equal((await r.post(endpoint,{},pushReadToken)).status,401);
+ const unconfigured=await serverRig(t);
+ assert.equal((await unconfigured.read('/api/binance-action-log',pushReadToken)).status,401);
 });
 test('pause-only persists without liquidation; demo viewing retains the real managed ledger',async t=>{
  const buy={type:'BUY',symbol:'BTCUSDT',qty:1,price:100,at:'2026-10-25T18:00:00Z',wyckoffTrade:{strategyId:'WYCKOFF_5M_V1',peakPrice:100}};

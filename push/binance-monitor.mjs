@@ -52,11 +52,12 @@ export async function deliverBinanceEvents({events,devices,store,send,remove,now
  }}));
  return stats;
 }
-export async function pollBinanceNotifications({devices,store,fetcher=fetch,send,remove,now=Date.now()}){
+export async function pollBinanceNotifications({devices,store,fetcher=fetch,send,remove,readToken,now=Date.now()}){
  const active=devices.filter(d=>deviceTopics(d).some(t=>t.startsWith('binance-')));
  if(!active.length){await store.setJSON('status',{checkedAt:now,devices:0});return {devices:0};}
- const get=async path=>{const r=await fetcher('https://levi-binance.2-29-48-20.sslip.io'+path,{method:'GET',headers:{Accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error('BINANCE_READ_UNAVAILABLE');return r.json();};
+ const get=async path=>{const r=await fetcher('https://levi-binance.2-29-48-20.sslip.io'+path,{method:'GET',headers:{Accept:'application/json',Authorization:'Bearer '+readToken},redirect:'error',signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error('BINANCE_READ_UNAVAILABLE');return r.json();};
  try{
+  if(typeof readToken!=='string'||!/^[-A-Za-z0-9._~]{32,512}$/.test(readToken))throw Error('BINANCE_PUSH_READ_TOKEN_REQUIRED');
   const [log,agents]=await Promise.all([get('/api/binance-action-log'),active.some(d=>deviceTopics(d).includes('binance-signals'))?get('/api/binance-agent'):null]);
   const events=[...binanceTradeEvents(log,now),...binanceSignalEvents(agents,now)].sort((a,b)=>a.at-b.at);
   const result=await deliverBinanceEvents({events,devices:active,store,send,remove,now});
