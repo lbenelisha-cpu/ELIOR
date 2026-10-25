@@ -6,6 +6,7 @@ import path from 'node:path';
 import {BinanceNativeProtection} from '../lib/binance-native-protection.mjs';
 import {applyTrailingExitPolicy} from '../lib/trailing-profit-exit.mjs';
 import {protectionState} from '../lib/binance-dashboard-math.mjs';
+import {protectionPrice} from '../lib/binance-protection-price.mjs';
 const symbol='EWYBUSDT',info={symbol,status:'TRADING',ocoAllowed:true,orderTypes:['TAKE_PROFIT','STOP_LOSS'],filters:[{filterType:'LOT_SIZE',stepSize:'.001',minQty:'.001',maxQty:'10000'},{filterType:'PRICE_FILTER',tickSize:'.01',minPrice:'.01',maxPrice:'1000000'},{filterType:'NOTIONAL',minNotional:'5'},{filterType:'PERCENT_PRICE_BY_SIDE',askMultiplierUp:'1.2',askMultiplierDown:'.9',avgPriceMins:5}]};
 function rig(t){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'levi-stop-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const file=path.join(dir,'native.json');
@@ -73,4 +74,15 @@ test('dashboard explicitly distinguishes a native stop from its software profit 
 test('trailing a standalone stop cancels its exact order and retains standalone mode',async t=>{
  const r=rig(t);await r.store.sync(symbol,r.p,r.price);const old=r.store.rows[symbol].params.newClientOrderId;r.store.rows[symbol].updatedAt=0;r.p.effectiveStopPrice=155;r.price=160;
  await r.store.sync(symbol,r.p,r.price);assert.equal(r.writes.length,4);assert.equal(r.writes[2].method,'DELETE');assert.equal(r.writes[2].params.origClientOrderId,old);assert.equal(r.orders.get(old).status,'CANCELED');assert.equal(r.writes[3].params.stopPrice,'155');assert.equal(r.store.rows[symbol].mode,'STOP_ONLY');assert.equal(r.store.rows[symbol].phase,'ACTIVE');
+});
+
+test('a missing trade stream recovers the rejected stop using a fresh REST quote',async t=>{
+ const r=rig(t);r.store.rows[symbol]={phase:'REJECTED',entryAt:r.p.entryAt,error:'Filter failure: PERCENT_PRICE_BY_SIDE',updatedAt:Date.now(),params:{quantity:'.187'}};
+ let reads=0;r.api.price=()=>protectionPrice(symbol,{status:'connected',lastPrice:null},async()=>{reads++;return {symbol,lastPrice:'152.61',bidPrice:'152.31',askPrice:'152.37',closeTime:Date.now()};});
+ await r.store.sync(symbol,r.p,null);assert.equal(r.writes.length,1);assert.equal(r.store.rows[symbol].phase,'ACTIVE');assert.equal(r.store.rows[symbol].stop,150.82);assert.equal(reads,2);
+ r.api.price=()=>{throw Error('offline');};await r.store.sync(symbol,r.p,null);assert.equal(r.writes.length,1);assert.equal(r.store.rows[symbol].phase,'ACTIVE');
+});
+test('failed recovery quote leaves rejected protection visible and submits nothing',async t=>{
+ const r=rig(t);r.store.rows[symbol]={phase:'REJECTED',entryAt:r.p.entryAt,error:'Filter failure: PERCENT_PRICE_BY_SIDE',updatedAt:Date.now(),params:{quantity:'.187'}};
+ r.api.price=async()=>{throw Error('NATIVE_PROTECTION_FRESH_QUOTE_REQUIRED');};await assert.rejects(r.store.sync(symbol,r.p,null),/FRESH_QUOTE/);assert.equal(r.writes.length,0);assert.equal(r.store.rows[symbol].phase,'REJECTED');
 });
