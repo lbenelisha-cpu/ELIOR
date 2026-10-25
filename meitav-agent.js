@@ -1,95 +1,108 @@
-import {createPaper,normalizeBars,runPaperCycle,paperValue,backtestDaily,RULES,restorePaperState} from './lib/meitav-paper.mjs';
-import {evaluateWyckoff as evaluateWaveStrategy} from './lib/wyckoff-strategy.mjs';
-import {compareScenarios} from './lib/meitav-experiments.mjs';
-const $=s=>document.querySelector(s),key='levi.meitav.paper.v1',fmt=n=>Number(n).toLocaleString('he-IL',{maximumFractionDigits:2}),esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let research=null;
-let comparison=null;
-let state={paper:createPaper(),markets:[]},selected=null;
-try{const s=JSON.parse(localStorage.getItem(key));if(s)state=restorePaperState(s);}catch{$('#status').textContent='לא ניתן לקרוא תיק שמור; התחל תיק חדש';}
-$('#currency').value=state.paper.currency;$('#initial').value=state.paper.initial;$('#fee').value=state.paper.feePct;
-function save(){localStorage.setItem(key,JSON.stringify(state));}
-function render(){
- research=null;$('#researchPanel').hidden=true;
- const p=state.paper,prices=Object.fromEntries(state.markets.map(m=>[m.symbol,m.bars.at(-1).close])),value=paperValue(p,prices),held=Object.keys(p.positions).length;
- $('#summary').innerHTML=[['שווי הדמיה',fmt(value)+' '+p.currency],['מזומן',fmt(p.cash)+' '+p.currency],['רווח / הפסד',fmt(value-p.initial)+' '+p.currency],['פוזיציות',held+'/6'],['מזומן למקום פנוי',held<6?fmt(p.cash/(6-held))+' '+p.currency:'—'],['מכירות',p.journal.filter(j=>j.type==='SELL').length]].map(([k,v])=>`<article><span>${k}</span><strong>${v}</strong></article>`).join('');
- $('#markets').innerHTML=state.markets.map(m=>{const s=evaluateWaveStrategy(m.bars,RULES),held=!!p.positions[m.symbol];return `<tr data-symbol="${esc(m.symbol)}" class="${held?'active-position '+(s.direction==='DOWN'?'active-down':'active-up'):''}"><td>${esc(m.symbol)}</td><td>${fmt(s.price)}</td><td>${esc(s.phase)}</td><td>${held?'פוזיציה פעילה':s.buyConfirmed?'מתאים לקנייה':'ממתין'}</td></tr>`;}).join('');
- $('#markets').querySelectorAll('tr').forEach(r=>r.onclick=()=>{selected=r.dataset.symbol;draw();});
- $('#positions').innerHTML=Object.values(p.positions).map(x=>{const price=prices[x.symbol]||x.lastPrice;return `<tr><td>${esc(x.symbol)}</td><td>${fmt(x.qty)}</td><td>${fmt(x.entryPrice)}</td><td>${fmt(price)}</td><td>${Number.isFinite(x.targetPrice)?fmt(x.targetPrice):"נדרש בירור"}</td><td>${Number.isFinite(x.stopPrice)?fmt(x.stopPrice):"—"}</td><td>${fmt(x.qty*price-x.cost)} ${p.currency}</td></tr>`;}).join('')||'<tr><td colspan="7">אין פוזיציות הדמיה</td></tr>';
- $('#journal').innerHTML=p.journal.slice(0,30).map(j=>`<div class="action-card"><b>${j.type==='BUY'?'קנייה':'מכירה'} · ${esc(j.symbol)}</b><span>${esc(j.date)} · ${fmt(j.amount)} ${p.currency}</span><small>${esc(j.reason)}${j.pnl!==undefined?' · רווח / הפסד '+fmt(j.pnl):''}</small></div>`).join('')||'טרם בוצעו פעולות הדמיה';
- if(!selected)selected=state.markets[0]?.symbol;draw();
+import {validateSnapshot, connectionState, protectionLabel, reservedSymbols, modeNames, reasonNames} from './lib/crawler-view.mjs';
+const $ = id => document.getElementById(id);
+const endpoint = '/.netlify/functions/meitav-crawler';
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (value, digits=2) => Number.isFinite(value) ? value.toLocaleString('he-IL',{maximumFractionDigits:digits}) : '—';
+const money = value => Number.isFinite(value) ? num(value)+' $' : '—';
+const pct = value => Number.isFinite(value) ? num(value)+'%' : '—';
+const color = value => Number.isFinite(value) ? value > 0 ? 'positive' : value < 0 ? 'negative' : '' : '';
+const time = ms => Number.isFinite(ms) && ms > 0 ? new Date(ms).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—';
+const yes = value => value === true ? 'פעיל' : value === false ? 'כבוי' : '—';
+const pair = (label,value) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`;
+let snapshot = null, health = null, receivedAt = 0, timer, busy = false, signedIn = false, epoch = 0;
+async function request(action, body) {
+  const response = await fetch(endpoint+'?action='+encodeURIComponent(action),{method:body ? 'POST' : 'GET',credentials:'same-origin',cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15_000),headers:body ? {'Content-Type':'application/json'} : {},...(body ? {body:JSON.stringify(body)} : {})});
+  let data;try { data=await response.json(); } catch {throw Error('החיבור לבוט אינו זמין בכתובת האתר הנוכחית.');}
+  if(!response.ok) {const error=Error(data.error || 'לא ניתן לקרוא נתונים');error.status=response.status;throw error;}
+  return data;
 }
-function draw(){$('#experiments').hidden=true;comparison=null;const m=state.markets.find(x=>x.symbol===selected);if(!m)return;const s=evaluateWaveStrategy(m.bars,RULES),rows=m.bars.slice(-180),all=m.bars;
- $('#chartTitle').textContent=m.symbol;$('#meta').textContent=`${m.source} · סגירה אחרונה ${m.bars.at(-1).date} · ${m.currency} · קו כחול: מחיר; קו צהוב: MA200`;
- const mas=all.map((_,i)=>i>=199?all.slice(i-199,i+1).reduce((n,b)=>n+b.close,0)/200:null).slice(-rows.length),vals=[...rows.map(b=>b.close),...mas.filter(v=>v!==null)],lo=Math.min(...vals)*.98,hi=Math.max(...vals)*1.02;
- const point=(v,i)=>`${40+i/(rows.length-1)*810},${315-(v-lo)/(hi-lo)*270}`;
- $('#chart').innerHTML=`<polyline fill="none" stroke="#65c2ff" stroke-width="2" points="${rows.map((b,i)=>point(b.close,i)).join(' ')}"/><polyline fill="none" stroke="#ffd36a" stroke-width="2" points="${mas.map((v,i)=>v===null?'':point(v,i)).filter(Boolean).join(' ')}"/><text x="40" y="350" fill="#aaa">${rows[0].date}</text><text x="720" y="350" fill="#aaa">${rows.at(-1).date}</text>`;
- $('#technical').innerHTML=[['שלב',s.phase],['שפל ראשון',s.firstLow?fmt(s.firstLow.price):'—'],['יעד מכירה',s.targetPrice?fmt(s.targetPrice):'—'],['תנאי קנייה',s.buyConfirmed?'מתקיימים':'לא מתקיימים']].map(([k,v])=>`<div><span>${k}</span><strong>${v}</strong></div>`).join('');
- $('#backtest').textContent='';
+function notice(message) {$('notice').hidden=!message;$('notice').textContent=message || '';}
+function connection() {
+  const state=connectionState(snapshot,health,receivedAt);
+  $('connectionTitle').textContent=state.label;
+  $('connectionDot').classList.toggle('connected',state.current);
+  document.body.classList.toggle('stale',Boolean(snapshot)&&!state.current);
+  if(snapshot) $('connectionDetail').textContent=state.current ? 'קריאה משרת הבוט כל 15 שניות בזמן שהמסך פתוח. אין משלוח פקודות מהמסך.' : 'התצוגה כוללת נתונים אחרונים בלבד. אין אישור שהמנוע פועל כעת.';
 }
-function add(m){if(m.currency!==state.paper.currency)throw Error('מטבע המניה שונה ממטבע התיק. אין המרת מטבע אוטומטית.');m.bars=normalizeBars(m.bars);const old=state.markets.find(x=>x.symbol===m.symbol);if(old&&old.bars.at(-1).date>m.bars.at(-1).date)throw Error('הנתונים ישנים מהסדרה הקיימת');state.markets=state.markets.filter(x=>x.symbol!==m.symbol);state.markets.push(m);selected=m.symbol;save();render();}
-async function action(fn){try{await fn();}catch(e){$('#status').textContent=e.message;}}
-$('#load').onclick=()=>action(async()=>{const symbol=$('#symbol').value.trim().toUpperCase();$('#load').disabled=true;$('#status').textContent='טוען נרות יומיים…';try{const r=await fetch('/.netlify/functions/meitav-market?symbol='+encodeURIComponent(symbol)+'&history='+$('#history').value,{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.error||'שגיאת נתונים');add(d);$('#status').textContent='נתונים נטענו; תיק הדמיה בלבד';}finally{$('#load').disabled=false;}});
-$('#csv').onchange=()=>action(async()=>{const file=$('#csv').files[0];if(!file)return;if(file.size>2000000)throw Error('קובץ גדול מדי');const raw=await file.text();if(raw.includes('"'))throw Error('ייבא CSV פשוט ללא מרכאות: Date,Open,High,Low,Close');const text=raw.replace(/^\uFEFF/,''),lines=text.trim().split(/\r?\n/),sep=lines[0].includes(';')?';':',',head=lines.shift().split(sep).map(s=>s.trim().toLowerCase());const di=head.findIndex(x=>['date','datetime'].includes(x)),ci=head.indexOf('close');const oi=head.indexOf('open'),hi=head.indexOf('high'),li=head.indexOf('low');if([di,ci,oi,hi,li].some(i=>i<0))throw Error('כותרות CSV נדרשות: Date,Open,High,Low,Close');const symbol=$('#symbol').value.trim().toUpperCase();if(!/^[A-Z][A-Z0-9.\-]{0,11}$/.test(symbol))throw Error('סימול לא תקין');const bars=lines.filter(Boolean).map(l=>{const cells=l.split(sep);return {date:cells[di].trim(),open:Number(cells[oi]),high:Number(cells[hi]),low:Number(cells[li]),close:Number(cells[ci])};});const today=new Date().toISOString().slice(0,10);if(bars.some(b=>b.date>=today))throw Error('ייבא רק נרות סגורים מתאריכים לפני היום');add({symbol,currency:state.paper.currency,bars,source:'CSV שהוזן ידנית'});$('#status').textContent='CSV נטען';});
-$('#cycle').onclick=()=>action(()=>{runPaperCycle(state.paper,state.markets);save();render();$('#status').textContent='מחזור הדמיה הושלם על סגירות יומיות';});
-$('#test').onclick=()=>action(()=>{const m=state.markets.find(m=>m.symbol===selected);if(!m)throw Error('טען מניה תחילה');const r=backtestDaily(m.bars,state.paper.feePct);$('#backtest').textContent=`בדיקה היסטורית · מודל: ${fmt(r.returnPct)}% · קנייה והחזקה: ${fmt(r.holdReturnPct)}% · ירידה מרבית: ${fmt(r.maxDrawdown)}% · פעולות: ${r.trades}. ${r.limitation}`;});
-$('#reset').onclick=()=>action(()=>{if(!confirm('ליצור תיק הדמיה חדש ולמחוק את הנתונים המקומיים הקודמים?'))return;state={paper:createPaper(Number($('#initial').value),$('#currency').value,Number($('#fee').value)),markets:[]};selected=null;$('#chart').innerHTML='';$('#chartTitle').textContent='בחר מניה';$('#meta').textContent='';$('#technical').innerHTML='';$('#backtest').textContent='';save();render();});
-$('#export').onclick=()=>{const u=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='meitav-paper-backup.json';a.click();URL.revokeObjectURL(u);};
-render();
-
-function renderComparison(){
- const r=comparison;if(!r)return;const sample=r.results[0],chosen=r.results.find(x=>x.scenario.id===r.selectedId),base=r.results.find(x=>x.scenario.id==='base');
- $('#experimentMeta').textContent=`${r.symbol} · עמלה ${fmt(r.feePct)}% לכל פעולה · השוואה: ${sample.train.startDate} עד ${sample.train.endDate} (${r.trainDays} ימים) · בדיקה נפרדת: ${sample.validation.startDate} עד ${sample.validation.endDate} (${r.validationDays} ימים)`;
- $('#experimentRows').innerHTML=r.results.map(x=>{const c=x.scenario;return `<tr class="${c.id===r.selectedId?'chosen':''}"><td>${esc(c.name)}${c.id===r.selectedId?' · נבחר בתקופה הראשונה':''}</td><td>${c.min}%–8%</td><td>${c.stop}%</td><td>${c.exit==='wave'?'נסיגה '+fmt(c.retrace*100)+'% מהגל':c.exit==='ma'?'MA200':'ללא'}</td><td>${fmt(x.train.returnPct)}%</td><td>${fmt(x.validation.returnPct)}%</td><td>${fmt(x.validation.maxDrawdown)}%</td><td>${x.validation.actions}</td></tr>`;}).join('');
- const v=chosen.validation,hold=v.holdReturnPct;
- $('#experimentVerdict').textContent=`התרחיש שנבחר בתקופה הראשונה: ${chosen.scenario.name}. בבדיקה הנפרדת: ${fmt(v.returnPct)}%, מול ${fmt(base.validation.returnPct)}% בכללי הגלים הקודמים ו־${fmt(hold)}% בקנייה והחזקה. ${v.returnPct>base.validation.returnPct?'הוא שיפר את התשואה ביחס לכללי הגלים הקודמים בבדיקה הזאת.':'הוא לא שיפר את התשואה ביחס לכללי הגלים הקודמים בבדיקה הזאת.'} ${v.returnPct>hold?'הוא גם עבר את הקנייה וההחזקה בבדיקה הזאת.':'הוא לא עבר את הקנייה וההחזקה בבדיקה הזאת.'} נדרשות בדיקות במניות ובתקופות נוספות; אין החלפה אוטומטית של החוקים.`;
- $('#experimentChoice').innerHTML=r.results.map(x=>`<option value="${x.scenario.id}">${esc(x.scenario.name)}</option>`).join('');$('#experimentChoice').value=r.selectedId;drawExperiment();
+function renderRadar() {
+  if(!snapshot)return;
+  const q=$('search').value.trim().toUpperCase();
+  const rows=snapshot.radar.filter(r=>String(r.symbol).includes(q));
+  $('radarCount').textContent=rows.length+' ברשימה';
+  $('radar').innerHTML=rows.length ? rows.map(r=>`<tr><td><b>${esc(r.symbol)}</b></td><td>${Number.isFinite(r.progress)?pct(Math.max(0,r.progress)*100):'—'}</td><td>${esc(r.note || (r.regime==='uptrend'?'מגמת עלייה':r.regime==='downtrend'?'מגמת ירידה':'ממתין'))}</td></tr>`).join('') : '<tr><td colspan="3">אין מטבעות ברשימת הרדאר התואמים לחיפוש.</td></tr>';
 }
-function drawExperiment(){
- if(!comparison)return;const x=comparison.results.find(x=>x.scenario.id===$('#experimentChoice').value),base=comparison.results.find(x=>x.scenario.id==='base'),v=x.validation,m=state.markets.find(m=>m.symbol===comparison.symbol);
- const prices=new Map(m.bars.map(b=>[b.date,b.close])),start=prices.get(v.startDate),hold=v.curve.map(b=>({date:b.date,value:10000/(start*(1+comparison.feePct/100))*prices.get(b.date)})),series=[v.curve,base.validation.curve,hold],values=series.flatMap(a=>a.map(b=>b.value)),low=Math.min(...values)*.98,high=Math.max(...values)*1.02;
- const points=a=>a.map((b,i)=>`${55+i/(a.length-1)*790},${315-(b.value-low)/(high-low)*270}`).join(' ');
- $('#experimentChart').innerHTML=series.map((a,i)=>`<polyline fill="none" stroke="${['#65c2ff','#ffd36a','#65e09a'][i]}" stroke-width="2" points="${points(a)}"/>`).join('')+`<text x="5" y="45" fill="#aaa">${fmt(high)}</text><text x="5" y="315" fill="#aaa">${fmt(low)}</text><text x="55" y="350" fill="#aaa">${v.startDate}</text><text x="710" y="350" fill="#aaa">${v.endDate}</text>`;
- $('#experimentDetails').textContent=`${x.scenario.name} · עסקאות סגורות: ${v.closedTrades} · שיעור עסקאות ברווח: ${v.winRate===null?'אין עסקאות סגורות':fmt(v.winRate)+'%'} · עמלות: ${fmt(v.fees)} ${state.paper.currency} · פוזיציה פתוחה בסיום: ${v.openPosition?'כן':'לא'}`;
- $('#experimentJournal').innerHTML=v.journal.slice(-30).reverse().map(j=>`<tr><td>${j.signalDate}</td><td>${j.date}</td><td>${j.type==='BUY'?'קנייה':'מכירה'}</td><td>${fmt(j.price)}</td><td>${esc(j.reason)}</td><td>${j.pnl===undefined?'—':fmt(j.pnl)}</td></tr>`).join('')||'<tr><td colspan="6">אין פעולות בתקופה זו</td></tr>';
+function render(s) {
+  const d=s.day, st=s.settings;
+  $('equity').textContent=money(s.equity);$('dayTotal').textContent=money(d.total);$('dayTotal').className=color(d.total);
+  $('dayBreakdown').textContent=`נסגרו: ${money(d.realized)} · פתוחות: ${money(d.open)}`;
+  $('slots').textContent=`${reservedSymbols(s)} / ${num(st.max_positions,0)}`;$('available').textContent=money(s.available);
+  $('dayDate').textContent='יום החשבון: '+(d.date || '—');$('dayTarget').textContent=money(d.target);
+  $('dayLoss').textContent=Number.isFinite(d.loss_limit)?money(-d.loss_limit):'—';$('dayFees').textContent=money(d.fees);
+  $('dayProgress').value=Number.isFinite(d.total)&&d.target>0 ? Math.max(0,Math.min(100,100*d.total/d.target)) : 0;
+  const locks={loss:'מגבלת הפסד יומית',kill:'עצירה יומית',target:'היעד הושג — כניסות נעצרו',floor:'הרווח ירד לסף העצירה'};
+  $('dayStatus').textContent=locks[d.lock] || (s.paused?'כניסות מושהות':d.target_reached?'היעד הושג':'מעקב פעיל');
+  $('dayExplanation').textContent=d.lock ? 'המנוע חסם כניסות חדשות. בדוק את העסקאות הפתוחות ואת היומן.' : d.target_reached && st.after_target==='keep_half' ? `המשך בחצי גודל; כניסות חדשות ייעצרו אם רווח היום ירד ל־${money(d.floor)}.` : `יעד היום: ${money(d.target)}. מגבלת ההפסד היומית: ${money(d.loss_limit)}.`;
+  $('mode').textContent=modeNames[s.mode];$('mode').className=s.real_money?'warning':'';
+  $('engineVersion').textContent='גרסת שרת: '+s.version;
+  $('engineInfo').innerHTML=pair('פעילות',s.paused?'כניסות מושהות':s.status)+pair('חסם כניסה',s.block || 'אין חסם מדווח')+pair('זמן פעימת המנוע',health?.tick_age_s == null?'לא אומת':num(health.tick_age_s)+' שניות')+pair('תאריך נתוני המנוע',time(s.now))+pair('חיבור התראות מהבורסה',s.stream?.state || 'לא דווח');
+  $('positionsCount').textContent=s.positions.length+' פתוחות';
+  $('positions').innerHTML=s.positions.length ? s.positions.map(p=>{
+    const stage={initial:'העסקה לפני מימוש חלקי',tp1_banked:'חלק מהעסקה מומש',protected:'היתרה סביב מחיר איזון'}[p.stage] || p.stage;
+    const values=[['כניסה',num(p.entry,8)],['מחיר אחרון',num(p.mark,8)],['כמות',num(p.qty,8)],['עצירת הפסד',num(p.stop_price,8)],['מימוש חלקי · TP1',num(p.tp1_price,8)],['יעד סופי · TP2',num(p.target_price,8)]];
+    return `<article class="position"><div class="position-head"><div><b>${esc(p.symbol)}</b><div class="position-stage">${p.direction>0?'לונג · רווח מעלייה':'שורט · רווח מירידה'} · מינוף ×${esc(num(p.leverage,0))}</div></div><strong class="${color(p.net)}">${money(p.net)}</strong></div><div class="position-details">${values.map(([label,value])=>`<div><span>${label}</span><b>${esc(value)}</b></div>`).join('')}</div><div class="position-foot">${esc(protectionLabel(p))}<div class="position-stage">${esc(stage)} · ${num(p.age_min,0)} דקות</div><div class="position-stage">תוצאה משוערת בסף ההגנה: <span class="${color(p.worst_case)}">${money(p.worst_case)}</span>. קפיצת מחיר עלולה להגדיל הפסד.</div></div></article>`;
+  }).join('') : '<div class="empty">המנוע מדווח שאין עסקאות מנוהלות פתוחות.</div>';
+  $('reservations').innerHTML=[['עסקאות מחוץ לניהול המנוע — יש לבדוק הגנה ביומן',s.orphans],['כניסה שטרם התקבל לה אישור',s.pending],['ממתינים לסגירת דקה בכיוון העסקה',s.waiting]].filter(([,rows])=>rows.length).map(([label,rows])=>`<div class="reservation"><b>${esc(label)}</b>: ${rows.map(p=>esc(p.symbol)).join(', ')}</div>`).join('');
+  renderRadar();
+  $('events').innerHTML=s.events.length ? s.events.slice(0,30).map(e=>`<li><time>${time(e.ts)}</time><span class="${e.level==='error'?'negative':e.level==='warning'?'warning':''}">${esc(e.msg)}</span></li>`).join('') : '<li class="muted">אין אירועים ביומן שהתקבל.</li>';
+  $('trades').innerHTML=s.trades?.length ? s.trades.slice(0,30).map(t=>`<tr><td>${time(t.closed_ms)}</td><td><b>${esc(t.symbol)}</b></td><td>${t.side==='LONG'?'לונג · עלייה':'שורט · ירידה'}</td><td>${esc(reasonNames[t.reason] || t.reason)}${t.tp1?' · מימוש חלקי':''}</td><td class="${color(t.net)}" dir="ltr">${money(t.net)}</td></tr>`).join('') : '<tr><td colspan="5">אין עסקאות סגורות בהיסטוריה שהתקבלה.</td></tr>';
+  $('settings').innerHTML=[['סיכון בסיסי לעסקה',pct(st.risk_per_trade_pct)],['מכפיל סיכון מרבי',num(st.max_bet)+'×'],['מינוף מרבי',num(st.max_leverage,0)+'×'],['עסקאות במקביל',num(st.max_positions,0)],['עסקאות באותו כיוון',num(st.max_same_direction,0)],['ממתינים לאישור דקה',yes(st.confirm_entry)],['מספר מטבעות בגל',num(st.min_crowd,0)],['יעד מול עלות משוערת',num(st.min_edge_x)+'×'],['מימוש חלקי מהכמות',pct(st.tp1_share_pct)],['מגבלת זמן לעסקה',num(st.max_hold_minutes,0)+' דקות'],['Flush Fade',yes(st.flush_on)],['Spring Reclaim',yes(st.spring_on)]].map(([label,value])=>pair(label,value)).join('');
+  $('lastUpdated').textContent='הנתונים התקבלו: '+time(receivedAt)+' · שעון ישראל';
+  notice(s.fatal || s.error || '');connection();
 }
-$('#experimentChoice').onchange=drawExperiment;
-$('#compare').onclick=()=>action(async()=>{
- const m=state.markets.find(m=>m.symbol===selected);if(!m)throw Error('בחר מניה שנטענה לפני ההשוואה');$('#compare').disabled=true;$('#status').textContent='משווה תשעה שילובי תנאים…';
- try{await new Promise(resolve=>setTimeout(resolve,0));comparison={...compareScenarios(m.bars,state.paper.feePct),symbol:m.symbol};$('#experiments').hidden=false;renderComparison();$('#status').textContent='השוואת התנאים הושלמה; תיק ההדמיה לא השתנה';$('#experiments').scrollIntoView({behavior:'smooth',block:'start'});}finally{$('#compare').disabled=false;}
+function schedule() {clearTimeout(timer);if(signedIn&&!document.hidden)timer=setTimeout(refresh,15_000);}
+async function refresh() {
+  if(busy || !signedIn || document.hidden)return;
+  busy=true;const generation=epoch;
+  try {
+    const result=await request('snapshot');
+    if(generation!==epoch)return;
+    snapshot=validateSnapshot(result.snapshot);health=result.health;receivedAt=Date.now();
+    $('connectPanel').hidden=true;$('logout').hidden=false;render(snapshot);
+  } catch(e) {
+    if(generation!==epoch)return;
+    health={ok:false};connection();notice(e.message);
+    if(e.status===401) {signedIn=false;clearTimeout(timer);$('connectPanel').hidden=false;$('loginForm').hidden=false;$('connectMessage').textContent='נדרשת כניסה עם קוד הגישה של הבוט.';}
+  } finally {busy=false;schedule();}
+}
+async function initialize() {
+  $('refresh').disabled=true;notice('');
+  try {
+    const config=await request('config');
+    if(config.protocol!=='crypto_crawler' || config.readOnly!==true)throw Error('חיבור התצוגה אינו מזוהה.');
+    $('setupHelp').hidden=config.configured;$('loginForm').hidden=!config.configured;
+    $('connectPanel').hidden=false;
+    if(!config.configured) {
+      $('connectionTitle').textContent='ממתין לחיבור שרת הבוט';
+      $('connectionDetail').textContent='הממשק מוכן. טרם הוגדר שרת crypto_crawler להצגת נתונים.';
+      $('connectMessage').textContent='יש להגדיר כתובת שרת של הבוט החדש. אין כרגע נתוני חשבון או עסקאות מאומתים.';
+      return;
+    }
+    $('connectMessage').textContent='הזן את קוד הבוט. הקוד אינו נשמר בדפדפן.';signedIn=true;await refresh();
+  } catch(e) {$('connectionTitle').textContent='החיבור אינו זמין';$('connectMessage').textContent=e.message;notice(e.message);}
+  finally {$('refresh').disabled=false;}
+}
+$('loginForm').addEventListener('submit',async event=>{
+  event.preventDefault();const button=event.submitter;button.disabled=true;$('loginError').textContent='';
+  try {await request('login',{pin:$('pin').value});$('pin').value='';signedIn=true;await refresh();}
+  catch(e) {$('loginError').textContent=e.message;$('pin').value='';}
+  finally {button.disabled=false;}
 });
-
-function renderResearch(){
- const r=research;if(!r)return;const chosen=r.results[0],a=chosen.summary[1],b=chosen.summary[2];
- $('#researchMeta').textContent=`מניות: ${r.symbols.join(', ')} · עמלה ${fmt(r.feePct)}% · עלות ביצוע ${fmt(r.slippagePct)}% לכל צד. `+r.periods.map(p=>`${p.name}: ${p.startDate} עד ${p.endDate}`).join(' · ');
- $('#researchRows').innerHTML=r.results.map(x=>{const [t,a,b]=x.summary;return `<tr class="${x.method.id===r.selectedId?'chosen':''}"><td>${esc(x.method.name)}${x.method.id===r.selectedId?' · נבחרה':''}</td><td>${esc(x.method.rule)}</td><td>${fmt(t.meanReturn)}%</td><td>${fmt(x.score)}</td><td>${fmt(a.meanReturn)}%</td><td>${fmt(a.meanDrawdown)}%</td><td>${fmt(b.meanReturn)}%</td><td>${fmt(b.meanDrawdown)}%</td><td>${b.beatingAssets}/${r.symbols.length}</td></tr>`;}).join('');
- $('#researchVerdict').textContent=`השיטה שנבחרה בחלק הראשון: ${chosen.method.name}. בבדיקה א׳ ממוצע התשואה ${fmt(a.meanReturn)}% מול ${fmt(a.meanHold)}% בהחזקה; בבדיקה ב׳ ${fmt(b.meanReturn)}% מול ${fmt(b.meanHold)}%. ירידת ההחזקה הממוצעת: א׳ ${fmt(a.meanHoldDrawdown)}%, ב׳ ${fmt(b.meanHoldDrawdown)}%. ${a.meanReturn>a.meanHold&&b.meanReturn>b.meanHold?'היא עברה בממוצע את ההחזקה בשתי הבדיקות ההיסטוריות.':'לא הוכח יתרון תשואה בממוצע מול החזקה בשתי הבדיקות.'} זו תוצאה על הרשימה שהוזנה, ללא הבטחה ליתרון בעתיד.`;
- $('#researchMethod').innerHTML=r.results.map(x=>`<option value="${x.method.id}">${esc(x.method.name)}</option>`).join('');$('#researchMethod').value=r.selectedId;
- $('#researchAsset').innerHTML=r.symbols.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');$('#researchPeriod').value='2';drawResearch();
-}
-function drawResearch(){
- if(!research)return;const x=research.results.find(x=>x.method.id===$('#researchMethod').value),asset=x.assets.find(x=>x.symbol===$('#researchAsset').value),n=Number($('#researchPeriod').value),v=asset.periods[n],market=research.datasets.find(m=>m.symbol===asset.symbol),bars=market.bars.filter(b=>b.date>=v.startDate&&b.date<=v.endDate);
- $('#researchAssets').innerHTML=x.assets.map(m=>{const a=m.periods[1],b=m.periods[2];return `<tr><td>${esc(m.symbol)}</td><td>${fmt(a.returnPct)}%</td><td>${fmt(a.holdReturnPct)}%</td><td>${fmt(a.maxDrawdown)}%</td><td>${fmt(b.returnPct)}%</td><td>${fmt(b.holdReturnPct)}%</td><td>${fmt(b.maxDrawdown)}%</td></tr>`;}).join('');
- $('#researchDetails').textContent=`${asset.symbol} · ${x.method.name} · ${research.periods[n].name} · ${v.startDate} עד ${v.endDate} · ${v.days} ימים · תשואה ${fmt(v.returnPct)}% · החזקה ${fmt(v.holdReturnPct)}% · ירידה מרבית ${fmt(v.maxDrawdown)}% · ${v.actions} פעולות · חשיפה ${fmt(v.exposurePct)}% מהימים · עמלות ${fmt(v.fees)} ${research.currency} · פוזיציה פתוחה בסיום: ${v.openPosition?'כן':'לא'}`;
- function plot(target,series,colors,marks=[]){
-  const vals=series.flat(),lo=Math.min(...vals)*.98,hi=Math.max(...vals)*1.02,size=series[0].length,px=i=>55+i/(size-1)*790,py=v=>315-(v-lo)/(hi-lo)*270;
-  let svg=series.map((a,i)=>`<polyline fill="none" stroke="${colors[i]}" stroke-width="2" points="${a.map((v,j)=>`${px(j)},${py(v)}`).join(' ')}"/>`).join('');
-  for(const j of marks){const i=bars.findIndex(b=>b.date===j.date);if(i<0)continue;const color=j.type==='BUY'?'#75ff9a':'#ff6464';svg+=`<circle cx="${px(i)}" cy="${py(bars[i].close)}" r="5" fill="${color}" stroke="#07111d"><title>${esc((j.type==='BUY'?'קנייה':'מכירה')+' · אות '+j.signalDate+' · ביצוע '+j.date+' · מחיר ביצוע '+fmt(j.price)+(j.reason?' · '+j.reason:''))}</title></circle>`;}
-  svg+=`<text x="5" y="35" fill="#aaa">${fmt(hi)}</text><text x="5" y="315" fill="#aaa">${fmt(lo)}</text><text x="55" y="350" fill="#aaa">${v.startDate}</text><text x="710" y="350" fill="#aaa">${v.endDate}</text>`;$(target).innerHTML=svg;
- }
- plot('#researchPriceChart',[bars.map(b=>b.close)],['#65c2ff'],v.journal);plot('#researchEquityChart',[v.curve.map(b=>b.value),v.curve.map(b=>b.hold)],['#65c2ff','#65e09a']);
-}
-for(const id of ['#researchMethod','#researchAsset','#researchPeriod'])$(id).onchange=drawResearch;
-$('#research').onclick=()=>action(async()=>{
- for(const id of ['#research','#load','#csv','#reset','#cycle'])$(id).disabled=true;$('#status').textContent='משווה שיטות על ההיסטוריה שנטענה…';
- try{await new Promise(resolve=>setTimeout(resolve,0));research=await runResearchWorker(state.markets,{feePct:state.paper.feePct,slippagePct:Number($('#slippage').value)});$('#researchPanel').hidden=false;renderResearch();$('#researchPanel').scrollIntoView({behavior:'smooth',block:'start'});$('#status').textContent='מחקר השיטות הושלם; חוקי המסחר לא השתנו';}finally{for(const id of ['#research','#load','#csv','#reset','#cycle'])$(id).disabled=false;}
+$('logout').addEventListener('click',async()=>{
+  epoch++;signedIn=false;clearTimeout(timer);$('logout').disabled=true;
+  try {await request('logout',{});location.reload();}
+  catch(e){notice(e.message);$('logout').disabled=false;}
 });
-$('#researchExport').onclick=()=>{if(!research)return;const u=URL.createObjectURL(new Blob([JSON.stringify(research,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='meitav-method-research.json';a.click();URL.revokeObjectURL(u);};
-
-function runResearchWorker(markets,options){
- return new Promise((resolve,reject)=>{
-  const worker=new Worker(new URL('./meitav-research-worker.mjs',import.meta.url),{type:'module'});
-  worker.onmessage=event=>{worker.terminate();if(event.data.error)reject(Error(event.data.error));else resolve(event.data.result);};
-  worker.onerror=()=>{worker.terminate();reject(Error('לא ניתן להריץ את מנוע המחקר. רענן את הדף לאחר הפריסה.'));};
-  worker.postMessage({markets,options});
- });
-}
+$('refresh').addEventListener('click',()=>signedIn?refresh():initialize());
+$('search').addEventListener('input',renderRadar);
+document.addEventListener('visibilitychange',()=>{clearTimeout(timer);connection();if(!document.hidden&&signedIn)refresh();});
+initialize();
