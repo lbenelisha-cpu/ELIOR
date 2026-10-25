@@ -4,6 +4,7 @@ import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colme
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
 import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261023-rolling';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
+function publishMarket(data){if(typeof window!=='undefined'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}
 const PAPER_MODE=document.body.dataset.mode==='simulation';
 let paperUI=null;
 const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:[]};
@@ -123,11 +124,11 @@ async function loadMarket(force=true){
   const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await response.json();
   if(!response.ok){const error=Error(data.error||'שגיאת מקור נתונים');error.retryAfterMs=Number(data.retryAfterSeconds)*1000;throw error;}
   if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
-  succeeded=true;marketFailures.delete(key);if(manualCharts.has(symbol))return;
+  succeeded=true;publishMarket({ok:true,symbol,observedAt:data.observedAt,priceAt:data.priceAt,cacheState:data.cacheState});marketFailures.delete(key);if(manualCharts.has(symbol))return;
   markets[symbol]={...data,loadedAt:Date.now()};if(!quotes[symbol]||(Date.parse(data.priceAt)||0)>=(Date.parse(quotes[symbol].priceAt||quotes[symbol].observedAt)||0))quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',observedAt:data.observedAt,loadedAt:Date.now()};if(['PROVIDER_QUOTE','BROKER_BID'].includes(data.priceKind)){quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;}saveQuotes();
   if(data.analysisBars||['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars,Date.now(),{position:liveSearchState.positions?.find(p=>p.symbol===symbol),after:liveSearchState.after?.[symbol]||0});wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
  if(!workbench.busy&&request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
- }catch(error){if(Number.isFinite(error.retryAfterMs)&&error.retryAfterMs>0)retryAfterMs=error.retryAfterMs;const reason=error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message;marketFailures.set(key,reason);if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=reason+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון. '+(retryAfterMs>3600000?'ניסיון נוסף לאחר איפוס המכסה.':'ניסיון אוטומטי בעוד כ־65 שניות.');}
+ }catch(error){if(Number.isFinite(error.retryAfterMs)&&error.retryAfterMs>0)retryAfterMs=error.retryAfterMs;const reason=error.name==='TimeoutError'?'הספק לא השיב בזמן.':error.message;marketFailures.set(key,reason);publishMarket({ok:false,symbol,reason});if(request===marketRequest&&selected===symbol)$('#marketStatus').textContent=reason+' נתונים קודמים, אם קיימים, נשארים מוצגים עם מועד הנתון. '+(retryAfterMs>3600000?'ניסיון נוסף לאחר איפוס המכסה.':'ניסיון אוטומטי בעוד כ־65 שניות.');}
  finally{pendingMarkets.delete(key);marketLoadGate.finish(key,succeeded,retryAfterMs);}
 }
 $('#loadMarket').onclick=()=>loadMarket(true);

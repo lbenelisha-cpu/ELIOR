@@ -6,7 +6,9 @@ function node(tag,text,className){const n=document.createElement(tag);if(text!==
 function number(v){if(v===null||v===undefined||typeof v==='boolean'||typeof v==='string'&&!v.trim())return null;const n=Number(v);return Number.isFinite(n)?n:null;}
 function value(v,currency=''){const n=number(v);return n===null?'—':new Intl.NumberFormat('he-IL',{maximumFractionDigits:6}).format(n)+(currency?' '+currency:'');}
 function clear(){ $('brokerMetrics').replaceChildren();$('brokerPositions').replaceChildren();$('brokerReadAt').textContent='';$('brokerFields').replaceChildren();$('brokerConnectionBadge').textContent='חשבון לא מאומת';}
+function publish(data,error=null){if(typeof window!=='undefined'&&typeof CustomEvent==='function'){const detail={data,error,receivedAt:Date.now()};window.LEVI_COLMEX_ACCOUNT=detail;window.dispatchEvent(new CustomEvent('levi:colmex-account',{detail}));}}
 function render(data){
+ publish(data);
  clear();
  const select=$('brokerAccounts'),selected=data.selectedAccount;
  select.replaceChildren();const placeholder=node('option','בחר חשבון');placeholder.value='';select.append(placeholder);
@@ -42,11 +44,11 @@ async function refresh(){
   if(!response.ok&&['AUTH_DENIED','AUTH_RESPONSE','ACCESS_DENIED'].includes(data.code))auto=false;
   if(!response.ok)throw Error(data.error||'לא ניתן לקרוא את החשבון');
   render(data);refreshMs=Math.max(60000,Number(data.refreshAfterMs)||60000);
- }catch(e){if(g===generation){const previous=!!$('brokerReadAt').textContent;if(previous)$('brokerConnectionBadge').textContent='נתונים קודמים · העדכון נכשל';$('brokerAccountStatus').textContent=(e.name==='AbortError'?'קריאת החשבון ארכה זמן רב. נסה לרענן.':e.message)+(previous?' · מוצגים נתונים מהקריאה הקודמת, לא מצב חשבון מאומת כעת.':' · מצב הפוזיציות אינו ידוע.');refreshMs=Math.max(refreshMs,60000);}}
+ }catch(e){if(g===generation){publish(null,e.message);const previous=!!$('brokerReadAt').textContent;if(previous)$('brokerConnectionBadge').textContent='נתונים קודמים · העדכון נכשל';$('brokerAccountStatus').textContent=(e.name==='AbortError'?'קריאת החשבון ארכה זמן רב. נסה לרענן.':e.message)+(previous?' · מוצגים נתונים מהקריאה הקודמת, לא מצב חשבון מאומת כעת.':' · מצב הפוזיציות אינו ידוע.');refreshMs=Math.max(refreshMs,60000);}}
  finally{clearTimeout(timeout);if(g===generation){controller=null;if(enabled&&auto)timer=setTimeout(refresh,refreshMs);}}
 }
 $('brokerRefresh').addEventListener('click',()=>{auto=true;refresh();});
-$('brokerAccounts').addEventListener('change',()=>{generation++;controller?.abort();controller=null;clearTimeout(timer);currentId=$('brokerAccounts').value;clear();if(currentId)refresh();});
+$('brokerAccounts').addEventListener('change',()=>{generation++;controller?.abort();controller=null;clearTimeout(timer);currentId=$('brokerAccounts').value;publish(null,'ממתין לחשבון שנבחר');clear();if(currentId)refresh();});
 async function status(){
  try{const r=await fetch('/.netlify/functions/colmex-account?action=status',{cache:'no-store'});if(!r.ok)throw Error();const d=await r.json();
   enabled=d.credentialsConfigured===true;
