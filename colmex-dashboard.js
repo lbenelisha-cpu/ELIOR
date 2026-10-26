@@ -33,17 +33,17 @@ function renderMap(now){
 }
 function health(id,kind,message){$(id).dataset.state=kind;$(id).textContent=message;}
 function render(){
- const now=Date.now(),data=account?.data,fresh=data?.selectedAccount&&!account.error&&Date.parse(data.observedAt)<=now+5000&&now-Date.parse(data.observedAt)<180000;
- health('colmexAccountHealth',fresh?'good':account?.error?'warning':'unknown',fresh?'החשבון מעודכן':account?.error?'החשבון אינו מאומת':data?.selectionRequired?'יש לבחור חשבון בפירוט':'ממתין לנתוני חשבון');
- txt('colmexSnapshotAt',fresh?'חשבון '+(data.selectedAccount?.name||data.selectedAccount?.id||'נבחר')+' · '+time(data.observedAt):account?.error?'החיבור מתעכב · היתרה והפוזיציות אינן מאומתות כרגע':'הנתונים יופיעו עם קבלת תשובת הברוקר');
+ const now=Date.now(),data=account?.data,usable=data?.selectedAccount&&Date.parse(data.observedAt)<=now+5000&&now-Date.parse(data.observedAt)<180000,fresh=usable&&!account.error;
+ health('colmexAccountHealth',fresh?'good':account?.error?'warning':'unknown',fresh?'החשבון מעודכן':account?.error?(usable?'עדכון החשבון מתעכב · נתונים קודמים':'קריאת החשבון נכשלה'):data?.selectionRequired?'יש לבחור חשבון בפירוט':'ממתין לנתוני חשבון');
+ txt('colmexSnapshotAt',usable?(fresh?'חשבון ':'קריאה קודמת · חשבון ')+(data.selectedAccount?.name||data.selectedAccount?.id||'נבחר')+' · '+time(data.observedAt):account?.error?'החיבור מתעכב · היתרה והפוזיציות אינן מאומתות כרגע':'הנתונים יופיעו עם קבלת תשובת הברוקר');
  const currency=data?.selectedAccount?.currency||'USD';txt('colmexEquityLabel','שווי החשבון · '+currency);txt('colmexCashLabel','מזומן בחשבון · '+currency);txt('colmexPnlLabel','רווח / הפסד פתוח נטו · '+currency);
  txt('colmexMode',!data?.selectedAccount?'חשבון ברוקר':data.selectedAccount.type==='demo'?'DEMO · חשבון דמו':data.selectedAccount.type==='live'?'LIVE · חשבון אמיתי':'חשבון מחובר');
- txt('colmexEquity',fresh?n(data.state?.projectedBalance??data.state?.balance):'—');txt('colmexCash',fresh?n(data.state?.cashBalance):'—');
- txt('colmexOpenPnl',fresh?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=!fresh||!Number(data.state?.openNetPnL)?'unknown':Number(data.state.openNetPnL)<0?'negative':'positive';
- txt('colmexSlotCount',fresh?(data.positions||[]).length+' / '+(status?.policy?.maxPositions||3):'—');
+ txt('colmexEquity',usable?n(data.state?.projectedBalance??data.state?.balance):'—');txt('colmexCash',usable?n(data.state?.cashBalance):'—');
+ txt('colmexOpenPnl',usable?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=!usable||!Number(data.state?.openNetPnL)?'unknown':Number(data.state.openNetPnL)<0?'negative':'positive';
+ txt('colmexSlotCount',usable?(data.positions||[]).length+' / '+(status?.policy?.maxPositions||3):'—');
  $('colmexSlots').replaceChildren(...Array.from({length:status?.policy?.maxPositions||3},(_,i)=>el('i',null,fresh&&i<(data.positions||[]).length?'used':'')));
  const monitor=status&&!statusFailed?monitorView(status,now):null;
- health('colmexServerHealth',!monitor?'unknown':monitor.health==='recent'&&!status.pendingActions?.length?'good':'warning',!monitor?'מצב המעקב לא אומת':status.halt?'נדרש בירור פקודה':status.pendingActions?.length?'הוראה ממתינה לאישור':monitor.health==='recent'?'שרת המעקב פעיל':monitor.health==='disabled'?'המעקב כבוי':'עדכון השרת מתעכב');
+ health('colmexServerHealth',!monitor?'unknown':monitor.health==='recent'&&!status.pendingActions?.length?'good':'warning',!monitor?'מצב המעקב לא אומת':status.halt?'נדרש בירור פקודה':status.pendingActions?.length?'הוראה ממתינה לאישור':monitor.health==='recent'?'שרת המעקב פעיל':monitor.health==='disabled'?'המעקב כבוי':status.lastError?(status.lastError.stage==='ACCOUNT_SNAPSHOT'?'סבב המעקב נכשל · קריאת חשבון':'סבב המעקב נכשל · ניסיון נוסף אוטומטי'):'עדכון השרת מתעכב');
  const marketHealth=marketHealthView(market,now);health('colmexMarketHealth',marketHealth.kind,marketHealth.label);
  txt('colmexPolicy',status?.policy?`${status.policy.symbols.length} מניות במעקב · עד $${status.policy.notionalUsd} למניה · ${status.policy.maxPositions} פוזיציות`:'50 מניות במעקב · עד $800 למניה · 3 פוזיציות');
  const prepared=!statusFailed&&status?.preparation?.rows||{},checked=Object.values(prepared).filter(r=>!r.error&&r.complete!==false).length,total=status?.policy?.symbols?.length||50;

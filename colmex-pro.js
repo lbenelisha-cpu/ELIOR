@@ -122,11 +122,10 @@ async function loadMarket(force=true){
  if(!marketLoadGate.begin(key)){const retryAt=marketLoadGate.retryAt(key);$('#marketStatus').textContent=retryAt>Date.now()?(marketFailures.get(key)||'ממתין למקור הנתונים')+' · ניסיון אוטומטי ב־'+new Date(retryAt).toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem'}):'בקשת הגרף ממתינה לסיום הטעינה הקודמת';return;}
  let succeeded=false,retryAfterMs=65000;const request=++marketRequest;pendingMarkets.add(key);$('#marketStatus').textContent='טוען '+symbol+' מקולמקס־פרו…';
  try{
-  globalThis.LEVI_MARKET_POWER?.load(symbol);
-  const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await response.json();
+  const response=await fetch('/.netlify/functions/colmex-stocks-market?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval),{cache:'no-store',signal:AbortSignal.timeout(30000)}),data=await response.json();
   if(!response.ok){const error=Error(data.error||'שגיאת מקור נתונים');error.retryAfterMs=Number(data.retryAfterSeconds)*1000;throw error;}
   if(data.symbol!==symbol||data.interval!==interval||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price)||!Array.isArray(data.bars)||!data.bars.length||!data.bars.every(validBar))throw Error('נתוני המקור אינם תקינים');
-  succeeded=true;publishMarket({ok:true,symbol,observedAt:data.observedAt,priceAt:data.priceAt,cacheState:data.cacheState});marketFailures.delete(key);if(manualCharts.has(symbol))return;
+  succeeded=true;publishMarket({ok:true,symbol,observedAt:data.observedAt,priceAt:data.priceAt,cacheState:data.cacheState,providerErrorCode:data.providerErrorCode});marketFailures.delete(key);if(manualCharts.has(symbol))return;
   markets[symbol]={...data,loadedAt:Date.now()};if(!quotes[symbol]||(Date.parse(data.priceAt)||0)>=(Date.parse(quotes[symbol].priceAt||quotes[symbol].observedAt)||0))quotes[symbol]={...(quotes[symbol]||{}),symbol,price:data.price,priceAt:data.priceAt,priceKind:data.priceKind,source:data.source,currency:'USD',observedAt:data.observedAt,loadedAt:Date.now()};if(['PROVIDER_QUOTE','BROKER_BID'].includes(data.priceKind)){quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;}saveQuotes();
   if(data.analysisBars||['5min','10min','15min'].includes(interval)){try{wyckoffHistories[symbol]=chartWyckoffOccurrences(data.analysisBars||data.bars);analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars,Date.now(),{position:liveSearchState.positions?.find(p=>p.symbol===symbol),after:liveSearchState.after?.[symbol]||0});wyckoffErrors[symbol]=null;}catch(e){wyckoffErrors[symbol]=e.message;}}
  if(!workbench.busy&&request===marketRequest&&selected===symbol&&$('#marketInterval').value===interval){render(true);$('#marketStatus').textContent=data.notice+' נרות: '+({'1day':'יום','1h':'שעה','5min':'5 דקות','10min':'10 דקות','15min':'15 דקות'}[interval])+' · '+(data.isMarketOpen===true?'הספק מדווח: שוק פתוח':data.isMarketOpen===false?'הספק מדווח: שוק סגור':'מצב השוק לא זמין')+' · בקשת נתונים: '+new Date().toLocaleTimeString('he-IL');}
@@ -148,7 +147,7 @@ async function loadNextWatchQuote(){
  const now=Date.now(),symbol=nextWatchQuote(state.symbols,{quotes,nextAt:quoteNextAt,blocked:new Set([...pendingMarkets].map(k=>k.split(':')[0])),now});
  if(!symbol)return;quoteBusy=true;quoteStatus[symbol]='טוען מחיר…';render(true,true);
  try{
-  const r=await fetch('/.netlify/functions/colmex-stocks-market?view=quote&symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(20000)}),data=await r.json();
+  const r=await fetch('/.netlify/functions/colmex-stocks-market?view=quote&symbol='+encodeURIComponent(symbol),{cache:'no-store',signal:AbortSignal.timeout(30000)}),data=await r.json();
   if(!r.ok||data.symbol!==symbol||data.currency!=='USD'||data.source!=='Colmex Pro'||!positive(data.price))throw Error('QUOTE_UNAVAILABLE');
   quotes[symbol]={...data,loadedAt:Date.now()};quoteStatus[symbol]='';quoteNextAt[symbol]=Date.now()+300000;saveQuotes();
  }catch{quoteStatus[symbol]='ממתין לספק · ניסיון חוזר';quoteNextAt[symbol]=Date.now()+65000;}

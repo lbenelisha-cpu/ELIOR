@@ -68,3 +68,9 @@ test('public read route sanitizes unknown errors and absent broker credentials r
  const d=await h({httpMethod:'GET'});assert.equal(d.statusCode,503);assert(!d.body.includes('must not escape'));assert.equal(JSON.parse(d.body).code,'SERVICE_UNAVAILABLE');
  const empty=makeHandler({env:()=>({})});assert.equal((await empty({httpMethod:'GET'})).statusCode,503);assert.equal(JSON.parse((await empty({httpMethod:'GET',queryStringParameters:{action:'status'}})).body).credentialsConfigured,false);
 });
+test('HTTP 200 broker errors preserve safe categories and never expose provider text',async()=>{
+ for(const [errmsg,code]of [['Too many requests for private-user','RATE_LIMIT'],['User is not connected private-user','BROKER_NOT_READY'],['Unrecognized private details','BROKER_ERROR_RESPONSE']]){const r=rig({respond:p=>p==='/accounts'?new Response(JSON.stringify({s:'error',errmsg})):null});await assert.rejects(r.client.snapshot(),e=>e.code===code&&!e.message.includes('private'));}
+});
+test('token renewal during the account list cannot reuse config from an older session',async()=>{
+ let failed=false,auths=0;const r=rig({respond:p=>{if(p==='/authorize')return ok({access_token:'session-'+(++auths),expiration:now/1000+3600});if(p==='/accounts'&&!failed){failed=true;return new Response('',{status:401});}if(p==='/config'&&auths===2)return ok({...config,accountDetailsConfig:{columns:[{id:'balance'},{id:'openNetPnL'},{id:'cashBalance'},{id:'availableFunds'}]}});}});const d=await r.client.snapshot();assert.equal(d.state.balance,12);assert.equal(d.state.openNetPnL,1000);assert.equal(auths,2);
+});
