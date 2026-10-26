@@ -65,3 +65,5 @@ main>section,main>.panel,.market-hours,.layout>.panel{width:100%;max-width:100%;
 
 /* Keep the expanded server watchlist readable without pushing the chart far down. */
 .auto-monitor .sim-table-wrap{max-height:440px;overflow:auto}.auto-monitor .monitor-table thead th{position:sticky;top:0;background:#0c1b2b;z-index:1}
+
+.wyckoff-search-status{margin:12px 0;padding:14px 16px;border:1px solid #45576d;border-radius:12px;background:#102237;color:#e2edf9;font-size:13px;line-height:1.8}.wyckoff-search-status strong{color:#bce9f7}.wyckoff-search-status p{margin:8px 0}.wyckoff-search-status .search-reset{color:#f6d490}.wyckoff-search-status small{display:block;color:#adc0d5;font-size:12px}.wyckoff-search-status:empty{display:none}

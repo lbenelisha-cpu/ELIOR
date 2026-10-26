@@ -1,9 +1,10 @@
+import {renderSearchStatus} from './colmex-search-status.js?v=20261026-entry-fix';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
-import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261023-rolling';
+import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261026-entry-fix';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
 function publishMarket(data){if(typeof window!=='undefined'){window.LEVI_COLMEX_MARKET=data;if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}}
 const PAPER_MODE=document.body.dataset.mode==='simulation';
@@ -58,6 +59,7 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
+ renderSearchStatus($('#wyckoffSearchStatus'),analysisMarks[selected]?.searchDiagnostic,{symbol:selected,check:liveSearchState.checks?.[selected],position:liveSearchState.positions?.some(p=>p.symbol===selected),manual:manualCharts.has(selected)||PAPER_MODE});
  renderSlopePanel($('#colmexSlope'),manualCharts.has(selected)?[]:(markets[selected]?.analysisBars||[]),{symbol:selected,platform:'colmex',source:'Colmex Pro · 5 דקות',position:!PAPER_MODE&&!manualCharts.has(selected)?liveSearchState.positions?.find(p=>p.symbol===selected):null,price:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastBid,priceAt:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastQuoteAt});
  const rsiQuote=quotes[selected],rsiLive=markets[selected]?.liveAnalysisBar,quoteAt=Date.parse(rsiQuote?.observedAt||rsiQuote?.priceAt);
  const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
