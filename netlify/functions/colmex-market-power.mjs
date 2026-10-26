@@ -3,8 +3,9 @@ import {analyzeCandlePower} from '../../lib/candle-power.mjs';
 import {POWER_INTERVALS,powerHistory} from '../../lib/market-power-history.mjs';
 import {cachedStockRead} from '../../lib/colmex-market-cache.mjs';
 import {connectColmexStore} from '../../lib/colmex-session-store.mjs';
+import {colmexFetchHandler} from '../../lib/colmex-function-adapter.mjs';
 let reader;const pending=new Map();
-export const handler=async event=>{
+const handler=async event=>{
  const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify(data)});
  const {symbol,interval='1d'}=event.queryStringParameters||{};
  if(event.httpMethod!=='GET'||!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol||'')||!POWER_INTERVALS[interval])return reply(400,{error:'INVALID_REQUEST'});
@@ -20,3 +21,4 @@ export const handler=async event=>{
   return reply(200,await pending.get(key));
  }catch(error){return reply(503,{...brokerMarketError(error),symbol,interval});}
 };
+export default colmexFetchHandler(handler);

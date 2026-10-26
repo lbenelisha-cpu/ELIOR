@@ -1,4 +1,5 @@
 import {makeBrokerMarketService} from '../../lib/colmex-market-endpoints.mjs';
+import {colmexFetchHandler} from '../../lib/colmex-function-adapter.mjs';
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 const positive=x=>Number.isFinite(Number(x))&&Number(x)>0;
 export function normalizeMarket(series,quote,symbol,interval){
@@ -22,4 +23,5 @@ export function marketFailure(error){
  if(/(limit|credit|quota|מכסת)/i.test(message))return {code:'PROVIDER_LIMIT',error:'ממתין למכסת נתונים פנויה אצל הספק.'};
  return {code:'PROVIDER_UNAVAILABLE',error:'לא ניתן לטעון נרות מהספק כעת.'};
 }
-export const handler=makeBrokerMarketService();
+export const readHandler=makeBrokerMarketService();
+export default colmexFetchHandler(readHandler);
