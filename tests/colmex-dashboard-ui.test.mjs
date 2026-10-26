@@ -18,6 +18,8 @@ const status=()=>({data:{enabled:true,lastCompletedAt:Date.now(),positions:[],po
 test('initial snapshots render immediately even when their events predate module loading',()=>{
  const u=ui({account:fixture(),status:status()});assert.equal(u.text('colmexEquity'),'1,000');assert.equal(u.text('colmexCash'),'0');assert.equal(u.text('colmexOpenPnl'),'-2');assert.equal(u.get('colmexServerHealth').dataset.state,'good');
 });
+test('a transient read failure shows a dated previous balance without a green verified badge',()=>{const account=fixture(),u=ui({account,status:status()});u.emit('levi:colmex-account',{...account,error:'NETWORK',code:'NETWORK'});assert.equal(u.text('colmexEquity'),'1,000');assert.equal(u.get('colmexAccountHealth').dataset.state,'warning');assert.match(u.text('colmexAccountHealth'),/נתונים קודמים/);assert.match(u.text('colmexSnapshotAt'),/קריאה קודמת/);});
+test('a recorded failed server cycle is not described as the server switching off',()=>{const s=status();s.data.lastError={reason:'BROKER_NOT_READY',stage:'ACCOUNT_SNAPSHOT'};const u=ui({account:fixture(),status:s});assert.match(u.text('colmexServerHealth'),/סבב המעקב נכשל · קריאת חשבון/);assert.equal(u.get('colmexServerHealth').dataset.state,'warning');});
 test('failed and stale account snapshots cannot display balances as current',()=>{
  const u=ui({account:fixture(),status:status()});u.emit('levi:colmex-account',{error:'NETWORK',data:null});assert.equal(u.text('colmexEquity'),'—');assert.notEqual(u.get('colmexAccountHealth').dataset.state,'good');
  const old=fixture();old.data.observedAt=new Date(Date.now()-180001).toISOString();u.emit('levi:colmex-account',old);assert.equal(u.text('colmexCash'),'—');
