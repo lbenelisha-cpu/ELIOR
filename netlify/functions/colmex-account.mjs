@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {ColmexClient} from '../../lib/colmex-client-api.mjs';
 import {sharedColmexSession,connectColmexStore} from '../../lib/colmex-session-store.mjs';
+import {colmexFetchHandler} from '../../lib/colmex-function-adapter.mjs';
 const headers={'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'};
 const reply=(statusCode,data)=>({statusCode,headers,body:JSON.stringify(data)});
 const hash=s=>createHash('sha256').update(s).digest();
@@ -22,4 +23,4 @@ export function makeHandler({env=()=>process.env,clientFactory=options=>new Colm
   catch(e){const messages={AUTH_DENIED:'קולמקס דחתה את פרטי ההתחברות או את הרשאת ה־API. בדוק שהפרטים שייכים לחשבון TraderEvolution.',AUTH_RESPONSE:'תגובת ההתחברות אינה בפורמט הצפוי.',TOKEN_EXPIRED:'אסימון החיבור פג; מתבצע ניסיון התחברות נוסף בהמשך.',ACCESS_DENIED:'לקולמקס אין הרשאה לקריאת הנתונים המבוקשים בחשבון זה.',RATE_LIMIT:'הושגה מגבלת בקשות אצל קולמקס. המתן לפני רענון נוסף.',NETWORK:'לא ניתן להגיע כעת לשרת קולמקס.',BROKER_NOT_READY:'חיבור קולמקס עדיין מתעדכן. ניסיון נוסף יתבצע אוטומטית.',BROKER_ERROR_RESPONSE:'קולמקס החזירה שגיאה בקריאת החשבון. ניסיון נוסף יתבצע אוטומטית.',SESSION_BUSY:'חיבור קולמקס מתחדש. ניסיון נוסף יתבצע אוטומטית.',SESSION_STORE_UNAVAILABLE:'שירות החיבור המשותף אינו זמין כרגע.',UNKNOWN_ACCOUNT:'החשבון המבוקש אינו ברשימת החשבונות הזמינים.'};const code=Object.hasOwn(messages,e?.code)?e.code:['COLUMN_SCHEMA','ROW_SCHEMA','ACCOUNT_SCHEMA','POSITION_SCHEMA','RESPONSE_SCHEMA'].includes(e?.code)?'RESPONSE_SCHEMA':'SERVICE_UNAVAILABLE';return reply(code==='UNKNOWN_ACCOUNT'?400:503,{error:messages[code]||'לא ניתן לפענח או לטעון את נתוני החשבון כעת. אין להסיק מכך שאין פוזיציות.',code,readOnly:true,connected:false,retryAfterMs:code==='RATE_LIMIT'?120000:60000});}
  };
 }
-export const handler=makeHandler();
+export default colmexFetchHandler(makeHandler());
