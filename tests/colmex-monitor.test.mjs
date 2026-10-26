@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import fs from 'node:fs';
+import {entryReasonLabel} from '../lib/colmex-entry-reasons.mjs';
 import {monitorView} from '../lib/colmex-monitor-view.mjs';
 const now=Date.now();
 test('all configured symbols remain visible, with missing and old checks distinguished',()=>{
@@ -19,8 +20,8 @@ function ui(){
  const el=()=>({textContent:'',children:[],dataset:{},disabled:false,append(...items){this.children.push(...items);},replaceChildren(){this.children=[];},addEventListener(type,cb){this[type]=cb;}});
  const data={enabled:true,status:'MONITORING',lastCompletedAt:now,lastResult:'SEARCH_PEAK',policy:{symbols:['AAPL','MSFT']},checks:{AAPL:{at:now,reason:'SEARCH_PEAK'}},historyQuality:{symbol:'AAPL',discarded:10,usableBars:25}};
  let fail=false;
- const context=vm.createContext({monitorView,document:{hidden:false,addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,el());return nodes.get(id);},createElement:el},fetch:async(url,options)=>{requests.push({url,options});if(fail)throw Error('network');return {ok:true,json:async()=>data};},Date,AbortSignal,setInterval:(fn,ms)=>timers.push({fn,ms})});
- vm.runInContext(fs.readFileSync(new URL('../colmex-auto-ui.js',import.meta.url),'utf8').replace(/^import .*;\n/,''),context);
+ const context=vm.createContext({monitorView,reason:entryReasonLabel,document:{hidden:false,addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,el());return nodes.get(id);},createElement:el},fetch:async(url,options)=>{requests.push({url,options});if(fail)throw Error('network');return {ok:true,json:async()=>data};},Date,AbortSignal,setInterval:(fn,ms)=>timers.push({fn,ms})});
+ vm.runInContext(fs.readFileSync(new URL('../colmex-auto-ui.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),context);
  return {context,nodes,timers,requests,setFail:()=>{fail=true;}};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));

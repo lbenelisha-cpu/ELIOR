@@ -86,3 +86,25 @@ test('slow snapshot can still analyze; insufficient time never submits a fresh o
 });
 
 test('800 USD permits whole shares within budget, rejects excessive amount and preserves fee reserve',()=>{const q={...input,quote:{ap:345,bp:344.99}};assert.equal(planBuy(q).order.qty,2);assert.equal(planBuy({...q,amountUsd:800.01}).reason,'INVALID_BUY_AMOUNT');assert.equal(planBuy({...q,cash:349}).reason,'INSUFFICIENT_UNLEVERAGED_CASH');assert.equal(planBuy({...q,amountUsd:100}).reason,'MINIMUM_QUANTITY_ABOVE_BUDGET');});
+test('explicit null broker maximum does not block documented whole-share quantities or bypass budgets',()=>{
+ const details={...input.details,maxLot:null,maxLotInCash:null};
+ const msft=planBuy({...input,details,quote:{ap:532.56,bp:532.55}});assert.equal(msft.reason,'READY');assert.equal(msft.order.qty,1);assert.ok(msft.notionalUsd<=800);
+ const adbe=planBuy({...input,details,quote:{ap:258.65,bp:258.64}});assert.equal(adbe.reason,'READY');assert.equal(adbe.order.qty,3);assert.ok(adbe.notionalUsd<=800);
+ assert.equal(planBuy({...input,details,cash:10}).reason,'INSUFFICIENT_UNLEVERAGED_CASH');
+ assert.equal(planBuy({...input,details,positions:[{},{},{}]}).reason,'NO_FREE_SLOT');
+ assert.equal(planBuy({...input,details:{...details,maxLot:2}}).order.qty,2);
+ assert.ok(planBuy({...input,details:{...details,maxLotInCash:100}}).notionalUsd<=100);
+ assert.equal(planBuy({...input,details:{...details,maxLotInCash:10}}).reason,'MINIMUM_QUANTITY_ABOVE_BUDGET');
+});
+test('absent, zero, malformed, negative or infinite maximum is still invalid, as are missing mandatory size rules',()=>{
+ for(const maxLot of [undefined,0,-1,'',false,'null','bad',Infinity])assert.equal(planBuy({...input,details:{...input.details,maxLot}}).reason,'UNKNOWN_QUANTITY_RULES');
+ for(const field of ['lotSize','minLot','lotStep'])for(const value of [null,undefined,0,-1,'',false,Infinity])assert.equal(planBuy({...input,details:{...input.details,maxLot:null,[field]:value}}).reason,'UNKNOWN_QUANTITY_RULES');
+ assert.equal(planBuy({...input,details:{...input.details,minLot:2,maxLot:1}}).reason,'UNKNOWN_QUANTITY_RULES');
+});
+test('null maximum fix reaches one durable IOC intent in an offline cycle; no signal still means no order',async()=>{
+ const b=fakeBroker();b.details=async()=>({...input.details,maxLot:null,maxLotInCash:null});let durable=null;const writes=[];
+ b.write=async(account,intent)=>{assert.equal(durable.pending.id,intent.id);writes.push(structuredClone(intent));return {orderId:'offline-order'};};
+ const s=initialState(now-1000);await runCycle({state:s,save:async state=>{durable=structuredClone(state);},broker:b,env,now:()=>now,deadline:now+24000,signal});
+ assert.equal(writes.length,1);assert.equal(writes[0].order.qty,26);assert.equal(writes[0].order.validity,'IOC');assert.equal(writes[0].order.stopLossType,'offset%');
+ const empty=initialState(now-1000);await runCycle({state:empty,save:async()=>{},broker:b,env,now:()=>now,deadline:now+24000,signal:()=>({ready:false,reason:'SEARCH_PEAK'})});assert.equal(writes.length,1);
+});
