@@ -110,7 +110,7 @@ function setDashboardView(view){
   if(grid)grid.hidden=activeView!=='trade'&&activeView!=='scans';
   if(activeView==='scans'&&$('#scannerSection'))$('#scannerSection').open=true;
   if(activeView==='portfolio')renderPortfolioView();
-  if(activeView==='journal'||activeView==='portfolio')loadActionJournal(currentMode);
+  if(activeView==='journal'||activeView==='portfolio'||$('#strategyReviewPanel')?.open)loadActionJournal(currentMode);
   if(activeView==='journal'&&currentAgentData)loadDecisionHistory(selectedSymbol);
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   document.querySelectorAll('.nav-btn[data-view], .topnav .nav-pill').forEach((btn,i)=>{
@@ -186,6 +186,7 @@ function mode(s){
 }
 
 function buyReasonLabel(r){
+  if(['WAIT_CLOSED_CONFIRMATION','WAIT_MA_HISTORY','MA_DOWNTREND_BLOCK','WAIT_VOLUME_HISTORY','CONFIRMATION_VOLUME_LOW','WAIT_ATR_HISTORY','VOLATILITY_RISK_TOO_HIGH','QUALITY_SIGNAL_INVALIDATED'].includes(r))return decisionReasonLabel(r);
   if(/^WAIT_PROFIT_ACTIVATION_/.test(r||''))return 'ממתין לרווח '+String(r).replace('WAIT_PROFIT_ACTIVATION_','').replace('_PERCENT','')+'% להפעלת ההגנה';
   if(['EARLY_WAVE_BREAKOUT','TRAILING_PROFIT_HOLD','TRAILING_PROFIT_EXIT'].includes(r))return decisionReasonLabel(r);
   if(['WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','HOURLY_TREND_CONFIRMED'].includes(r))return decisionReasonLabel(r);
@@ -456,6 +457,7 @@ function blockerLabel(b){
 }
 
 function decisionReasonLabel(r){
+  const quality={WAIT_CLOSED_CONFIRMATION:'ממתין לנר סגור המאשר התאוששות / פריצה',WAIT_MA_HISTORY:'ממתין להיסטוריה עבור MA100/200',MA_DOWNTREND_BLOCK:'מגמת MA100/200 יורדת והמחיר מתחת לשניהם',WAIT_VOLUME_HISTORY:'נתוני מחזור חסרים',CONFIRMATION_VOLUME_LOW:'מחזור נר האישור נמוך מהממוצע',WAIT_ATR_HISTORY:'ממתין לנתוני תנודתיות',VOLATILITY_RISK_TOO_HIGH:'מרחק ההגנה הנדרש גדול מ־3%',QUALITY_SIGNAL_INVALIDATED:'אישור הכניסה בוטל במחיר הנוכחי'};if(quality[r])return quality[r];
   return ({
     BUY_EXECUTED:'BUY בוצע',
     SELL_EXECUTED:'SELL בוצע',
@@ -520,9 +522,11 @@ function actionLabel(x){
   return ({BUY:'קנייה',SELL:'מכירה',ROTATE_IN:'רוטציה פנימה',ROTATE_OUT:'רוטציה החוצה'})[x]||x||'פעולה';
 }
 
+$('#strategyReviewPanel')?.addEventListener('toggle',()=>{if($('#strategyReviewPanel').open)loadActionJournal(currentMode);});
 async function loadActionJournal(currentModeArg){
   try{
     const d=await J(ACTIONLOG);
+    window.LEVI_STRATEGY_REVIEW_DATA=currentModeArg==='live'?d.strategyReview:null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:window.LEVI_STRATEGY_REVIEW_DATA}));
     const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
     window.dispatchEvent(new CustomEvent('levi:binance-history',{detail:{mode:currentModeArg,visible:activeView==='journal',symbols:[...new Set([...list.map(a=>a.symbol),...(currentLiveAccount?.balances||[]).filter(b=>b.asset!=='USDT'&&b.valueUsdt>=5).map(b=>b.asset+'USDT')])].filter(s=>/^[A-Z0-9]+USDT$/.test(s)),selectedSymbol}}));
     const journal=d.netJournal?.[currentModeArg]||[];
@@ -537,6 +541,7 @@ async function loadActionJournal(currentModeArg){
       return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${fees}${reason} · ${when}</div>`;
     }).join(''):'<div class="mini">'+(currentModeArg==='live'?'עדיין אין פעולות LIVE.':'עדיין אין פעולות DEMO.')+'</div>';
   }catch(e){
+    window.LEVI_STRATEGY_REVIEW_DATA=null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:null}));
     $('#actionJournal').innerHTML='<div class="mini">שגיאה בטעינת יומן הפעולות</div>';
   }
 }
@@ -1031,7 +1036,7 @@ async function load(){
         put('#scannerFreshness',scannerVerifiedMode==='live'?'לא ניתן לעדכן פוזיציות כרגע · הטבלה מציגה את העדכון האחרון מ־'+tradeExecutionTime(scannerVerifiedAt)+' · הנתונים לא אומתו מחדש':'ממתין לנתוני חשבון מאומתים להצגת רווח והפסד.');
       }
     }else{scannerVerifiedMode=null;scannerVerifiedAt=null;put('#scannerFreshness','');render(agent,m.mode,null);}
-    if(activeView==='journal'||activeView==='portfolio')await loadActionJournal(m.mode);
+    if(activeView==='journal'||activeView==='portfolio'||$('#strategyReviewPanel')?.open)await loadActionJournal(m.mode);
     dashboardLoaded=true;
   }catch(e){
     put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));

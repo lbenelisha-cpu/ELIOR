@@ -1,4 +1,4 @@
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261026-entry-fix';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261026-quality';
 import {monitorView} from './lib/colmex-monitor-view.mjs';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');

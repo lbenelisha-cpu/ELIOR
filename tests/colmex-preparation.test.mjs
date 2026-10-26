@@ -9,9 +9,9 @@ function history(){
  const prices=[...Array(16).fill(95),95,97,100,90,80,85,92,87,82,84,86,85,86,50];
  return {barDetails:prices.map((c,i)=>({t:closed-(prices.length-i)*step,o:i===16||i===17?c-1:c,h:c,l:i===16||i===17?c-1:c,c,v:100}))};
 }
-test('closed-market candidate uses actual last session close and RSI, never grants executable entry',()=>{
+test('closed-market Spring uses actual session/RSI but remains pending until closed reclaim and quality checks',()=>{
  const h=history(),r=analyzePreparation(h,{symbol:'AAPL',now});
- assert.equal(r.phase,'SPRING');assert.ok(r.rsi<=30);assert.equal(r.dataAt,closed);assert.equal(r.checkedAt,now);assert.equal(r.candidate,true);assert.equal(r.executionReady,false);assert.equal(r.closedOnly,true);
+ assert.equal(r.phase,'SPRING');assert.ok(r.rsi<=30);assert.equal(r.dataAt,closed);assert.equal(r.checkedAt,now);assert.equal(r.candidate,false);assert.equal(r.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(r.executionReady,false);assert.equal(r.closedOnly,true);
  // A weekend quote/open bar must not change the last valid market close.
  h.barDetails.push({t:now,o:5,h:6,l:4,c:5});assert.deepEqual(analyzePreparation(h,{symbol:'AAPL',now}),r);
  const old=history();old.barDetails=old.barDetails.map(b=>({...b,t:b.t-86400000}));
@@ -31,7 +31,7 @@ test('closed-market rotation covers all fifty even after one failure and throttl
  const broker={instruments:async()=>{catalogCalls++;return catalog;},history:async id=>{calls++;if(id===1)throw Error('private broker error');return history();},quote(){throw Error('no quote allowed');},write(){throw Error('no order allowed');}};
  for(let i=0;i<10;i++,t+=60000)await runPreparationCycle({state,broker,save:async()=>saves++,account:'123',now:()=>t});
  assert.equal(state.preparation.checked,50);assert.equal(calls,50);assert.equal(saves,50);assert.equal(catalogCalls,10);
- assert.equal(state.preparation.rows.AAPL.error,'PREPARATION_DATA_UNAVAILABLE');assert.equal(state.preparation.candidates.length,49);
+ assert.equal(state.preparation.rows.AAPL.error,'PREPARATION_DATA_UNAVAILABLE');assert.equal(state.preparation.candidates.length,0);
  assert.deepEqual(state.used,[]);assert.deepEqual(state.positions,[]);assert.equal(state.pending,null);
  const r=await runPreparationCycle({state,broker,save:async()=>{},account:'123',now:()=>Date.parse('2026-10-26T15:00:00Z')});
  assert.equal(r.reason,'PREPARATION_MARKET_OPEN');assert.equal(calls,50);
@@ -43,7 +43,7 @@ test('real closed-session cycle scans with a full portfolio, without consuming s
  const s=initialState(now),env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
  const snap={positions:[],orders:[{side:'buy'},{side:'buy'},{side:'buy'}],history:[],account:{},state:{availableCash:0}};
  const broker={snapshot:async()=>snap,instruments:async()=>[{name:'AAPL',tradableInstrumentId:1,type:'EQUITY'}],history:async()=>history(),quote(){throw Error('unexpected quote');},write(){throw Error('unexpected order');}};
- const r=await runCycle({state:s,broker,env,save:async()=>{},now:()=>now});assert.equal(r.reason,'OUTSIDE_REGULAR_SESSION');assert.equal(s.preparation.rows.AAPL.candidate,true);assert.deepEqual(s.used,[]);assert.equal(s.pending,null);
+ const r=await runCycle({state:s,broker,env,save:async()=>{},now:()=>now});assert.equal(r.reason,'OUTSIDE_REGULAR_SESSION');assert.equal(s.preparation.rows.AAPL.candidate,false);assert.deepEqual(s.used,[]);assert.equal(s.pending,null);
  const h=makeHandler({env,storeFactory:()=>({get:async()=>({state:s})})});const d=JSON.parse((await h({httpMethod:'GET'})).body);assert.equal(d.preparation.rows.AAPL.executionReady,false);assert.deepEqual(d.checks,{});
 });
 
@@ -69,8 +69,8 @@ test('broker orders and known positions never qualify for empty account caching'
  await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});t+=60000;await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});assert.equal(reads,2);assert.equal(s.closedEmptySnapshotAt,null);
 });
 
-test('preparation accepts RSI between 30 and 40, keeps Spring required and never grants execution',()=>{
+test('preparation retains RSI between 30 and 40 but does not call an unconfirmed Spring a candidate',()=>{
  const h=history();Object.assign(h.barDetails.at(-1),{o:86,h:86,l:50,c:80});
- const ready=analyzePreparation(h,{symbol:'AAPL',now});assert.ok(ready.rsi>30&&ready.rsi<40);assert.equal(ready.candidate,true);assert.equal(ready.executionReady,false);
- h.barDetails.at(-1).c=85;const high=analyzePreparation(h,{symbol:'AAPL',now});assert.equal(high.reason,'WAIT_RSI_0_40');assert.equal(high.candidate,false);
+ const ready=analyzePreparation(h,{symbol:'AAPL',now});assert.ok(ready.rsi>30&&ready.rsi<40);assert.equal(ready.candidate,false);assert.equal(ready.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(ready.executionReady,false);
+ h.barDetails.at(-1).c=85;const high=analyzePreparation(h,{symbol:'AAPL',now});assert.equal(high.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(high.candidate,false);
 });

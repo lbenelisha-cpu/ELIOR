@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {evaluateWyckoff} from '../lib/wyckoff-strategy.mjs';
 import {liveSpringRsi} from '../lib/wyckoff-spring-rsi.mjs';
 import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
-import {entrySignal} from '../lib/colmex-auto-policy.mjs';
+import {legacyEntrySignal as entrySignal} from '../lib/colmex-auto-policy.mjs';
 import {chartAnalysisMarks} from '../lib/colmex-chart-view.mjs';
 const step=300000,base=Date.parse('2026-10-22T13:30:00Z');
 const seed=[95,97,100,90,80,85,92,87,82,84,86,85,86];
 function bars(prices,green=[0,1]){return prices.map((close,i)=>({openTime:base+i*step,closeTime:base+(i+1)*step,open:green.includes(i)?close-1:close,high:close,low:green.includes(i)?close-1:close,close,timeframe:'5m',closed:true}));}
 function analyze(rows){return evaluateWyckoff(rows,{now:rows.at(-1).closeTime,timeframe:'5m',rollingSearch:true});}
-test('a newer lower local peak replaces an unfinished old structure on both platforms',()=>{
+test('a newer lower local peak replaces an unfinished old structure in shared pattern search and the legacy comparison',()=>{
  const rows=bars([...seed,70,72,74,76,75],[0,1,14,15]);
  const s=analyze(rows);assert.equal(s.phase,'FIRST_LOW');assert.equal(s.initialPeak.price,76);assert.equal(s.initialPeak.index,16);
  const now=rows.at(-1).closeTime+1000,live={price:60,priceAsOf:now,now};

@@ -1,3 +1,7 @@
+import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
+import {sizeRisk,positionRiskSettings} from './lib/confirmed-risk-sizing.mjs';
+import {recordStrategyObservation} from './lib/strategy-followup.mjs';
+import {binanceStrategyReport} from './lib/binance-strategy-followup.mjs';
 import {FileMaAudit} from './lib/ma-audit-file.mjs';
 import {makeAuditRecord,auditSnapshots} from './lib/ma-decision-audit.mjs';
 import {EARLY_WAVE_POLICY} from './lib/early-wave-entry.mjs';
@@ -306,14 +310,14 @@ const livePeakMemory=new Map();
 const liveManagedPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
-  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
+  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,positionRiskSettings(p,tradeSettings.values));
   for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,mode:r.mode||'OCO',stopPrice:r.stop,takeProfitPrice:r.mode==='STOP_ONLY'?null:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
 };
 const tradingPositions=()=>{
  if(mode==='live')return liveManagedPositions();
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
- for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
+ for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,positionRiskSettings(p,tradeSettings.values));
  return positions;
 };
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
@@ -367,6 +371,13 @@ if(savedTradeSettings.policyVersion!==TRADE_SETTINGS_VERSION){
  fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(tradeSettings),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);
 }
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
+const STRATEGY_REVIEW_FILE=LIVE_LOG_FILE+'.strategy-review';
+let strategyReviewState={},strategyReviewSaveAt=0,strategyReviewError=null;
+try{if(fs.existsSync(STRATEGY_REVIEW_FILE))strategyReviewState=JSON.parse(fs.readFileSync(STRATEGY_REVIEW_FILE,'utf8'));}catch{strategyReviewError='REVIEW_READ_FAILED';}
+function saveStrategyReview(){
+ if(strategyReviewError==='REVIEW_READ_FAILED'||Date.now()-strategyReviewSaveAt<30000)return;
+ try{fs.mkdirSync(path.dirname(STRATEGY_REVIEW_FILE),{recursive:true});fs.writeFileSync(STRATEGY_REVIEW_FILE+'.tmp',JSON.stringify(strategyReviewState));fs.renameSync(STRATEGY_REVIEW_FILE+'.tmp',STRATEGY_REVIEW_FILE);strategyReviewSaveAt=Date.now();strategyReviewError=null;}catch{strategyReviewError='REVIEW_SAVE_FAILED';}
+}
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
  get:signedBinanceGet,post:signedBinancePost,del:signedBinanceDelete,info:symbolExchangeInfo,
@@ -758,7 +769,7 @@ function floorToStep(value,step){
 async function recordLiveFill(order,intent){
  lastDisplayAccount=null;
  const fills=order.fills||await signedBinanceGet('/api/v3/myTrades',{symbol:intent.params.symbol,orderId:String(order.orderId)});
- if(intent.params.side==='BUY'&&intent.meta?.wyckoffTrade)intent={...intent,meta:{...intent.meta,wyckoffTrade:{...intent.meta.wyckoffTrade,exitSettings:tradeSettings.values}}};
+ if(intent.params.side==='BUY'&&intent.meta?.wyckoffTrade)intent={...intent,meta:{...intent.meta,wyckoffTrade:{...intent.meta.wyckoffTrade,exitSettings:intent.meta.wyckoffTrade.exitSettings||tradeSettings.values}}};
  pushLiveAction(liveFillAction(order,intent,fills));
 }
 async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
@@ -794,6 +805,11 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     if(!allocation.ok)throw Error('LIVE buy allocation blocked: '+allocation.code);
     quoteUsdt=allocation.amountUsdt;
   }
+  if(reason!=='MANUAL_BUY'&&meta.wyckoffTrade?.riskInput){
+    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,meta.wyckoffTrade.riskInput);
+    if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;
+    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};
+  }
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
@@ -812,7 +828,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     throw e;
   }
 
-  if(quoteUsdt*.988<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
+  if(quoteUsdt*(1-(meta.wyckoffTrade?.riskPlan?.stopLossPct??1)/100)*.998<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
   const precision=Math.min(8,Number(info.quoteAssetPrecision??8));
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
@@ -823,7 +839,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:ENTRY_POLICY_VERSION}};
   }
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
-  if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live'].includes(meta.wyckoffTrade?.entryMode)){
+  if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live','spring_reclaim_confirmed','early_wave_confirmed'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
@@ -1491,10 +1507,11 @@ async function evaluateSymbol(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
-    if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
+    if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings=positionRiskSettings(ev.wyckoffTrade,tradeSettings.values);
+    if(!p&&mode==='live'){recordStrategyObservation(strategyReviewState,{symbol:s,bars:entryBars,at:Date.now(),price:livePrice,comparison:ev.comparison,version:ENTRY_POLICY_VERSION});saveStrategyReview();}
     const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
     ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});
     if(p){
@@ -2041,7 +2058,7 @@ async function buildTechnicalDailyHistory(symbol,limit=30){
   const c=await candles(symbol),rows=[];
   for(let i=Math.max(3,c.length-limit);i<c.length;i++){
    const historicalNow=c[i].closeTime+1;
-   const ev=evaluateDailyTrade({symbol,allowEarlyWave:true,bars:c.slice(0,i),price:c[i].close,priceAsOf:new Date(c[i].closeTime).toISOString(),now:c[i].closeTime,timeframe:'5m',entryMode:'spring_rsi_live',liveBar:c[i]});
+   const ev=evaluateDailyTrade({symbol,allowEarlyWave:true,bars:c.slice(0,i),price:c[i].close,priceAsOf:new Date(c[i].closeTime).toISOString(),now:c[i].closeTime,timeframe:'5m',entryMode:'confirmed_quality',exitSettings:tradeSettings.values,liveBar:c[i]});
    const hourlyTrend=assessQualityEntry(symbol,c.slice(0,i+1),{now:historicalNow});
    if(ev.entryConfirmed&&!hourlyTrend.ok){ev.entryConfirmed=false;ev.buyReason=hourlyTrend.code;}
    rows.push({at:new Date(c[i].closeTime).toISOString(),hourlyTrend,price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
@@ -2310,7 +2327,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
@@ -2385,6 +2402,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{
       mode,
+      strategyReview:{...binanceStrategyReport(strategyReviewState,liveActionLog),error:strategyReviewError},
       netJournal:{live:buildNetTradeJournal(liveActionLog),demo:buildNetTradeJournal(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[])},
       demo:(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).slice(0,100),
       live:(liveActionLog||[]).slice(0,100)
@@ -2496,20 +2514,20 @@ const server=http.createServer((req,res)=>{
         qualityPolicy:QUALITY_POLICY,
         entryFiltersEnabled:true,
         entryCostFilterEnabled:false,
-        volumeFilterEnabled:false,
+        volumeFilterEnabled:true,
         liveState:liveReadiness(),
         hourlyTrendFilter:HOURLY_TREND_RULE,
-        entryPolicyVersion:ENTRY_POLICY_VERSION,
-        entryMode:'spring_rsi_live',
-        entryModes:['spring_rsi_live','early_wave_live'],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
-        entryConfirmation:'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max,
+        entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,
+        entryMode:'confirmed_quality',
+        entryModes:['spring_reclaim_confirmed','early_wave_confirmed'],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
+        entryConfirmation:'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
         rsiScreenerVersion:1,
         externalCostVersion:1,
-        waitForConfirmationCandleClose:false,
+        waitForConfirmationCandleClose:true,
         waitForSpringRetest:false,
-        entrySignalValidityMinutes:null,
+        entrySignalValidityMinutes:15,
         entryRsi:BINANCE_ENTRY_RSI,
         exitPolicy:TRAILING_EXIT_POLICY,
         fixedExitVersion:1,
