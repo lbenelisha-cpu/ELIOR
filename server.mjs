@@ -1,4 +1,5 @@
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
+import {RESEARCH_PROTOCOL} from './lib/trading-research.mjs';
 import {sizeRisk,positionRiskSettings} from './lib/confirmed-risk-sizing.mjs';
 import {recordStrategyObservation} from './lib/strategy-followup.mjs';
 import {binanceStrategyReport} from './lib/binance-strategy-followup.mjs';
@@ -2327,7 +2328,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,researchMonitoring:RESEARCH_PROTOCOL,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
