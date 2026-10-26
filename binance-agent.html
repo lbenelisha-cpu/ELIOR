@@ -11,7 +11,8 @@
 <link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
   <link rel="stylesheet" href="/binance-dashboard.css?v=20261026-platform-tabs">
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-slope2">
-<link rel="stylesheet" href="/position-map-change.css?v=20261026-position-change"></head>
+<link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
+</head>
 <body>
   <main class="app-shell">
     <header class="topbar">
@@ -67,7 +68,7 @@
       </div>
       <div class="overview-visuals app-view trade-view portfolio-view">
         <article class="allocation-card"><div class="section-kicker">חלוקת התיק</div><div class="allocation-layout"><div id="allocationRing" class="allocation-ring" role="img" aria-label="חלוקת תיק טרם זמינה"><div><strong id="allocationPercent">—</strong><span>מזומן זמין</span></div></div><div class="allocation-legend"><p><i class="cash-key"></i>מזומן זמין <b id="allocationCash">—</b></p><p><i class="asset-key"></i>נכסים ויתרות נעולות <b id="allocationOther">—</b></p><small id="allocationNote">יוצג לאחר אימות נתוני החשבון</small></div></div></article>
-        <article class="position-map"><div class="position-map-head"><div><div class="section-kicker">מפת הפוזיציה</div><h2 id="positionMapTitle">ממתין לפוזיציות</h2></div><label class="visually-hidden" for="positionMapSelect">בחר פוזיציה למפת המחירים</label><select id="positionMapSelect" hidden></select></div><div id="positionMapContent"><p class="quiet-empty">כאן יוצגו מחיר הכניסה, המחיר הנוכחי וגבולות ההגנה של פוזיציה פעילה.</p></div><button type="button" id="positionMapChart" class="text-action" hidden>פתיחת הגרף והניתוח ←</button></article>
+        <article class="position-map"><div class="position-map-head"><div><div class="section-kicker">מפת הפוזיציה</div><h2 id="positionMapTitle">ממתין לפוזיציות</h2></div><label class="visually-hidden" for="positionMapSelect">בחר פוזיציה למפת המחירים</label><select id="positionMapSelect" hidden></select></div><div id="positionMapContent"><p class="quiet-empty">כאן יוצגו מחיר הכניסה, המחיר הנוכחי וגבולות ההגנה של פוזיציה פעילה.</p></div><a id="positionMapChart" class="text-action" target="_blank" rel="noopener noreferrer" hidden>פתיחת הגרף והניתוח ב־TradingView ↗</a><p class="mini">Binance · חיבור חשבון המסחר מתבצע ב־TradingView.</p></article>
       </div>
     </section>
 
@@ -361,6 +362,8 @@
       <div id="portfolioViewContent" class="portfolio-view-content"></div>
     </section>
 
+    <section id="binanceHistoryPanel" class="panel app-view journal-view" hidden aria-label="היסטוריית קניות ומכירות בבייננס"></section>
+
     <details class="panel app-view journal-view dashboard-fold" hidden><summary>היסטוריית החלטות · פתיחה / סגירה</summary>
       <div class="panel-title-row">
         <div>
@@ -432,12 +435,12 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
-  <script src="/binance-agent.js?v=20261026-slope2"></script>
+  <script src="/binance-agent.js?v=20261026-history"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-wave-trail5"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261026-entry-fix"></script><script type="module" src="/ma-slope-panel.js?v=20261026-slope2"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-wave-trail5"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261026-history"></script><script type="module" src="/ma-slope-panel.js?v=20261026-slope2"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script></body>
 </html>

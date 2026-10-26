@@ -1,5 +1,5 @@
 import {finite,tradeScenario,allocationParts,accountSummary,protectionState} from './lib/binance-dashboard-math.mjs';
-import {positionChangeBadge} from './position-map-change.js?v=20261026-position-change';
+import {positionChangeBadge} from './position-map-change.js?v=20261026-position-side';
 
 const $=id=>document.getElementById(id);
 const number=(v,d=2)=>finite(v)===null?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
@@ -39,6 +39,7 @@ function renderPosition(summary,fresh){
   select.value=selected||'';select.hidden=list.length<2;
   const host=$('positionMapContent');host.replaceChildren();
   $('positionMapChart').hidden=!selected||!fresh;
+  if(selected&&fresh)$('positionMapChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+selected)+'&interval=5&trade-now=BINANCE&trade-now-source=broker_profile';
   text('positionMapTitle',selected||(!summary?'ממתין לפוזיציות':'אין פוזיציה פעילה'));
   if(!selected||!fresh){host.append(node('p',!fresh?'נתוני הפוזיציה יוצגו לאחר אימות עדכני של החשבון.':'מפת המחירים תופיע כשיש פוזיציה פעילה.','quiet-empty'));return;}
   const p=list.find(p=>p.symbol===selected),agent=snapshot.agent.agents?.find(a=>a.symbol===selected),s=agent?.strategy;
@@ -93,7 +94,6 @@ function render(){
 
 $('overviewConnect').addEventListener('click',()=>window.LEVI_DEVICE_ACCESS?.open());
 $('positionMapSelect').addEventListener('change',e=>{selected=e.target.value;render();});
-$('positionMapChart').addEventListener('click',()=>window.dispatchEvent(new CustomEvent('levi-dashboard-select',{detail:selected})));
 $('collapseDashboard').addEventListener('click',()=>{
   document.querySelectorAll('main details[open]').forEach(d=>d.open=false);
   document.querySelectorAll('[data-detail-toggle][aria-expanded="true"]').forEach(b=>b.click());

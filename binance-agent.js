@@ -3,7 +3,7 @@ window.API_BASE=B;
 window.binanceReadUrl=url=>{
   if(['localhost','127.0.0.1'].includes(window.location.hostname)||window.location.origin===new URL(B).origin)return url;
   const target=new URL(url,window.location.origin);
-  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
+  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trade-history','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
   return target.origin===new URL(B).origin&&paths.includes(target.pathname)?'/.netlify/functions/binance-read-proxy?path='+encodeURIComponent(target.pathname+target.search):url;
 };
 window.binanceReadHeaders=url=>{
@@ -523,6 +523,7 @@ async function loadActionJournal(currentModeArg){
   try{
     const d=await J(ACTIONLOG);
     const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
+    window.dispatchEvent(new CustomEvent('levi:binance-history',{detail:{mode:currentModeArg,visible:activeView==='journal',symbols:[...new Set([...list.map(a=>a.symbol),...(currentLiveAccount?.balances||[]).filter(b=>b.asset!=='USDT'&&b.valueUsdt>=5).map(b=>b.asset+'USDT')])].filter(s=>/^[A-Z0-9]+USDT$/.test(s)),selectedSymbol}}));
     const journal=d.netJournal?.[currentModeArg]||[];
     const netPanel=$('#netTradeJournal');if(netPanel)netPanel.innerHTML=journal.length?journal.slice(0,30).map(t=>'<div><b>'+t.symbol+' · '+(t.closed?'נסגרה':'מכירה חלקית')+'</b><div>'+tradeExecutionTime(t.at)+' · קנייה '+fmt(t.entryPrice,12)+' → מכירה '+fmt(t.sellPrice,12)+'</div><div class="'+(t.netPnlUsdt===null?'pnl-unknown':t.netPnlUsdt>=0?'pnl-profit':'pnl-loss')+'">רווח נטו: '+(t.netPnlUsdt===null?'חסרים נתוני עלות / עמלות':fmt(t.netPnlUsdt,4)+' USDT ('+fmt(t.netPnlPct)+'%)')+'</div><div>שיא רווח לפני עמלות: '+fmt(t.maxGrossPnlUsdt,4)+' USDT · שיא מחיר '+fmt(t.peakPrice,12)+'</div><div>עמלת קנייה: '+commissionsText(t.buyCommissions)+' · עמלת מכירה: '+commissionsText(t.sellCommissions)+'</div><div>סיבה: '+decisionReasonLabel(t.reason)+'</div></div>').join(''):'אין עסקאות עם עלות כניסה מתועדת';
     put('#actionJournalTitle','יומן פעולות · '+(currentModeArg==='live'?'LIVE':'DEMO'));

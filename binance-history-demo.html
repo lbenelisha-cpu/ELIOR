@@ -1,0 +1,13 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>היסטוריית עסקאות · הדגמה בלבד</title><link rel="stylesheet" href="/binance-agent.css"><link rel="stylesheet" href="/binance-dashboard.css"><link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history"><style>body{padding:24px;background:#091a23;color:#deedf5;font-family:Arial}main{max-width:1100px;margin:auto}.examples{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}.examples article{padding:20px}h1{font-size:22px}.demo-notice{color:#f1ce8e;line-height:1.6}a{color:#7bd9dc}@media(max-width:600px){.examples{grid-template-columns:1fr}body{padding:12px}}</style></head><body><main><h1>מפת פוזיציה והיסטוריית עסקאות · נתוני הדגמה בלבד</h1><p class="demo-notice">המחשה באמצעות נתונים מלאכותיים. אין כאן חיבור לחשבון או אפשרות מסחר. הדגמת SHORT אינה מפעילה מסחר בשורט.</p><div class="examples"><article class="position-map" id="demoLong"><h2>LONG · דוגמה</h2></article><article class="position-map" id="demoShort"><h2>SHORT · דוגמה</h2></article></div><section class="panel" id="historyDemo"></section></main><script type="module">
+import {positionChangeBadge} from '/position-map-change.js?v=20261026-position-side';
+import {buildTradeHistory} from '/lib/binance-trade-history.mjs';
+import {createTradeHistoryPanel} from '/binance-trade-history.js?v=20261026-history';
+const create=(tag,text,cls)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
+document.querySelector('#demoLong').append(positionChangeBadge(create,100,105,'LONG'));
+document.querySelector('#demoShort').append(positionChangeBadge(create,100,95,'SHORT'));
+const symbol='DEMOUSDT',start=Date.now()-3600000;
+const fill=(id,isBuyer,price,extra={})=>({symbol,id,orderId:id,time:start+id*100000,isBuyer,qty:'2',price:String(price),quoteQty:String(price*2),commission:'.2',commissionAsset:'USDT',...extra});
+const trades=[fill(1,true,100),fill(2,false,105),fill(3,true,100),fill(4,false,98),fill(5,true,100,{commission:'.001',commissionAsset:'BNB'}),fill(6,false,103)];
+const data={ok:true,...buildTradeHistory(symbol,trades,[{symbol,type:'SELL',orderId:2,reason:'TRAILING_PROFIT_EXIT'},{symbol,type:'SELL',orderId:4,reason:'BROKER_STOP_LOSS'}]),complete:true,asOf:new Date().toISOString()};
+const panel=createTradeHistoryPanel(document.querySelector('#historyDemo'),{read:async()=>data});panel.setContext({mode:'live',symbols:[symbol],visible:true});
+</script></body></html>
