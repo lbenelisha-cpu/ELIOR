@@ -684,6 +684,10 @@ async function runBinanceWyckoffScan(candles,rows,position){
   worker.postMessage({candles,rows,position});
  });
 }
+function publishSlopeData(symbol,bars){
+ if(typeof window==='undefined')return;
+ window.LEVI_MA_SLOPE_DATA={symbol,bars};globalThis.LEVI_MA_SLOPE?.renderBinance(window.LEVI_MA_SLOPE_DATA);
+}
 let chartLoadInFlight=null;
 let chartLastReadKey=null,chartLastReadAt=0;
 function loadChart(symbol){
@@ -702,7 +706,7 @@ async function loadChartRequest(symbol){
   const contextKey=[symbol,interval,range,modeAtRequest].join(':');
   try{
     if(chartAnalysisContext!==contextKey){
-      chartCandles=[];chartDecisions=[];
+      chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
       $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');
       const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
       put('#chartEmpty','טוען נתוני גרף…');$('#chartEmpty')?.classList.remove('hidden');
@@ -724,7 +728,7 @@ async function loadChartRequest(symbol){
       chartAnalysisContext=contextKey;selectedWyckoffId=null;chartWyckoffHistory=[];chartWyckoffError=null;
     }
     chartVisibleStartTime=Number(d.visibleStartTime)||0;
-    chartCandles=d.candles||[];
+    chartCandles=d.candles||[];if(interval==='5m')publishSlopeData(symbol,chartCandles);
     chartLastReadKey=contextKey;chartLastReadAt=Date.now();
     if(typeof window!=='undefined')window.LEVI_CHART_CACHE?.write(contextKey,d);
     chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
@@ -735,7 +739,7 @@ async function loadChartRequest(symbol){
     wyckoffHistoryEngine=historyEngine;
     const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(range),{timeoutMs:35000});
     if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode)return;
-    const sourceCandles=source.candles||[];
+    const sourceCandles=source.candles||[];publishSlopeData(symbol,sourceCandles);
     if(typeof window!=='undefined')window.LEVI_RSI_BADGE_SOURCE={symbol,bars:sourceCandles};
     globalThis.LEVI_RSI_BADGE?.setBinance(symbol,sourceCandles);
     const closedAt=sourceCandles.filter(b=>b.closed!==false).at(-1)?.closeTime;
@@ -754,7 +758,7 @@ async function loadChartRequest(symbol){
     if(chartAnalysisContext===contextKey&&chartCandles.length){
       put('#chartLegend','לא ניתן לרענן כעת · מוצגים הנרות מהטעינה האחרונה · '+e.message);
     }else{
-      chartCandles=[];chartDecisions=[];
+      chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
       $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נתוני עליות');put('#chartRiseDetails','');
       $('#chartDecisionMarkers')?.replaceChildren();
       const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;

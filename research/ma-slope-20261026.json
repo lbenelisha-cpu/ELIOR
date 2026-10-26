@@ -1,0 +1,857 @@
+{
+  "version": "MA_SLOPE_RESEARCH_V1",
+  "createdAt": "2026-10-26T13:59:05.202Z",
+  "source": "Previously cached Binance Spot public 5-minute OHLC; fixed six-symbol universe",
+  "dataManifest": [
+    {
+      "symbol": "BTCUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "563663d99cacbbd7cb18c20a5fd105d8dc07628f8d128e266d5951ab948e1ed3"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "3fcfed82b4debec70e4d5e50194d8b85b9d5b8ec0fd5f824bc96b7f235983237"
+    },
+    {
+      "symbol": "BNBUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "18f1270047246d9029ce74a5871216ad50c2f742220be3cb476c757dd210304c"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "3722b07b15e482148a1c240268652d21326feef647315e3cfa277d1c5b465463"
+    },
+    {
+      "symbol": "XRPUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "a448384809c9de449eb54c6c10b9a610b288d6465336b7ce13122e847a8e00aa"
+    },
+    {
+      "symbol": "LINKUSDT",
+      "bars": 11808,
+      "start": "2026-09-04T08:10:00.000Z",
+      "end": "2026-10-15T08:09:59.999Z",
+      "testStart": "2026-10-03T06:10:00.000Z",
+      "sha256": "de8322a82db8ff1716c3cb98d8fb9d64f29eebffefa2e9fb97e8840b03dd1ac0"
+    }
+  ],
+  "assumptions": {
+    "feePctPerSide": 0.1,
+    "slippagePctPerSide": 0.05,
+    "entry": "Early-wave branch only; signal on closed bar, fill next open if breakout still valid",
+    "exits": "Current stop 1%, activation 5%, trailing gap 1pp. Conservative OHLC checks; peaks update at close. Slope needs two closed observations; execution next open.",
+    "split": "Chronological 70% training / 30% holdout, fresh position state in each segment; warmup uses prior bars only",
+    "angleScalePctPerMinute": 0.01,
+    "shortTested": false,
+    "colmexTested": false
+  },
+  "chosenUsingTrainingOnly": {
+    "id": "ma20-10-alpha-10",
+    "lookbackBars": 10,
+    "thresholdAngle": -10
+  },
+  "summary": {
+    "baselineTestMeanReturnPct": -4.416397660981919,
+    "chosenTestMeanReturnPct": -5.7176111325031655,
+    "baselineTestMeanDrawdownPct": 7.441013776542884,
+    "chosenTestMeanDrawdownPct": 6.068068617652584
+  },
+  "automaticExitEnabled": false,
+  "conclusion": "Exploratory only. Does not validate complete live strategy, actual fills, other market regimes, seconds data, Colmex or Futures. No automatic activation.",
+  "results": [
+    {
+      "variant": {
+        "id": "baseline",
+        "thresholdAngle": null,
+        "lookbackBars": 10
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -0.7885485118034552,
+            "maxDrawdownPct": 8.13134773916008,
+            "trades": 11,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -1.2472032967032902,
+            "maxDrawdownPct": 4.331813689923487,
+            "trades": 1,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -12.478176125520278,
+            "maxDrawdownPct": 15.21353181270467,
+            "trades": 21,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.295346237869367,
+            "maxDrawdownPct": 7.218263529663529,
+            "trades": 7,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -10.414206754894806,
+            "maxDrawdownPct": 15.343571098392522,
+            "trades": 18,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -6.082392853974497,
+            "maxDrawdownPct": 6.082392853974497,
+            "trades": 5,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -1.743805150073058,
+            "maxDrawdownPct": 14.326010465642852,
+            "trades": 27,
+            "slopeExits": 0,
+            "forcedEndExits": 1
+          },
+          "test": {
+            "returnPct": -3.88900741632537,
+            "maxDrawdownPct": 8.427117355097485,
+            "trades": 8,
+            "slopeExits": 0,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -15.516268175827577,
+            "maxDrawdownPct": 24.30916224418269,
+            "trades": 53,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.942325244500154,
+            "maxDrawdownPct": 8.706609390158576,
+            "trades": 12,
+            "slopeExits": 0,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -5.0709680117258955,
+            "maxDrawdownPct": 19.413635797682442,
+            "trades": 53,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -4.042110916518837,
+            "maxDrawdownPct": 9.879885840439728,
+            "trades": 16,
+            "slopeExits": 0,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-5-alpha-10",
+        "lookbackBars": 5,
+        "thresholdAngle": -10
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -6.287075727426014,
+            "maxDrawdownPct": 8.342838161122632,
+            "trades": 18,
+            "slopeExits": 13,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": 1.8682050212652257,
+            "maxDrawdownPct": 1.801793332767793,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -10.965716163076621,
+            "maxDrawdownPct": 14.683884753048416,
+            "trades": 35,
+            "slopeExits": 21,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.089183087926685,
+            "maxDrawdownPct": 3.7471228439059945,
+            "trades": 10,
+            "slopeExits": 9,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -5.533056545101573,
+            "maxDrawdownPct": 9.721219883389013,
+            "trades": 25,
+            "slopeExits": 20,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.9225435907503368,
+            "maxDrawdownPct": 4.0493353498023765,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -9.223937269252701,
+            "maxDrawdownPct": 12.293585493294756,
+            "trades": 55,
+            "slopeExits": 41,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -8.982085916563122,
+            "maxDrawdownPct": 9.880506719191045,
+            "trades": 20,
+            "slopeExits": 14,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -19.02294318286353,
+            "maxDrawdownPct": 23.359903138244878,
+            "trades": 86,
+            "slopeExits": 62,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -8.214912402642526,
+            "maxDrawdownPct": 8.510041301669403,
+            "trades": 19,
+            "slopeExits": 14,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -32.64652414241918,
+            "maxDrawdownPct": 35.413341971171015,
+            "trades": 128,
+            "slopeExits": 91,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -10.775238002665745,
+            "maxDrawdownPct": 11.280157083434746,
+            "trades": 26,
+            "slopeExits": 19,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-5-alpha0",
+        "lookbackBars": 5,
+        "thresholdAngle": 0
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -5.663526730386991,
+            "maxDrawdownPct": 7.647824937715959,
+            "trades": 18,
+            "slopeExits": 13,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -0.9521364327051316,
+            "maxDrawdownPct": 1.4274321250698228,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -11.826653981971035,
+            "maxDrawdownPct": 15.159910917978694,
+            "trades": 35,
+            "slopeExits": 22,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.826839441241418,
+            "maxDrawdownPct": 3.826839441241418,
+            "trades": 10,
+            "slopeExits": 9,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -5.671857160054486,
+            "maxDrawdownPct": 9.964078373157108,
+            "trades": 25,
+            "slopeExits": 20,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.7258438135136913,
+            "maxDrawdownPct": 3.8528951538628746,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -14.457357259949376,
+            "maxDrawdownPct": 14.641068615713515,
+            "trades": 60,
+            "slopeExits": 43,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.051085724680789,
+            "maxDrawdownPct": 7.968567068958513,
+            "trades": 20,
+            "slopeExits": 15,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -21.004640813310814,
+            "maxDrawdownPct": 24.228954818121682,
+            "trades": 93,
+            "slopeExits": 75,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -8.935290586129014,
+            "maxDrawdownPct": 9.22810315659163,
+            "trades": 19,
+            "slopeExits": 14,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -38.809261444711154,
+            "maxDrawdownPct": 40.526813116078756,
+            "trades": 136,
+            "slopeExits": 98,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.555454091278051,
+            "maxDrawdownPct": 7.967029039303928,
+            "trades": 27,
+            "slopeExits": 22,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-5-alpha10",
+        "lookbackBars": 5,
+        "thresholdAngle": 10
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -5.038998104198299,
+            "maxDrawdownPct": 7.0364328110212595,
+            "trades": 18,
+            "slopeExits": 14,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -1.0805201868933239,
+            "maxDrawdownPct": 1.312723229278987,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -11.870655039368245,
+            "maxDrawdownPct": 15.313555190392922,
+            "trades": 36,
+            "slopeExits": 23,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -2.6760620210697255,
+            "maxDrawdownPct": 2.8890242459175255,
+            "trades": 10,
+            "slopeExits": 10,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -5.481590924604646,
+            "maxDrawdownPct": 10.1031672079828,
+            "trades": 25,
+            "slopeExits": 20,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.513261445568517,
+            "maxDrawdownPct": 3.6405933271953477,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -12.868711028906532,
+            "maxDrawdownPct": 12.974831829121438,
+            "trades": 60,
+            "slopeExits": 44,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.371302399298131,
+            "maxDrawdownPct": 8.285622944685633,
+            "trades": 20,
+            "slopeExits": 15,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -25.055241595826416,
+            "maxDrawdownPct": 29.017902946232983,
+            "trades": 99,
+            "slopeExits": 83,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -8.57120389288471,
+            "maxDrawdownPct": 8.865187160110167,
+            "trades": 19,
+            "slopeExits": 15,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -34.550704189694144,
+            "maxDrawdownPct": 36.52320577181648,
+            "trades": 140,
+            "slopeExits": 109,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -6.4056000841740826,
+            "maxDrawdownPct": 6.758835981928191,
+            "trades": 27,
+            "slopeExits": 22,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-10-alpha-10",
+        "lookbackBars": 10,
+        "thresholdAngle": -10
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -4.772416029745884,
+            "maxDrawdownPct": 7.190616868459945,
+            "trades": 17,
+            "slopeExits": 12,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -1.482066445109652,
+            "maxDrawdownPct": 1.7133269000192117,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -11.644135006943372,
+            "maxDrawdownPct": 14.972528123934781,
+            "trades": 33,
+            "slopeExits": 18,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.9410771571441927,
+            "maxDrawdownPct": 4.151271302078271,
+            "trades": 10,
+            "slopeExits": 10,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -3.967829623358682,
+            "maxDrawdownPct": 8.54916377033254,
+            "trades": 24,
+            "slopeExits": 19,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -4.019060872748469,
+            "maxDrawdownPct": 4.1457252596112255,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -13.311745761267844,
+            "maxDrawdownPct": 13.375231155801956,
+            "trades": 56,
+            "slopeExits": 40,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -10.126591113314419,
+            "maxDrawdownPct": 11.013714719254928,
+            "trades": 20,
+            "slopeExits": 14,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -16.36659138704485,
+            "maxDrawdownPct": 22.697442159774262,
+            "trades": 82,
+            "slopeExits": 60,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.457183704192971,
+            "maxDrawdownPct": 7.7547490299029675,
+            "trades": 19,
+            "slopeExits": 15,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -31.329418278007267,
+            "maxDrawdownPct": 35.613718509268345,
+            "trades": 128,
+            "slopeExits": 89,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.27968750250929,
+            "maxDrawdownPct": 7.629624495048899,
+            "trades": 26,
+            "slopeExits": 21,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-10-alpha0",
+        "lookbackBars": 10,
+        "thresholdAngle": 0
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -3.9813705105393637,
+            "maxDrawdownPct": 6.648447642777764,
+            "trades": 17,
+            "slopeExits": 13,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -1.0805201868933239,
+            "maxDrawdownPct": 1.312723229278987,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -10.62023925831484,
+            "maxDrawdownPct": 14.538655302112868,
+            "trades": 35,
+            "slopeExits": 23,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -4.130904186157906,
+            "maxDrawdownPct": 4.340682955519682,
+            "trades": 10,
+            "slopeExits": 10,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -4.212794762259023,
+            "maxDrawdownPct": 8.592861219327615,
+            "trades": 25,
+            "slopeExits": 21,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.893221884826872,
+            "maxDrawdownPct": 4.020052339227561,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -12.007255865557994,
+            "maxDrawdownPct": 12.037483244374817,
+            "trades": 58,
+            "slopeExits": 46,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -8.399383530681234,
+            "maxDrawdownPct": 9.303556079550418,
+            "trades": 21,
+            "slopeExits": 17,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -18.76035688591989,
+            "maxDrawdownPct": 23.97009733086261,
+            "trades": 91,
+            "slopeExits": 74,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -5.623126871944706,
+            "maxDrawdownPct": 5.926589486504369,
+            "trades": 19,
+            "slopeExits": 16,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -32.983119041372106,
+            "maxDrawdownPct": 36.77485934403792,
+            "trades": 137,
+            "slopeExits": 100,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -9.085476486239614,
+            "maxDrawdownPct": 9.24204570009799,
+            "trades": 28,
+            "slopeExits": 22,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    },
+    {
+      "variant": {
+        "id": "ma20-10-alpha10",
+        "lookbackBars": 10,
+        "thresholdAngle": 10
+      },
+      "markets": [
+        {
+          "symbol": "BTCUSDT",
+          "training": {
+            "returnPct": -6.201994166190929,
+            "maxDrawdownPct": 8.30654576887956,
+            "trades": 18,
+            "slopeExits": 14,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -1.0805201868933239,
+            "maxDrawdownPct": 1.312723229278987,
+            "trades": 4,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "ETHUSDT",
+          "training": {
+            "returnPct": -12.1110157515037,
+            "maxDrawdownPct": 15.96407603153424,
+            "trades": 37,
+            "slopeExits": 27,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.879975009998489,
+            "maxDrawdownPct": 4.090302857385112,
+            "trades": 10,
+            "slopeExits": 10,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "BNBUSDT",
+          "training": {
+            "returnPct": -5.697701163723693,
+            "maxDrawdownPct": 9.951435282478503,
+            "trades": 26,
+            "slopeExits": 21,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -3.606113514326182,
+            "maxDrawdownPct": 3.733322860682321,
+            "trades": 6,
+            "slopeExits": 4,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "SOLUSDT",
+          "training": {
+            "returnPct": -10.559432359956986,
+            "maxDrawdownPct": 11.842984600702193,
+            "trades": 59,
+            "slopeExits": 46,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -6.903664291968795,
+            "maxDrawdownPct": 7.822600805629754,
+            "trades": 21,
+            "slopeExits": 17,
+            "forcedEndExits": 1
+          }
+        },
+        {
+          "symbol": "XRPUSDT",
+          "training": {
+            "returnPct": -20.214844867881226,
+            "maxDrawdownPct": 24.466938514140605,
+            "trades": 95,
+            "slopeExits": 80,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -6.298901602998285,
+            "maxDrawdownPct": 6.600191308454896,
+            "trades": 19,
+            "slopeExits": 17,
+            "forcedEndExits": 0
+          }
+        },
+        {
+          "symbol": "LINKUSDT",
+          "training": {
+            "returnPct": -38.94634025880107,
+            "maxDrawdownPct": 39.549737215821104,
+            "trades": 147,
+            "slopeExits": 116,
+            "forcedEndExits": 0
+          },
+          "test": {
+            "returnPct": -7.542963063261752,
+            "maxDrawdownPct": 7.702188729628119,
+            "trades": 28,
+            "slopeExits": 24,
+            "forcedEndExits": 0
+          }
+        }
+      ]
+    }
+  ]
+}

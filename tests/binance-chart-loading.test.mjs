@@ -1,10 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 const src=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
-const block=src.slice(src.indexOf('let chartLoadInFlight='),src.indexOf('\nfunction drawIndicators(',src.indexOf('let chartLoadInFlight=')));
+const block=src.slice(src.indexOf('function publishSlopeData('),src.indexOf('\nfunction drawIndicators(',src.indexOf('let chartLoadInFlight=')));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 function harness(){
  const scan=deferred(),events=[],labels={},empty={hidden:true};let requests=0;const data={candles:[{closeTime:1,closed:true,close:50}],decisions:[],actions:[],decisionMode:'live'};
- const ctx=vm.createContext({selectedSymbol:'BTCUSDT',selectedInterval:'5m',selectedRange:'1W',currentMode:'live',chartRequestId:0,chartAnalysisContext:null,selectedWyckoffId:null,chartWyckoffHistory:[],chartWyckoffError:null,chartVisibleStartTime:0,chartCandles:[],chartDecisions:[],currentAgentData:{agents:[]},wyckoffHistoryCache:new Map(),CHART:'/chart',
+ const ctx=vm.createContext({window:{},selectedSymbol:'BTCUSDT',selectedInterval:'5m',selectedRange:'1W',currentMode:'live',chartRequestId:0,chartAnalysisContext:null,selectedWyckoffId:null,chartWyckoffHistory:[],chartWyckoffError:null,chartVisibleStartTime:0,chartCandles:[],chartDecisions:[],currentAgentData:{agents:[]},wyckoffHistoryCache:new Map(),CHART:'/chart',
   wyckoffHistoryEngine:{mergeBinanceRecorded:history=>history},
   J:async(url,options)=>{requests++;assert.equal(options.timeoutMs,35000);return data;},
   runBinanceWyckoffScan:()=>scan.promise,
@@ -24,7 +24,7 @@ test('changing asset starts its own load and an older completion cannot overwrit
  h.ctx.J=()=>++calls===1?firstData.promise:secondData.promise;
  const a=h.ctx.loadChart('BTCUSDT');h.ctx.selectedSymbol='ETHUSDT';const b=h.ctx.loadChart('ETHUSDT');
  secondData.resolve({...h.data,candles:[{closeTime:2,closed:true,close:100}]});h.scan.resolve({history:[],error:null});await b;
- firstData.resolve(h.data);await a;assert.equal(h.ctx.chartCandles[0].close,100);assert.equal(calls,2);
+ firstData.resolve(h.data);await a;assert.equal(h.ctx.chartCandles[0].close,100);assert.equal(calls,2);assert.equal(h.ctx.window.LEVI_MA_SLOPE_DATA.symbol,'ETHUSDT');assert.equal(h.ctx.window.LEVI_MA_SLOPE_DATA.bars[0].close,100);
 });
 test('same-asset refresh failure retains visible candles with an explicit stale-data message',async()=>{
  const h=harness();h.scan.resolve({history:[],error:null});await h.ctx.loadChart('BTCUSDT');h.ctx.J=async()=>{throw Error('timeout');};vm.runInContext('chartLastReadAt=0',h.ctx);await h.ctx.loadChart('BTCUSDT');

@@ -1,3 +1,4 @@
+import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-slope1';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
@@ -57,6 +58,7 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
+ renderSlopePanel($('#colmexSlope'),manualCharts.has(selected)?[]:(markets[selected]?.analysisBars||[]),{symbol:selected,platform:'colmex',source:'Colmex Pro · 5 דקות'});
  const rsiQuote=quotes[selected],rsiLive=markets[selected]?.liveAnalysisBar,quoteAt=Date.parse(rsiQuote?.observedAt||rsiQuote?.priceAt);
  const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
  renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),freshRsiLive||null);
