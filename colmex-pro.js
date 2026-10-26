@@ -1,4 +1,4 @@
-import {renderRsiChart} from './rsi-chart.js?v=20261024-current-rsi';
+import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';

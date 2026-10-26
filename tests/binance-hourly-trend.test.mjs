@@ -1,5 +1,6 @@
 import {withLiveSafety} from './helpers/live-safety.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+import {assessQualityEntry,ENTRY_POLICY_VERSION} from '../lib/binance-quality-policy.mjs';
 import {assessHourlyTrend} from '../lib/binance-hourly-trend.mjs';
 import {makeFeatures} from '../lib/portfolio-variant-study.mjs';
 const H=3600000,S=300000,end=Date.UTC(2026,9,18,15);
@@ -25,8 +26,8 @@ test('live hourly values match the fixed simulation gate on completed hours',()=
  const input=bars(),rows=input.map(b=>[b.openTime,b.close,b.close+1,b.close-1,b.close,1,b.closeTime]),features=makeFeatures(rows);
  for(const n of [600,588]){const subset=input.slice(0,n),now=subset.at(-1).closeTime+1;assert.equal(assessHourlyTrend(subset,{now}).ok,n===600?features[n-1].trend:false);}
 });
-test('automatic submission rechecks the hourly gate before order intent; no failed gate can post an order',async()=>{
+test('automatic submission permits missing hourly data but preserves stablecoin exclusion',async()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketBuy('),source.indexOf('async function placeLiveMarketSell('));
- let posts=0;const c=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},liveManagedPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['MARKET','TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:10}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry:()=>({ok:false,code:'WAIT_HOURLY_TREND'}),candles:async()=>[],liveOrders:{submit:async()=>posts++}});
- vm.runInContext(fn,withLiveSafety(c));await assert.rejects(()=>c.placeLiveMarketBuy('BTCUSDT',10),/WAIT_HOURLY_TREND/);assert.equal(posts,0);
+ let posts=0;const c=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},liveManagedPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['MARKET','TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:10}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry,ENTRY_POLICY_VERSION,candles:async()=>[],signedBinancePost:()=>{throw Error('No network');},recordLiveFill:()=>{},requireLivePrice:()=>50,streams:{BTCUSDT:{}},liveOrders:{submit:async()=>{posts++;return {};}}});
+ vm.runInContext(fn,withLiveSafety(c));await assert.rejects(()=>c.placeLiveMarketBuy('RLUSDUSDT',10),/WAIT_STABLECOIN/);assert.equal(posts,0);await c.placeLiveMarketBuy('BTCUSDT',10);assert.equal(posts,1);
 });

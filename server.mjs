@@ -12,7 +12,7 @@ import {rsiSnapshot} from './lib/rsi-screener.mjs';
 import {createChartReader} from './lib/binance-chart-reader.mjs';
 import {observeLiveCandle} from './lib/wyckoff-spring-rsi.mjs';
 import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
-import {HOURLY_TREND_RULE} from './lib/binance-hourly-trend.mjs';
+import {BINANCE_ENTRY_RSI,BINANCE_HOURLY_TREND_FILTER as HOURLY_TREND_RULE} from './lib/binance-quality-policy.mjs';
 import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
 import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
 import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
@@ -1491,7 +1491,7 @@ async function evaluateSymbol(s){
       }
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
-    ev.decisionPriceSource=ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_30':ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
+    ev.decisionPriceSource=ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
   }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
@@ -1562,7 +1562,7 @@ function candidateBlocker(ev,evals){
   if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===TRAILING_EXIT_POLICY?'סטופ 1% · מרווח 4%: רצפה 4% ונגרר נקודת אחוז מהשיא':'פוזיציה קודמת — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:'Spring ו־RSI חי 0–30 ומגמת שעה אושרו · קנייה ללא המתנה לסגירת נר'};
+  return {code:'BUY_READY',text:'Spring ו־RSI חי 0–40 אושרו · מגמת שעה אינה תנאי כניסה · קנייה ללא המתנה לסגירת נר'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -2258,6 +2258,7 @@ const server=http.createServer((req,res)=>{
       deviceAuth:{version:1,enabled:controlDevices.enabled,pairCodeLength:6},
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
+      entryRsi:BINANCE_ENTRY_RSI,
       entryPolicyVersion:ENTRY_POLICY_VERSION,
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
@@ -2438,7 +2439,7 @@ const server=http.createServer((req,res)=>{
         hourlyTrendFilter:HOURLY_TREND_RULE,
         entryPolicyVersion:ENTRY_POLICY_VERSION,
         entryMode:'spring_rsi_live',
-        entryConfirmation:'LIVE_SPRING_RSI_0_30',
+        entryConfirmation:'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max,
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
         rsiScreenerVersion:1,
@@ -2446,7 +2447,7 @@ const server=http.createServer((req,res)=>{
         waitForConfirmationCandleClose:false,
         waitForSpringRetest:false,
         entrySignalValidityMinutes:null,
-        entryRsi:{period:14,timeframe:'5m',min:0,max:30,includesOpenCandle:true},
+        entryRsi:BINANCE_ENTRY_RSI,
         exitPolicy:TRAILING_EXIT_POLICY,
         fixedExitVersion:1,
         takeProfitPct:tradeSettings.values.takeProfitPct,
