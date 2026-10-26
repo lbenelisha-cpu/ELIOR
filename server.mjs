@@ -9,6 +9,7 @@ import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
 import {createTradeHistoryReader,historySymbol} from './lib/binance-trade-history.mjs';
+import {EquityHistory,createEquitySampler} from './lib/binance-equity-history.mjs';
 const tradeHistoryReader=createTradeHistoryReader({fetchTrades:(symbol,params)=>signedBinanceGet('/api/v3/myTrades',{symbol,...params})});
 const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
 import {rsiSnapshot} from './lib/rsi-screener.mjs';
@@ -1037,6 +1038,17 @@ async function getLiveAccountSnapshot(){
     updatedAt:new Date(observedAt).toISOString()
   };
   lastDisplayAccount=snapshot;return snapshot;
+}
+
+const equityHistory=new EquityHistory({file:process.env.BINANCE_EQUITY_HISTORY_FILE||'/var/data/binance-equity-history.json'});
+const sampleEquity=createEquitySampler({history:equityHistory,readAccount:()=>{
+  // Reuse a recent raw account read; never request trade history or mutate positions.
+  if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<15000)return lastDisplayAccount;
+  return getLiveAccountSnapshot();
+}});
+if(KEYS_CONFIGURED){
+  setTimeout(()=>sampleEquity(),5000).unref();
+  setInterval(()=>sampleEquity(),60000).unref();
 }
 
 function isEligibleSymbol(x){
@@ -2328,6 +2340,8 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-kelly'&&req.method==='GET')return send(res,{ok:true,live:kellyLearningReport(liveActionLog)});
+
+  if(u.pathname==='/api/binance-equity-history'&&req.method==='GET')return send(res,equityHistory.today());
 
   if(u.pathname==='/api/binance-trade-history'&&req.method==='GET'){
     let symbol;try{symbol=historySymbol(u.searchParams.get('symbol'));}catch{return send(res,{ok:false,error:'יש להזין צמד USDT תקין'},400);}
