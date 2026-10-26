@@ -1,4 +1,4 @@
-import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-ma100';
+import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
@@ -58,7 +58,7 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
- renderSlopePanel($('#colmexSlope'),manualCharts.has(selected)?[]:(markets[selected]?.analysisBars||[]),{symbol:selected,platform:'colmex',source:'Colmex Pro · 5 דקות'});
+ renderSlopePanel($('#colmexSlope'),manualCharts.has(selected)?[]:(markets[selected]?.analysisBars||[]),{symbol:selected,platform:'colmex',source:'Colmex Pro · 5 דקות',position:!PAPER_MODE&&!manualCharts.has(selected)?liveSearchState.positions?.find(p=>p.symbol===selected):null,price:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastBid,priceAt:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastQuoteAt});
  const rsiQuote=quotes[selected],rsiLive=markets[selected]?.liveAnalysisBar,quoteAt=Date.parse(rsiQuote?.observedAt||rsiQuote?.priceAt);
  const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
  renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),freshRsiLive||null);
@@ -165,6 +165,7 @@ startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});
 globalThis.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!validSymbol(symbol))return;if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(false);});
 
 $('#showWyckoffHistory')?.addEventListener('change',()=>renderChart());
+globalThis.window?.addEventListener('levi:colmex-status-error',()=>{liveSearchState={positions:[],after:{}};renderChart();});
 globalThis.window?.addEventListener('levi-colmex-rsi',event=>{
  if(PAPER_MODE)return;
  liveSearchState=event.detail||{positions:[],after:{}};

@@ -7,38 +7,51 @@ const guidance={ENTRY_SUPPORT:'תמיכה בכיוון',EXIT_WARNING:'אזהרת
 const comparison={SUPPORTS:'תומך בהחלטה',OPPOSES:'כיוון מנוגד',MIXED:'חיווי חלקי',NOT_COMPARABLE:'ללא הכרעה להשוואה',UNAVAILABLE:'אין השוואה תקפה'};
 const signed=value=>Number.isFinite(value)?(value>0?'+':'')+num(value,2)+'%':'—';
 export function createDecisionJournal(host,{read}){
- const fold=node('details',null,'ma-journal-fold'),summary=node('summary','יומן השוואת החלטות · MA100 / MA200');
- const body=node('div',null,'ma-journal-body'),intro=node('p','החלטות שרת LIVE מול הממוצעים באותו זמן · תיעוד בלבד · LONG. היומן אינו משנה הוראות מסחר.','ma-journal-intro');
+ const fold=node('details',null,'ma-journal-fold'),summary=node('summary','יומן החלטות · מהכניסה, MA100 / MA200');
+ const body=node('div',null,'ma-journal-body'),intro=node('p','החלטות שרת LIVE מול המדידה מהכניסה, הכיוון האחרון והממוצעים באותו זמן · תיעוד בלבד · LONG. היומן אינו משנה הוראות מסחר.','ma-journal-intro');
  const toolbar=node('form',null,'ma-journal-toolbar'),symbol=node('input'),label=node('label','סימול ');symbol.placeholder='כל הנכסים';symbol.maxLength=30;symbol.dir='ltr';symbol.setAttribute('aria-label','סינון היומן לפי סימול');label.append(symbol);
  const cadence=node('select'),cadenceLabel=node('label','תדירות ההשוואה ');for(const n of [10,20]){const option=node('option',n+' דקות');option.value=String(n);cadence.append(option);}cadenceLabel.append(cadence);
  const refresh=node('button','רענן יומן');refresh.type='submit';toolbar.append(label,cadenceLabel,refresh);
  const status=node('p','פתח כדי לקרוא את התיעוד השמור בשרת.','ma-journal-status');status.setAttribute('role','status');
  const stats=node('div',null,'ma-journal-stats'),wrap=node('div',null,'ma-journal-scroll'),table=node('table'),head=node('thead'),titles=node('tr'),tbody=node('tbody');
- for(const title of ['מועד · ישראל','נכס / החלטה','MA100 / MA200','השוואה','שינוי מחיר בהמשך'])titles.append(node('th',title));head.append(titles);table.append(head,tbody);wrap.append(table);wrap.tabIndex=0;wrap.setAttribute('aria-label','טבלת השוואת החלטות');
- const note=node('p','נרות 5 דקות סגורים; MA100 ו־MA200, שיפוע על 10 נרות (50 דקות). נשמרים שינויים בהחלטות ודגימה של מצב חוזר בכל 10 דקות. מוצגות עד 200 רשומות מ־24 השעות האחרונות. נתון חסר או מיושן מסומן ואינו הופך לאיתות. שינוי המחיר נמדד מהמחיר שנצפה בהחלטה למדידה הראשונה עד 5 דקות אחרי המועד המבוקש; זהו שינוי ברוטו במחיר, לא רווח נטו מעסקה. בקולמקס זמן המחיר הוא זמן קבלת הציטוט, ללא חותמת מקור של הברוקר.','ma-journal-note');
+ for(const title of ['מועד · ישראל','נכס / החלטה','מהכניסה / כיוון אחרון','MA100 / MA200','השוואה','שינוי מחיר בהמשך'])titles.append(node('th',title));head.append(titles);table.append(head,tbody);wrap.append(table);wrap.tabIndex=0;wrap.setAttribute('aria-label','טבלת השוואת החלטות');
+ const note=node('p','נרות 5 דקות סגורים; MA100 ו־MA200, שיפוע על 10 נרות (50 דקות). נשמרים שינויים בהחלטות ודגימה בכל נר חדש של מדידת הפוזיציה, או בכל 10 דקות בהיעדר פוזיציה. מוצגות עד 200 רשומות מ־24 השעות האחרונות. נתון חסר או מיושן מסומן ואינו הופך לאיתות. שינוי המחיר נמדד מהמחיר שנצפה בהחלטה למדידה הראשונה עד 5 דקות אחרי המועד המבוקש; זהו שינוי ברוטו במחיר, לא רווח נטו מעסקה. בקולמקס זמן המחיר הוא זמן קבלת הציטוט, ללא חותמת מקור של הברוקר.','ma-journal-note');
  body.append(intro,toolbar,status,stats,wrap,note);fold.append(summary,body);host.append(fold);let data=null,busy=false,generation=0;
  function render(){
   tbody.replaceChildren();stats.replaceChildren();if(!data)return;
   const minutes=Number(cadence.value||10),counts={SUPPORTS:0,OPPOSES:0,UNAVAILABLE:0};
   for(const row of data.rows){
    const check=row.checks.find(c=>c.checkMinutes===minutes);if(!check)continue;if(check.comparison in counts)counts[check.comparison]++;
-   const tr=node('tr'),when=node('td',time(row.at)),decision=node('td'),ma=node('td'),result=node('td'),outcome=node('td');
+   const tr=node('tr'),when=node('td',time(row.at)),decision=node('td'),alphaCell=node('td'),ma=node('td'),result=node('td'),outcome=node('td');
    const action=row.stage==='BROKER_FILL'?(row.action==='ENTER'?'קנייה בוצעה':'מכירה בוצעה'):actions[row.action]||row.action;
    decision.append(node('strong',row.symbol+' · '+action),node('small',stages[row.stage]||row.stage),node('small',(row.origin==='MANUAL'?'פעולה ידנית · ':row.origin==='BROKER'?'דיווח ברוקר · ':'')+row.reason,'ma-journal-code'));
    if(row.price!=null)decision.append(node('small','מחיר '+num(row.price,8)+(row.priceFresh?'':' · ללא מחיר בסיס עדכני')));
+   const alpha=row.positionAlpha;
+   const alphaStatus={NO_POSITION:'ללא פוזיציה בזמן ההחלטה',ENTRY_PRICE_UNAVAILABLE:'מחיר כניסה חסר',ENTRY_TIME_UNVERIFIED:'זמן כניסה לא מאומת',ENTRY_BASIS_CHANGED:'בסיס הכניסה השתנה',WAIT_FIRST_CLOSE:'ממתין לנר מלא לאחר הכניסה',INVALID_DATA:'נתוני נרות לא תקינים',INVALID_ENTRY_TIME:'זמן כניסה לא תקין',STALE:'נתון עבר · אינו חיווי עדכני'};
+   if(!alpha)alphaCell.append(node('small','לא תועד בגרסה זו'));
+   else{
+    alphaCell.append(node('strong',alpha.status==='READY'?'מדידה בעת ההחלטה':alphaStatus[alpha.status]||alpha.status));
+    if(['READY','STALE'].includes(alpha.status)){
+     alphaCell.append(node('small','מהכניסה: '+num(alpha.fromEntry?.angle,1)+'° · '+signed(alpha.fromEntry?.changePct)));
+     alphaCell.append(node('small',alpha.recent?.status==='READY'?'כיוון אחרון: '+num(alpha.recent.angle,1)+'°':'כיוון אחרון: ממתין ל־5 נרות רצופים'));
+    }
+    if(alpha.quote)alphaCell.append(node('small','רווח בציטוט ברוטו: '+signed(alpha.quote.grossPnlPct)));
+    if(alpha.asOf)alphaCell.append(node('small','נר: '+time(alpha.asOf)));
+    if(alpha.reference?.entryAt)alphaCell.append(node('small',(alpha.reference.timeSource==='BROKER_EXECUTION'?'כניסה בביצוע: ':'כניסה מתועדת: ')+time(alpha.reference.entryAt)));
+   }
    ma.append(node('strong',guidance[check.state]||check.state));
    if(check.status==='READY')ma.append(node('small','MA100: '+num(check.ma100?.average,8)+' · '+num(check.ma100?.angle,1)+'°'),node('small','MA200: '+num(check.ma200?.average,8)+' · '+num(check.ma200?.angle,1)+'°'));
    else ma.append(node('small',check.status));
    ma.append(node('small','נר המדידה: '+time(check.asOf)));
    const badge=node('span',comparison[check.comparison]||check.comparison,'ma-journal-badge');badge.dataset.state=check.comparison;result.append(badge);
    for(const observation of row.outcomes||[]){const item=node('small',observation.minutes+' דק׳: '+(observation.status==='OBSERVED'?signed(observation.changePct):observation.status==='PENDING'?'טרם הגיע המועד':observation.status==='WAIT_OBSERVATION'?'ממתין למדידה':'אין מדידה תקפה'));if(observation.status==='OBSERVED'){item.title='נמדד בפועל: '+time(observation.at);item.dataset.direction=observation.changePct>0?'up':observation.changePct<0?'down':'flat';}outcome.append(item);}
-   tr.append(when,decision,ma,result,outcome);tbody.append(tr);
+   tr.append(when,decision,alphaCell,ma,result,outcome);tbody.append(tr);
   }
   for(const [key,title]of [['SUPPORTS','תמיכה'],['OPPOSES','כיוון מנוגד'],['UNAVAILABLE','חסר להשוואה']]){const cell=node('div');cell.append(node('strong',String(counts[key])),node('span',title+' · ברשומות המוצגות'));stats.append(cell);}
   const trouble=data.storageError||data.dropped?' · קיימת בעיית שמירה; התיעוד עשוי להיות חלקי':data.stale?' · התיעוד לא התעדכן לאחרונה':'';
   status.textContent=data.health?'תחילת תיעוד '+time(data.health.startedAt)+' · שמירה אחרונה '+time(data.health.lastPersistedAt)+(data.health.lastRecordAt?' · החלטה אחרונה '+time(data.health.lastRecordAt):'')+' · '+data.rows.length+' מתוך '+data.total+' רשומות בטווח'+(data.pending?' · '+data.pending+' ממתינות לשמירה':'')+trouble:'התיעוד הופעל; ממתינים לשמירה הראשונה בשרת.';
   status.dataset.state=trouble?'warning':'ready';
-  if(!data.rows.length){const tr=node('tr'),td=node('td','עדיין אין החלטות מתועדות בטווח או בסימול שנבחר. מחוץ לשעות המסחר בקולמקס ייתכן שלא יהיו בדיקות כניסה חדשות.');td.colSpan=5;tr.append(td);tbody.append(tr);}
+  if(!data.rows.length){const tr=node('tr'),td=node('td','עדיין אין החלטות מתועדות בטווח או בסימול שנבחר. מחוץ לשעות המסחר בקולמקס ייתכן שלא יהיו בדיקות כניסה חדשות.');td.colSpan=6;tr.append(td);tbody.append(tr);}
  }
  async function load(){if(busy)return;const request=++generation;busy=true;refresh.disabled=true;status.textContent='קורא תיעוד מהשרת…';try{
    const query=symbol.value.trim().toUpperCase();if(query&&!/^[A-Z0-9][A-Z0-9._-]{0,29}$/.test(query))throw Error('INVALID_SYMBOL');

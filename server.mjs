@@ -259,7 +259,7 @@ function observeMaDecision(event){
   const at=event.at??Date.now(),bars=inputBars??dailyCandleCache.get(event.symbol)?.rows??[],bucket=Math.floor(at/600000),old=maAuditContexts.get(event.symbol);
   let snapshots=old?.snapshots;
   if(!old||old.bars!==bars||old.bucket!==bucket){snapshots=auditSnapshots(bars,at);maAuditContexts.set(event.symbol,{bars,bucket,snapshots});}
-  maAudit.record(makeAuditRecord({platform:'BINANCE',at,price:Number(streams[event.symbol]?.lastPrice),priceAt:Number(streams[event.symbol]?.lastEventAt),...details,snapshots}));
+  maAudit.record(makeAuditRecord({platform:'BINANCE',at,price:Number(streams[event.symbol]?.lastPrice),priceAt:Number(streams[event.symbol]?.lastEventAt),...details,position:Object.hasOwn(event,'position')?event.position:liveManagedPositions()[event.symbol]||null,positionBars:bars,snapshots}));
  }catch{maAudit.error='AUDIT_CAPTURE_FAILED';}
 }
 setInterval(()=>{void maAudit.flush();},60000).unref();
@@ -604,10 +604,11 @@ function pushDemoAction(action){
 }
 
 function pushLiveAction(action){
+  let alphaPrior=null;try{alphaPrior=liveManagedPositions()[action.symbol]||null;}catch{}
   if(!liveActionLog.some(a=>a.orderId===action.orderId&&a.symbol===action.symbol))liveActionLog.unshift(action);
   // Execution metadata and consumed patterns must survive display log limits.
   if(!saveLiveActionLog())throw Error('LIVE_EXECUTION_JOURNAL_UNAVAILABLE');
-  if(['BUY','SELL'].includes(action.type)&&Number(action.executedQty)>0)observeMaDecision({symbol:action.symbol,stage:'BROKER_FILL',origin:action.reason?.startsWith('MANUAL')?'MANUAL':'BROKER',action:action.type==='BUY'?'ENTER':'EXIT',reason:action.reason,price:Number(action.price),priceAt:null,reference:String(action.orderId)});
+  if(['BUY','SELL'].includes(action.type)&&Number(action.executedQty)>0)observeMaDecision({symbol:action.symbol,stage:'BROKER_FILL',origin:action.reason?.startsWith('MANUAL')?'MANUAL':'BROKER',action:action.type==='BUY'?'ENTER':'EXIT',reason:action.reason,price:Number(action.price),priceAt:null,reference:String(action.orderId),position:action.type==='SELL'?alphaPrior:action.wyckoffTrade?{...action.wyckoffTrade,entryAt:action.at,entryPrice:Number(action.price)}:null});
 }
 
 let mode=process.env.BINANCE_MODE==='live'?'live':'demo';
@@ -1526,7 +1527,7 @@ async function evaluateSymbol(s){
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
-    if(mode==='live')observeMaDecision({symbol:s,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
+    if(mode==='live')observeMaDecision({symbol:s,position:p||null,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
     return ev;
   }catch(e){if(mode==='live')observeMaDecision({symbol:s,action:'WAIT',reason:'EVALUATION_DATA_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol:s,error:e.message};}
 }
@@ -2087,7 +2088,7 @@ setInterval(async()=>{
       try{
         const price=requireLivePrice(streams[symbol],Date.now(),15000);
         const ev=evaluateDailyTrade({symbol,bars:[],price,priceAsOf:streams[symbol].lastEventAt,position:p,timeframe:'5m',exitEvaluator:wyckoffExit});
-        observeMaDecision({symbol,at:Date.parse(ev.at),price,priceAt:ev.priceAsOf,action:ev.rawDecision==='SELL'?'EXIT':'HOLD',reason:ev.buyReason||ev.rawDecision});
+        observeMaDecision({symbol,position:p,at:Date.parse(ev.at),price,priceAt:ev.priceAsOf,action:ev.rawDecision==='SELL'?'EXIT':'HOLD',reason:ev.buyReason||ev.rawDecision});
         return ev;
       }catch(error){observeMaDecision({symbol,action:'WAIT',reason:'EXIT_QUOTE_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol,error:error.message};}
     }));}catch(e){console.error('LIVE exit monitor failed',e.message);}
@@ -2201,6 +2202,14 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/position-alpha-panel.js':['position-alpha-panel.js','text/javascript'],
+    '/lib/position-alpha.mjs':['lib/position-alpha.mjs','text/javascript'],
+    '/ma-slope-panel.js':['ma-slope-panel.js','text/javascript'],
+    '/ma-slope-panel.css':['ma-slope-panel.css','text/css'],
+    '/lib/ma-slope.mjs':['lib/ma-slope.mjs','text/javascript'],
+    '/lib/ma-slope-schedule.mjs':['lib/ma-slope-schedule.mjs','text/javascript'],
+    '/lib/ma-slope-decision.mjs':['lib/ma-slope-decision.mjs','text/javascript'],
+    '/lib/colmex-market-hours.mjs':['lib/colmex-market-hours.mjs','text/javascript'],
     '/ma-decision-journal.js':['ma-decision-journal.js','text/javascript'],
     '/ma-decision-journal.css':['ma-decision-journal.css','text/css'],
     '/binance-chart-cache.js':['binance-chart-cache.js','text/javascript'],
@@ -2441,7 +2450,7 @@ const server=http.createServer((req,res)=>{
       tradeControl,
       symbols:SYMBOLS,
       streams,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Number(streams[a.symbol]?.lastEventAt):null}};}),
       paper:accountSnapshot(),
       universeStatus,
       universeError,
@@ -2524,7 +2533,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-agent/evaluate'&&req.method==='POST'){
     evalAll().then(()=>send(res,{
       ok:true,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Number(streams[a.symbol]?.lastEventAt):null}};}),
       paper:accountSnapshot()
     })).catch(e=>send(res,{ok:false,error:e.message},502));
     return;

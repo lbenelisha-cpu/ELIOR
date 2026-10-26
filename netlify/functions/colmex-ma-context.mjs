@@ -1,3 +1,4 @@
+import {analyzePositionAlpha,compactPositionAlpha} from '../../lib/position-alpha.mjs';
 import {runtimeEnvironment,configuredLive,brokerBars} from '../../lib/colmex-auto-policy.mjs';
 import {autoStore,stateKey} from '../../lib/colmex-auto-store.mjs';
 import {AutoBroker} from '../../lib/colmex-auto-broker.mjs';
@@ -11,7 +12,7 @@ export default async function(request,context){
  if(!configuredLive(env)||!regularSession(now))return new Response(null,{status:204});
  const saved=await autoStore().get(stateKey(env.COLMEX_AUTO_ACCOUNT_ID),{type:'json'}),positions=(saved?.state?.positions||[]).slice(0,3);
  const broker=new AutoBroker({env,deadline:now+24000}),contexts={};
- await Promise.allSettled(positions.map(async p=>{if(!/^\d+$/.test(String(p.instrumentId)))return;const bars=brokerBars(await broker.history(p.instrumentId,env.COLMEX_AUTO_ACCOUNT_ID),Date.now());contexts[p.symbol]=auditSnapshots(bars,Date.now(),stockSessionGap);}));
+ await Promise.allSettled(positions.map(async p=>{if(!/^\d+$/.test(String(p.instrumentId)))return;const bars=brokerBars(await broker.history(p.instrumentId,env.COLMEX_AUTO_ACCOUNT_ID),Date.now());const at=Date.now();contexts[p.symbol]={checks:auditSnapshots(bars,at,stockSessionGap),positionAlpha:compactPositionAlpha(analyzePositionAlpha(bars,p,{now:at}))};}));
  await maAuditStore().setJSON(colmexAuditPrefix(env.COLMEX_AUTO_ACCOUNT_ID)+'/contexts',{at:Date.now(),contexts});
  return new Response(null,{status:204});
 }
