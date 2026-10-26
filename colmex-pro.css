@@ -67,3 +67,11 @@ main>section,main>.panel,.market-hours,.layout>.panel{width:100%;max-width:100%;
 .auto-monitor .sim-table-wrap{max-height:440px;overflow:auto}.auto-monitor .monitor-table thead th{position:sticky;top:0;background:#0c1b2b;z-index:1}
 
 .wyckoff-search-status{margin:12px 0;padding:14px 16px;border:1px solid #45576d;border-radius:12px;background:#102237;color:#e2edf9;font-size:13px;line-height:1.8}.wyckoff-search-status strong{color:#bce9f7}.wyckoff-search-status p{margin:8px 0}.wyckoff-search-status .search-reset{color:#f6d490}.wyckoff-search-status small{display:block;color:#adc0d5;font-size:12px}.wyckoff-search-status:empty{display:none}
+/* Scanner coverage is separate from quote freshness; provisional pivots are neutral. */
+.watch-row{flex-wrap:wrap}
+.watch-row .watch-scan{flex-basis:100%;text-align:right;font-size:11px;line-height:1.6;color:#b3c2d8;overflow-wrap:anywhere}
+.watch-row .watch-scan[hidden]{display:none}
+.watch-row .watch-scan[data-scan-state="error"],.watch-row .watch-scan[data-scan-state="old"],.watch-row .watch-scan[data-scan-state="delayed"]{color:#ffd38b}
+.watch-row .watch-scan[data-scan-state="display"]{color:#d3bcf6}
+.watch-scan-summary{padding:10px;border:1px solid #31445f;border-radius:8px;color:#bdcce1;font-size:12px;line-height:1.7}
+.search-next{color:#d9e5f6}.search-coverage{color:#b4c4dc;font-size:12px}.search-progress{margin-top:10px}.search-progress summary{cursor:pointer;color:#c7d8ef;padding:7px 0}.search-progress ol{padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}.search-progress li{padding:5px 9px;border:1px dashed #46556b;border-radius:7px;font-size:12px;color:#9eacc0}.search-progress li.complete{border-style:solid;color:#c8daed;background:#15273c}
