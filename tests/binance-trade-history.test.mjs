@@ -15,7 +15,7 @@ test('base fees reduce received quantity and multiple executions aggregate by or
 });
 test('unknown purchase and third-asset fees never become net profit; a zero fee remains known',()=>{
  const r=buildTradeHistory(symbol,[fill(1,false,1,120),fill(2,true,1,100,{commission:'.001',commissionAsset:'BNB'}),fill(3,false,1,110)]);
- assert.equal(r.rows[0].netPnlUsdt,null);assert.equal(r.rows[0].unknownReason,'UNVALUED_FEE');assert.equal(r.rows[0].pnlBeforeOtherFeesUsdt,10);assert.equal(r.rows[2].unknownReason,'MISSING_BUY');
+ assert.equal(r.rows[0].netPnlUsdt,null);assert.equal(r.rows[0].unknownReason,'UNVALUED_FEE');assert.equal(r.rows[0].pnlBeforeOtherFeesUsdt,10);assert.equal(r.rows[2].unknownReason,'MISSING_BUY');assert.equal(r.rows[2].status,'UNKNOWN');
  assert.equal(buildTradeHistory(symbol,[fill(1,true,1,100,{commissionAsset:'BNB'}),fill(2,false,1,110)]).rows[0].netPnlUsdt,10);
 });
 test('dust retains its allocated cost for later buys and sales',()=>{

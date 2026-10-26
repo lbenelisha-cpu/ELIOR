@@ -26,7 +26,7 @@ export function createTradeHistoryPanel(host,{read}){
   if(!rows.length){list.append(el('p','אין פעולות בטווח ובסינון שנבחרו.'));return;}
   for(const r of rows.slice(0,shown)){
    const card=el('details',null,'history-order'),summary=el('summary'),identity=el('div'),buy=r.side==='BUY',kind=r.netPnlUsdt==null?'unknown':r.netPnlUsdt>0?'gain':r.netPnlUsdt<0?'loss':'flat';
-   identity.append(el('b',(buy?'קנייה':'מכירה')+' · '+r.symbol),el('small',time(r.at)+' · '+(buy?'רכישה':r.status==='CLOSED'?'נסגרה':r.status==='DUST'?'יציאה עם שארית קטנה':'מכירה חלקית')));
+   identity.append(el('b',(buy?'קנייה':'מכירה')+' · '+r.symbol),el('small',time(r.at)+' · '+(buy?'רכישה':r.status==='UNKNOWN'?'ההחזקה הקודמת לא אומתה':r.status==='CLOSED'?'נסגרה לפי הביצועים':r.status==='DUST'?'יציאה עם שארית קטנה':'מכירה חלקית')));
    const result=el('div',null,'history-result '+kind);result.append(el('strong',buy?number(r.quoteQty)+' USDT':r.netPnlUsdt==null?'נתוני רווח חסרים':signed(r.netPnlUsdt)+' USDT'));
    result.append(el('small',buy?'סכום הקנייה לפני עמלה':r.netPnlPct==null?(r.unknownReason==='UNVALUED_FEE'?'עמלה במטבע נוסף':'חסרה קנייה תואמת'):signed(r.netPnlPct)+'% לאחר עמלות'));summary.append(identity,result);card.append(summary);
    const detail=el('div',null,'history-order-detail');
