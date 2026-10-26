@@ -1,0 +1,9 @@
+.position-map .position-change{display:flex;align-items:center;gap:15px;margin:16px 0 18px;padding:15px 17px;border-radius:13px;border:1px solid #34505c;background:#14252f;color:#a5bac5}
+.position-map .position-change[data-direction=gain]{color:#77e4b1;border-color:#387964;background:linear-gradient(110deg,#14252f,#153c30)}
+.position-map .position-change[data-direction=loss]{color:#ff8d9e;border-color:#834754;background:linear-gradient(110deg,#14252f,#3b222d)}
+.position-map .position-change-arrow{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:50%;border:1px solid currentColor;font-size:34px;line-height:1;background:#0c18204d}
+.position-map .position-change[data-direction=gain] .position-change-arrow,.position-map .position-change[data-direction=loss] .position-change-arrow{animation:position-change-pulse 1.8s ease-in-out infinite}
+.position-map .position-change-copy{min-width:0}.position-map .position-change-label{display:block;font-size:11px}.position-map .position-change-value{display:block;font-size:29px;line-height:1.2;font-weight:650;font-variant-numeric:tabular-nums;text-align:right;margin:4px 0;overflow-wrap:anywhere}.position-map .position-change-note{display:block;font-size:10px;line-height:1.5;color:#aac0c8}
+@keyframes position-change-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@media(prefers-reduced-motion:reduce){.position-map .position-change .position-change-arrow{animation:none}}
+@media(max-width:440px){.position-map .position-change{padding:12px;gap:12px}.position-map .position-change-value{font-size:26px}.position-map .position-change-arrow{width:42px;height:42px;font-size:30px}}

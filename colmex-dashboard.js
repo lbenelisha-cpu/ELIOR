@@ -1,5 +1,6 @@
 import {stockScenario,protectionView,closedTradeSummary,marketHealthView} from './lib/colmex-dashboard-math.mjs';
 import {monitorView} from './lib/colmex-monitor-view.mjs';
+import {positionChangeBadge} from './position-map-change.js?v=20261026-position-change';
 const $=id=>document.getElementById(id),txt=(id,value)=>{if($(id))$(id).textContent=value;};
 const n=v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:2});
 const price=v=>v>0?Number(v).toLocaleString('en-US',{maximumSignificantDigits:7}):'—';
@@ -21,6 +22,7 @@ function renderMap(now){
  txt('colmexMapTitle',p?.symbol||'מפת פוזיציה');
  if(!p){const empty=el('div',null,'map-empty');empty.append(el('div',null,'empty-rail'),el('p',!status||statusFailed?'ממתין לנתוני הפוזיציות.':account?.data?.positions?.length?'ההחזקות מופיעות בפרטי החשבון. המפה תוצג לפוזיציה שבמעקב האוטומטי.':'אין כרגע פוזיציה במעקב האוטומטי.\nכשתיפתח פוזיציה, רמות המחיר יוצגו כאן.'));host.append(empty);return;}
  const protection=protectionView(p,status.pendingActions,now),entry=Number(p.entryPrice)>0?Number(p.entryPrice):null,current=freshAt(p.lastQuoteAt,now,120000)&&Number(p.lastBid)>0?Number(p.lastBid):null;
+ host.append(positionChangeBadge(el,entry,current));
  const stop=protection.stop>0?protection.stop:null,target=protection.target>0?protection.target:null;
  const grid=el('div',null,'position-prices');
  for(const [label,value,cls] of [['כניסה',entry,''],['מחיר שנצפה',current,''],['סטופ מאושר',stop,'negative'],['יעד מאושר',target,'positive']]){const item=el('div');item.append(el('span',label),el('b',value===null?'—':'$'+price(value),cls));grid.append(item);}host.append(grid);

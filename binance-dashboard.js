@@ -1,4 +1,5 @@
 import {finite,tradeScenario,allocationParts,accountSummary,protectionState} from './lib/binance-dashboard-math.mjs';
+import {positionChangeBadge} from './position-map-change.js?v=20261026-position-change';
 
 const $=id=>document.getElementById(id);
 const number=(v,d=2)=>finite(v)===null?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
@@ -42,6 +43,7 @@ function renderPosition(summary,fresh){
   if(!selected||!fresh){host.append(node('p',!fresh?'נתוני הפוזיציה יוצגו לאחר אימות עדכני של החשבון.':'מפת המחירים תופיע כשיש פוזיציה פעילה.','quiet-empty'));return;}
   const p=list.find(p=>p.symbol===selected),s=snapshot.agent.agents?.find(a=>a.symbol===selected)?.strategy;
   const entry=finite(p.entryPrice),current=finite(p.usdtPrice??p.currentPrice);
+  host.append(positionChangeBadge(node,entry,current));
   const managed=s&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(s.exitPolicy);
   const protection=s?.brokerProtection;
   const verified=snapshot.mode==='live'&&managed&&snapshot.agent.config?.liveState?.ready===true&&protection?.status==='ACTIVE'&&finite(protection.verifiedAt)>Date.now()-60000;
