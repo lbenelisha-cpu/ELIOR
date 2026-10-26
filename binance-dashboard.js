@@ -41,10 +41,13 @@ function renderPosition(summary,fresh){
   $('positionMapChart').hidden=!selected||!fresh;
   text('positionMapTitle',selected||(!summary?'ממתין לפוזיציות':'אין פוזיציה פעילה'));
   if(!selected||!fresh){host.append(node('p',!fresh?'נתוני הפוזיציה יוצגו לאחר אימות עדכני של החשבון.':'מפת המחירים תופיע כשיש פוזיציה פעילה.','quiet-empty'));return;}
-  const p=list.find(p=>p.symbol===selected),s=snapshot.agent.agents?.find(a=>a.symbol===selected)?.strategy;
-  const entry=finite(p.entryPrice),current=finite(p.usdtPrice??p.currentPrice);
+  const p=list.find(p=>p.symbol===selected),agent=snapshot.agent.agents?.find(a=>a.symbol===selected),s=agent?.strategy;
+  const managed=agent?.position==='LONG'&&finite(s?.qty)>0&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(s.exitPolicy);
+  // The map describes the open managed trade. Its recorded fill price remains
+  // available even while wallet-wide cost accounting is being reconciled.
+  const recordedEntry=managed&&finite(s.entryPrice)>0?finite(s.entryPrice):null;
+  const entry=recordedEntry??finite(p.entryPrice),current=finite(p.usdtPrice??p.currentPrice);
   host.append(positionChangeBadge(node,entry,current));
-  const managed=s&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(s.exitPolicy);
   const protection=s?.brokerProtection;
   const verified=snapshot.mode==='live'&&managed&&snapshot.agent.config?.liveState?.ready===true&&protection?.status==='ACTIVE'&&finite(protection.verifiedAt)>Date.now()-60000;
   const stop=managed?finite(verified?protection.stopPrice:s.effectiveStopPrice):null;
@@ -62,7 +65,8 @@ function renderPosition(summary,fresh){
     host.append(node('p','מרחק מהמחיר הנוכחי: סטופ '+number((stop/current-1)*100)+'% · יעד '+signed((target/current-1)*100)+'%','map-distances'));
   }
   host.append(node('p',verified?(serverTarget?'● הסטופ אומת בבורסה · יעד הרווח תלוי בפעילות השרת':'● מחירי ההגנה אומתו בבורסה'):snapshot.mode==='demo'?'סימולציה · רמות מתוכננות, ללא הגנה בחשבון LIVE':managed?'הגנות הבורסה טרם אומתו · הרמות מוצגות לפי הגדרות הפוזיציה':'לא אומתה פוזיציה מנוהלת · אין רמות הגנה להצגה',verified?'map-note positive':'map-note'));
-  host.append(node('small','המחירים לפני עמלות; מחיר הביצוע עשוי להיות שונה.'));
+  if(recordedEntry!==null)host.append(node('small','מחיר הכניסה לפי העסקה המנוהלת · לפני עמלות.'));
+  host.append(node('small','רמות הסטופ והיעד לפני עמלות; מחיר הביצוע עשוי להיות שונה.'));
 }
 
 function render(){
