@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {RESEARCH_PROTOCOL,researchSnapshot,researchPhase,appendResearchOutcome,dayBlockInterval,tradingResearchReport} from '../lib/trading-research.mjs';
 import {recordStrategyObservation,strategyFollowupReport} from '../lib/strategy-followup.mjs';
 import {renderTradingResearch} from '../trading-research-ui.js';
+import {renderStrategyReview} from '../strategy-followup-ui.js';
 import {RESEARCH_SOURCES} from '../lib/trading-research-sources.mjs';
 import {evaluateDailyTrade} from '../lib/wyckoff-evaluation.mjs';
 const step=300000,day=86400000,at=Date.parse('2026-10-27T15:00Z');
@@ -77,4 +78,11 @@ test('UI presents primary sources, backend unknown state, uncertainty and resear
  const state={};recordStrategyObservation(state,event());recordStrategyObservation(state,{...event(),at:at+1800000,bars:[{closeTime:at+1800000,close:125}]});renderTradingResearch(host,strategyFollowupReport(state).research,{document:doc});
  assert.match(text(host),/תרחישי עלות בלבד/);assert.match(text(host),/אינן מוסיפות הוראות מסחר/);assert.match(text(host),/100 איתותים/);
  assert.match(fs.readFileSync(new URL('../scripts/install-confirmed-quality.sh',import.meta.url),'utf8'),/researchMonitoring\?\.version==='TRADING_RESEARCH_V1'/);
+});
+test('expanded research and sources remain open across polling without reopening panels the user collapsed',()=>{
+ const el=tag=>({tag,children:[],textContent:'',append(...items){this.children.push(...items);},replaceChildren(){this.children=[];},querySelectorAll(selector){const all=this.children.flatMap(c=>[c,...c.querySelectorAll('details')]);return all.filter(c=>c.tag==='details'&&(selector!=='details[open]'||c.open));}}),host=el('host'),doc={createElement:el};
+ renderStrategyReview(host,{actual:[],observations:[],research:tradingResearchReport({})},{document:doc});for(const e of host.querySelectorAll('details'))e.open=true;
+ renderStrategyReview(host,{actual:[],observations:[],research:tradingResearchReport({})},{document:doc});assert.equal(host.querySelectorAll('details[open]').length,2);
+ for(const e of host.querySelectorAll('details'))e.open=false;
+ renderStrategyReview(host,null,{document:doc});assert.equal(host.querySelectorAll('details[open]').length,0);
 });
