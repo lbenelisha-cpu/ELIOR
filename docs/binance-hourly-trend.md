@@ -1,56 +1,51 @@
-# Wyckoff with hourly trend confirmation
+# Current entry policy: RSI40 without hourly trend confirmation
 
-Automatic Binance entries require the existing 5m Wyckoff confirmation plus:
-last completed UTC hourly close > SMA20 of hourly closes > SMA50 of hourly
-closes. SMA20 must strictly exceed SMA50. The module derives exactly 50
-completed, continuous hours from 600 existing closed 5m candles. The unfinished
-hour never affects approval. Missing, duplicate, malformed or stale required
-bars produce WAIT_HOURLY_TREND_DATA rather than a trade approval.
+As authorized on 2026-10-26, automatic Binance and Colmex entries require the
+existing 5m Wyckoff Spring structure with RSI(14) between 0 and 40, inclusive,
+including the current open candle. Neither platform requires an hourly uptrend.
+Colmex already operated without an hourly gate; its RSI maximum changes from 30
+to 40. Binance removes the close > SMA20 > SMA50 requirement both during
+evaluation and before automatic order submission.
 
-The evaluation layer applies this gate to new DEMO/LIVE automatic entries;
-existing positions bypass entry gating and retain their saved exit policy.
-The actual automatic LIVE submission rechecks the current gate from the existing
-candle cache/feed before creating any order intent. Fresh execution prices,
-five LIVE slots, funding, fees reserve, signal expiry and fresh post-sale signal
-requirements remain enforced. Manual buys remain explicit user-directed actions
-and bypass the automatic Wyckoff/trend gates. Manual sells are unchanged.
+Binance evaluation, final execution validation, closed-bar replay and public
+configuration use BINANCE_ENTRY_RSI. Colmex live entry and closed-market
+preparation use AUTO_POLICY.entryRsi. Browser charts highlight the 0–40 entry
+range. The standard RSI screener's optional 0–30 preset remains a separate
+display filter. The generic shared engine retains its default 30 for historical
+callers; both production entry adapters explicitly select 40.
 
-No volume, depth, momentum-strength, RSI or ATR entry/exit filters are enabled
-by this change. The existing loss stop, profit retention, and profit-hold rules
-are unchanged. This implements only the trend-entry variant in the frozen
-60-day research comparison, not the ATR or combined alternatives. Historical
-5m study confirmations still differ from live intrabar confirmation timing.
-The last-20-day research result for this variant was negative (-17.99%);
-the update does not establish or promise profitability.
+Fresh price and candle checks, full Wyckoff structure, pattern reuse limits,
+post-sale boundaries, stablecoin exclusion on Binance, cash and position caps,
+and existing exit/protection rules remain enforced. Binance's high-RSI Spring
+reset now occurs above 40. No historical trade records or search boundaries are
+rewritten. Policy versions invalidate stale Binance replay and Colmex
+preparation caches. Closed-market preparation still cannot submit orders.
 
-Agent diagnostics retain the underlying Wyckoff analysis signal separately from
-the final entry approval. UI displays the hourly close, SMA20, SMA50 and exact
-hour-close time. The UI indicates pending server installation when connected
-to an older backend rather than claiming the gate is already active. Read-only
-market-watch replay and technical history use the same quality gate. Policy V5
-separates new Kelly learning cohorts and resets stale market-watch replay labels.
-Existing fills and their historical rules remain untouched.
+The hourly indicator module remains available for historical research. Its
+mathematical tests do not describe the current production entry requirement.
 
 ## Deployment
 
-From the existing Ubuntu server terminal:
+Colmex server functions and both frontends deploy from main through Netlify.
+Install the Binance backend from a tested, merged full commit SHA:
 
+```bash
+cd /opt/levi-binance
+git fetch origin main
+git show REVISION:scripts/install-binance-rsi40.sh > /tmp/levi-rsi40-install.sh
+bash /tmp/levi-rsi40-install.sh REVISION
 ```
-cd /opt/levi-binance &&
-git fetch origin &&
-git show REVISION:scripts/install-binance-hourly-trend.sh > /tmp/levi-hourly-trend-install.sh &&
-bash /tmp/levi-hourly-trend-install.sh REVISION
-```
 
-The pinned installer stages and syntax-checks the server plus dependencies,
-backs up the old server/lib, restarts the service and checks the read-only
-/api/binance-mode capability for the 20/50 filter. It restores the backup if
-startup or capability verification fails. It sends no manual trade order;
-normal authorized automatic operation resumes with the installed policy.
+The installer stages and syntax-checks the five affected backend files, runs an
+offline policy smoke check, backs up the replaced code, stops the service before
+copying, then starts it and verifies the public GET /api/binance-mode response.
+It restores code if startup or capability verification fails. Account data,
+environment settings, pending intents, positions and trade journals are not
+modified by the installer. It sends no test order; existing authorized automatic
+operation resumes using the updated entry policy.
 
-Validation: all 379 tests pass, including strict averages, exclusion of partial
-and future hours, stale/missing/duplicate data, automatic pre-submit rejection,
-manual-action compatibility and preserved post-sale requirements. Live gate
-values also match the frozen simulation at 136 historical BTC observations.
-No real orders were submitted during verification. SSH from the coding workspace
-is unavailable; server installation must be run in the owner's SSH terminal.
+Validation covers RSI in the newly allowed 30–40 range, the inclusive boundary,
+rejection above 40, caller override rejection, stale data and pattern reuse,
+stablecoin rejection at submission, missing/downward hourly data, preparation
+without execution, and the complete regression suite. Relaxing entry conditions
+does not establish or promise higher returns.

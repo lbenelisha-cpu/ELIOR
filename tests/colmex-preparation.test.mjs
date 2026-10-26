@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {analyzePreparation,runPreparationCycle} from '../lib/colmex-preparation.mjs';
+import {analyzePreparation,runPreparationCycle,PREPARATION_VERSION} from '../lib/colmex-preparation.mjs';
 import {initialState,runCycle} from '../lib/colmex-auto-runner.mjs';
 import {AUTO_POLICY,LIVE_ACK} from '../lib/colmex-auto-policy.mjs';
 import {makeHandler} from '../netlify/functions/colmex-auto-status.mjs';
@@ -48,11 +48,11 @@ test('real closed-session cycle scans with a full portfolio, without consuming s
 });
 
 test('complete close is reused for six hours, a new close invalidates immediately',async()=>{
- const state=initialState(now);state.preparation={version:'CLOSED_MARKET_WYCKOFF_V1',rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,analyzePreparation(history(),{symbol,now})]))};
+ const state=initialState(now);state.preparation={version:PREPARATION_VERSION,rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,analyzePreparation(history(),{symbol,now})]))};
  let reads=0;const broker={instruments:async()=>{reads++;return [];}};
  await runPreparationCycle({state,broker,account:'123',save:async()=>{},now:()=>now+35*60000});assert.equal(reads,0);
  await runPreparationCycle({state,broker,account:'123',save:async()=>{},now:()=>now+6*3600000});assert.equal(reads,1);
- const fresh=initialState(now);fresh.preparation={version:'CLOSED_MARKET_WYCKOFF_V1',rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,{...analyzePreparation(history(),{symbol,now}),checkedAt:Date.parse('2026-10-26T19:59:00Z')}]))};
+ const fresh=initialState(now);fresh.preparation={version:PREPARATION_VERSION,rows:Object.fromEntries(AUTO_POLICY.symbols.map(symbol=>[symbol,{...analyzePreparation(history(),{symbol,now}),checkedAt:Date.parse('2026-10-26T19:59:00Z')}]))};
  await runPreparationCycle({state:fresh,broker,account:'123',save:async()=>{},now:()=>Date.parse('2026-10-26T20:01:00Z')});assert.equal(reads,2);
 });
 test('closed empty snapshot cache expires, and pending work or market opening bypasses it',async()=>{
@@ -67,4 +67,10 @@ test('broker orders and known positions never qualify for empty account caching'
  const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
  let reads=0,t=now;const s=initialState(now),broker={snapshot:async()=>{reads++;return {positions:[],orders:[{side:'buy'}],history:[],account:{},state:{}};},instruments:async()=>[]};
  await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});t+=60000;await runCycle({state:s,broker,env,save:async()=>{},now:()=>t});assert.equal(reads,2);assert.equal(s.closedEmptySnapshotAt,null);
+});
+
+test('preparation accepts RSI between 30 and 40, keeps Spring required and never grants execution',()=>{
+ const h=history();Object.assign(h.barDetails.at(-1),{o:86,h:86,l:50,c:80});
+ const ready=analyzePreparation(h,{symbol:'AAPL',now});assert.ok(ready.rsi>30&&ready.rsi<40);assert.equal(ready.candidate,true);assert.equal(ready.executionReady,false);
+ h.barDetails.at(-1).c=85;const high=analyzePreparation(h,{symbol:'AAPL',now});assert.equal(high.reason,'WAIT_RSI_0_40');assert.equal(high.candidate,false);
 });

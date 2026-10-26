@@ -253,7 +253,7 @@
         <div id="chartVolume"></div>
         <div id="rsiPanel" class="indicator-panel"><h3 class="indicator-heading rsi-heading">RSI (14) · מדד עוצמה יחסית</h3><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
         <div id="rocPanel" class="indicator-panel"><h3 class="indicator-heading roc-heading">ROC (12) · שיעור שינוי המחיר (%)</h3><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
-        <p class="mini">RSI (14) של 5 דקות בין 0 ל־30 יחד עם Spring: תנאי כניסה גם בנר פתוח. בתצוגת משך נר אחר ה־RSI משתנה בהתאם. ROC לתצוגה בלבד.</p>
+        <p class="mini">RSI (14) של 5 דקות בין 0 ל־40, כולל 40, יחד עם Spring: תנאי כניסה גם בנר פתוח. אין דרישה למגמה עולה בשעה. RSI מוצג תמיד לפי 5 דקות; ROC לתצוגה בלבד.</p>
         <details class="chart-analysis dashboard-fold" aria-label="ניתוחי וויקוף על הגרף"><summary>ניתוחי וויקוף והסבר הסימונים</summary>
           <p>🟢 אות אושר · 🟠 ממתין לתנאים · 🔴 שגיאת ניתוח · 🔵 עסקה בפועל</p>
           <p class="mini">לחץ על סימון בגרף או על בדיקה למטה. בדיקות חוזרות מקובצות; כל שלב מסומן בצבע ייחודי; נרות תבנית הקנייה מהבהבים בזמן פוזיציה פעילה בלבד; תבנית היסטורית מוצגת ללא הבהוב ועם תאריך; הגרף מציג את הטווח שבחרת. נקודות אישור שמחוץ לטווח אינן מוצגות. נשמרות עד 2,000 קבוצות לכל מטבע ועד 90 יום.</p>
@@ -331,7 +331,7 @@
 
         <div class="rules-box">
           <h3>כללי מסחר</h3>
-          <p><b>קנייה:</b> נרות 5 דקות סגורים כולל פתילים: שיא → שפל ראשון → התאוששות → בדיקה משנית → לפחות 3 נרות דשדוש → שפל נמוך יותר → חציית השפל הראשון במחיר החי לאחר זיהוי Spring, ללא המתנה לסגירת נר נוסף.</p>
+          <p><b>קנייה:</b> נרות 5 דקות כולל פתילים: שיא → שפל ראשון → התאוששות → בדיקה משנית → לפחות 3 נרות דשדוש → Spring ו־RSI חי בין 0 ל־40, כולל 40. אין המתנה לסגירת הנר ואין דרישה למגמה עולה בשעה.</p>
           <p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
         </div>
       </div></details>
@@ -429,12 +429,12 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261024-settings"></script>
-  <script src="/binance-agent.js?v=20261026-rise-labels"></script>
+  <script src="/binance-agent.js?v=20261026-rsi40"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261025-stability"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261024-current-rsi"></script><script type="module" src="/binance-dashboard.js?v=20261025-stop-fallback"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261025-stability"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261025-stop-fallback"></script></body>
 </html>
