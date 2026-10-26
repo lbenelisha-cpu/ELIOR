@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="/binance-agent.css?v=20261024-latest-labels-20261021-edge-axis">
+  <link rel="stylesheet" href="/binance-agent.css?v=20261026-rise-labels">
 <link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
   <link rel="stylesheet" href="/binance-dashboard.css?v=20261026-platform-tabs">
 </head>
@@ -238,14 +238,18 @@
         </details>
         <p class="mini">רענון תצוגה אוטומטי בכל 30 שניות כשהמסך פתוח · מנגנון המסחר בשרת פועל בנפרד.</p>
         <div id="chartTools"></div>
+        <div class="chart-rise-controls"><label><input type="checkbox" id="showRises" checked> הצג עליות של 1% ומעלה</label><span>שפל ← שיא לפי מחירי סגירה</span></div>
         <div class="chart-wrap">
           <div id="binanceTradeRisk" hidden></div>
           <canvas id="priceChart" width="1200" height="560"></canvas>
+          <div id="chartRises" class="chart-rises" aria-label="אחוזי עלייה על הגרף"></div>
           <div id="wyckoffPivots" class="wyckoff-pivots"></div>
           <div id="wyckoffOccurrences" class="wyckoff-occurrences"></div>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
+        <p id="chartRiseDetails" class="mini chart-rise-details" role="status"></p>
+        <details class="chart-rise-breakdown"><summary id="chartRiseSummary">ממתין לנרות</summary><p class="mini">נרות סגורים בלבד. עלייה מחושבת מהשפל לשיא במחירי הסגירה; ירידה של 1% מהשיא מסיימת מהלך. מסגרת מקווקוות: מהלך מתהווה או נתונים שנקטעו. החישוב מתייחס לטווח ולמשך הנר שבחרת ואינו רווח מעסקה.</p><div id="chartRiseList"></div></details>
         <div id="chartVolume"></div>
         <div id="rsiPanel" class="indicator-panel"><h3 class="indicator-heading rsi-heading">RSI (14) · מדד עוצמה יחסית</h3><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
         <div id="rocPanel" class="indicator-panel"><h3 class="indicator-heading roc-heading">ROC (12) · שיעור שינוי המחיר (%)</h3><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
@@ -420,12 +424,12 @@
   <dialog id="deviceConnectionDialog" aria-labelledby="deviceConnectionTitle"><h2 id="deviceConnectionTitle">חיבור מכשיר למסחר</h2><p>הזן את הקוד הקבוע שהוגדר בשרת. אותו קוד מתאים גם למכשיר נוסף. החיבור נשמר עד שנה; אין קוד בכל פעולה.</p><label>קוד חיבור — שש ספרות<input id="devicePairCode" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" dir="ltr"></label><p id="devicePairResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="devicePairSubmit" type="button">חבר מכשיר</button><button id="devicePairCancel" type="button">סגור</button></div></dialog>
   <dialog id="manualTradeDialog" aria-labelledby="manualTradeTitle"><h2 id="manualTradeTitle"></h2><p id="manualTradeSummary"></p><label id="manualAmountRow">סכום קנייה ב־USDT<input id="manualQuoteAmount" type="number" inputmode="decimal" min="5" step="0.01" autocomplete="off"></label><p id="manualTradePolicy" class="mini"></p><p id="manualTradeResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="manualTradeSubmit" type="button">אשר</button><button id="manualTradeCheck" type="button" hidden>בדוק מצב בקשה</button><button id="manualTradeCancel" type="button">סגור / ביטול</button></div></dialog>
   <script src="/binance-chart-decisions.js?v=20261025-asset-search"></script>
-  <script src="/binance-indicators.js?v=20261017-history"></script>
+  <script src="/binance-indicators.js?v=20261026-rise-labels"></script>
   <script src="/binance-control-session.js?v=20261019-device-access"></script>
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261024-settings"></script>
-  <script src="/binance-agent.js?v=20261025-visual"></script>
+  <script src="/binance-agent.js?v=20261026-rise-labels"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
