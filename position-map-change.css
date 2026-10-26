@@ -7,3 +7,5 @@
 @keyframes position-change-pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @media(prefers-reduced-motion:reduce){.position-map .position-change .position-change-arrow{animation:none}}
 @media(max-width:440px){.position-map .position-change{padding:12px;gap:12px}.position-map .position-change-value{font-size:26px}.position-map .position-change-arrow{width:42px;height:42px;font-size:30px}}
+
+.position-map .position-change-side{display:block;width:fit-content;padding:3px 8px;border:1px solid currentColor;border-radius:7px;font-size:11px;line-height:1.4;margin-bottom:7px;opacity:.95}

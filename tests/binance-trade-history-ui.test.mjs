@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+function fixture(read){
+ const nodes=[];function element(tag){const n={tag,children:[],textContent:'',hidden:false,value:'',events:{},append(...xs){this.children.push(...xs);if(tag==='select'&&!this.value)this.value=xs[0]?.value||'';},replaceChildren(...xs){this.children=xs;},setAttribute(k,v){this[k]=v;},addEventListener(k,fn){this.events[k]=fn;}};nodes.push(n);return n;}
+ const context=vm.createContext({document:{createElement:element},Date,Intl,Number,Error});
+ const source=fs.readFileSync(new URL('../binance-trade-history.js',import.meta.url),'utf8').split("const host=document.getElementById('binanceHistoryPanel');")[0].replace('export function','function');vm.runInContext(source,context);
+ const host=element('section'),panel=context.createTradeHistoryPanel(host,{read});const text=n=>n.textContent+n.children.map(text).join('|');
+ return {panel,nodes,text:()=>text(host)};
+}
+const response={ok:true,complete:true,asOf:new Date().toISOString(),rows:[{symbol:'TESTUSDT',orderId:'1',side:'SELL',at:new Date().toISOString(),qty:1,quoteQty:110,price:110,fillCount:1,commissions:[{asset:'BNB',amount:.01}],entryPrice:100,entryAt:new Date().toISOString(),netPnlUsdt:null,netPnlPct:null,unknownReason:'UNVALUED_FEE',pnlBeforeOtherFeesUsdt:10,status:'CLOSED'}]};
+const turn=()=>new Promise(r=>setImmediate(r));
+test('history keeps unknown net profit distinct from a positive result before unconverted fees',async()=>{const u=fixture(async()=>response);u.panel.setContext({mode:'live',visible:true,symbols:['TESTUSDT']});await turn();assert.match(u.text(),/נתוני רווח חסרים/);assert.match(u.text(),/זו אינה תוצאת נטו/);assert.doesNotMatch(u.text(),/\+10 USDT\|.*לאחר עמלות/);});
+test('switching mode invalidates an in-flight private history response',async()=>{let resolve;const u=fixture(()=>new Promise(r=>resolve=r));u.panel.setContext({mode:'live',visible:true,symbols:['TESTUSDT']});u.panel.setContext({mode:'demo'});resolve(response);await turn();assert.doesNotMatch(u.text(),/מספר פקודה/);assert.match(u.text(),/יומן הסימולציה/);});
+test('failed refresh removes previous rows, while automatic retries are throttled',async()=>{let calls=0;const u=fixture(async()=>{if(calls++)throw Error('history unavailable');return response;});const ctx={mode:'live',visible:true,symbols:['TESTUSDT']};u.panel.setContext(ctx);await turn();await u.panel.load();assert.doesNotMatch(u.text(),/מספר פקודה/);assert.match(u.text(),/history unavailable/);u.panel.setContext(ctx);await turn();assert.equal(calls,2);});

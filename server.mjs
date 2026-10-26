@@ -8,6 +8,8 @@ import {DEFAULT_TRADE_SETTINGS,validateTradeSettings,normalizeTradeSettingsRecor
 import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
+import {createTradeHistoryReader,historySymbol} from './lib/binance-trade-history.mjs';
+const tradeHistoryReader=createTradeHistoryReader({fetchTrades:(symbol,params)=>signedBinanceGet('/api/v3/myTrades',{symbol,...params})});
 const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
 import {rsiSnapshot} from './lib/rsi-screener.mjs';
 import {createChartReader} from './lib/binance-chart-reader.mjs';
@@ -2326,6 +2328,11 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-kelly'&&req.method==='GET')return send(res,{ok:true,live:kellyLearningReport(liveActionLog)});
+
+  if(u.pathname==='/api/binance-trade-history'&&req.method==='GET'){
+    let symbol;try{symbol=historySymbol(u.searchParams.get('symbol'));}catch{return send(res,{ok:false,error:'יש להזין צמד USDT תקין'},400);}
+    tradeHistoryReader.read(symbol,liveActionLog).then(data=>send(res,{ok:true,...data})).catch(error=>send(res,{ok:false,error:error.message==='HISTORY_BUSY'?'טעינת היסטוריה כבר מתבצעת. נסה שוב בעוד רגע.':'לא ניתן לאמת כרגע את היסטוריית Binance. נסה שוב מאוחר יותר.'},503));return;
+  }
 
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{

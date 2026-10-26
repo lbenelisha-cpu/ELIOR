@@ -26,3 +26,15 @@ test('multiple open purchases keep weighted basis and a real unexplained withdra
  const p=liveBalancePnl({asset:'BEL',qty:15,usdtPrice:3,valueUsdt:45},actions);assert.equal(p.allocationIls,35);
  assert.equal(liveBalancePnl({asset:'BEL',qty:13,usdtPrice:3,valueUsdt:39},actions).pnlIls,null);
 });
+test('a floating-point-only wallet reconciliation preserves purchase cost and quote fees',()=>{
+ const qty=136.7631,actual=136.76309999999998;
+ const actions=[{type:'POSITION_RECONCILIATION',symbol:'TESTUSDT',qty:actual},{type:'BUY',symbol:'TESTUSDT',qty,amountUsdt:100,quoteFeeUsdt:.1}];
+ const p=liveBalancePnl({asset:'TEST',qty:actual,usdtPrice:1,valueUsdt:actual},actions);
+ assert.equal(p.allocationIls,100.1);assert.equal(p.entryPrice,100.1/qty);assert.equal(p.pnlIls,actual-100.1);
+});
+test('real reconciliations remain unknown even when followed by a floating-point-only adjustment',()=>{
+ for(const reduction of [1e-8,.1,10]){
+  const qty=100-reduction,actions=[{type:'POSITION_RECONCILIATION',symbol:'TESTUSDT',qty:qty-Number.EPSILON*qty},{type:'POSITION_RECONCILIATION',symbol:'TESTUSDT',qty},{type:'BUY',symbol:'TESTUSDT',qty:100,amountUsdt:200}];
+  assert.equal(liveBalancePnl({asset:'TEST',qty,usdtPrice:3,valueUsdt:qty*3},actions).pnlIls,null);
+ }
+});

@@ -1,6 +1,6 @@
 import {stockScenario,protectionView,closedTradeSummary,marketHealthView} from './lib/colmex-dashboard-math.mjs';
 import {monitorView} from './lib/colmex-monitor-view.mjs';
-import {positionChangeBadge} from './position-map-change.js?v=20261026-position-change';
+import {positionChangeBadge} from './position-map-change.js?v=20261026-position-side';
 const $=id=>document.getElementById(id),txt=(id,value)=>{if($(id))$(id).textContent=value;};
 const n=v=>v===null||v===undefined||v===''||!Number.isFinite(Number(v))?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:2});
 const price=v=>v>0?Number(v).toLocaleString('en-US',{maximumSignificantDigits:7}):'—';
