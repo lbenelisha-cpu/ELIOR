@@ -8,7 +8,7 @@ systemctl is-active --quiet levi-binance
 stage=$(mktemp -d /tmp/levi-ma-audit.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/lib" "$stage/scripts"
-files=(server.mjs lib/ma-audit-file.mjs lib/ma-decision-audit.mjs lib/ma-slope.mjs lib/ma-slope-schedule.mjs lib/ma-slope-decision.mjs scripts/verify-binance-ma-audit.mjs ma-decision-journal.js ma-decision-journal.css)
+files=(server.mjs binance-agent.html binance-agent.js ma-slope-panel.js ma-slope-panel.css position-alpha-panel.js lib/position-alpha.mjs lib/colmex-market-hours.mjs lib/wyckoff-live-positions.mjs lib/ma-audit-file.mjs lib/ma-decision-audit.mjs lib/ma-slope.mjs lib/ma-slope-schedule.mjs lib/ma-slope-decision.mjs scripts/verify-binance-ma-audit.mjs ma-decision-journal.js ma-decision-journal.css)
 existing=(); missing=()
 for file in "${files[@]}"; do
  git show "$revision:$file" > "$stage/$file"
@@ -18,6 +18,7 @@ done
 STAGED_AUDIT="$stage/lib/ma-decision-audit.mjs" node --input-type=module - <<'JS'
 const {makeAuditRecord}=await import(process.env.STAGED_AUDIT);
 const row=makeAuditRecord({platform:'BINANCE',symbol:'BTCUSDT',at:Date.now(),action:'WAIT',bars:[]});
+if(row.positionAlpha?.version!=='POSITION_ALPHA_5M_V1')throw Error('Position alpha smoke failed');
 if(row.checks.length!==2||row.checks.some(c=>c.comparison!=='UNAVAILABLE'))throw Error('Audit smoke failed');
 JS
 backup="/root/levi-before-ma-audit-$(date +%Y%m%d-%H%M%S).tgz"

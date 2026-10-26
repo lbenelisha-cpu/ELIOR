@@ -270,6 +270,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   d={...d,agents:activeContext(d,currentMode,liveAccount).agents};
   rememberWyckoffDisplay(d.agents,currentMode);
   currentAgentData=d;
+  if(window.LEVI_MA_SLOPE_DATA?.symbol===selectedSymbol)publishSlopeData(selectedSymbol,window.LEVI_MA_SLOPE_DATA.bars);
   if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-binance-rsi',{detail:d.agents||[]}));
   const wx=d.wyckoffStats||{};
   put('#wyckoffBuys',wx.buys??0);
@@ -687,7 +688,8 @@ async function runBinanceWyckoffScan(candles,rows,position){
 }
 function publishSlopeData(symbol,bars){
  if(typeof window==='undefined')return;
- window.LEVI_MA_SLOPE_DATA={symbol,bars};globalThis.LEVI_MA_SLOPE?.renderBinance(window.LEVI_MA_SLOPE_DATA);
+ const agent=currentAgentData?.agents?.find(a=>a.symbol===symbol),position=agent?.position==='LONG'?agent.strategy:null;
+ window.LEVI_MA_SLOPE_DATA={symbol,bars,position,price:position?.price,priceAt:position?.positionQuoteAt};globalThis.LEVI_MA_SLOPE?.renderBinance(window.LEVI_MA_SLOPE_DATA);
 }
 let chartLoadInFlight=null;
 let chartLastReadKey=null,chartLastReadAt=0;
