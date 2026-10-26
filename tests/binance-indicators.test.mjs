@@ -39,3 +39,27 @@ test('rises never use open/future candles, bridge gaps or infer an intrabar path
 test('rise percentages work for tiny crypto prices and do not mutate input candles',()=>{
  const rows=riseBars([.000004,.00000408,.0000040392]),before=structuredClone(rows),moves=rises(rows);assert.ok(Math.abs(moves[0].pct-2)<1e-10);assert.equal(moves[0].status,'completed');assert.deepEqual(rows,before);
 });
+const falls=globalThis.BinanceIndicators.fallingMoves,layout=globalThis.BinanceIndicators.moveLabelLayout;
+test('fall labels measure from the high and combine small recoveries until a 1% rebound',()=>{
+ assert.equal(falls(riseBars([100,99.01])).length,0);assert.equal(falls(riseBars([100,99]))[0].pct,-1);
+ const m=falls(riseBars([100,98,98.4,95,95.95]));assert.equal(m.length,1);assert.equal(m[0].pct,-5);assert.equal(m[0].status,'completed');assert.equal(m[0].endIndex,3);
+ const rows=riseBars([100,98,80]);rows[2].closed=false;assert.equal(falls(rows)[0].pct,-2);
+});
+test('fall labels do not connect across missing data or use future candles',()=>{
+ const rows=riseBars([100,98,96,94]);rows[2].openTime+=300000;rows[2].closeTime+=300000;rows[3].openTime+=300000;rows[3].closeTime+=300000;
+ const m=falls(rows);assert.equal(m.length,2);assert.equal(m[0].status,'interrupted');assert.equal(m[1].startPrice,96);
+ assert.equal(falls(riseBars([100,98,80]),{now:riseBars([100,98])[1].closeTime})[0].pct,-2);
+});
+test('dense labels use two non-overlapping rows and preserve every move in overflow groups',()=>{
+ const moves=Array.from({length:120},(_,i)=>({endIndex:i,pct:i%17+1}));
+ for(const right of [270,700,1300]){
+  const placed=layout(moves,{left:18,right,step:(right-18)/120});
+  assert.equal(placed.reduce((n,p)=>n+p.moves.length,0),120);assert.ok(placed.some(p=>p.overflow));
+  assert.ok(placed.every(p=>[0,1].includes(p.row)&&p.x>=18&&p.x+p.width<=right));
+  for(const row of [0,1]){const items=placed.filter(p=>p.row===row).sort((a,b)=>a.x-b.x);for(let i=1;i<items.length;i++)assert.ok(items[i-1].x+items[i-1].width<=items[i].x);}
+ }
+});
+test('two movements at the same chart location stack instead of covering each other',()=>{
+ const moves=[{endIndex:5,pct:2},{endIndex:5,pct:3}],p=layout(moves,{left:18,right:800,step:5});
+ assert.equal(p.length,2);assert.equal(p[0].x,p[1].x);assert.notEqual(p[0].row,p[1].row);assert.equal(p[0].overflow,false);assert.equal(p[1].overflow,false);
+});
