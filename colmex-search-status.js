@@ -1,4 +1,4 @@
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261026-entry-fix';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261026-quality';
 const reasons={INITIAL_PEAK_REACHED:'המחיר חזר לשיא הראשוני לפני השלמת התבנית',LOW_BROKEN_BEFORE_TEST:'השפל הראשון נשבר לפני שאושרה בדיקה חוזרת',LOW_BROKEN_BEFORE_CONSOLIDATION:'השפל הראשון נשבר לפני שלב הדשדוש',LOW_BROKEN_TOO_EARLY:'השפל הראשון נשבר לפני שהושלמו שלושה נרות דשדוש',NEWER_PEAK:'זוהה שיא מקומי חדש והחיפוש עבר לתבנית עדכנית',SPRING_EXPIRED:'חלון ה־Spring הסתיים בלי כניסה',SETUP_EXPIRED:'התבנית לא הושלמה בתוך חלון החיפוש',CONFIRMATION_ENDED:'אישור התבנית הקודמת פג או נפסל'};
 const time=at=>Number.isFinite(at)?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'—';
 const price=n=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:6}):'—';
@@ -25,5 +25,6 @@ export function renderSearchStatus(host,diagnostic,{symbol='',check=null,positio
  }
  if(!manual&&!position&&diagnostic?.lastReset)add('p','למה הסימונים הקודמים התחלפו? '+searchResetText(diagnostic.lastReset),'search-reset');
  if(!manual&&check)add('p','בדיקת שרת אחרונה: '+time(check.at)+' · '+entryReasonLabel(check.reason)+(Number.isFinite(check.entryRsi)?' · RSI '+check.entryRsi.toFixed(2):''),'search-server-check');
+ if(!manual&&check?.quality){const q=check.quality;add('p','תנאי איכות בבדיקה: '+(q.confirmed?'נר אישור זוהה':'ממתין לנר אישור')+' · מגמה: '+(!q.trend?.ready?'חסרים נתונים':q.trend.blocked?'חוסמת קנייה':'אינה חוסמת')+' · יחס מחזור: '+(Number.isFinite(q.volume?.ratio)?q.volume.ratio.toFixed(2)+'×':'לא זמין')+' · ATR: '+price(q.atr),'search-quality');}
  if(!manual&&!position)add('small','הסבר האיפוס משוחזר מהנרות הזמינים. נקודות שנפסלו יוצאות מהחיפוש הפעיל; זיהוי שיא ושפל לבדם אינו אישור קנייה.');
 }

@@ -2,17 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {earlyWaveEntry,assertEarlyWaveEntry} from '../lib/early-wave-entry.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from '../lib/wyckoff-evaluation.mjs';
-import {entrySignal} from '../lib/colmex-auto-policy.mjs';
+import {entrySignal,legacyEntrySignal} from '../lib/colmex-auto-policy.mjs';
 import {rsiSeries} from '../lib/wyckoff-spring-rsi.mjs';
 const bucket=Date.parse('2026-10-26T15:00:00Z'),now=bucket+10000;
 function bars(){return Array.from({length:20},(_,i)=>({openTime:bucket-(20-i)*300000,closeTime:bucket-(19-i)*300000,open:99+i*.05,high:100.5,low:i===14?100:100.1,close:100.2+i*.01,closed:true,timeframe:'5m'})).map(b=>({...b,open:b.close}));}
 const options=(extra={})=>({price:101,priceAsOf:now,now,...extra});
-test('a causal 1% rebound and breakout qualify without an RSI ceiling on both platforms',()=>{
+test('a causal 1% rebound and breakout qualify without an RSI ceiling for Binance legacy mode and the Colmex comparison baseline',()=>{
  const b=bars();assert.ok(rsiSeries([...b.map(b=>b.close),101]).at(-1)>40);
  const wave=earlyWaveEntry(b,options());assert.equal(wave.buyConfirmed,true);assert.equal(wave.minimumPrice,101);assert.equal(wave.breakoutPrice,100.5);
  const binance=evaluateDailyTrade({symbol:'TESTUSDT',bars:b,price:101,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'spring_rsi_live',allowEarlyWave:true});
  assert.equal(binance.rawDecision,'BUY');assert.equal(binance.wyckoffTrade.entryMode,'early_wave_live');assert.equal(binance.wyckoffTrade.setup.waveLow.price,100);
- const colmex=entrySignal(b,now,0,[],options());assert.equal(colmex.ready,true);assert.equal(colmex.setup.patternId,binance.wyckoffTrade.patternId);
+ const colmex=legacyEntrySignal(b,now,0,[],options());assert.equal(colmex.ready,true);assert.equal(colmex.setup.patternId,binance.wyckoffTrade.patternId);
  assert.doesNotThrow(()=>assertSpringEntryReady(binance.wyckoffTrade,101,now));
  assert.equal(evaluateDailyTrade({symbol:'TESTUSDT',bars:b,price:101,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'spring_rsi_live'}).rawDecision,'HOLD');
 });
@@ -32,7 +32,7 @@ test('same-wave identity is retained through a restart, and a post-sale low is r
  const first=earlyWaveEntry(bars(),options());
  assert.equal(earlyWaveEntry(bars(),options({used:JSON.parse(JSON.stringify([first.patternId]))})).entryReason,'PATTERN_ALREADY_USED');
  assert.equal(earlyWaveEntry(bars(),options({after:first.waveLow.time})).entryReason,'WAIT_NEW_EARLY_WAVE');
- assert.equal(entrySignal(bars(),now,first.waveLow.time,[],options()).ready,false);
+ assert.equal(legacyEntrySignal(bars(),now,first.waveLow.time,[],options()).ready,false);
 });
 test('final submission rejects lost breakout, expiry, and a new low in the live candle',()=>{
  const s=earlyWaveEntry(bars(),options());
@@ -56,10 +56,10 @@ async function liveCycle({cash=1000,positions=[],orders=[],used=[],delayReservat
   details:async()=>({quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000}),
   history:async()=>({barDetails:bars().map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:1}))}),quote:async()=>({bp:101,ap:101.01}),
   write:async(a,i)=>{assert.ok(saves.some(s=>s.pending?.id===i.id));writes.push(structuredClone(i));return {orderId:'1'};}};
- const result=await runCycle({state,broker,env,now:()=>clock,deadline:now+24000,save:async s=>{saves.push(structuredClone(s));if(delayReservation&&s.pending)clock+=10001;}});
+ const result=await runCycle({state,broker,env,signal:legacyEntrySignal,now:()=>clock,deadline:now+24000,save:async s=>{saves.push(structuredClone(s));if(delayReservation&&s.pending)clock+=10001;}});
  return {state,writes,result};
 }
-test('Colmex real entry path persists an early-wave intent with native brackets and no short',async()=>{
+test('Legacy Colmex execution reservation persists an early-wave intent with native brackets and no short',async()=>{
  const {state,writes}=await liveCycle();assert.equal(writes.length,1);assert.equal(writes[0].setup.entryMode,'early_wave_live');assert.equal(writes[0].order.side,'buy');assert.equal(writes[0].order.stopLoss,1);assert.equal(writes[0].order.takeProfit,50);assert.ok(writes[0].order.qty*writes[0].order.price<=800);assert.equal(state.used.length,1);
 });
 test('Colmex early wave shares cash and slot limits and does not reuse consumed waves',async()=>{

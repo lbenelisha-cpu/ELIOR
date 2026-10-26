@@ -40,9 +40,9 @@ test('Demo confirmation entry can buy above Spring and fills retain the same exi
   assert.equal(restored.state.positions.BTCUSDT.minProfitHoldMs,7*86400000);
  }finally{x.close();}
 });
-test('server selects live Spring RSI entries without a candle-close wait',()=>{
+test('server selects confirmed quality entries with a candle-close wait',()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
- assert.match(source,/exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live'/);
+ assert.match(source,/exitEvaluator:wyckoffExit,entryMode:'confirmed_quality'/);
  assert.match(source,/waitForSpringRetest:false/);
  assert.doesNotMatch(source,/springSignalValidityMinutes:20/);
 });
