@@ -14,7 +14,7 @@ test('actual MSFT candles reproduce the disappearing peak/low and explain the 53
  assert.match(searchResetText(d.lastReset),/531.34/);assert.match(searchResetText(d.lastReset),/531.29/);
 });
 test('diagnostic collection changes neither the historical search nor a trading decision at any candle prefix',()=>{
- for(let i=3;i<=bars.length;i++){const sample=bars.slice(0,i),options={now:sample.at(-1).closeTime,timeframe:'5m',rollingSearch:true};const normal=evaluateWyckoff(sample,options),{searchReset,...traced}=evaluateWyckoff(sample,{...options,diagnostics:true});assert.deepEqual(traced,normal);}
+ for(let i=3;i<=bars.length;i++){const sample=bars.slice(0,i),options={now:sample.at(-1).closeTime,timeframe:'5m',rollingSearch:true};const normal=evaluateWyckoff(sample,options),{searchReset,searchCandidate,...traced}=evaluateWyckoff(sample,{...options,diagnostics:true});assert.deepEqual(traced,normal);}
 });
 test('journal preserves original reset facts and records a new reset even inside the same sampling bucket',()=>{
  const searchDiagnostic=chartAnalysisMarks(fixture,now).searchDiagnostic,make=diagnostic=>makeAuditRecord({platform:'COLMEX',symbol:'MSFT',at:now,action:'WAIT',reason:'SEARCH_PEAK',price:531.81,priceAt:now,searchDiagnostic:diagnostic});

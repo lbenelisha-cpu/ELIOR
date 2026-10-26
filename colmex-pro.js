@@ -1,10 +1,11 @@
-import {renderSearchStatus} from './colmex-search-status.js?v=20261026-entry-fix';
+import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261026-coverage';
+import {renderSearchStatus} from './colmex-search-status.js?v=20261026-coverage';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
-import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';
+import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261026-coverage';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
-import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261026-entry-fix';
+import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261026-coverage';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
 function publishMarket(data){if(typeof window!=='undefined'){window.LEVI_COLMEX_MARKET=data;if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}}
 const PAPER_MODE=document.body.dataset.mode==='simulation';
@@ -13,7 +14,7 @@ const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:
 const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261022-tools';
-import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261024-watch50';
+import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261026-coverage';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
@@ -40,7 +41,8 @@ function formatMarketTime(at){return /^\d{4}-\d{2}-\d{2}$/.test(at)?at:new Date(
 function chartBars(){return markets[selected]&&!manualCharts.has(selected)?markets[selected].bars:state.bars[selected]||[];}
 function render(preserveForm=false,preserveChart=false){
  $('#watchCount').textContent=String(state.symbols.length);
- syncWatchRows($('#watchList'),state.symbols,{selected,createElement:tag=>document.createElement(tag),onSelect:s=>{selected=s;render();loadMarket(false);},describe:s=>{const m=mark(s);return {text:m?money(m.price):(quoteStatus[s]||'ממתין לטעינה'),title:m?m.source+(quoteStatus[s]?' · '+quoteStatus[s]:''):''};}});
+ const coverage=PAPER_MODE?null:scanCoverage(liveSearchState);if($('#watchScanStatus'))$('#watchScanStatus').textContent=coverage?.summary||'';
+ syncWatchRows($('#watchList'),state.symbols,{selected,createElement:tag=>document.createElement(tag),onSelect:s=>{selected=s;render();loadMarket(false);},describe:s=>{const m=mark(s);return {...(!PAPER_MODE?stockScanStatus(s,liveSearchState,Date.now(),coverage):{}),text:m?money(m.price):(quoteStatus[s]||'ממתין לטעינה'),title:m?m.source+(quoteStatus[s]?' · '+quoteStatus[s]:''):''};}});
  $('#selectedSymbol').textContent=selected;if(PAPER_MODE)$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
  if(PAPER_MODE){$('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
@@ -59,7 +61,7 @@ function parseCandles(text){
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
 function renderChart(){
- renderSearchStatus($('#wyckoffSearchStatus'),analysisMarks[selected]?.searchDiagnostic,{symbol:selected,check:liveSearchState.checks?.[selected],position:liveSearchState.positions?.some(p=>p.symbol===selected),manual:manualCharts.has(selected)||PAPER_MODE});
+ renderSearchStatus($('#wyckoffSearchStatus'),analysisMarks[selected]?.searchDiagnostic,{symbol:selected,progress:analysisMarks[selected]?.searchProgress,scan:PAPER_MODE?null:stockScanStatus(selected,liveSearchState),check:liveSearchState.checks?.[selected],position:liveSearchState.positions?.some(p=>p.symbol===selected),manual:manualCharts.has(selected)||PAPER_MODE});
  renderSlopePanel($('#colmexSlope'),manualCharts.has(selected)?[]:(markets[selected]?.analysisBars||[]),{symbol:selected,platform:'colmex',source:'Colmex Pro · 5 דקות',position:!PAPER_MODE&&!manualCharts.has(selected)?liveSearchState.positions?.find(p=>p.symbol===selected):null,price:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastBid,priceAt:liveSearchState.positions?.find(p=>p.symbol===selected)?.lastQuoteAt});
  const rsiQuote=quotes[selected],rsiLive=markets[selected]?.liveAnalysisBar,quoteAt=Date.parse(rsiQuote?.observedAt||rsiQuote?.priceAt);
  const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
@@ -76,7 +78,7 @@ function renderChart(){
  for(let i=0;i<5;i++){const price=lo+(hi-lo)*i/4;add('line',{x1:15,y1:y(price),x2:760,y2:y(price),stroke:'#21364b'});add('text',{x:775,y:y(price)+4,fill:'#93a8bf','font-size':11},price.toFixed(price<10?4:2));}
  
  bars.forEach((b,i)=>{const marks=visiblePoints.filter(p=>p.index===i),primary=marks.find(p=>p.kind==='peak')||marks.find(p=>p.kind==='buy'||p.kind==='sell')||marks.at(-1),color=primary?.color||(b.close>=b.open?'#67e0ae':'#ff798b'),w=Math.max(2,Math.min(12,730/bars.length*.6));const line=add('line',{x1:x(i),x2:x(i),y1:y(b.high),y2:y(b.low),stroke:color,'stroke-width':primary?2:1});const body=add('rect',{x:x(i)-w/2,y:Math.min(y(b.open),y(b.close)),width:w,height:Math.max(primary?3:1,Math.abs(y(b.open)-y(b.close))),fill:color});
-  const pulse=marks.length>0;for(const el of [line,body]){if(pulse){el.classList.add('sim-candle-flash');el.setAttribute('data-pulse-candle',String(i));}const title=document.createElementNS(ns,'title');title.textContent=b.date+' · O '+b.open+' · H '+b.high+' · L '+b.low+' · C '+b.close;el.append(title);}
+  const pulse=marks.some(p=>!p.provisional);for(const el of [line,body]){if(pulse){el.classList.add('sim-candle-flash');el.setAttribute('data-pulse-candle',String(i));}const title=document.createElementNS(ns,'title');title.textContent=b.date+' · O '+b.open+' · H '+b.high+' · L '+b.low+' · C '+b.close;el.append(title);}
   if(marks.length){const hit=add('rect',{x:x(i)-Math.max(6,w/2),y:Math.min(y(b.high),y(b.low))-5,width:Math.max(12,w),height:Math.max(14,Math.abs(y(b.high)-y(b.low))+10),fill:'transparent',stroke:'transparent','data-mark-id':marks.map(m=>m.id).join('|'),tabindex:0,role:'button','aria-label':marks.map(m=>m.name+' '+m.price).join(' · ')});const title=document.createElementNS(ns,'title');title.textContent=marks.map(m=>m.name+' · '+m.price+' USD').join(' / ');hit.append(title);const show=()=>{$('#chartMarkDetails').textContent=marks.map(detail).join(' | ');};hit.onclick=e=>{e.stopPropagation();show();};hit.onpointerdown=e=>e.stopPropagation();hit.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();e.stopPropagation();show();}};}
  });
  if(entry)add('line',{x1:15,x2:760,y1:y(entry),y2:y(entry),stroke:'#74b8ff','stroke-dasharray':'6 4'});
@@ -167,12 +169,12 @@ startCandleFlashing({root:$('#chart'),control:$('#flashCandles')});
 globalThis.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!validSymbol(symbol))return;if(!state.symbols.includes(symbol))state.symbols.push(symbol);selected=symbol;$('#marketInterval').value='5min';save();render();loadMarket(false);});
 
 $('#showWyckoffHistory')?.addEventListener('change',()=>renderChart());
-globalThis.window?.addEventListener('levi:colmex-status-error',()=>{liveSearchState={positions:[],after:{}};renderChart();});
+globalThis.window?.addEventListener('levi:colmex-status-error',()=>{liveSearchState={positions:[],after:{},unavailable:true};render(true);});
 globalThis.window?.addEventListener('levi-colmex-rsi',event=>{
  if(PAPER_MODE)return;
  liveSearchState=event.detail||{positions:[],after:{}};
  for(const [symbol,data] of Object.entries(markets)){
   try{analysisMarks[symbol]=chartAnalysisMarks(data.analysisBars||data.bars,Date.now(),{position:liveSearchState.positions?.find(p=>p.symbol===symbol),after:liveSearchState.after?.[symbol]||0});}catch{}
  }
- renderChart();
+ render(true);
 });
