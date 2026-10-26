@@ -5,7 +5,7 @@ import {stockSessionGap,equitySession} from '../lib/colmex-market-hours.mjs';
 const STEP=300000,start=Date.UTC(2026,9,1);
 const bars=(count=230,fn=i=>100+i)=>Array.from({length:count},(_,i)=>({openTime:start+i*STEP,closeTime:start+(i+1)*STEP-1,close:fn(i),closed:true}));
 test('MA200 needs 200 bars plus the slope window; it is not an MA10',()=>{
- assert.equal(analyzeSlope(bars(209)).status,'WARMUP');
+ assert.equal(analyzeSlope(bars(199)).status,'WARMUP');assert.equal(analyzeSlope(bars(209)).status,'WAIT_WINDOW');
  const s=analyzeSlope(bars(210),{now:bars(210).at(-1).closeTime});assert.equal(s.status,'READY');assert.equal(s.slow.average,209.5);
  assert.ok(Math.abs(s.slow.pctPerMinute-100*(209.5/199.5-1)/50)<1e-10);
  assert.equal(s.minutes,50);assert.equal(analyzeSlope(bars(205),{lookbackBars:5}).minutes,25);
@@ -29,7 +29,8 @@ test('gaps reset warmup, duplicate/out-of-order and invalid prices fail closed',
 test('verified stock session breaks may warm MA200 but never compress an overnight slope window',()=>{
  const b=[];for(const day of ['2026-10-19','2026-10-20','2026-10-21','2026-10-22']){const s=equitySession(day);for(let t=s.openAt;t<s.closeAt;t+=STEP)b.push({openTime:t,closeTime:t+STEP,close:100+b.length*.01});}
  const at=234+4;
- const warm=analyzeSlope(b.slice(0,at),{now:b[at-1].closeTime,isSessionGap:stockSessionGap});assert.equal(warm.status,'WARMUP');
+ const warm=analyzeSlope(b.slice(0,at),{now:b[at-1].closeTime,isSessionGap:stockSessionGap});assert.equal(warm.status,'WAIT_WINDOW');
+ const early=b.slice(0,234+7);assert.equal(analyzeSlope(early,{now:early.at(-1).closeTime,isSessionGap:stockSessionGap,lookbackBars:5}).status,'READY');assert.equal(analyzeSlope(early,{now:early.at(-1).closeTime,isSessionGap:stockSessionGap,lookbackBars:10}).status,'WAIT_WINDOW');
  assert.equal(analyzeSlope(b,{now:b.at(-1).closeTime,isSessionGap:stockSessionGap}).status,'READY');
  assert.equal(analyzeSlope(b,{now:b.at(-1).closeTime}).status,'WARMUP');
 });
