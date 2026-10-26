@@ -42,6 +42,28 @@ test('both signal and trade feeds carry the dedicated credential and rejected au
  assert.equal(requests.length,2);for(const r of requests){assert.equal(r.options.headers.Authorization,'Bearer '+readToken);assert.equal(r.options.method,'GET');assert.equal(new URL(r.url).origin,'https://levi-binance.2-29-48-20.sslip.io');}
  assert.equal(store.data.get('status').data.error,'BINANCE_READ_OR_PUSH_UNAVAILABLE');
 });
+test('execution alerts survive optional signal read and parsing failures',async()=>{
+ for(const signalResponse of [()=>({ok:false}),()=>({ok:true,json:async()=>{throw Error('Invalid JSON');}}),()=>({ok:true,json:async()=>({mode:'live',agents:{}})})]){
+  const store=memory(),sent=[],d={...device(),topics:['binance-trades','binance-signals']};
+  const result=await pollBinanceNotifications({devices:[d],store,readToken:'n'.repeat(64),now,fetcher:async url=>url.endsWith('action-log')?{ok:true,json:async()=>({live:[{...fill,type:'SELL',reason:'BROKER_STOP_LOSS'}]})}:signalResponse(),send:async(s,payload,options)=>sent.push({payload:JSON.parse(payload),options}),remove:async()=>{}});
+  assert.equal(result.accepted,1);assert.match(sent[0].payload.title,/מכירה בוצעה/);
+  assert.equal(sent[0].options.TTL,86400);assert.equal(store.data.get('status').data.error,'BINANCE_SIGNAL_READ_UNAVAILABLE');
+ }
+});
+test('executions take priority and remain queued longer than time-sensitive signals',async()=>{
+ const store=memory(),sent=[],d={...device(),topics:['binance-trades','binance-signals']};
+ const args={devices:[d],store,readToken:'n'.repeat(64),now,fetcher:async url=>({ok:true,json:async()=>url.endsWith('action-log')?{live:[fill]}:{mode:'live',agents:[{symbol:'UNIUSDT',position:'CASH',entryConfirmed:true,strategy:{patternId:'older',signalTime:now-90000}}]}}),send:async(s,payload,options)=>sent.push({payload:JSON.parse(payload),options}),remove:async()=>{}};
+ await pollBinanceNotifications(args);assert.equal(sent.length,2);assert.match(sent[0].payload.title,/קנייה בוצעה/);assert.equal(sent[0].options.TTL,86400);assert.match(sent[1].payload.title,/וואיקוף/);assert.equal(sent[1].options.TTL,300);
+ assert.equal(store.data.get('status').data.error,undefined);
+ await pollBinanceNotifications(args);assert.equal(sent.length,2);
+});
+test('transient delivery failures report degraded health and recover without duplicating accepted events',async()=>{
+ const store=memory();let failed=true,sends=0;
+ const args={devices:[device()],store,readToken:'n'.repeat(64),now,fetcher:async()=>({ok:true,json:async()=>({live:[fill]})}),send:async()=>{sends++;if(failed)throw Error('Temporary');},remove:async()=>{}};
+ await pollBinanceNotifications(args);assert.equal(store.data.get('status').data.error,'BINANCE_PUSH_RETRY_PENDING');
+ failed=false;await pollBinanceNotifications(args);assert.equal(store.data.get('status').data.error,undefined);assert.equal(store.data.get('status').data.accepted,1);
+ await pollBinanceNotifications(args);assert.equal(sends,2);
+});
 test('notification clicks route trades into Binance and reject external navigation',async()=>{
  const handlers={},opened=[],shown=[];const ctx=vm.createContext({URL,self:{addEventListener:(name,fn)=>handlers[name]=fn,registration:{showNotification:async(...args)=>shown.push(args)}},clients:{matchAll:async()=>[],openWindow:async url=>opened.push(url)}});vm.runInContext(fs.readFileSync(new URL('../push-sw.js',import.meta.url),'utf8'),ctx);let pending;const waitUntil=p=>{pending=p;};handlers.push({data:{json:()=>({title:'BUY',url:'/binance-agent.html'})},waitUntil});await pending;assert.equal(shown[0][1].data.url,'/binance-agent.html');handlers.notificationclick({notification:{data:{url:'https://evil.example'},close(){}},waitUntil});await pending;assert.deepEqual(opened,['/push.html']);
 });

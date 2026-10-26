@@ -1,5 +1,6 @@
 import {hash} from './core.mjs';
 const TEN_MINUTES=600000;
+const TRADE_PUSH_TTL=86400,SIGNAL_PUSH_TTL=300;
 const stamp=value=>Date.parse(value);
 const price=value=>Number(value).toLocaleString('he-IL',{maximumFractionDigits:10});
 const clock=value=>new Date(value).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
@@ -43,7 +44,7 @@ export async function deliverBinanceEvents({events,devices,store,send,remove,now
   const claim=await store.setJSON(key,{status:'sending',leaseUntil:now+120000},{...(old?.etag?{onlyIfMatch:old.etag}:{onlyIfNew:true})});
   if(!claim.modified)continue;
   try{
-   await send(device.subscription,JSON.stringify(event.notification),{TTL:300,urgency:'high',topic:event.notification.tag,timeout:6000});
+   await send(device.subscription,JSON.stringify(event.notification),{TTL:event.topic==='binance-trades'?TRADE_PUSH_TTL:SIGNAL_PUSH_TTL,urgency:'high',topic:event.notification.tag,timeout:6000});
    await store.setJSON(key,{status:'sent',at:event.at,acceptedAt:now});stats.accepted++;
   }catch(error){
    if([404,410].includes(error.statusCode)){await remove(device.key);await store.setJSON(key,{status:'sent',expired:true,at:now});stats.expired++;}
@@ -58,9 +59,17 @@ export async function pollBinanceNotifications({devices,store,fetcher=fetch,send
  const get=async path=>{const r=await fetcher('https://levi-binance.2-29-48-20.sslip.io'+path,{method:'GET',headers:{Accept:'application/json',Authorization:'Bearer '+readToken},redirect:'error',signal:AbortSignal.timeout(8000)});if(!r.ok)throw Error('BINANCE_READ_UNAVAILABLE');return r.json();};
  try{
   if(typeof readToken!=='string'||!/^[-A-Za-z0-9._~]{32,512}$/.test(readToken))throw Error('BINANCE_PUSH_READ_TOKEN_REQUIRED');
-  const [log,agents]=await Promise.all([get('/api/binance-action-log'),active.some(d=>deviceTopics(d).includes('binance-signals'))?get('/api/binance-agent'):null]);
-  const events=[...binanceTradeEvents(log,now),...binanceSignalEvents(agents,now)].sort((a,b)=>a.at-b.at);
+  // An optional analysis feed must never suppress an actual execution alert.
+  const [trades,signals]=await Promise.allSettled([
+   get('/api/binance-action-log').then(log=>binanceTradeEvents(log,now)),
+   active.some(d=>deviceTopics(d).includes('binance-signals'))?get('/api/binance-agent').then(agents=>binanceSignalEvents(agents,now)):Promise.resolve([])
+  ]);
+  if(trades.status==='rejected')throw trades.reason;
+  // Spend the bounded delivery budget on executions before optional signals.
+  const byTime=(a,b)=>a.at-b.at;
+  const events=[...trades.value.sort(byTime),...(signals.status==='fulfilled'?signals.value.sort(byTime):[])];
   const result=await deliverBinanceEvents({events,devices:active,store,send,remove,now});
-  await store.setJSON('status',{checkedAt:now,devices:active.length,...result});return result;
+  const error=result.failed?'BINANCE_PUSH_RETRY_PENDING':signals.status==='rejected'?'BINANCE_SIGNAL_READ_UNAVAILABLE':null;
+  await store.setJSON('status',{checkedAt:now,devices:active.length,...result,...(error?{error}:{})});return result;
  }catch(error){await store.setJSON('status',{checkedAt:now,devices:active.length,error:'BINANCE_READ_OR_PUSH_UNAVAILABLE'});throw error;}
 }
