@@ -31,3 +31,5 @@ test('a native standalone stop labels the profit target as server-managed',()=>{
  const d=fixture(),p=d.agent.agents[0].strategy.brokerProtection;p.mode='STOP_ONLY';p.takeProfitPrice=null;d.agent.config.liveState.softwareTargets=['BTCUSDT'];
  const u=ui(d);assert.match(u.text('positionMapContent'),/יעד במעקב השרת/);assert.match(u.text('positionMapContent'),/יעד הרווח תלוי בפעילות השרת/);assert.doesNotMatch(u.text('positionMapContent'),/מחירי ההגנה אומתו בבורסה/);
 });
+
+test('new trailing policy remains a managed holding with verified native protection',()=>{const d=fixture();d.agent.agents[0].strategy.exitPolicy='PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2';assert.match(ui(d).text('positionMapContent'),/אומתו בבורסה/);});
