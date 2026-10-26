@@ -1,4 +1,4 @@
-import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-slope1';
+import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-slope2';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261021-edge-axis';

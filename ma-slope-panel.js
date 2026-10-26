@@ -1,8 +1,8 @@
-import {analyzeSlope,slopeReading} from './lib/ma-slope.mjs?v=20261026-slope1';
+import {analyzeSlope,slopeReading} from './lib/ma-slope.mjs?v=20261026-slope2';
 import {stockSessionGap} from './lib/colmex-market-hours.mjs';
 const panels=new WeakMap();
 const signed=(n,d=4)=>Number.isFinite(n)?(n>0?'+':'')+n.toFixed(d):'—';
-const statusText={NO_DATA:'ממתין לנרות 5 דקות',WARMUP:'אין מספיק נרות רציפים לחישוב MA200',STALE:'נתוני עבר · ממתין לנרות עדכניים',INVALID_DATA:'פער או שגיאה בנתוני הנרות',READY:'נרות סגורים · מדד לניתוח'};
+const statusText={NO_DATA:'ממתין לנרות 5 דקות',WARMUP:'אין מספיק נרות תקינים לחישוב MA200',WAIT_WINDOW:'MA200 זמין · ממתין לחלון שיפוע רציף לאחר הפסקת מסחר או חימום',STALE:'נתוני עבר · ממתין לנרות עדכניים',INVALID_DATA:'פער או שגיאה בנתוני הנרות',READY:'נרות סגורים · מדד לניתוח'};
 const readingText={UNAVAILABLE:'אין קריאה עדכנית',FLAT:'ללא כיוון ברור',AGAINST_CONFIRMED:'השיפוע הקצר נגד כיוון העסקה בשתי קריאות',AGAINST_PENDING:'השיפוע הקצר נגד כיוון העסקה · טרם אושר',WEAKENING:'המומנטום בכיוון העסקה נחלש',SUPPORTIVE:'השיפוע הקצר תומך בכיוון העסקה'};
 const gauge='<svg viewBox="0 0 180 150" aria-hidden="true"><path d="M90 15 A60 60 0 0 1 90 135" fill="none" stroke="currentColor" opacity=".25" stroke-width="6"/><path d="M90 75 H155" stroke="currentColor" opacity=".25" stroke-dasharray="3 4"/><g class="slope-needle"><path d="M90 75 H145 M136 69 L145 75 L136 81" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></g><circle cx="90" cy="75" r="4" fill="currentColor"/><text x="65" y="16">90°</text><text x="158" y="79">0°</text><text x="59" y="141">−90°</text></svg>';
 export function renderSlopePanel(host,bars,{symbol='',platform='binance',source=''}={}){
