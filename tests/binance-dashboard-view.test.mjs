@@ -15,7 +15,7 @@ function ui(snapshot){
  return {get,text:id=>text(get(id)),update:detail=>handlers['levi:binance-dashboard']({detail})};
 }
 function fixture(){
- const now=Date.now();return {mode:'live',receivedAt:now,account:{totalValueUsdt:100,usdtFree:0,maxPositions:5,balances:[{asset:'BTC',qty:2,entryPrice:50,usdtPrice:51,valueUsdt:100,pnlIls:2}]},agent:{config:{liveState:{ready:true,managedPositions:1,missingProtection:[],reconciliation:{checkedAt:new Date(now).toISOString()}}},agents:[{symbol:'BTCUSDT',strategy:{exitPolicy:'PROFIT_FLOOR4_TRAIL1PP_STOP1_V1',entryPrice:50,takeProfitPct:40,effectiveStopPrice:49,brokerProtection:{status:'ACTIVE',verifiedAt:now,stopPrice:49,takeProfitPrice:70}}}]}};
+ const now=Date.now();return {mode:'live',receivedAt:now,account:{totalValueUsdt:100,usdtFree:0,maxPositions:5,balances:[{asset:'BTC',qty:2,entryPrice:50,usdtPrice:51,valueUsdt:100,pnlIls:2}]},agent:{config:{liveState:{ready:true,managedPositions:1,missingProtection:[],reconciliation:{checkedAt:new Date(now).toISOString()}}},agents:[{symbol:'BTCUSDT',position:'LONG',strategy:{qty:2,exitPolicy:'PROFIT_FLOOR4_TRAIL1PP_STOP1_V1',entryPrice:50,takeProfitPct:40,effectiveStopPrice:49,brokerProtection:{status:'ACTIVE',verifiedAt:now,stopPrice:49,takeProfitPrice:70}}}]}};
 }
 test('dashboard presents current wallet values and verified broker levels without treating zero cash as missing',()=>{
  const u=ui(fixture());assert.equal(u.text('overviewValue'),'100');assert.equal(u.text('overviewCash'),'0');assert.equal(u.text('overviewPnl'),'+2');assert.equal(u.text('overviewSlots'),'1 / 5');assert.equal(u.text('allocationPercent'),'0%');assert.match(u.text('positionMapContent'),/אומתו בבורסה/);assert.match(u.text('positionMapContent'),/70/);assert.match(u.text('positionMapContent'),/\+2.00%/);assert.equal(u.get('positionMapContent').children[0].dataset.direction,'gain');
@@ -36,3 +36,15 @@ test('a native standalone stop labels the profit target as server-managed',()=>{
 test('new trailing policy remains a managed holding with verified native protection',()=>{const d=fixture();d.agent.agents[0].strategy.exitPolicy='PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2';assert.match(ui(d).text('positionMapContent'),/אומתו בבורסה/);});
 
 test('position-map percentages follow entry price for losses, flat prices and missing quotes',()=>{const d=fixture(),u=ui(d);for(const [current,label,kind] of [[49,'−2.00%','loss'],[50,'0.00%','flat'],[null,'ממתין למחיר כניסה ולמחיר עדכני','unknown']]){d.account.balances[0].usdtPrice=current;u.update(d);assert.ok(u.text('positionMapContent').includes(label));assert.equal(u.get('positionMapContent').children[0].dataset.direction,kind);}});
+
+test('managed entry remains visible while wallet cost is unknown, without inventing monetary P/L',()=>{
+ const d=fixture();delete d.account.balances[0].entryPrice;d.account.balances[0].pnlIls=null;
+ const u=ui(d);assert.match(u.text('positionMapContent'),/כניסה\|50/);assert.match(u.text('positionMapContent'),/\+2.00%/);assert.match(u.text('positionMapContent'),/מחיר הכניסה לפי העסקה המנוהלת/);assert.equal(u.text('overviewPnl'),'—');
+ d.account.balances[0].entryPrice=50.1;u.update(d);assert.match(u.text('positionMapContent'),/\+2.00%/);
+});
+test('a closed, empty or unrelated strategy cannot supply a missing entry price',()=>{
+ for(const change of [d=>d.agent.agents[0].position='CASH',d=>d.agent.agents[0].strategy.qty=0,d=>d.agent.agents[0].symbol='ETHUSDT',d=>d.agent.agents[0].strategy.entryPrice=null]){
+  const d=fixture();delete d.account.balances[0].entryPrice;change(d);const u=ui(d);
+  assert.equal(u.get('positionMapContent').children[0].dataset.direction,'unknown');assert.doesNotMatch(u.text('positionMapContent'),/\+2.00%/);
+ }
+});
