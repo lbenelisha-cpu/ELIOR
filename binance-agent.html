@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-ma100">
 <link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
 <link rel="stylesheet" href="/binance-equity-history.css?v=20261026-equity">
-</head>
+<link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"></head>
 <body>
   <main class="app-shell">
     <header class="topbar">
@@ -67,6 +67,7 @@
         <article class="metric-card"><span id="overviewPnlLabel">רווח / הפסד לא ממומש</span><strong id="overviewPnl">—</strong><small id="overviewPnlNote">ממתין לעלות קנייה מאומתת</small></article>
         <article class="metric-card"><span>פוזיציות פעילות</span><strong id="overviewSlots">—</strong><div id="overviewSlotDots" class="slot-dots" aria-hidden="true"></div><small>ללא שאריות קטנות</small></article>
       </div>
+<section id="maDecisionJournal" class="ma-journal app-view trade-view portfolio-view" data-platform="BINANCE" aria-label="יומן השוואת החלטות אוטומטיות לממוצעים"></section>
       <section id="binanceEquityPanel" class="equity-panel app-view trade-view portfolio-view" aria-label="שווי התיק לאורך היום"></section>
       <div class="overview-visuals app-view trade-view portfolio-view">
         <article class="allocation-card"><div class="section-kicker">חלוקת התיק</div><div class="allocation-layout"><div id="allocationRing" class="allocation-ring" role="img" aria-label="חלוקת תיק טרם זמינה"><div><strong id="allocationPercent">—</strong><span>מזומן זמין</span></div></div><div class="allocation-legend"><p><i class="cash-key"></i>מזומן זמין <b id="allocationCash">—</b></p><p><i class="asset-key"></i>נכסים ויתרות נעולות <b id="allocationOther">—</b></p><small id="allocationNote">יוצג לאחר אימות נתוני החשבון</small></div></div></article>
@@ -437,12 +438,12 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
-  <script src="/binance-agent.js?v=20261026-equity"></script>
+  <script src="/binance-agent.js?v=20261026-audit"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-wave-trail5"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261026-history"></script><script type="module" src="/ma-slope-panel.js?v=20261026-ma100"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-wave-trail5"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261026-history"></script><script type="module" src="/ma-slope-panel.js?v=20261026-ma100"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-audit"></script></body>
 </html>

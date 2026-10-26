@@ -1,3 +1,5 @@
+import {FileMaAudit} from './lib/ma-audit-file.mjs';
+import {makeAuditRecord,auditSnapshots} from './lib/ma-decision-audit.mjs';
 import {EARLY_WAVE_POLICY} from './lib/early-wave-entry.mjs';
 import {LiveWalletReconciler} from './lib/live-wallet-reconciliation.mjs';
 import {readLiveJournal} from './lib/live-journal.mjs';
@@ -249,6 +251,19 @@ function consolidationBreakout(symbol){
 }
 
 const dailyCandleCache=new Map();
+const maAudit=new FileMaAudit({directory:process.env.BINANCE_MA_AUDIT_DIR||'/var/data/binance-ma-audit'});
+const maAuditContexts=new Map();
+function observeMaDecision(event){
+ try{
+  const {bars:inputBars,...details}=event;
+  const at=event.at??Date.now(),bars=inputBars??dailyCandleCache.get(event.symbol)?.rows??[],bucket=Math.floor(at/600000),old=maAuditContexts.get(event.symbol);
+  let snapshots=old?.snapshots;
+  if(!old||old.bars!==bars||old.bucket!==bucket){snapshots=auditSnapshots(bars,at);maAuditContexts.set(event.symbol,{bars,bucket,snapshots});}
+  maAudit.record(makeAuditRecord({platform:'BINANCE',at,price:Number(streams[event.symbol]?.lastPrice),priceAt:Number(streams[event.symbol]?.lastEventAt),...details,snapshots}));
+ }catch{maAudit.error='AUDIT_CAPTURE_FAILED';}
+}
+setInterval(()=>{void maAudit.flush();},60000).unref();
+
 
 // Durable DEMO state (use Render Persistent Disk mounted at /var/data)
 const STATE_FILE=process.env.BINANCE_STATE_FILE||'/var/data/binance-paper-state.json';
@@ -592,6 +607,7 @@ function pushLiveAction(action){
   if(!liveActionLog.some(a=>a.orderId===action.orderId&&a.symbol===action.symbol))liveActionLog.unshift(action);
   // Execution metadata and consumed patterns must survive display log limits.
   if(!saveLiveActionLog())throw Error('LIVE_EXECUTION_JOURNAL_UNAVAILABLE');
+  if(['BUY','SELL'].includes(action.type)&&Number(action.executedQty)>0)observeMaDecision({symbol:action.symbol,stage:'BROKER_FILL',origin:action.reason?.startsWith('MANUAL')?'MANUAL':'BROKER',action:action.type==='BUY'?'ENTER':'EXIT',reason:action.reason,price:Number(action.price),priceAt:null,reference:String(action.orderId)});
 }
 
 let mode=process.env.BINANCE_MODE==='live'?'live':'demo';
@@ -811,7 +827,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
 
-  const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+  const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
   try{await nativeProtection.sync(symbol,liveManagedPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
   catch(error){recordLiveError(symbol,error);order.protectionWarning=error.message;}
   return order;
@@ -846,7 +862,7 @@ async function placeLiveMarketSell(symbol,reason='SELL',meta={}){
     const remaining=Number(liveManagedPositions()[symbol]?.qty||0);
     const qty=manualSellQuantity({...bal,free:sellAll?Number(bal?.free||0):Math.min(Number(bal?.free||0),remaining)},info);
     const dustThresholdUsdt=Math.max(5,...(info.filters||[]).filter(f=>['MIN_NOTIONAL','NOTIONAL'].includes(f.filterType)).map(f=>Number(f.minNotional)||0));
-    return await liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>signedBinancePost('/api/v3/order',params),recordLiveFill);
+    return await liveOrders.submit({symbol,side:'SELL',type:'MARKET',quantity:String(qty),newOrderRespType:'FULL'},{reason,meta:{...meta,dustThresholdUsdt}},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
   }catch(error){
     // A timed-out sale might have executed. Never re-arm over an unknown order.
     if(released&&!liveOrders.pending&&liveStateHealth.journalReady){
@@ -1510,8 +1526,9 @@ async function evaluateSymbol(s){
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
+    if(mode==='live')observeMaDecision({symbol:s,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
     return ev;
-  }catch(e){return {ok:false,symbol:s,error:e.message};}
+  }catch(e){if(mode==='live')observeMaDecision({symbol:s,action:'WAIT',reason:'EVALUATION_DATA_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol:s,error:e.message};}
 }
 
 function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
@@ -2054,6 +2071,10 @@ async function refreshUniverse(){
 }
 
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
+// Read-only MA context for held assets. Independent of the one-second risk loop;
+// at most one cached five-minute history refresh per held symbol per bar.
+let maContextBusy=false;
+setInterval(async()=>{if(maContextBusy||!LIVE)return;maContextBusy=true;try{await Promise.allSettled(Object.keys(liveManagedPositions()).map(symbol=>candles(symbol)));}finally{maContextBusy=false;}},60000).unref();
 // Exit monitoring does not wait for the 100-symbol daily-candle scan.
 let exitMonitorInFlight=false;
 setInterval(async()=>{
@@ -2066,8 +2087,9 @@ setInterval(async()=>{
       try{
         const price=requireLivePrice(streams[symbol],Date.now(),15000);
         const ev=evaluateDailyTrade({symbol,bars:[],price,priceAsOf:streams[symbol].lastEventAt,position:p,timeframe:'5m',exitEvaluator:wyckoffExit});
+        observeMaDecision({symbol,at:Date.parse(ev.at),price,priceAt:ev.priceAsOf,action:ev.rawDecision==='SELL'?'EXIT':'HOLD',reason:ev.buyReason||ev.rawDecision});
         return ev;
-      }catch(error){return {ok:false,symbol,error:error.message};}
+      }catch(error){observeMaDecision({symbol,action:'WAIT',reason:'EXIT_QUOTE_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol,error:error.message};}
     }));}catch(e){console.error('LIVE exit monitor failed',e.message);}
    if(mode==='live')return;
   }
@@ -2179,6 +2201,8 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/ma-decision-journal.js':['ma-decision-journal.js','text/javascript'],
+    '/ma-decision-journal.css':['ma-decision-journal.css','text/css'],
     '/binance-chart-cache.js':['binance-chart-cache.js','text/javascript'],
     '/binance-chart-decisions.js':['binance-chart-decisions.js','text/javascript'],
     '/binance-kelly.js':['binance-kelly.js','text/javascript'],
@@ -2341,6 +2365,7 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-kelly'&&req.method==='GET')return send(res,{ok:true,live:kellyLearningReport(liveActionLog)});
 
+  if(u.pathname==='/api/binance-ma-audit'&&req.method==='GET'){maAudit.read({symbol:u.searchParams.get('symbol')||''}).then(data=>send(res,data)).catch(error=>send(res,{ok:false,error:error.message==='INVALID_SYMBOL'?'INVALID_SYMBOL':'AUDIT_READ_UNAVAILABLE'},error.message==='INVALID_SYMBOL'?400:503));return;}
   if(u.pathname==='/api/binance-equity-history'&&req.method==='GET')return send(res,equityHistory.today());
 
   if(u.pathname==='/api/binance-trade-history'&&req.method==='GET'){

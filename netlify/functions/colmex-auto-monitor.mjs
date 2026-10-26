@@ -1,3 +1,4 @@
+import {maAuditStore,colmexAuditPrefix,createColmexAudit,flushColmexAudit} from '../../lib/colmex-ma-audit.mjs';
 import {configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mjs';
 import {autoStore,lease} from '../../lib/colmex-auto-store.mjs';
 import {AutoBroker} from '../../lib/colmex-auto-broker.mjs';
@@ -10,9 +11,14 @@ export function cycleError(error,stage){
 export default async function(request,context){
  const env=runtimeEnvironment(process.env,context);
  if(!configuredLive(env))return new Response(null,{status:204});
+ const contextRead=Promise.resolve().then(()=>maAuditStore().get(colmexAuditPrefix(env.COLMEX_AUTO_ACCOUNT_ID)+'/contexts',{type:'json'})).catch(()=>null);
  const lock=await lease(autoStore(),env.COLMEX_AUTO_ACCOUNT_ID);if(!lock)return new Response(null,{status:204});
  const deadline=Date.now()+27000;
- try{const result=await runCycle({state:lock.state,save:lock.save,broker:new AutoBroker({env,deadline}),env,deadline});if(result.reason!=='CYCLE_COOLDOWN'){lock.state.lastResult=result.reason;lock.state.lastCompletedAt=Date.now();lock.state.lastError=null;await lock.save(lock.state);}}
+ let timer;const contextData=await Promise.race([contextRead,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),750);})]);clearTimeout(timer);
+ const audit=createColmexAudit(lock.state,contextData?.contexts||{});
+ try{const result=await runCycle({state:lock.state,save:lock.save,broker:new AutoBroker({env,deadline}),env,deadline,audit});if(result.reason!=='CYCLE_COOLDOWN'){lock.state.lastResult=result.reason;lock.state.lastCompletedAt=Date.now();lock.state.lastError=null;
+  if(Date.now()<deadline-1500){try{await flushColmexAudit(maAuditStore(),env.COLMEX_AUTO_ACCOUNT_ID,lock.state);}catch{lock.state.maAudit.error='AUDIT_STORAGE_UNAVAILABLE';}}
+  await lock.save(lock.state);}}
  catch(error){
   // Never retry saving an in-memory intent after its durable write failed.
   // The last confirmed state is released; uncertain CAS writes retain their reservation.
