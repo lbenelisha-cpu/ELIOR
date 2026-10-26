@@ -3,7 +3,7 @@ window.API_BASE=B;
 window.binanceReadUrl=url=>{
   if(['localhost','127.0.0.1'].includes(window.location.hostname)||window.location.origin===new URL(B).origin)return url;
   const target=new URL(url,window.location.origin);
-  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trade-history','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
+  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trade-history','/api/binance-equity-history','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
   return target.origin===new URL(B).origin&&paths.includes(target.pathname)?'/.netlify/functions/binance-read-proxy?path='+encodeURIComponent(target.pathname+target.search):url;
 };
 window.binanceReadHeaders=url=>{
