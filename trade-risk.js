@@ -1,13 +1,13 @@
 (function(global){
  'use strict';
  function levels(position){
-  if(!['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'].includes(position?.exitPolicy)&&position?.displayOnly!==true)return null;
+  if(!['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(position?.exitPolicy)&&position?.displayOnly!==true)return null;
   const entry=Number(position.entryPrice),qty=Number(position.qty);
   if(!(entry>0&&qty>0&&Number.isFinite(entry)&&Number.isFinite(qty)))return null;
   const current=Number(position.currentPrice),pnl=Number(position.pnlIls);
-  const tp=Number(position.takeProfitPct??50),sl=Number(position.stopLossPct??1),activation=Number(position.profitActivationPct??4),gap=Number(position.trailingGapPp??1);
-  const trailing=position.exitPolicy==='PROFIT_FLOOR4_TRAIL1PP_STOP1_V1',peak=Math.max(entry,Number(position.peakPrice)||entry),armed=trailing&&(position.profitFloorArmed===true||peak>=entry*(1+activation/100));
-  const stop=trailing?Math.max(entry*(1-sl/100),Number(position.effectiveStopPrice)||0,armed?Math.max(entry*(1+activation/100),peak-entry*gap/100):0):entry*(1-sl/100);
+  const tp=Number(position.takeProfitPct??50),sl=Number(position.stopLossPct??1),activation=Number(position.profitActivationPct??(position.exitPolicy==='PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'?5:4)),gap=Number(position.trailingGapPp??1);
+  const trailing=['PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(position.exitPolicy),peak=Math.max(entry,Number(position.peakPrice)||entry),armed=trailing&&(position.profitFloorArmed===true||peak>=entry*(1+activation/100));
+  const stop=trailing?Math.max(entry*(1-sl/100),Number(position.effectiveStopPrice)||0,armed?Math.max(position.exitPolicy==='PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'?entry*(1+activation/100):0,peak-entry*gap/100):0):entry*(1-sl/100);
   return {brokerProtection:position.brokerProtection||null,tp,sl,activation,gap,brokerTarget:entry*(1+tp/100),entry,qty,target:entry*(1+activation/100),stop,peak,trailing,armed,protectedPnl:(stop-entry)*qty,profit:entry*qty*activation/100,loss:entry*qty*sl/100,displayOnly:position.displayOnly===true,current:current>0&&Number.isFinite(current)?current:null,pnl:position.pnlIls!=null&&Number.isFinite(pnl)?pnl:current>0&&Number.isFinite(current)?(current-entry)*qty:null};
  }
  function render(host,position,currency){

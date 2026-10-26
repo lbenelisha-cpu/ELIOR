@@ -36,7 +36,7 @@ test('Colmex migrates owned position and closes full quantity at trailing floor'
  const s=initialState(now);s.positions=[{...owned(),peakPrice:110,exitPolicy:'SPRING_GAIN_LOCK_80_STOP_10_V1',minProfitHoldMs:604800000}];let written;
  const broker={snapshot:async()=>({positions:[{id:'p',tradableInstrumentId:1,qty:2,side:'buy',stopLoss:90}],orders:[],history:[]}),quote:async()=>({bp:109}),write:async(a,i)=>{written=structuredClone(i);return {};}};
  await runCycle({state:s,save:async()=>{},broker,env,now:()=>now});
- assert.equal(written.kind,'CLOSE');assert.equal(written.qty,2);assert.equal(written.reason,'PROFIT_FLOOR4_TRAIL1PP_EXIT');
+ assert.equal(written.kind,'CLOSE');assert.equal(written.qty,2);assert.equal(written.reason,'TRAILING_PROFIT_EXIT');
 });
 test('Colmex updates both broker thresholds and reconciles both before new work',async()=>{
  const s=initialState(now);s.positions=[owned()];let written;

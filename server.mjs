@@ -1,9 +1,10 @@
+import {EARLY_WAVE_POLICY} from './lib/early-wave-entry.mjs';
 import {LiveWalletReconciler} from './lib/live-wallet-reconciliation.mjs';
 import {readLiveJournal} from './lib/live-journal.mjs';
 import {balancedUniverse,isBstock} from './lib/balanced-universe.mjs';
 import {createSearchBoundaries} from './lib/wyckoff-search-boundary.mjs';
 import {analyzeCandlePower} from './lib/candle-power.mjs';
-import {DEFAULT_TRADE_SETTINGS,validateTradeSettings} from './lib/trade-settings.mjs';
+import {DEFAULT_TRADE_SETTINGS,validateTradeSettings,normalizeTradeSettingsRecord,TRADE_SETTINGS_VERSION} from './lib/trade-settings.mjs';
 import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
@@ -342,8 +343,11 @@ function loadPaperState(){
 }
 
 const SETTINGS_FILE=process.env.BINANCE_SETTINGS_FILE||'/var/data/binance-trade-settings.json';
-let tradeSettings=fs.existsSync(SETTINGS_FILE)?JSON.parse(fs.readFileSync(SETTINGS_FILE,'utf8')):{revision:0,values:{...DEFAULT_TRADE_SETTINGS}};
-tradeSettings.values=validateTradeSettings(tradeSettings.values);
+const savedTradeSettings=fs.existsSync(SETTINGS_FILE)?JSON.parse(fs.readFileSync(SETTINGS_FILE,'utf8')):{};
+let tradeSettings=normalizeTradeSettingsRecord(savedTradeSettings);
+if(savedTradeSettings.policyVersion!==TRADE_SETTINGS_VERSION){
+ fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(tradeSettings),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);
+}
 const LIVE_LOG_FILE=process.env.BINANCE_LIVE_LOG_FILE||'/var/data/binance-live-actions.json';
 const liveOrders=new PersistedMarketOrder(LIVE_LOG_FILE+'.pending');
 const nativeProtection=new BinanceNativeProtection(LIVE_LOG_FILE+'.protection',{
@@ -799,7 +803,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:ENTRY_POLICY_VERSION}};
   }
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
-  if(['spring_retest','wyckoff_confirmation','spring_rsi_live'].includes(meta.wyckoffTrade?.entryMode)){
+  if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
@@ -1456,7 +1460,7 @@ async function evaluateSymbol(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'spring_rsi_live',liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
     if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
@@ -1491,7 +1495,7 @@ async function evaluateSymbol(s){
       }
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
-    ev.decisionPriceSource=ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
+    ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     return ev;
   }catch(e){return {ok:false,symbol:s,error:e.message};}
 }
@@ -1559,10 +1563,10 @@ function decisionReasonFromAgent(agent,ev){
 function candidateBlocker(ev,evals){
   if(!ev?.ok)return {code:ev?.error||'WAIT_DATA',text:'ממתין לנרות 5 דקות סגורים או למחיר עדכני'};
   if(ev.demoTradable===false)return {code:'NOT_DEMO_TRADABLE',text:'אינו זמין למסחר בדמו'};
-  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===TRAILING_EXIT_POLICY?'סטופ 1% · מרווח 4%: רצפה 4% ונגרר נקודת אחוז מהשיא':'פוזיציה קודמת — נדרש בירור'};
+  if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===TRAILING_EXIT_POLICY?'הגנת רווח נגררת לפי SETTINGS · הסטופ אינו יורד':'פוזיציה קודמת — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:'Spring ו־RSI חי 0–40 אושרו · מגמת שעה אינה תנאי כניסה · קנייה ללא המתנה לסגירת נר'};
+  return {code:'BUY_READY',text:ev.wyckoffTrade?.entryMode==='early_wave_live'?'גל מוקדם אושר · עלייה של 1% ופריצת 3 נרות · ללא תקרת RSI':'Spring ו־RSI חי 0–40 אושרו · מגמת שעה אינה תנאי כניסה · קנייה ללא המתנה לסגירת נר'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -2005,7 +2009,7 @@ async function buildTechnicalDailyHistory(symbol,limit=30){
   const c=await candles(symbol),rows=[];
   for(let i=Math.max(3,c.length-limit);i<c.length;i++){
    const historicalNow=c[i].closeTime+1;
-   const ev=evaluateDailyTrade({symbol,bars:c.slice(0,i),price:c[i].close,priceAsOf:new Date(c[i].closeTime).toISOString(),now:c[i].closeTime,timeframe:'5m',entryMode:'spring_rsi_live',liveBar:c[i]});
+   const ev=evaluateDailyTrade({symbol,allowEarlyWave:true,bars:c.slice(0,i),price:c[i].close,priceAsOf:new Date(c[i].closeTime).toISOString(),now:c[i].closeTime,timeframe:'5m',entryMode:'spring_rsi_live',liveBar:c[i]});
    const hourlyTrend=assessQualityEntry(symbol,c.slice(0,i+1),{now:historicalNow});
    if(ev.entryConfirmed&&!hourlyTrend.ok){ev.entryConfirmed=false;ev.buyReason=hourlyTrend.code;}
    rows.push({at:new Date(c[i].closeTime).toISOString(),hourlyTrend,price:c[i].close,phase:ev.strategy.phase,buyQualified:ev.entryConfirmed,buyReason:ev.buyReason,technicalDecision:ev.entryConfirmed?'BUY_READY':'HOLD',timeframe:'5m',strategyId:'WYCKOFF_5M_V1'});
@@ -2142,7 +2146,7 @@ const server=http.createServer((req,res)=>{
    let text='';req.on('data',chunk=>{text+=chunk;if(text.length>2000)req.destroy();});
    req.on('end',async()=>{try{const input=JSON.parse(text);await liveExecution.manual(async()=>{
     if(input.revision!==tradeSettings.revision)throw Error('SETTINGS_CHANGED_RELOAD');
-    const next={revision:tradeSettings.revision+1,values:validateTradeSettings(input.values),updatedAt:new Date().toISOString()};
+    const next={policyVersion:TRADE_SETTINGS_VERSION,revision:tradeSettings.revision+1,values:validateTradeSettings(input.values),updatedAt:new Date().toISOString()};
     fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(next),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);tradeSettings=next;
    });send(res,{ok:true,...tradeSettings});}catch(e){send(res,{ok:false,error:e.message},400);}});return;
   }
@@ -2260,6 +2264,9 @@ const server=http.createServer((req,res)=>{
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
       entryPolicyVersion:ENTRY_POLICY_VERSION,
+      earlyWave:EARLY_WAVE_POLICY,
+      shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
+      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
@@ -2439,6 +2446,7 @@ const server=http.createServer((req,res)=>{
         hourlyTrendFilter:HOURLY_TREND_RULE,
         entryPolicyVersion:ENTRY_POLICY_VERSION,
         entryMode:'spring_rsi_live',
+        entryModes:['spring_rsi_live','early_wave_live'],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
         entryConfirmation:'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max,
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
@@ -2452,9 +2460,9 @@ const server=http.createServer((req,res)=>{
         fixedExitVersion:1,
         takeProfitPct:tradeSettings.values.takeProfitPct,
         profitActivationPct:tradeSettings.values.profitActivationPct,
-        profitFloorPct:tradeSettings.values.profitActivationPct,
+        profitFloorPct:tradeSettings.values.profitActivationPct-tradeSettings.values.trailingGapPp,
         trailingGapPp:tradeSettings.values.trailingGapPp,
-        trailingExitVersion:1,
+        trailingExitVersion:2,
         springStopLossPct:tradeSettings.values.stopLossPct,
         profitGivebackPct:null,
         profitRetentionPct:null,

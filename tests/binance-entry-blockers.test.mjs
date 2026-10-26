@@ -18,7 +18,7 @@ test('full portfolio never advertises rotation when rotation is disabled',()=>{
  assert.equal(context.candidateBlocker({...ev,entryConfirmed:true,entryGainPct:2},[]).code,'NO_SLOT');
 });
 
-test('active holding shows immediate fixed exit thresholds',()=>{
+test('active holding refers to configured trailing protection',()=>{
  const result=context.candidateBlocker({...ev,position:'LONG',strategy:{strategyId:'WYCKOFF_5M_V1',exitPolicy:'PROFIT_FLOOR4_TRAIL1PP_STOP1_V1',entryMode:'spring_rsi_live'}},[]);
- assert.equal(result.code,'ACTIVE_LONG');assert.match(result.text,/4%/);assert.match(result.text,/1%/);assert.match(result.text,/נגרר/);
+ assert.equal(result.code,'ACTIVE_LONG');assert.match(result.text,/SETTINGS/);assert.match(result.text,/אינו יורד/);assert.match(result.text,/נגרר/);
 });

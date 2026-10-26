@@ -294,7 +294,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   if(warning){
     const unverified=isLive&&liveAccount?.connected?liveBalances.filter(b=>{
       const a=agents.find(a=>a.symbol===b.asset+'USDT');
-      return !['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'].includes(a?.strategy?.exitPolicy);
+      return !['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(a?.strategy?.exitPolicy);
     }):[];
     warning.hidden=!unverified.length;
     warning.textContent=unverified.length?'נדרש טיפול · ניהול והגנות לא אומתו: '+unverified.map(b=>b.asset).join(', ')+' · קיימת יתרה בחשבון ללא פוזיציה מנוהלת מתועדת. אין להסתמך על מכירה אוטומטית. יש לבדוק פקודות הגנה בבייננס.':'';
@@ -424,14 +424,14 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
   const hourly=a.entryFilters;
-  put('#hourlyTrendStatus',d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' · מגמת שעה אינה תנאי כניסה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
+  put('#hourlyTrendStatus',d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' או גל 1% ופריצת 3 נרות · ללא מסנן שעה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
     'מגמת שעה: '+(hourly.ok?'מאושרת':'ממתינה')+' · סגירה '+fmt(hourly.close,8)+' · ממוצע 20 '+fmt(hourly.sma20,8)+' · ממוצע 50 '+fmt(hourly.sma50,8)+' · '+new Date(hourly.asOf).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'מגמת שעה: ממתין ל־50 שעות מלאות ועדכניות');
 
   const selectedPnl=positionPnlDisplay(currentModeArg==='live'?liveAccount?.balances?.find(x=>x.asset+'USDT'===a.symbol):p.positions?.[a.symbol],currentModeArg==='live'?'USDT':moneyUnit);
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':'וואיקוף 5 דקות · '+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'RSI עד '+(d.config.entryRsi?.max??40)+' · ללא דרישת מגמת שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
@@ -490,6 +490,10 @@ function decisionReasonLabel(r){
     WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',
     WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',
     WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    EARLY_WAVE_BREAKOUT:'כניסה נוספת · גל של 1% ופריצת 3 נרות',
+    TRAILING_PROFIT_HOLD:'הגנת רווח פעילה · הסטופ עולה עם השיא',
+    TRAILING_PROFIT_EXIT:'מכירה · סף הגנת הרווח נחצה',
+    WAIT_PROFIT_ACTIVATION_5_PERCENT:'סטופ התחלתי · ממתין לרווח 5% להפעלת הגנה',
     WAIT_PROFIT_ACTIVATION_4_PERCENT:'סטופ 1% · ממתין לרווח 4% להפעלת נגרר',
     PROFIT_FLOOR4_TRAIL1PP_HOLD:'רצפת רווח 4% · נגרר נקודת אחוז מהשיא',
     PROFIT_FLOOR4_TRAIL1PP_EXIT:'מכירה · הגנת רווח נגררת',
@@ -857,7 +861,7 @@ function drawCandles(candles){
   const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
   const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
   const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
-  const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1'].includes(selectedPosition.exitPolicy);
+  const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(selectedPosition.exitPolicy);
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
   const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
