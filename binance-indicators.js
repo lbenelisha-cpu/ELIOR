@@ -1,4 +1,28 @@
 (function(root){
+  // Display-only directional swings in CLOSED prices. A 1% pullback completes
+  // a rise; smaller pullbacks stay in the same move. No intrabar order is assumed.
+  function risingMoves(candles,{minPct=1,reversalPct=1,now=Date.now()}={}){
+    if(!(minPct>0)||!(reversalPct>0))return [];
+    const moves=[];let low=null,peak=null,previous=null;
+    const finish=(status,confirmedAt=null)=>{
+      if(low&&peak)moves.push({startIndex:low.index,endIndex:peak.index,startPrice:low.price,endPrice:peak.price,startTime:low.time,endTime:peak.time,pct:(peak.price-low.price)/low.price*100,status,confirmedAt});
+      low=null;peak=null;
+    };
+    for(let index=0;index<candles.length;index++){
+      const bar=candles[index],price=Number(bar.close),time=Number(bar.closeTime),openTime=Number(bar.openTime);
+      if(bar.closed===false||time>now)continue;
+      if(![price,time,openTime].every(Number.isFinite)||price<=0||time<openTime){finish('interrupted');previous=null;continue;}
+      if(previous&&(openTime!==previous.time+1||time<=previous.time))finish('interrupted');
+      const point={index,price,time};previous=point;
+      if(!low){low=point;continue;}
+      if(!peak){
+        if(price<low.price)low=point;
+        else if((price-low.price)/low.price*100>=minPct-1e-10)peak=point;
+      }else if(price>peak.price)peak=point;
+      else if((peak.price-price)/peak.price*100>=reversalPct-1e-10){finish('completed',time);low=point;}
+    }
+    finish('developing');return moves;
+  }
   function calculateIndicators(candles,period=14,rocPeriod=12){
     const closes=candles.map(c=>Number(c.close));
     const rsi=closes.map(()=>null),roc=closes.map(()=>null);
@@ -30,5 +54,5 @@
     ctx.setLineDash([]);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();let started=false;
     series.forEach((v,i)=>{if(!Number.isFinite(v)){started=false;return;}const x=left+(i+.5)*(W-left-right)/series.length;if(started)ctx.lineTo(x,y(v));else {ctx.moveTo(x,y(v));started=true;}});ctx.stroke();
   }
-  root.BinanceIndicators={calculateIndicators,drawIndicator};
+  root.BinanceIndicators={calculateIndicators,drawIndicator,risingMoves};
 })(globalThis);
