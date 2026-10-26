@@ -37,6 +37,44 @@
     for(let i=rocPeriod;i<closes.length;i++)roc[i]=(closes[i]/closes[i-rocPeriod]-1)*100;
     return {rsi,roc};
   }
+  function fallingMoves(candles,{minPct=1,reversalPct=1,now=Date.now()}={}){
+    if(!(minPct>0)||!(reversalPct>0))return [];
+    const moves=[];let high=null,trough=null,previous=null;
+    const finish=(status,confirmedAt=null)=>{
+      if(high&&trough)moves.push({startIndex:high.index,endIndex:trough.index,startPrice:high.price,endPrice:trough.price,startTime:high.time,endTime:trough.time,pct:(trough.price-high.price)/high.price*100,status,confirmedAt});
+      high=null;trough=null;
+    };
+    for(let index=0;index<candles.length;index++){
+      const bar=candles[index],price=Number(bar.close),time=Number(bar.closeTime),openTime=Number(bar.openTime);
+      if(bar.closed===false||time>now)continue;
+      if(![price,time,openTime].every(Number.isFinite)||price<=0||time<openTime){finish('interrupted');previous=null;continue;}
+      if(previous&&(openTime!==previous.time+1||time<=previous.time))finish('interrupted');
+      const point={index,price,time};previous=point;
+      if(!high){high=point;continue;}
+      if(!trough){if(price>high.price)high=point;else if((high.price-price)/high.price*100>=minPct-1e-10)trough=point;}
+      else if(price<trough.price)trough=point;
+      else if((price-trough.price)/trough.price*100>=reversalPct-1e-10){finish('completed',time);high=point;}
+    }
+    finish('developing');return moves;
+  }
+  // Two aligned rows outside the candle plot. Dense bins retain all moves in
+  // an explicit overflow button instead of overlapping or summing percentages.
+  function moveLabelLayout(moves,{left,right,step,width=62}={}){
+    if(!(right>left&&step>0))return [];
+    const count=Math.max(1,Math.floor((right-left)/(width+4))),cell=(right-left)/count,labelWidth=Math.min(width,cell-2),bins=new Map();
+    for(const move of moves){
+      const x=left+step*(move.endIndex+.5),bin=Math.max(0,Math.min(count-1,Math.floor((x-left)/cell)));
+      if(!bins.has(bin))bins.set(bin,[]);bins.get(bin).push(move);
+    }
+    const placed=[];
+    for(const [bin,group]of bins){
+      const x=left+bin*cell+(cell-labelWidth)/2;
+      const sorted=group.slice().sort((a,b)=>Math.abs(b.pct)-Math.abs(a.pct)||a.endIndex-b.endIndex);
+      placed.push({x,width:labelWidth,row:0,moves:[sorted[0]],overflow:false});
+      if(sorted.length>1)placed.push({x,width:labelWidth,row:1,moves:sorted.slice(1),overflow:sorted.length>2});
+    }
+    return placed;
+  }
   function drawIndicator(canvas,series,{name,color,bounds,levels=[]}){
     const rect=canvas.getBoundingClientRect(),ratio=root.devicePixelRatio||1;
     if(!rect.width||!rect.height)return;
@@ -54,5 +92,5 @@
     ctx.setLineDash([]);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();let started=false;
     series.forEach((v,i)=>{if(!Number.isFinite(v)){started=false;return;}const x=left+(i+.5)*(W-left-right)/series.length;if(started)ctx.lineTo(x,y(v));else {ctx.moveTo(x,y(v));started=true;}});ctx.stroke();
   }
-  root.BinanceIndicators={calculateIndicators,drawIndicator,risingMoves};
+  root.BinanceIndicators={calculateIndicators,drawIndicator,risingMoves,fallingMoves,moveLabelLayout};
 })(globalThis);

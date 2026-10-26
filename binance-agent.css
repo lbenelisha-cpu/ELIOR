@@ -431,3 +431,19 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .wyckoff-arrow{position:absolute;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;transform:translateX(-50%);pointer-events:none;z-index:2}
 .wyckoff-arrow.points-down{border-top:8px solid var(--pivot-color);transform:translate(-50%,-100%)}
 .wyckoff-arrow.points-up{border-bottom:8px solid var(--pivot-color)}
+
+/* Movement labels live outside the candle canvas and never cover prices. */
+.chart-move-lane{position:relative;min-height:56px;direction:ltr;background:#0c1c23;border:1px solid #25483d;border-radius:10px 10px 0 0;margin-top:8px;overflow:hidden}
+.chart-move-lane.down{background:#201820;border-color:#50313e;border-radius:0 0 10px 10px;margin-top:0}
+.chart-move-lane[hidden]{display:none}
+.chart-move-caption{position:absolute;right:8px;top:18px;color:#82dcb5;font:11px Arial;direction:rtl}
+.chart-move-lane.down .chart-move-caption{color:#f5a0ae}
+.chart-move-lane .chart-rise-label{height:22px;padding:1px 3px;border-radius:5px;font-size:10px;box-shadow:none;pointer-events:auto}
+.chart-rise-label.down{border-color:#c87789;background:#39232d;color:#ffb5c2}
+.chart-rise-label.is-group{background:transparent;border-style:dotted;color:#b7c5cd;font-weight:normal}
+.chart-rise-item.down{color:#ffb5c2}
+.chart-risk-details{border:1px solid #294257;border-radius:9px;padding:10px 12px;margin-top:12px;font-size:12px;color:#bfd0de}
+.chart-risk-details[hidden]{display:none}.chart-risk-details summary{cursor:pointer}
+#binanceTradeRisk.trade-risk-table{position:static;max-width:100%;width:max-content;margin-top:10px;pointer-events:auto;font-size:12px}
+#binanceTradeRisk.trade-risk-table td{padding:4px 8px}
+.chart-rise-details{max-height:130px;overflow:auto}
