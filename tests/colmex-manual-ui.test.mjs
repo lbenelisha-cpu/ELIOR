@@ -27,3 +27,9 @@ test('expired device authorization reopens one-time pairing instead of trapping 
  const u=setup();u.setResponse({ok:false,status:401,json:async()=>({error:'DEVICE_REQUIRED'})});u.nodes.get('colmexManualBuy').click();await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
  assert.equal(u.saved.has('levi-colmex-device-v1'),false);assert.equal(u.nodes.get('colmexPairForm').hidden,false);assert.equal(u.nodes.get('colmexManualBuy').disabled,true);
 });
+test('explicit rejection and proven not-sent outcomes release local pending without a retry',async()=>{
+ for(const status of ['REJECTED','NOT_SENT']){
+  const u=setup();u.setResponse({ok:true,status:202,json:async()=>({status,symbol:'AAPL'})});u.nodes.get('colmexManualBuy').click();await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
+  assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);assert.equal(u.nodes.get('colmexManualBuy').disabled,false);assert.equal(u.calls.length,1);assert.doesNotMatch(u.nodes.get('colmexManualStatus').textContent,/ממתין לאימות/);
+ }
+});

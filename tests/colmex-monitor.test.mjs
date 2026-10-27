@@ -15,10 +15,11 @@ test('fresh screen reads cannot disguise stale, failed, disabled or missing serv
  assert.equal(monitorView({...d,enabled:false},now).health,'disabled');
  assert.equal(monitorView({enabled:true,lastCycleAt:now},now).health,'waiting');
 });
-function ui(){
+function ui(overrides={}){
  const nodes=new Map();const timers=[];const requests=[];
  const el=()=>({textContent:'',children:[],dataset:{},disabled:false,append(...items){this.children.push(...items);},replaceChildren(){this.children=[];},addEventListener(type,cb){this[type]=cb;}});
  const data={enabled:true,status:'MONITORING',lastCompletedAt:now,lastResult:'SEARCH_PEAK',policy:{symbols:['AAPL','MSFT']},checks:{AAPL:{at:now,reason:'SEARCH_PEAK'}},historyQuality:{symbol:'AAPL',discarded:10,usableBars:25}};
+ Object.assign(data,overrides);
  let fail=false;
  const context=vm.createContext({monitorView,reason:entryReasonLabel,document:{hidden:false,addEventListener(){},getElementById(id){if(!nodes.has(id))nodes.set(id,el());return nodes.get(id);},createElement:el},fetch:async(url,options)=>{requests.push({url,options});if(fail)throw Error('network');return {ok:true,json:async()=>data};},Date,AbortSignal,setInterval:(fn,ms)=>timers.push({fn,ms})});
  vm.runInContext(fs.readFileSync(new URL('../colmex-auto-ui.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),context);
@@ -35,4 +36,10 @@ test('monitor displays recorded results and all rows; refresh reads status only'
 test('failed status fetch removes live assurance and old rows',async()=>{
  const u=ui();await flush();u.setFail();await u.nodes.get('autoMonitorRefresh').click();
  assert.equal(u.nodes.get('autoMonitorHealth').dataset.health,'error');assert.equal(u.nodes.get('autoLiveChecks').children.length,0);assert.equal(u.nodes.get('autoMonitorRefresh').disabled,false);
+});
+test('pending diagnostics distinguish continuing observation scans from permission to trade',async()=>{
+ const data={halt:'UNRESOLVED_ORDER_REQUIRES_REVIEW',status:'REQUIRES_REVIEW',scanActivity:{at:now,mode:'OBSERVATION_ONLY',dataAvailable:true},pendingActions:[{kind:'BUY',symbol:'AMD',at:now-3600000,requestId:'offline-request',acknowledged:false,failure:null,reconciliation:{at:now,historyAvailable:true,matches:0,relatedHistoryCount:0,openOrders:0,openPositions:0}}]};
+ const u=ui(data);await flush();assert.match(u.nodes.get('autoMonitorHealth').textContent,/סריקת המניות נמשכת/);assert.equal(u.nodes.get('autoMonitorHealth').dataset.health,'error');
+ const text=u.nodes.get('autoMonitorHistory').children.map(p=>p.textContent).join('\n');assert.match(text,/AMD/);assert.match(text,/offline-request/);assert.match(text,/סיבת הכישלון לא נשמרה/);
+ for(const change of [{at:now-360000},{at:now+60000},{dataAvailable:false}])assert.equal(monitorView({...data,enabled:true,scanActivity:{...data.scanActivity,...change}},now).observationScanning,false);
 });

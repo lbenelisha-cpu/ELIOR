@@ -43,11 +43,16 @@ function open(side){
 $('colmexManualBuy').addEventListener('click',()=>open('BUY'));
 $('colmexManualSell').addEventListener('click',()=>open('SELL'));
 $('colmexTradeCancel').addEventListener('click',()=>$('colmexTradeDialog').close());
+function finishUnexecuted(data){
+ if(!['REJECTED','NOT_SENT'].includes(data.status))return false;
+ say(data.status==='NOT_SENT'?'ההוראה לא נשלחה לברוקר.':'הברוקר דחה את פרטי ההוראה; היא לא בוצעה.');rememberPending(null);return true;
+}
 async function checkPending(){
  if(!pending||!token||busy)return;
  try{
   const {response,data}=await api('colmex-manual-trade?requestId='+encodeURIComponent(pending.requestId));
   if(!response.ok){say(explain(data.error));return;}
+  if(finishUnexecuted(data))return;
   if(['FILLED','CLOSED','NO_FILL'].includes(data.status)){
    say(data.status==='FILLED'?'הברוקר אישר ביצוע קנייה · '+data.symbol:data.status==='CLOSED'?'הברוקר אישר סגירת הפוזיציה · '+data.symbol:'הוראת הקנייה הסתיימה ללא מילוי.');rememberPending(null);return;
   }
@@ -64,7 +69,7 @@ async function send(input,retry=false){
    if(response.status<500&&!retry)rememberPending(null);
    throw Error(explain(data.error));
   }
-  say('בקשת המסחר נשלחה · ממתין לאימות ביצוע אצל הברוקר.');$('colmexTradeDialog').close();
+  if(!finishUnexecuted(data))say('בקשת המסחר נשלחה · ממתין לאימות ביצוע אצל הברוקר.');$('colmexTradeDialog').close();
  }catch(error){$('colmexTradeResult').textContent=error.message;say(error.message+' · אם התוצאה אינה ודאית, אין לשלוח שוב.');}
  finally{busy=false;renderAccess();$('colmexTradeSubmit').disabled=false;}
 }

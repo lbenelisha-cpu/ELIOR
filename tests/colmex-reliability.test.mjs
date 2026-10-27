@@ -23,7 +23,7 @@ test('valid half-day closure preserves history, but a missing full trading day d
 });
 test('pending unknown buy cannot prevent an independent emergency close, nor duplicate it on restart',async()=>{
  const s=initialState(now-1000);s.pending=pending();s.positions=[owned('p','AAPL',1)];const written=[];
- const b={snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1,null)]}),write:async(a,i)=>{written.push(structuredClone(i));throw Error('timeout');}};
+ const b={instruments:async()=>[],snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1,null)]}),write:async(a,i)=>{written.push(structuredClone(i));throw Error('timeout');}};
  await runCycle({state:s,env,save:async()=>{},now:()=>now,broker:b});
  assert.equal(written.length,1);assert.equal(written[0].kind,'CLOSE');assert.equal(s.pending.symbol,'NVDA');assert.equal(s.riskPending[0].symbol,'AAPL');
  const restart=JSON.parse(JSON.stringify(s));await runCycle({state:restart,env,save:async()=>{},now:()=>now+60000,broker:b});assert.equal(written.length,1);
@@ -31,7 +31,7 @@ test('pending unknown buy cannot prevent an independent emergency close, nor dup
 });
 test('a pending intent on the same instrument never receives a second write',async()=>{
  const s=initialState(now-1000);s.pending={...pending(),symbol:'AAPL',order:{qty:2,tradableInstrumentId:1}};s.positions=[owned('p','AAPL',1)];let writes=0;
- await runCycle({state:s,env,save:async()=>{},now:()=>now,broker:{snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1,null)]}),write:async()=>{writes++;}}});assert.equal(writes,0);
+ await runCycle({state:s,env,save:async()=>{},now:()=>now,broker:{instruments:async()=>[],snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1,null)]}),write:async()=>{writes++;}}});assert.equal(writes,0);
 });
 test('all emergency exits outrank normal trailing updates',async()=>{
  for(const missing of [true,false]){
@@ -82,7 +82,7 @@ test('one failed quote cannot prevent another verified holding from exiting',asy
 });
 test('risk intents reserve the account even after the main intent is resolved',async()=>{
  const s=initialState(now);s.pending=null;s.riskPending=[{kind:'CLOSE',id:'risk',at:now,positionId:'p',qty:2,symbol:'AAPL'}];s.positions=[owned('p','AAPL',1)];
- const r=await runCycle({state:s,env,save:async()=>{},now:()=>now,broker:{snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1)]})}});
+ const r=await runCycle({state:s,env,save:async()=>{},now:()=>now,broker:{instruments:async()=>[],snapshot:async()=>({...snapshot(),positions:[brokerPos('p',1)]})}});
  assert.equal(r.reason,'PENDING_BROKER_CONFIRMATION');assert.equal(s.riskPending.length,1);
 });
 test('broker adapter isolates missing history while critical snapshots still fail closed',async()=>{
