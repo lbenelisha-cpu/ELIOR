@@ -42,8 +42,8 @@ function render(){
  txt('colmexOpenPnl',usable?signed(data.state?.openNetPnL):'—');$('colmexOpenPnl').dataset.sign=!usable||!Number(data.state?.openNetPnL)?'unknown':Number(data.state.openNetPnL)<0?'negative':'positive';
  txt('colmexSlotCount',usable?(data.positions||[]).length+' / '+(status?.policy?.maxPositions||3):'—');
  $('colmexSlots').replaceChildren(...Array.from({length:status?.policy?.maxPositions||3},(_,i)=>el('i',null,fresh&&i<(data.positions||[]).length?'used':'')));
- const monitor=status&&!statusFailed?monitorView(status,now):null;
- health('colmexServerHealth',!monitor?'unknown':monitor.health==='recent'&&!status.pendingActions?.length?'good':'warning',!monitor?'מצב המעקב לא אומת':status.halt?'נדרש בירור פקודה':status.pendingActions?.length?'הוראה ממתינה לאישור':monitor.health==='recent'?'שרת המעקב פעיל':monitor.health==='disabled'?'המעקב כבוי':status.lastError?(status.lastError.stage==='ACCOUNT_SNAPSHOT'?'סבב המעקב נכשל · קריאת חשבון':'סבב המעקב נכשל · ניסיון נוסף אוטומטי'):'עדכון השרת מתעכב');
+ const monitor=status&&!statusFailed?monitorView(status,now):null,blockingPending=status?.pendingActions?.filter(p=>!p.quarantined)||[];
+ health('colmexServerHealth',!monitor?'unknown':monitor.health==='recent'&&!blockingPending.length?'good':'warning',!monitor?'מצב המעקב לא אומת':status.halt?'נדרש בירור פקודה':blockingPending.length?'הוראה ממתינה לאישור':monitor.health==='recent'?'שרת המעקב פעיל':monitor.health==='disabled'?'המעקב כבוי':status.lastError?(status.lastError.stage==='ACCOUNT_SNAPSHOT'?'סבב המעקב נכשל · קריאת חשבון':'סבב המעקב נכשל · ניסיון נוסף אוטומטי'):'עדכון השרת מתעכב');
  const marketHealth=marketHealthView(market,now);health('colmexMarketHealth',marketHealth.kind,marketHealth.label);
  txt('colmexPolicy',status?.policy?`${status.policy.symbols.length} מניות במעקב · עד $${status.policy.notionalUsd} למניה · ${status.policy.maxPositions} פוזיציות`:'50 מניות במעקב · עד $800 למניה · 3 פוזיציות');
  const prepared=!statusFailed&&status?.preparation?.rows||{},checked=Object.values(prepared).filter(r=>!r.error&&r.complete!==false).length,total=status?.policy?.symbols?.length||50;

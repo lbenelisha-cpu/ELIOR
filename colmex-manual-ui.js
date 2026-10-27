@@ -1,16 +1,17 @@
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261027-order-diagnostics';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261027-review-recovery';
 const $=id=>document.getElementById(id),TOKEN_KEY='levi-colmex-device-v1',PENDING_KEY='levi-colmex-manual-pending-v1';
-let token=null,pending=null,busy=false,diagnosticReviewId=null;
+let token=null,pending=null,busy=false,diagnosticReviewId=null,reviewReleaseId=null;
 try{token=localStorage.getItem(TOKEN_KEY);pending=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}catch{}
 const messages={DEVICE_REQUIRED:'יש לחבר את המכשיר פעם אחת בקוד קצר.',PAIRING_NOT_CONFIGURED:'יש להגדיר ב־Netlify קוד חיבור קבוע COLMEX_DEVICE_PAIR_CODE בן 6 ספרות ולפרסם מחדש.',PAIR_CODE_INVALID:'קוד החיבור אינו נכון.',PAIR_CODE_EXPIRED_OR_USED:'קוד החיבור אינו פעיל. בדוק את הגדרת השרת.',PAIR_CODE_COOLDOWN:'יותר מדי ניסיונות. אפשר להשתמש באותו קוד שוב בעוד 15 דקות.',PAIR_CODE_RETRY:'בקשת חיבור נוספת מתבצעת. נסה שוב.',TRADE_IN_PROGRESS:'פעולת מסחר אחרת מתבצעת. המתן לסיומה.',LIVE_NOT_ENABLED:'מסחר LIVE אינו מופעל בשרת.',INVALID_BUY_AMOUNT:'יש להזין סכום גדול מאפס ועד 800 דולר.',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות.',NO_UNIQUE_LONG_POSITION:'לא נמצאה פוזיציית LONG יחידה במניה זו.',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מהסכום שבחרת.',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן לקנייה ולרזרבה של 5 דולר.',OUTSIDE_REGULAR_SESSION:'קנייה זמינה בשעות המסחר הרגילות בארה״ב.',EXISTING_POSITION_OR_ORDER:'קיימת פוזיציה או הוראה במניה שמונעת את הפעולה.',INSTRUMENT_UNAVAILABLE:'המניה אינה זמינה באופן חד־משמעי אצל הברוקר.',REQUIRES_REVIEW:'פעולה קודמת דורשת בדיקה אצל הברוקר.',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשות הרשאות מסחר וסטופ אצל הברוקר.'};
 Object.assign(messages,{INVALID_DIAGNOSTIC_REQUEST:'בדיקת קנייה מותרת עד 200 דולר בלבד.',DIAGNOSTIC_STATE_CHANGED:'מצב ההוראה שבבירור השתנה או אינו מאפשר בדיקה נפרדת. לא נשלחה קנייה.',DIAGNOSTIC_ALREADY_USED:'כבר תועד ניסיון בדיקה עבור ההוראה שבבירור. אין לשלוח ניסיון נוסף.',DIAGNOSTIC_SAME_INSTRUMENT:'יש לבחור מניה אחרת מזו שההוראה שלה בבירור.',DIAGNOSTIC_ACCOUNT_NOT_EMPTY:'בדיקה נפרדת דורשת חשבון ללא פוזיציות או הוראות פתוחות והיסטוריה זמינה.'});
 const explain=code=>messages[code]||entryReasonLabel(code);
 const failureText=data=>data.failure?' · '+explain(data.failure.code)+(data.failure.httpStatus?' · HTTP '+data.failure.httpStatus:'')+(data.requestId?' · מזהה בקשה: '+data.requestId:''):'';
+Object.assign(messages,{REVIEW_STATE_CHANGED:'מצב ההוראה השתנה; רענן מצב לפני הסרת החסימה.',REVIEW_ACCOUNT_NOT_EMPTY:'לא ניתן להסיר את החסימה: קיימת הוראה או פוזיציה, או שהיסטוריית הברוקר אינה זמינה.'});
 function say(text){$('colmexManualStatus').textContent=text;}
 function renderAccess(){
  $('colmexDeviceState').textContent=token?'המכשיר מחובר · ללא סיסמה בכל פעולה':'חיבור מכשיר חד־פעמי נדרש למסחר ידני';
  $('colmexPairForm').hidden=!!token;$('colmexDisconnect').hidden=!token;
- for(const id of ['colmexManualBuy','colmexManualSell','colmexDiagnosticBuy'])$(id).disabled=!token||busy||!!pending;
+ for(const id of ['colmexManualBuy','colmexManualSell','colmexDiagnosticBuy','colmexReleaseReview'])$(id).disabled=!token||busy||!!pending;
  $('colmexRetryTrade').disabled=true;
 }
 function rememberPending(value){pending=value;if(value)localStorage.setItem(PENDING_KEY,JSON.stringify(value));else localStorage.removeItem(PENDING_KEY);renderAccess();}
@@ -36,7 +37,7 @@ $('colmexDisconnect').addEventListener('click',async()=>{
 function selected(){return $('selectedSymbol').textContent.trim();}
 function open(side){
  if(!token||busy||pending)return;
- diagnosticReviewId=null;$('colmexTradeAmount').max='800';
+ diagnosticReviewId=null;reviewReleaseId=null;$('colmexTradeAmount').max='800';$('colmexTradeSubmit').textContent='שלח הוראה בחשבון האמיתי';
  const symbol=selected();$('colmexTradeSide').value=side;$('colmexTradeSymbol').value=symbol;
  $('colmexTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+symbol+' · LIVE';
  $('colmexAmountLabel').hidden=side!=='BUY';
@@ -45,6 +46,20 @@ function open(side){
  $('colmexTradeResult').textContent='';$('colmexTradeDialog').showModal();
 }
 $('colmexManualBuy').addEventListener('click',()=>open('BUY'));
+$('colmexReleaseReview').addEventListener('click',async()=>{
+ if(!token||busy||pending)return;
+ busy=true;renderAccess();
+ try{
+  const {response,data}=await api('colmex-auto-status'),offer=data.reviewRecovery;
+  if(!response.ok||!offer)throw Error('לא ניתן לאמת את אפשרות הסרת החסימה. רענן את האפליקציה.');
+  if(!offer.available)throw Error(explain('REVIEW_STATE_CHANGED'));
+  busy=false;open('BUY');reviewReleaseId=offer.reviewRequestId;
+  $('colmexTradeTitle').textContent='הסרת חסימה · המשך ללא '+offer.blockedSymbol;
+  $('colmexTradeDescription').textContent='האישור מאפשר שוב קניות ידניות ואוטומטיות במניות אחרות בחשבון האמיתי, לפי החוקים והיתרה הזמינה. '+offer.blockedSymbol+' תישאר מוחרגת מקניות, ותיעוד ההוראה יישמר. $'+Number(offer.reservedUsd).toFixed(2)+' יישארו שמורים כנגד ההוראה שלא אומתה. הפעולה אינה מבטלת הוראה אצל הברוקר ואינה מאשרת שלא בוצעה. אין צורך לפנות לתמיכה כדי לבצע פעולה זו.';
+  $('colmexAmountLabel').hidden=true;$('colmexTradeAmount').disabled=true;
+  $('colmexTradeSubmit').textContent='אשר הסרת חסימה וחידוש המעקב';
+ }catch(error){say(error.message);}finally{busy=false;renderAccess();}
+});
  $('colmexDiagnosticBuy').addEventListener('click',async()=>{
   if(!token||busy||pending)return;
   busy=true;renderAccess();
@@ -62,6 +77,7 @@ $('colmexManualBuy').addEventListener('click',()=>open('BUY'));
 $('colmexManualSell').addEventListener('click',()=>open('SELL'));
 $('colmexTradeCancel').addEventListener('click',()=>$('colmexTradeDialog').close());
 function finishUnexecuted(data){
+ if(data.status==='REVIEW_RELEASED'){say('החסימה הגורפת הוסרה · '+data.symbol+' מוחרגת מקניות · המעקב במניות אחרות יכול להמשיך לפי החוקים והיתרה.');rememberPending(null);return true;}
  if(!['REJECTED','NOT_SENT'].includes(data.status))return false;
  say((data.status==='NOT_SENT'?'ההוראה לא נשלחה לברוקר.':'הברוקר דחה את פרטי ההוראה; היא לא בוצעה.')+failureText(data));rememberPending(null);return true;
 }
@@ -95,7 +111,8 @@ $('colmexRetryTrade').addEventListener('click',async()=>{if(pending&&!busy)await
 $('colmexTradeForm').addEventListener('submit',async event=>{
  event.preventDefault();if(busy||pending)return;
  const input={requestId:crypto.randomUUID(),symbol:$('colmexTradeSymbol').value,side:$('colmexTradeSide').value};
- if(input.side==='BUY')input.amountUsd=Number($('colmexTradeAmount').value);
+ if(reviewReleaseId){delete input.symbol;delete input.side;input.action='release_review';input.reviewRequestId=reviewReleaseId;}
+ else if(input.side==='BUY')input.amountUsd=Number($('colmexTradeAmount').value);
  if(diagnosticReviewId){input.diagnostic=true;input.reviewRequestId=diagnosticReviewId;if(!(input.amountUsd>0&&input.amountUsd<=200)){$('colmexTradeResult').textContent=explain('INVALID_DIAGNOSTIC_REQUEST');return;}}
  // Persist the request identity before network I/O. Never auto-resubmit a financial action.
  try{rememberPending(input);}catch{pending=null;renderAccess();$('colmexTradeResult').textContent='לא ניתן לשמור מזהה בקשה במכשיר. לא נשלחה הוראה.';return;}
