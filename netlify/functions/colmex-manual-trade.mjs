@@ -4,6 +4,8 @@ import {autoStore,lease,stateKey} from '../../lib/colmex-auto-store.mjs';
 import {AutoBroker} from '../../lib/colmex-auto-broker.mjs';
 import {deviceStoreName,requireDevice,sameOrigin,accessError} from '../../lib/colmex-device-access.mjs';
 import {manualInput,manualTrade} from '../../lib/colmex-manual-trades.mjs';
+import {pendingIntents} from '../../lib/colmex-live-state.mjs';
+import {failureDiagnostic} from '../../lib/colmex-order-diagnostics.mjs';
 export function makeManualHandler({env=process.env,deviceStoreFactory=()=>getStore({name:deviceStoreName,consistency:'strong'}),storeFactory=autoStore,brokerFactory=options=>new AutoBroker(options),leaseFactory=lease}={}){
  return async(request,context)=>{
   const vars=runtimeEnvironment(env,context),reply=(code,data)=>new Response(JSON.stringify(data),{status:code,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
@@ -18,7 +20,8 @@ export function makeManualHandler({env=process.env,deviceStoreFactory=()=>getSto
     if(!/^[a-f0-9-]{36}$/i.test(id||''))throw accessError('INVALID_REQUEST');
     const saved=await store.get(stateKey(vars.COLMEX_AUTO_ACCOUNT_ID),{type:'json'});
     const result=saved?.state?.manualRequests?.[id];
-    return reply(200,{ok:true,requestId:id,status:result?.status||'NOT_RECORDED',...(result?{side:result.side,symbol:result.symbol}:{}),reviewRequired:!!saved?.state?.halt});
+    const pending=saved?.state?pendingIntents(saved.state).find(i=>i.id===id):null;
+    return reply(200,{ok:true,requestId:id,status:result?.status||'NOT_RECORDED',...(result?{side:result.side,symbol:result.symbol,acknowledged:!!result.acknowledged,failure:result.failure?failureDiagnostic(result.failure):null}:{}),reviewRequired:!!pending?.reviewRequired});
    }
    const raw=await request.text();if(raw.length>1000)throw accessError('INVALID_REQUEST');
    const input=manualInput(JSON.parse(raw));
