@@ -1,5 +1,5 @@
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261027-order-diagnostics';
-import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261027-order-diagnostics';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261027-review-recovery';
+import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261027-review-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
 let latest=null,loading=false;
@@ -38,6 +38,7 @@ function renderMonitor(){
  document.getElementById('autoMonitorHistory').replaceChildren();
  if(latest.historyQuality?.discarded)line(document.getElementById('autoMonitorHistory'),`${latest.historyQuality.symbol} · החיפוש התחיל מחדש לאחר פער בהיסטוריה · ${latest.historyQuality.usableBars} נרות רצופים זמינים`);
  for(const p of latest.pendingActions||[]){
+  if(p.quarantined)line(document.getElementById('autoMonitorHistory'),`${p.symbol} · מוחרגת מקניות; אינה חוסמת מניות אחרות · $${p.reservedUsd?.toFixed(2)} נשמרים כנגד ההוראה הלא מאומתת`);
   line(document.getElementById('autoMonitorHistory'),`${p.symbol} · הוראה בבירור מאז ${time(p.at)} · `+(p.failure?reason(p.failure.code):p.acknowledged?'התקבל אישור קבלה; ממתין לאימות ביצוע':'סיבת הכישלון לא נשמרה בגרסה ששלחה את ההוראה'));
   if(p.requestId)line(document.getElementById('autoMonitorHistory'),'מזהה בקשה לבירור אצל הברוקר: '+p.requestId);
   const proof=p.reconciliation;

@@ -47,3 +47,9 @@ test('diagnostic same-symbol and unavailable offer cannot open a live order form
   const u=setup();u.setResponse({ok:true,status:200,json:async()=>({manualDiagnostic:offer})});await u.nodes.get('colmexDiagnosticBuy').click();assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');assert.notEqual(u.nodes.get('colmexTradeDialog')?.open,true);
  }
 });
+test('release dialog reads only until the user confirms; POST records a review action, not an order',async()=>{
+ const u=setup();u.setResponse({ok:true,status:200,json:async()=>({reviewRecovery:{available:true,blockedSymbol:'AMD',reservedUsd:805,reviewRequestId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'}})});
+ await u.nodes.get('colmexReleaseReview').click();assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');assert.equal(u.nodes.get('colmexTradeAmount').disabled,true);assert.match(u.nodes.get('colmexTradeDescription').textContent,/805.00/);assert.match(u.nodes.get('colmexTradeDescription').textContent,/אוטומטיות/);
+ u.setResponse({ok:true,status:200,json:async()=>({status:'REVIEW_RELEASED',symbol:'AMD'})});await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
+ const input=JSON.parse(u.calls[1].options.body);assert.equal(input.action,'release_review');assert.equal(input.side,undefined);assert.equal(input.amountUsd,undefined);assert.equal(input.reviewRequestId,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);assert.match(u.nodes.get('colmexManualStatus').textContent,/החסימה הגורפת הוסרה/);
+});
