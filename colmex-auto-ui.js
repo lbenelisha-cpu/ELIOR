@@ -1,5 +1,5 @@
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261026-quality';
-import {monitorView} from './lib/colmex-monitor-view.mjs';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261027-order-diagnostics';
+import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261027-order-diagnostics';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
 let latest=null,loading=false;
@@ -25,25 +25,31 @@ function renderMonitor(){
  renderPreparation();
  const view=monitorView(latest);
  const messages={disabled:'המעקב כבוי בשרת',error:'תקלה או עצירה · יש לבדוק את מצב השרת',waiting:'טרם תועד סבב שהושלם',stale:'לא תועד סבב שהושלם בחמש הדקות האחרונות',recent:'התקבל סבב שרת שהושלם לאחרונה'};
- health.textContent=messages[view.health]+(latest.lastResult==='OUTSIDE_REGULAR_SESSION'?' · השוק סגור; ניתוח ההכנה מוצג בטבלה הנפרדת':'');health.dataset.health=view.health;
+ health.textContent=(view.observationScanning?'סריקת המניות נמשכת · קניות חדשות חסומות עד בירור ההוראה':messages[view.health])+(latest.lastResult==='OUTSIDE_REGULAR_SESSION'?' · השוק סגור; ניתוח ההכנה מוצג בטבלה הנפרדת':'');health.dataset.health=view.health;
  summary.textContent=`סבב שרת אחרון שהושלם: ${time(view.completed)} · ${view.age===null?'':`לפני ${Math.floor(view.age/60000)} דקות · `}תועדה בדיקה ל־${view.checked} מתוך ${view.total} מניות`;
  checks.replaceChildren();
  for(const row of view.rows){
   const tr=document.createElement('tr');tr.dataset.state=row.state;
-  for(const value of [row.symbol,row.reason?reason(row.reason)+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
+  for(const value of [row.symbol,row.reason?reason(row.reason)+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):'')+(row.entryBlockReason?' · '+reason(row.entryBlockReason):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
    const td=document.createElement('td');td.textContent=value;tr.append(td);
   }
   checks.append(tr);
  }
  document.getElementById('autoMonitorHistory').replaceChildren();
  if(latest.historyQuality?.discarded)line(document.getElementById('autoMonitorHistory'),`${latest.historyQuality.symbol} · החיפוש התחיל מחדש לאחר פער בהיסטוריה · ${latest.historyQuality.usableBars} נרות רצופים זמינים`);
+ for(const p of latest.pendingActions||[]){
+  line(document.getElementById('autoMonitorHistory'),`${p.symbol} · הוראה בבירור מאז ${time(p.at)} · `+(p.failure?reason(p.failure.code):p.acknowledged?'התקבל אישור קבלה; ממתין לאימות ביצוע':'סיבת הכישלון לא נשמרה בגרסה ששלחה את ההוראה'));
+  if(p.requestId)line(document.getElementById('autoMonitorHistory'),'מזהה בקשה לבירור אצל הברוקר: '+p.requestId);
+  const proof=p.reconciliation;
+  if(proof)line(document.getElementById('autoMonitorHistory'),`בדיקה מול הברוקר: ${time(proof.at)} · `+(!proof.historyAvailable?'היסטוריית ההוראות אינה זמינה':`${proof.matches??0} התאמות למזהה ההוראה · ${proof.relatedHistoryCount??0} רשומות היסטוריה באותו נכס · ${proof.openOrders??0} הוראות פתוחות בחשבון · ${proof.openPositions??0} פוזיציות בחשבון`));
+ }
 }
 async function refresh(){if(document.hidden||loading)return;loading=true;refreshButton.disabled=true;try{
  const r=await fetch('/.netlify/functions/colmex-auto-status',{cache:'no-store',signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error();
  if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:d,error:false};
  if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-colmex-rsi',{detail:d}));
  latest=d;received.textContent='מצב השרת נקרא במסך: '+time(Date.now());document.getElementById('autoMonitorHistory').replaceChildren();renderMonitor();
- badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt?' · '+d.halt:'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
+ badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt&&d.halt!==d.lastResult?' · '+reason(d.halt):'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
  positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · כמות ${p.qty} · כניסה $${p.entryPrice} · שיא שנצפה $${p.peakPrice}`);
  if(!d.positions?.length)line(positions,'אין פוזיציות שמנוהלות בידי המנגנון הזה. פוזיציות ידניות מוצגות בחלונית החשבון.');
  }catch{if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:null,error:true};if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-status-error'));latest=null;badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';health.textContent='אין חיבור לתצוגת המעקב · לא ניתן לאמת שהבדיקות ממשיכות';health.dataset.health='error';summary.textContent='זמן הסבב האחרון אינו מאומת כעת.';positions.replaceChildren();checks.replaceChildren();document.getElementById('autoMonitorHistory').replaceChildren();}finally{loading=false;refreshButton.disabled=false;}}
