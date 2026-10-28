@@ -102,3 +102,11 @@ test('server never sends a second market sell when native reconciliation already
 test('changing configured TP replaces an active bracket even when stop and quantity are unchanged',async t=>{
  const r=rig(t);await r.store.sync(symbol,r.p,100);r.store.rows[symbol].updatedAt=0;applyTrailingExitPolicy(r.p,{takeProfitPct:20,stopLossPct:1,profitActivationPct:4,trailingGapPp:1});await r.store.sync(symbol,r.p,100);assert.equal(r.posts,2);assert.equal(r.deletes,1);assert.equal(r.last.aboveStopPrice,'120');
 });
+test('settings-only migration tightens an existing 3% native stop to the configured 1%',async t=>{
+ const r=rig(t);r.p.effectiveStopPrice=0;applyTrailingExitPolicy(r.p,{stopLossPct:3});
+ await r.store.sync(symbol,r.p,100);assert.equal(r.last.belowStopPrice,'97');
+ r.store.rows[symbol].updatedAt=0;applyTrailingExitPolicy(r.p,{stopLossPct:1});
+ await r.store.sync(symbol,r.p,99.5);
+ assert.equal(r.deletes,1);assert.equal(r.posts,2);assert.equal(r.last.belowStopPrice,'99');
+ assert.equal(r.store.rows[symbol].phase,'ACTIVE');
+});
