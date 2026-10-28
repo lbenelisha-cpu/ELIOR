@@ -1,6 +1,8 @@
 // Unit-test dependencies for source-isolated functions. Integration tests use
 // the real reconciliation, journal and protection implementations separately.
+import {validateTradeSettings} from '../../lib/trade-settings.mjs';
 export function withLiveSafety(context){
+ context.tradeSettings??={values:validateTradeSettings({})};
  context.liveStateHealth??={journalReady:true};
  context.liveReadiness??=()=>({ready:true});
  context.reconcileLiveHoldings??=()=>context.getLiveAccountSnapshot();

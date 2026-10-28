@@ -1,6 +1,6 @@
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
 import {RESEARCH_PROTOCOL} from './lib/trading-research.mjs';
-import {sizeRisk,positionRiskSettings} from './lib/confirmed-risk-sizing.mjs';
+import {sizeRisk} from './lib/confirmed-risk-sizing.mjs';
 import {recordStrategyObservation} from './lib/strategy-followup.mjs';
 import {binanceStrategyReport} from './lib/binance-strategy-followup.mjs';
 import {FileMaAudit} from './lib/ma-audit-file.mjs';
@@ -311,14 +311,14 @@ const livePeakMemory=new Map();
 const liveManagedPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
-  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,positionRiskSettings(p,tradeSettings.values));
+  for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
   for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,mode:r.mode||'OCO',stopPrice:r.stop,takeProfitPrice:r.mode==='STOP_ONLY'?null:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
   return positions;
 };
 const tradingPositions=()=>{
  if(mode==='live')return liveManagedPositions();
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
- for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,positionRiskSettings(p,tradeSettings.values));
+ for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
  return positions;
 };
 const accountSnapshot=()=>DEMO_TRADING&&mode==='demo'?demoTrader.snapshot():snap();
@@ -811,6 +811,9 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};
   }
+  // Snapshot the current settings for every fill, including manual purchases.
+  // Historical riskPlan percentages describe entry risk, never an exit override.
+  if(meta.wyckoffTrade)meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:{...tradeSettings.values}}};
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
@@ -829,7 +832,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     throw e;
   }
 
-  if(quoteUsdt*(1-(meta.wyckoffTrade?.riskPlan?.stopLossPct??1)/100)*.998<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
+  if(quoteUsdt*(1-tradeSettings.values.stopLossPct/100)*.998<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
   const precision=Math.min(8,Number(info.quoteAssetPrecision??8));
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
@@ -1511,7 +1514,7 @@ async function evaluateSymbol(s){
     const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
-    if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings=positionRiskSettings(ev.wyckoffTrade,tradeSettings.values);
+    if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
     if(!p&&mode==='live'){recordStrategyObservation(strategyReviewState,{symbol:s,bars:entryBars,at:Date.now(),price:livePrice,comparison:ev.comparison,version:ENTRY_POLICY_VERSION});saveStrategyReview();}
     const rsiBars=entryBars.length?entryBars:(dailyCandleCache.get(s)?.rows||[]);
     ev.screenRsi=rsiSnapshot(rsiBars,{close:livePrice,observedAt:streams[s]?.lastEventAt});

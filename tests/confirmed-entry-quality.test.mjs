@@ -57,9 +57,9 @@ test('wider stops shrink order size, respect $8 planned risk and lot minimums; e
  const plan=planBuy(input);assert.equal(plan.reason,'READY');assert.ok(plan.order.stopLoss>1);assert.ok(plan.order.qty<7);assert.ok(plan.riskPlan.plannedRiskUsd<=8);assert.equal(plan.order.stopLossType,'offset%');
  assert.equal(planBuy({...input,riskInput:{...riskInput,atr:5}}).reason,'VOLATILITY_RISK_TOO_HIGH');
  assert.equal(planBuy({...input,details:{...details,minLot:5}}).reason,'MINIMUM_QUANTITY_ABOVE_RISK_BUDGET');
- const btc=sizeRisk(100,20,validateTradeSettings({}),{...riskInput,version:'BINANCE_CONFIRMED_QUALITY_V1'});assert.ok(btc.budget<20);assert.ok(btc.budget*btc.settings.stopLossPct/100<=.2+1e-12);
+ const btc=sizeRisk(100,20,validateTradeSettings({}),{...riskInput,version:'BINANCE_CONFIRMED_QUALITY_V1'});assert.equal(btc.settings.stopLossPct,1);assert.equal(btc.budget,20);assert.ok(btc.budget*btc.settings.stopLossPct/100<=.2+1e-12);
 });
-test('frozen entry stop survives reconciliation/settings changes; existing positions keep their prior policy',()=>{
+test('Colmex frozen entry stop survives reconciliation/settings changes; existing positions keep their prior policy',()=>{
  const p=applyTrailingExitPolicy({entryPrice:100,peakPrice:100,riskPlan:{stopLossPct:2}},positionRiskSettings({riskPlan:{stopLossPct:2}},{stopLossPct:1}));assert.equal(p.stopPrice,98);
  applyTrailingExitPolicy(p,positionRiskSettings(p,{stopLossPct:4}));assert.equal(p.stopPrice,98);assert.equal(positionRiskSettings({}, {stopLossPct:1}).stopLossPct,1);
 });
@@ -80,11 +80,11 @@ test('offline Colmex cycle writes one confirmed intent, persists risk metadata a
  reconcile(state,{positions:[],orders:[],history:[{id:'sell',positionId:'p',side:'sell',status:'filled',filledQty:intent.order.qty,avgPrice:101}]},clock+1000);assert.equal(state.closedTrades[0].entryMode,'spring_reclaim_confirmed');assert.equal(state.closedTrades[0].netPnl,null);
  }}
 });
-test('Binance final order path reduces notional before minimum checks and revalidates the confirmed signal',async()=>{
+test('Binance final order path uses the configured stop before minimum checks and revalidates the confirmed signal',async()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketBuy('),source.indexOf('async function placeLiveMarketSell('));
  const b=wave(),ev=evaluateDailyTrade({symbol:'ABCUSDT',bars:b,price:101.05,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'confirmed_quality',allowEarlyWave:true}),meta={wyckoffTrade:ev.wyckoffTrade};
  const submitted=[];let price=101.05;
  const context=vm.createContext({Date:class extends Date{static now(){return now;}},sizeRisk,tradeSettings:{values:validateTradeSettings({})},nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},liveManagedPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:20}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry,ENTRY_POLICY_VERSION,candles:async()=>[],signedBinancePost(){throw Error('network forbidden');},recordLiveFill(){},requireLivePrice:()=>price,streams:{ABCUSDT:{}},assertSpringEntryReady,tradeControl:{paused:false},liveOrders:{submit:async(p,m)=>{submitted.push({p,m});return {};}}});
- vm.runInContext(fn,withLiveSafety(context));await context.placeLiveMarketBuy('ABCUSDT',20,'READY',meta);assert.equal(submitted.length,1);assert.ok(Number(submitted[0].p.quoteOrderQty)<20);assert.ok(submitted[0].m.meta.wyckoffTrade.riskPlan.plannedRiskUsd<=.2+1e-12);
+ vm.runInContext(fn,withLiveSafety(context));await context.placeLiveMarketBuy('ABCUSDT',20,'READY',meta);assert.equal(submitted.length,1);assert.equal(Number(submitted[0].p.quoteOrderQty),20);assert.equal(submitted[0].m.meta.wyckoffTrade.exitSettings.stopLossPct,1);assert.equal(submitted[0].m.meta.wyckoffTrade.riskPlan.stopLossPct,1);assert.ok(submitted[0].m.meta.wyckoffTrade.riskPlan.plannedRiskUsd<=.2+1e-12);
  price=99;await assert.rejects(()=>context.placeLiveMarketBuy('ABCUSDT',20,'READY',meta));assert.equal(submitted.length,1);
 });

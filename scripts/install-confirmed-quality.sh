@@ -27,9 +27,9 @@ const {BINANCE_CONFIRMED_POLICY}=await import(process.env.STAGED_QUALITY);
 const {sizeRisk}=await import(process.env.STAGED_RISK);
 const {RESEARCH_PROTOCOL,tradingResearchReport}=await import(process.env.STAGED_RESEARCH);
 if(RESEARCH_PROTOCOL.version!=='TRADING_RESEARCH_V1'||tradingResearchReport({}).protocol.mode!=='OBSERVATION_ONLY')throw Error('Research runtime check failed');
-if(BINANCE_CONFIRMED_POLICY.version!=='BINANCE_CONFIRMED_QUALITY_V1')throw Error('Wrong policy');
-const p=sizeRisk(100,20,{stopLossPct:1},{version:BINANCE_CONFIRMED_POLICY.version,atr:1.2,structureLow:99});
-if(p.reason!=='READY'||p.budget>=20||p.budget*p.settings.stopLossPct/100>.200001)throw Error('Risk sizing smoke failed');
+if(BINANCE_CONFIRMED_POLICY.version!=='BINANCE_CONFIRMED_QUALITY_V1'||BINANCE_CONFIRMED_POLICY.stopLossPolicy!=='SETTINGS_ONLY_V1')throw Error('Wrong policy');
+const p=sizeRisk(100,20,{stopLossPct:2},{version:BINANCE_CONFIRMED_POLICY.version,atr:5,structureLow:90});
+if(p.reason!=='READY'||p.settings.stopLossPct!==2||p.riskPlan.stopLossPolicy!=='SETTINGS_ONLY_V1'||p.budget!==10||p.budget*p.settings.stopLossPct/100>.200001)throw Error('Settings-only stop smoke failed');
 JS
 backup="/root/levi-before-confirmed-quality-$(date +%Y%m%d-%H%M%S).tgz"
 tar -czf "$backup" "${existing[@]}"
@@ -51,7 +51,7 @@ let ready=false;
 for(let i=0;i<15;i++){
  try{
   const r=await fetch('http://127.0.0.1:8080/api/binance-mode',{signal:AbortSignal.timeout(1500)}),d=await r.json();
-  if(r.ok&&d.entryPolicyVersion==='BINANCE_CONFIRMED_QUALITY_V1'&&d.confirmedQuality?.maxStopPct===3&&d.researchMonitoring?.version==='TRADING_RESEARCH_V1'){ready=true;break;}
+  if(r.ok&&d.entryPolicyVersion==='BINANCE_CONFIRMED_QUALITY_V1'&&d.confirmedQuality?.stopLossPolicy==='SETTINGS_ONLY_V1'&&d.researchMonitoring?.version==='TRADING_RESEARCH_V1'){ready=true;break;}
  }catch{}
  await new Promise(r=>setTimeout(r,1000));
 }
