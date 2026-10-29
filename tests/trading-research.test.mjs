@@ -82,7 +82,7 @@ test('UI presents primary sources, backend unknown state, uncertainty and resear
 test('expanded research and sources remain open across polling without reopening panels the user collapsed',()=>{
  const el=tag=>({tag,children:[],textContent:'',append(...items){this.children.push(...items);},replaceChildren(){this.children=[];},querySelectorAll(selector){const all=this.children.flatMap(c=>[c,...c.querySelectorAll('details')]);return all.filter(c=>c.tag==='details'&&(selector!=='details[open]'||c.open));}}),host=el('host'),doc={createElement:el};
  renderStrategyReview(host,{actual:[],observations:[],research:tradingResearchReport({})},{document:doc});for(const e of host.querySelectorAll('details'))e.open=true;
- renderStrategyReview(host,{actual:[],observations:[],research:tradingResearchReport({})},{document:doc});assert.equal(host.querySelectorAll('details[open]').length,2);
+ renderStrategyReview(host,{actual:[],observations:[],research:tradingResearchReport({})},{document:doc});assert.equal(host.querySelectorAll('details[open]').length,3);
  for(const e of host.querySelectorAll('details'))e.open=false;
  renderStrategyReview(host,null,{document:doc});assert.equal(host.querySelectorAll('details[open]').length,0);
 });

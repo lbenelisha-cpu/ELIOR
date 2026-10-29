@@ -1,3 +1,4 @@
+import {recordEntryBlocker} from '../../lib/entry-method-comparison.mjs';
 import {maAuditStore,colmexAuditPrefix,createColmexAudit,flushColmexAudit} from '../../lib/colmex-ma-audit.mjs';
 import {configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mjs';
 import {autoStore,lease} from '../../lib/colmex-auto-store.mjs';
@@ -23,7 +24,7 @@ export default async function(request,context){
   // Never retry saving an in-memory intent after its durable write failed.
   // The last confirmed state is released; uncertain CAS writes retain their reservation.
   if(error.statePersistenceFailure)throw error;
-  lock.state.lastError=cycleError(error,lock.state.stage);await lock.save(lock.state);
+  lock.state.lastError=cycleError(error,lock.state.stage);recordEntryBlocker(lock.state,{reason:lock.state.lastError.reason});await lock.save(lock.state);
  }
  finally{await lock.release();}
  return new Response(null,{status:204});

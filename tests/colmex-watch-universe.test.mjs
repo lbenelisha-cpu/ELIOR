@@ -41,7 +41,7 @@ test('a ready entry stops further scanning after one durable intent; full accoun
  const f=fake();await f.run({signal:()=>({ready:true,setup:{patternId:'fresh',targetPrice:50}})});
  assert.equal(f.writes,1);assert.deepEqual(f.reads,[1]);assert.equal(f.state.pending.kind,'BUY');assert.deepEqual(f.state.used,['fresh']);
  const full=fake();full.broker.snapshot=async()=>({positions:[],orders:[{side:'buy'},{side:'buy'},{side:'buy'}],history:[],account:{},state:{availableCash:1000}});
- assert.equal((await full.run()).reason,'NO_FREE_SLOT');assert.equal(full.catalogs,0);assert.equal(full.writes,0);
+ assert.equal((await full.run()).reason,'NO_FREE_SLOT');assert.equal(full.catalogs,1);assert.equal(full.reads.length,5);assert.equal(full.writes,0);assert.equal(full.state.checks.AAPL.entryBlockReason,'NO_FREE_SLOT');assert.equal(full.state.entryComparison.diagnostics.AAPL.entryBlockCategory,'CAPITAL_OR_RISK');
 });
 test('durable check failure cannot be swallowed by the per-stock data error handler',async()=>{
  const f=fake();await assert.rejects(f.run({save:async s=>{if(s.checks.AAPL)throw Error('storage down');},signal:()=>({ready:true,setup:{patternId:'fresh',targetPrice:50}})}),/storage down/);

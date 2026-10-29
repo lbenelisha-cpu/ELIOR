@@ -1,3 +1,4 @@
+import {renderEntryComparison} from './entry-comparison-ui.js?v=20261029-entry-comparison';
 import {renderTradingResearch} from './trading-research-ui.js?v=20261027-research2';
 const modes={spring_rsi_live:'Spring מיידי · קודם',early_wave_live:'גל מוקדם · קודם',spring_reclaim_confirmed:'Spring לאחר חזרה',early_wave_confirmed:'גל מוקדם מאושר',unknown:'מקור לא ידוע',manual_external:'ידני',mixed_or_multiple_entries:'כניסות מעורבות'};
 const variants={legacy:'כללים קודמים',confirmed:'אישור נר בלבד',confirmed_trend:'אישור + מגמה',confirmed_volume:'אישור + מחזור',full_quality:'אישור + מגמה + מחזור'};
@@ -8,10 +9,11 @@ export function renderStrategyReview(host,data,{document:doc=globalThis.document
  const restore=()=>{for(const e of host.querySelectorAll?.('details')||[])e.open=openIds.has(e.id);};
  host.replaceChildren();
  const add=(tag,text,parent=host)=>{const e=doc.createElement(tag);e.textContent=text;parent.append(e);return e;};
- if(!data){add('p','ממתין לנתוני גרסת האסטרטגיה מהשרת. תצוגה זו אינה מאשרת שהעדכון הותקן במנוע המסחר.');renderTradingResearch(host,null,{document:doc,modes,variants});restore();return;}
- add('p','מעקב נפרד לכל מסלול וגרסה · נרות 5 דקות סגורים · MA100/200 על ארבעה נרות · מחזור נר האישור לפחות כממוצע 20 קודמיו. מרחק הסטופ נקבע בכניסה לפי ATR והמבנה, עד 3%, תוך הקטנת הכמות.');
+ if(!data){add('p','ממתין לנתוני גרסת האסטרטגיה מהשרת. תצוגה זו אינה מאשרת שהעדכון הותקן במנוע המסחר.');renderEntryComparison(host,null,{document:doc});renderTradingResearch(host,null,{document:doc,modes,variants});restore();return;}
+ add('p','מעקב נפרד לכל מסלול וגרסה · נרות 5 דקות סגורים · MA100/200 על ארבעה נרות · מחזור נר האישור לפחות כממוצע 20 קודמיו. מרחק הסטופ בבייננס נקבע ב־SETTINGS; בקולמקס קיימת גם התאמה ל־ATR ולמבנה, עד 3%.');
  if(data.error||data.dropped)add('p','חלק מתיעוד ההשוואה חסר או לא נשמר. אין להסיק מסקנות מהנתונים החלקיים.');
  const table=(headers,rows)=>{const wrap=add('div','');wrap.className='strategy-table-wrap';const t=add('table','',wrap),head=add('thead','',t),hr=add('tr','',head);for(const h of headers)add('th',h,hr);const body=add('tbody','',t);for(const row of rows){const tr=add('tr','',body);for(const value of row)add('td',String(value),tr);}};
+ renderEntryComparison(host,data.entryComparison,{document:doc});
  add('h3','עסקאות אמיתיות שנסגרו');
  if(!data.actual?.length)add('p','טרם נצברו עסקאות סגורות ביומן הזמין.');
  else table(['מסלול / גרסה','עסקאות','ברוטו','נטו מאומת','הצלחות נטו','רווח ממוצע / הפסד ממוצע','ירידה מצטברת ממומשת'],data.actual.map(g=>[(modes[g.entryMode]||g.entryMode)+' · '+g.version,g.closed,number(g.grossKnown===g.closed?g.grossPnl:null,' '+currency),g.netKnown===g.closed?number(g.netPnl,' '+currency):'עמלות/עלות חסרות · '+g.netKnown+'/'+g.closed+' אומתו',number(g.netWinRate,'%'),number(g.averageWin)+' / '+number(g.averageLoss),number(g.maxClosedDrawdown,' '+currency)]));
