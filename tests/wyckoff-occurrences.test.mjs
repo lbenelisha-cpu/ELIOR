@@ -2,7 +2,7 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {scanWyckoffOccurrences,mergeWyckoffOccurrences} from '../lib/wyckoff-occurrences.mjs';
 import {analyzeStockHistory,newSimulation} from '../lib/colmex-simulation.mjs';
 import {numberedWyckoffOccurrences} from '../lib/colmex-chart-view.mjs';
-const base=Date.parse('2026-10-16T13:30:00Z'),step=300000,pattern=[95,97,100,90,80,85,92,87,82,84,86,85,86,78,79,80,81];
+const base=Date.parse('2026-10-16T13:30:00Z'),step=300000,pattern=[95,97,100,90,80,85,92,87,82,84,93,85,86,78,79,80,81];
 function rows(closes){return closes.map((close,i)=>({open:i%pattern.length<2?close-1:close,high:close,low:i%pattern.length<2?close-1:close,close,openTime:base+i*step,closeTime:base+(i+1)*step,timeframe:'5m',closed:true}));}
 test('one structural setup is counted once through Spring and later reclaim, with no future confirmation',()=>{
  const bars=rows(pattern),before=scanWyckoffOccurrences(bars.slice(0,13),{now:bars.at(-1).closeTime});assert.equal(before.length,0);

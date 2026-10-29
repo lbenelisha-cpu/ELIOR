@@ -186,7 +186,7 @@ function mode(s){
 }
 
 function buyReasonLabel(r){
-  if(['WAIT_CLOSED_CONFIRMATION','WAIT_MA_HISTORY','MA_DOWNTREND_BLOCK','WAIT_VOLUME_HISTORY','CONFIRMATION_VOLUME_LOW','WAIT_ATR_HISTORY','VOLATILITY_RISK_TOO_HIGH','QUALITY_SIGNAL_INVALIDATED'].includes(r))return decisionReasonLabel(r);
+  if(['WAIT_SECOND_RECOVERY_CONFIRMATION','SECOND_RECOVERY_NOT_HIGHER','WAIT_CLOSED_CONFIRMATION','WAIT_MA_HISTORY','MA_DOWNTREND_BLOCK','WAIT_VOLUME_HISTORY','CONFIRMATION_VOLUME_LOW','WAIT_ATR_HISTORY','VOLATILITY_RISK_TOO_HIGH','QUALITY_SIGNAL_INVALIDATED'].includes(r))return decisionReasonLabel(r);
   if(/^WAIT_PROFIT_ACTIVATION_/.test(r||''))return 'ממתין לרווח '+String(r).replace('WAIT_PROFIT_ACTIVATION_','').replace('_PERCENT','')+'% להפעלת ההגנה';
   if(['EARLY_WAVE_BREAKOUT','TRAILING_PROFIT_HOLD','TRAILING_PROFIT_EXIT'].includes(r))return decisionReasonLabel(r);
   if(['WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','HOURLY_TREND_CONFIRMED'].includes(r))return decisionReasonLabel(r);
@@ -457,7 +457,7 @@ function blockerLabel(b){
 }
 
 function decisionReasonLabel(r){
-  const quality={WAIT_CLOSED_CONFIRMATION:'ממתין לנר סגור המאשר התאוששות / פריצה',WAIT_MA_HISTORY:'ממתין להיסטוריה עבור MA100/200',MA_DOWNTREND_BLOCK:'מגמת MA100/200 יורדת והמחיר מתחת לשניהם',WAIT_VOLUME_HISTORY:'נתוני מחזור חסרים',CONFIRMATION_VOLUME_LOW:'מחזור נר האישור נמוך מהממוצע',WAIT_ATR_HISTORY:'ממתין לנתוני תנודתיות',VOLATILITY_RISK_TOO_HIGH:'מרחק ההגנה הנדרש גדול מ־3%',QUALITY_SIGNAL_INVALIDATED:'אישור הכניסה בוטל במחיר הנוכחי'};if(quality[r])return quality[r];
+  const quality={WAIT_SECOND_RECOVERY_CONFIRMATION:'ממתין לאישור שיא ההתאוששות השנייה בנר סגור',SECOND_RECOVERY_NOT_HIGHER:'קנייה חסומה: ההתאוששות השנייה אינה גבוהה מהראשונה',WAIT_CLOSED_CONFIRMATION:'ממתין לנר סגור המאשר התאוששות / פריצה',WAIT_MA_HISTORY:'ממתין להיסטוריה עבור MA100/200',MA_DOWNTREND_BLOCK:'מגמת MA100/200 יורדת והמחיר מתחת לשניהם',WAIT_VOLUME_HISTORY:'נתוני מחזור חסרים',CONFIRMATION_VOLUME_LOW:'מחזור נר האישור נמוך מהממוצע',WAIT_ATR_HISTORY:'ממתין לנתוני תנודתיות',VOLATILITY_RISK_TOO_HIGH:'מרחק ההגנה הנדרש גדול מ־3%',QUALITY_SIGNAL_INVALIDATED:'אישור הכניסה בוטל במחיר הנוכחי'};if(quality[r])return quality[r];
   return ({
     BUY_EXECUTED:'BUY בוצע',
     SELL_EXECUTED:'SELL בוצע',
@@ -923,7 +923,7 @@ function drawCandles(candles){
 
   const flashingIndices=new Set(),candleColors=new Map();
   const candleSetup=heldNow?selectedPosition.setup:displayedWyckoffSetup(selectedSymbol,currentMode)?.setup;
-  const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
+  const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondRallyHigh:'#a5e67a',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
   const markCandle=(stamp,color,active)=>{const i=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(i>=0){candleColors.set(i,color);if(active)flashingIndices.add(i);}};
   for(const item of chartWyckoffHistory)for(const [key,color] of Object.entries(pivotColors)){const p=item.setup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,false);}
   for(const [key,color] of Object.entries(pivotColors)){const p=candleSetup?.[key];if(p?.time)markCandle(Number(p.time)-(key==='confirmation'&&p.live?0:1),color,heldNow);}

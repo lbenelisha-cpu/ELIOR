@@ -12,16 +12,16 @@ import {replayEntryChecks} from '../lib/binance-market-watch.mjs';
 const end=Date.parse('2026-10-26T15:00:00Z'),now=end+1000,step=300000;
 function spring(){
  const nums=[...Array.from({length:170},(_,i)=>i*.5),...Array(50).fill(95),95,97,100,90,80,85,92,87,82,84,86,85,86,79,81];
- return nums.map((n,i)=>({openTime:end-(nums.length-i)*step,closeTime:end-(nums.length-i-1)*step,open:100+(n-(i===220||i===221?1:0))*.01,high:100+n*.01,low:100+(n-(i===220||i===221?1:0))*.01,close:100+n*.01,volume:1000,closed:true,timeframe:'5m'}));
+ return nums.map((n,i)=>({openTime:end-(nums.length-i)*step,closeTime:end-(nums.length-i-1)*step,open:100+(n-(i===220||i===221?1:0))*.01,high:100+(i===230?93:n)*.01,low:100+(n-(i===220||i===221?1:0))*.01,close:100+n*.01,volume:1000,closed:true,timeframe:'5m'}));
 }
 const live=bars=>({price:bars.at(-1).close,priceAsOf:bars.at(-1).closeTime+1000});
-function wave(){const b=Array.from({length:210},(_,i)=>({openTime:end-(210-i)*step,closeTime:end-(209-i)*step,open:100,high:100.2,low:99.9,close:100,volume:1000,closed:true,timeframe:'5m'}));Object.assign(b.at(-1),{high:101.1,close:101.05,volume:1200});return b;}
+function wave(){const b=spring().slice(0,-2);b.push({...b.at(-1),openTime:b.at(-1).closeTime,closeTime:b.at(-1).closeTime+step,open:100.86,low:100.86,high:102.1,close:102.05,volume:1200});const shift=end-b.at(-1).closeTime;return b.map(x=>({...x,openTime:x.openTime+shift,closeTime:x.closeTime+shift}));}
 test('live Colmex requires a closed reclaim; Binance quality mode agrees after timestamp normalization',()=>{
  const b=spring(),s=entrySignal(b,now,0,[],live(b));assert.equal(s.ready,true);assert.equal(s.setup.entryMode,'spring_reclaim_confirmed');assert.ok(s.entryRsi<40);assert.equal(s.quality.volume.ratio,1);
  const pending=b.slice(0,-1),t=pending.at(-1).closeTime+1000;
  assert.equal(legacyEntrySignal(pending,t,0,[],live(pending)).ready,true);assert.equal(entrySignal(pending,t,0,[],live(pending)).ready,false);
  const ev=evaluateDailyTrade({symbol:'ABCUSDT',bars:b.map(x=>({...x,closeTime:x.closeTime-1})),price:b.at(-1).close,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'confirmed_quality',allowEarlyWave:true});
- assert.equal(ev.rawDecision,'BUY');assert.equal(ev.wyckoffTrade.entryPolicyVersion,'BINANCE_CONFIRMED_QUALITY_V1');assert.equal(ev.wyckoffTrade.setup.firstLow.price,s.setup.firstLow.price);assert.doesNotThrow(()=>assertSpringEntryReady(ev.wyckoffTrade,b.at(-1).close,now));
+ assert.equal(ev.rawDecision,'BUY');assert.equal(ev.wyckoffTrade.entryPolicyVersion,'BINANCE_CONFIRMED_QUALITY_V2');assert.equal(ev.wyckoffTrade.setup.firstLow.price,s.setup.firstLow.price);assert.doesNotThrow(()=>assertSpringEntryReady(ev.wyckoffTrade,b.at(-1).close,now));
 });
 test('trend and volume independently explain rejections; missing data, a consumed pattern and unfinished bars cannot buy',()=>{
  const b=spring();b.at(-1).volume=900;let s=entrySignal(b,now,0,[],live(b));assert.equal(s.reason,'CONFIRMATION_VOLUME_LOW');assert.equal(s.comparison.variants.confirmed_trend,true);assert.equal(s.comparison.variants.full_quality,false);
@@ -34,7 +34,7 @@ test('trend and volume independently explain rejections; missing data, a consume
 test('early-wave route also needs a closed breakout plus trend and volume, retaining independent identity',()=>{
  const b=wave(),s=entrySignal(b,now,0,[],live(b));assert.equal(s.ready,true);assert.equal(s.setup.entryMode,'early_wave_confirmed');assert.ok(s.setup.patternId.startsWith('early-wave:'));assert.equal(s.entryRsi,null);
  b.at(-1).volume=10;assert.equal(entrySignal(b,now,0,[],live(b)).ready,false);
- const before=wave().slice(0,-1),t=before.at(-1).closeTime+1000;assert.equal(entrySignal(before,t,0,[],{price:101.05,priceAsOf:t}).ready,false);
+ const before=wave().slice(0,-1),t=before.at(-1).closeTime+1000;assert.equal(entrySignal(before,t,0,[],{price:102.05,priceAsOf:t}).ready,false);
 });
 test('final price checks reject loss of support, a new low, stale quotes and expired confirmation',()=>{
  const b=spring(),s=entrySignal(b,now,0,[],live(b)),p=b.at(-1).close;
@@ -57,7 +57,7 @@ test('wider stops shrink order size, respect $8 planned risk and lot minimums; e
  const plan=planBuy(input);assert.equal(plan.reason,'READY');assert.ok(plan.order.stopLoss>1);assert.ok(plan.order.qty<7);assert.ok(plan.riskPlan.plannedRiskUsd<=8);assert.equal(plan.order.stopLossType,'offset%');
  assert.equal(planBuy({...input,riskInput:{...riskInput,atr:5}}).reason,'VOLATILITY_RISK_TOO_HIGH');
  assert.equal(planBuy({...input,details:{...details,minLot:5}}).reason,'MINIMUM_QUANTITY_ABOVE_RISK_BUDGET');
- const btc=sizeRisk(100,20,validateTradeSettings({}),{...riskInput,version:'BINANCE_CONFIRMED_QUALITY_V1'});assert.equal(btc.settings.stopLossPct,1);assert.equal(btc.budget,20);assert.ok(btc.budget*btc.settings.stopLossPct/100<=.2+1e-12);
+ const btc=sizeRisk(100,20,validateTradeSettings({}),{...riskInput,version:'BINANCE_CONFIRMED_QUALITY_V2'});assert.equal(btc.settings.stopLossPct,1);assert.equal(btc.budget,20);assert.ok(btc.budget*btc.settings.stopLossPct/100<=.2+1e-12);
 });
 test('Colmex frozen entry stop survives reconciliation/settings changes; existing positions keep their prior policy',()=>{
  const p=applyTrailingExitPolicy({entryPrice:100,peakPrice:100,riskPlan:{stopLossPct:2}},positionRiskSettings({riskPlan:{stopLossPct:2}},{stopLossPct:1}));assert.equal(p.stopPrice,98);
@@ -82,8 +82,8 @@ test('offline Colmex cycle writes one confirmed intent, persists risk metadata a
 });
 test('Binance final order path uses the configured stop before minimum checks and revalidates the confirmed signal',async()=>{
  const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8'),fn=source.slice(source.indexOf('async function placeLiveMarketBuy('),source.indexOf('async function placeLiveMarketSell('));
- const b=wave(),ev=evaluateDailyTrade({symbol:'ABCUSDT',bars:b,price:101.05,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'confirmed_quality',allowEarlyWave:true}),meta={wyckoffTrade:ev.wyckoffTrade};
- const submitted=[];let price=101.05;
+ const b=wave(),ev=evaluateDailyTrade({symbol:'ABCUSDT',bars:b,price:102.05,priceAsOf:new Date(now).toISOString(),now,timeframe:'5m',entryMode:'confirmed_quality',allowEarlyWave:true}),meta={wyckoffTrade:ev.wyckoffTrade};
+ const submitted=[];let price=102.05;
  const context=vm.createContext({Date:class extends Date{static now(){return now;}},sizeRisk,tradeSettings:{values:validateTradeSettings({})},nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},liveManagedPositions:()=>({}),getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>({status:'TRADING',ocoAllowed:true,orderTypes:['TAKE_PROFIT','STOP_LOSS'],quoteAsset:'USDT',filters:[]}),getLiveAccountSnapshot:async()=>({balances:[],usdtFree:100}),liveNextBuyAllocation:()=>({ok:true,amountUsdt:20}),LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,assessQualityEntry,ENTRY_POLICY_VERSION,candles:async()=>[],signedBinancePost(){throw Error('network forbidden');},recordLiveFill(){},requireLivePrice:()=>price,streams:{ABCUSDT:{}},assertSpringEntryReady,tradeControl:{paused:false},liveOrders:{submit:async(p,m)=>{submitted.push({p,m});return {};}}});
  vm.runInContext(fn,withLiveSafety(context));await context.placeLiveMarketBuy('ABCUSDT',20,'READY',meta);assert.equal(submitted.length,1);assert.equal(Number(submitted[0].p.quoteOrderQty),20);assert.equal(submitted[0].m.meta.wyckoffTrade.exitSettings.stopLossPct,1);assert.equal(submitted[0].m.meta.wyckoffTrade.riskPlan.stopLossPct,1);assert.ok(submitted[0].m.meta.wyckoffTrade.riskPlan.plannedRiskUsd<=.2+1e-12);
  price=99;await assert.rejects(()=>context.placeLiveMarketBuy('ABCUSDT',20,'READY',meta));assert.equal(submitted.length,1);

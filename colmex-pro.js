@@ -1,11 +1,11 @@
-import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261026-quality';
-import {renderSearchStatus} from './colmex-search-status.js?v=20261026-quality';
+import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
+import {renderSearchStatus} from './colmex-search-status.js?v=20261029-higher-recovery';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
-import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261026-quality';
+import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261029-higher-recovery';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
-import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261026-quality';
+import {lastTwoTradingDays,startCandleFlashing,chartWyckoffOccurrences,numberedWyckoffOccurrences,chartAnalysisMarks} from './lib/colmex-chart-view.mjs?v=20261029-higher-recovery';
 import {markBarIndex} from './lib/colmex-chart-marks.mjs?v=20261017-intervals';
 function publishMarket(data){if(typeof window!=='undefined'){window.LEVI_COLMEX_MARKET=data;if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-market',{detail:data}));}}
 const PAPER_MODE=document.body.dataset.mode==='simulation';
@@ -14,7 +14,7 @@ const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:
 const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261022-tools';
-import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261026-quality';
+import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261029-higher-recovery';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;
