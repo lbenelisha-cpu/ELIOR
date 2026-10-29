@@ -41,3 +41,9 @@ test('edge bands keep every caption outside the plot, even for dense numbered hi
  for(const a of layout){assert.ok(a.above?a.box.bottom<bounds.top:a.box.top>bounds.bottom);assert.ok(a.box.bottom<bounds.height-43);}
  for(let i=0;i<layout.length;i++)for(let j=0;j<i;j++){const a=layout[i].box,b=layout[j].box;assert.ok(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);}
 });
+
+test('mobile caption bounds keep labels inside the price plot and leave room for the axis',()=>{
+ const points=wyckoffArrowPoints([],[{setup,number:1}],bars,'5min'),x=i=>20+(i+.5)*205/bars.length;
+ const bounds=wyckoffEdgeBands(points,x,{left:16,right:225}),layout=arrowLayout(points,x,()=>bounds.top+125,bounds);
+ for(const a of layout){assert.ok(a.box.left>=16-1e-9);assert.ok(a.box.right<=225+1e-9);assert.ok(a.above?a.box.bottom<bounds.top:a.box.top>bounds.bottom);}
+});
