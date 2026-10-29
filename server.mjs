@@ -1,3 +1,4 @@
+import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
 import {RESEARCH_PROTOCOL} from './lib/trading-research.mjs';
 import {sizeRisk} from './lib/confirmed-risk-sizing.mjs';
@@ -989,11 +990,11 @@ async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
     const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
-    if(held>=LIVE_MAX_POSITIONS)break;
+    if(held>=LIVE_MAX_POSITIONS){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:'NO_FREE_SLOT'});break;}
     const allocation=liveNextBuyAllocation(account,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
-    if(!allocation.ok)break;
+    if(!allocation.ok){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:allocation.code||'INSUFFICIENT_BALANCE'});break;}
     const spend=allocation.amountUsdt;
-    if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002)break;
+    if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:'INSUFFICIENT_UNLEVERAGED_CASH'});break;}
     await placeLiveMarketBuy(ev.symbol,spend,ev.buyReason||'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade,kellyPolicyVersion:KELLY_RULESET});
     account=await getLiveAccountSnapshot();
   }
@@ -1549,8 +1550,9 @@ async function evaluateSymbol(s){
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     if(mode==='live')observeMaDecision({symbol:s,position:p||null,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
+    if(mode==='live'){recordEntryBlocker(strategyReviewState,{symbol:s,at:Date.now(),reason:ev.analysisReason||ev.buyReason||'ACTIVE_LONG',technicalReady:ev.analysisSignal,entryBlockReason:tradeControl.paused?'TRADING_PAUSED':p?'ACTIVE_LONG':!liveReadiness().ready?'LIVE_STATE_NOT_READY':Object.keys(tradingPositions()).length>=LIVE_MAX_POSITIONS?'NO_FREE_SLOT':null,universe:SYMBOLS});saveStrategyReview();}
     return ev;
-  }catch(e){if(mode==='live')observeMaDecision({symbol:s,action:'WAIT',reason:'EVALUATION_DATA_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol:s,error:e.message};}
+  }catch(e){if(mode==='live'){recordEntryBlocker(strategyReviewState,{symbol:s,reason:'EVALUATION_DATA_UNAVAILABLE'});saveStrategyReview();}if(mode==='live')observeMaDecision({symbol:s,action:'WAIT',reason:'EVALUATION_DATA_UNAVAILABLE',price:null,priceAt:null});return {ok:false,symbol:s,error:e.message};}
 }
 
 function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
@@ -2223,6 +2225,10 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/entry-comparison-ui.js':['entry-comparison-ui.js','text/javascript'],
+    '/strategy-followup-ui.js':['strategy-followup-ui.js','text/javascript'],
+    '/trading-research-ui.js':['trading-research-ui.js','text/javascript'],
+    '/lib/trading-research-sources.mjs':['lib/trading-research-sources.mjs','text/javascript'],
     '/position-alpha-panel.js':['position-alpha-panel.js','text/javascript'],
     '/lib/position-alpha.mjs':['lib/position-alpha.mjs','text/javascript'],
     '/ma-slope-panel.js':['ma-slope-panel.js','text/javascript'],
@@ -2331,7 +2337,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,researchMonitoring:RESEARCH_PROTOCOL,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
@@ -2583,6 +2589,25 @@ const server=http.createServer((req,res)=>{
 
   send(res,{error:'Not found'},404);
 });
+
+
+// Read-only candle comparison has its own paced task: a history request cannot
+// delay an exit evaluation, and held symbols continue to receive study candles.
+let comparisonReading=false;
+async function refreshEntryComparison(){
+ if(mode!=='live'||comparisonReading||strategyReviewError==='REVIEW_READ_FAILED')return;
+ comparisonReading=true;
+ try{
+  const open=(strategyReviewState.entryComparison?.cohorts||[]).flatMap(c=>Object.values(c.items).filter(i=>Object.values(i.methods).some(m=>m.position||m.pending)).map(i=>i.symbol));
+  for(const symbol of new Set([...SYMBOLS,...open])){
+   if(mode!=='live')break;
+   try{const bars=await candles(symbol);observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
+   catch{recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}
+   saveStrategyReview();
+  }
+ }finally{comparisonReading=false;}
+}
+setInterval(()=>refreshEntryComparison().catch(()=>{}),60000).unref();
 
 server.listen(PORT,'0.0.0.0',async()=>{
   console.log('Server',server.address().port);

@@ -8,7 +8,7 @@ systemctl is-active --quiet levi-binance
 git cat-file -e "$revision^{commit}"
 stage=$(mktemp -d /tmp/levi-confirmed-quality.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
-files=("scripts/audit-wyckoff-recovery.mjs")
+files=("scripts/audit-wyckoff-recovery.mjs" "scripts/compare-entry-methods.mjs")
 while IFS= read -r file; do
  case "$file" in *.js|*.mjs|*.html|*.css) files+=("$file");; esac
 done < <(git ls-tree --name-only "$revision")
@@ -22,7 +22,9 @@ for file in "${files[@]}"; do
  case "$file" in *.js|*.mjs) node --check "$stage/$file";; esac
  if [[ -f "$file" ]]; then existing+=("$file"); else missing+=("$file"); fi
 done
-STAGED_QUALITY="$stage/lib/confirmed-entry-quality.mjs" STAGED_RISK="$stage/lib/confirmed-risk-sizing.mjs" STAGED_RESEARCH="$stage/lib/trading-research.mjs" node --input-type=module - <<'JS'
+STAGED_QUALITY="$stage/lib/confirmed-entry-quality.mjs" STAGED_RISK="$stage/lib/confirmed-risk-sizing.mjs" STAGED_RESEARCH="$stage/lib/trading-research.mjs" STAGED_COMPARISON="$stage/lib/entry-method-comparison.mjs" node --input-type=module - <<'JS'
+const {ENTRY_COMPARISON_POLICY,entryComparisonReport}=await import(process.env.STAGED_COMPARISON);
+if(ENTRY_COMPARISON_POLICY.version!=='ENTRY_METHOD_COMPARISON_V1'||ENTRY_COMPARISON_POLICY.mode!=='SIMULATION_ONLY'||entryComparisonReport({})!==null)throw Error('Comparison smoke failed');
 const {BINANCE_CONFIRMED_POLICY}=await import(process.env.STAGED_QUALITY);
 const {sizeRisk}=await import(process.env.STAGED_RISK);
 const {RESEARCH_PROTOCOL,tradingResearchReport}=await import(process.env.STAGED_RESEARCH);
@@ -51,7 +53,7 @@ let ready=false;
 for(let i=0;i<15;i++){
  try{
   const r=await fetch('http://127.0.0.1:8080/api/binance-mode',{signal:AbortSignal.timeout(1500)}),d=await r.json();
-  if(r.ok&&d.entryPolicyVersion==='BINANCE_CONFIRMED_QUALITY_V2'&&d.confirmedQuality?.stopLossPolicy==='SETTINGS_ONLY_V1'&&d.confirmedQuality?.recoveryRule==='SECOND_RECOVERY_HIGHER_V1'&&d.researchMonitoring?.version==='TRADING_RESEARCH_V1'){ready=true;break;}
+  if(r.ok&&d.entryPolicyVersion==='BINANCE_CONFIRMED_QUALITY_V2'&&d.confirmedQuality?.stopLossPolicy==='SETTINGS_ONLY_V1'&&d.confirmedQuality?.recoveryRule==='SECOND_RECOVERY_HIGHER_V1'&&d.researchMonitoring?.version==='TRADING_RESEARCH_V1'&&d.entryComparison?.version==='ENTRY_METHOD_COMPARISON_V1'&&d.entryComparison?.mode==='SIMULATION_ONLY'){ready=true;break;}
  }catch{}
  await new Promise(r=>setTimeout(r,1000));
 }

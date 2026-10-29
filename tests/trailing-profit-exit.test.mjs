@@ -40,7 +40,7 @@ const now=Date.parse('2026-10-20T15:00:00Z'),env={CONTEXT:'production',COLMEX_AU
 async function cycle(bid,peakPrice=100,brokerStop=99,takeProfit=null){
  const state=initialState(now);state.positions=[{...pos(),symbol:'AAPL',id:'p',instrumentId:1,peakPrice,tickSize:[{leftRangeLimit:0,tickSize:.01}]}];let written;
  const p={id:'p',tradableInstrumentId:1,side:'buy',qty:2,stopLoss:brokerStop,takeProfit};
- await runCycle({state,save:async()=>{},env,now:()=>now,broker:{snapshot:async()=>({account:{tradingRules:{}},state:{},positions:[p],orders:[],history:[]}),quote:async()=>({bp:bid}),write:async(a,i)=>{written=structuredClone(i);return {};}}});return {state,written,p};
+ await runCycle({state,save:async()=>{},env,now:()=>now,broker:{snapshot:async()=>({account:{tradingRules:{}},state:{},positions:[p],orders:[],history:[]}),instruments:async()=>[],quote:async()=>({bp:bid}),write:async(a,i)=>{written=structuredClone(i);return {};}}});return {state,written,p};
 }
 test('Colmex replaces old fixed TP with +50% and raises broker SL to +9% at a +10% observed peak',async()=>{
  const {written,state,p}=await cycle(110,100,99,104);assert.equal(written.kind,'PROTECTION');assert.equal(written.stopLoss,109);assert.equal(written.takeProfit,150);
