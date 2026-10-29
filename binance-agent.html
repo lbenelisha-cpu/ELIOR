@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-entry-alpha">
 <link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
 <link rel="stylesheet" href="/binance-equity-history.css?v=20261026-equity">
-<link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"></head>
+<link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"><link rel="stylesheet" href="/chart-time-navigation.css?v=20261029-time-nav"></head>
 <body>
   <main class="app-shell">
     <header class="topbar">
@@ -226,7 +226,7 @@
           </div>
 
           <div class="toolbar-group">
-            <span class="toolbar-label">טווח</span>
+            <span class="toolbar-label">היסטוריה זמינה</span>
             <button class="time-pill range-btn" data-range="1D">יום</button>
             <button class="time-pill range-btn" data-range="2D">יומיים</button>
             <button class="time-pill range-btn" data-range="3D">3 ימים</button>
@@ -242,7 +242,7 @@
 
         </details>
         <p class="mini">רענון תצוגה אוטומטי בכל 30 שניות כשהמסך פתוח · מנגנון המסחר בשרת פועל בנפרד.</p>
-        <div id="chartTools"></div>
+        <div id="chartTools"></div><div id="chartTimeNavigation" aria-label="בחירת חלון זמן בגרף"></div>
         <div class="chart-rise-controls"><label><input type="checkbox" id="showRises" checked> הצג עליות וירידות של 1% ומעלה</label><span>עליות מעל הגרף · ירידות מתחתיו · לחץ על אחוז להדגשת המהלך</span></div>
         <div id="chartRises" class="chart-move-lane" aria-label="עליות מעל הגרף"></div>
         <div class="chart-wrap">
@@ -438,7 +438,7 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
-  <script src="/binance-agent.js?v=20261029-higher-recovery"></script>
+  <script src="/binance-agent.js?v=20261029-time-nav"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>

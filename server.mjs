@@ -2225,6 +2225,9 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/chart-time-navigation.js':['chart-time-navigation.js','text/javascript'],
+    '/chart-time-navigation.css':['chart-time-navigation.css','text/css'],
+    '/lib/chart-viewport.mjs':['lib/chart-viewport.mjs','text/javascript'],
     '/entry-comparison-ui.js':['entry-comparison-ui.js','text/javascript'],
     '/strategy-followup-ui.js':['strategy-followup-ui.js','text/javascript'],
     '/trading-research-ui.js':['trading-research-ui.js','text/javascript'],
