@@ -4,10 +4,10 @@ import {buildColmexMarks,markBarIndex,COLMEX_MARK_TYPES} from '../lib/colmex-cha
 const base=Date.parse('2026-10-16T14:00:00Z');
 const setup=Object.fromEntries(COLMEX_MARK_TYPES.map(([key],i)=>[key,{price:100+i,time:base+i*300000}]));
 const position={setup,entryPrice:105,entryAt:new Date(base+1600000).toISOString(),peakPrice:110,peakAt:new Date(base+1700000).toISOString(),effectiveStopPrice:94.5};
-test('all six Wyckoff stages, buy and peak carry exact prices/times; active pattern pulses despite journal deduplication',()=>{
+test('all seven Wyckoff stages, buy and peak carry exact prices/times; active pattern pulses despite journal deduplication',()=>{
  const state={positions:{AAPL:position},assets:{},journal:[{symbol:'AAPL',side:'BUY',price:105,at:position.entryAt,setup}]};const m=buildColmexMarks(state,'AAPL');
  for(const [kind] of COLMEX_MARK_TYPES){assert.equal(m.points.filter(p=>p.kind===kind).length,1);assert.equal(m.points.find(p=>p.kind===kind).pulse,true);}
- assert.ok(m.points.some(p=>p.kind==='buy'&&p.price===105));assert.ok(m.points.some(p=>p.kind==='peak'&&p.price===110&&p.pulse));assert.deepEqual(m.lines.map(x=>x.kind),['buy','peak','stop']);assert.equal(m.cards.length,9);
+ assert.ok(m.points.some(p=>p.kind==='buy'&&p.price===105));assert.ok(m.points.some(p=>p.kind==='peak'&&p.price===110&&p.pulse));assert.deepEqual(m.lines.map(x=>x.kind),['buy','peak','stop']);assert.equal(m.cards.length,10);
 });
 test('sale retains historical pattern, entry, observed peak and sale without blinking or inventing missing timestamps',()=>{
  const sale={symbol:'AAPL',side:'SELL',price:108,at:new Date(base+1800000).toISOString(),entryPrice:105,entryAt:position.entryAt,peakPrice:110,peakAt:position.peakAt,setup};

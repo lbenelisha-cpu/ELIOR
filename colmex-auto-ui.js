@@ -1,5 +1,5 @@
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261027-review-recovery';
-import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261027-review-recovery';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261029-higher-recovery';
+import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
 let latest=null,loading=false;
@@ -29,8 +29,8 @@ function renderMonitor(){
  summary.textContent=`סבב שרת אחרון שהושלם: ${time(view.completed)} · ${view.age===null?'':`לפני ${Math.floor(view.age/60000)} דקות · `}תועדה בדיקה ל־${view.checked} מתוך ${view.total} מניות`;
  checks.replaceChildren();
  for(const row of view.rows){
-  const tr=document.createElement('tr');tr.dataset.state=row.state;
-  for(const value of [row.symbol,row.reason?reason(row.reason)+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):'')+(row.entryBlockReason?' · '+reason(row.entryBlockReason):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
+  const tr=document.createElement('tr');tr.dataset.state=row.state;const recovery=latest.checks?.[row.symbol]?.quality?.recovery;const recoveryText=recovery?.firstPrice!=null?' · התאוששות 1: '+recovery.firstPrice+' · התאוששות 2: '+(recovery.secondPrice??'טרם אושרה'):'';
+  for(const value of [row.symbol,row.reason?reason(row.reason)+recoveryText+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):'')+(row.entryBlockReason?' · '+reason(row.entryBlockReason):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
    const td=document.createElement('td');td.textContent=value;tr.append(td);
   }
   checks.append(tr);

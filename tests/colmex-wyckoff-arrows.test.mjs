@@ -10,9 +10,9 @@ test('incomplete stages get arrows without inventing a confirmed pattern or a bu
 });
 test('historical numbered stages are deduplicated and retain candle close versus live-event anchors',()=>{
  const result=wyckoffArrowPoints([{kind:'initialPeak',at:setup.initialPeak.time,price:100,anchor:'close'}],[{setup,number:2}],bars,'5min');
- assert.equal(result.length,6);assert.deepEqual(result.map(p=>p.index),[0,1,2,3,4,5]);assert.ok(result.every(p=>p.number===2&&p.pulse));
+ assert.equal(result.length,7);assert.deepEqual(result.map(p=>p.index),[0,1,2,3,4,5,6]);assert.ok(result.every(p=>p.number===2&&p.pulse));
  const live={...setup,confirmation:{...setup.confirmation,live:true}};
- assert.equal(wyckoffArrowPoints([],[{setup:live,number:1}],bars,'5min').at(-1).index,6);
+ assert.equal(wyckoffArrowPoints([],[{setup:live,number:1}],bars,'5min').at(-1).index,7);
  const outside=wyckoffArrowPoints([{kind:'springLow',price:90,at:start-1},{kind:'springLow',price:90,at:start+99999999}],[],bars,'5min');assert.equal(outside.length,0);
 });
 test('high arrows point down, low arrows up, tips stay at actual values and colliding labels separate',()=>{
@@ -37,7 +37,7 @@ test('SVG arrows are keyboard accessible and report exact selected point; arrows
 test('edge bands keep every caption outside the plot, even for dense numbered history',()=>{
  const points=Array.from({length:12},(_,i)=>wyckoffArrowPoints([],[{setup,number:i+1}],bars,'5min')).flat();
  const x=()=>400,bounds=wyckoffEdgeBands(points,x),layout=arrowLayout(points,x,()=>bounds.top+125,bounds);
- assert.equal(layout.length,72);assert.equal(bounds.bottom-bounds.top,250);
+ assert.equal(layout.length,84);assert.equal(bounds.bottom-bounds.top,250);
  for(const a of layout){assert.ok(a.above?a.box.bottom<bounds.top:a.box.top>bounds.bottom);assert.ok(a.box.bottom<bounds.height-43);}
  for(let i=0;i<layout.length;i++)for(let j=0;j<i;j++){const a=layout[i].box,b=layout[j].box;assert.ok(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);}
 });

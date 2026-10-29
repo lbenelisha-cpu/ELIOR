@@ -9,9 +9,9 @@ function history(){
  const prices=[...Array(16).fill(95),95,97,100,90,80,85,92,87,82,84,86,85,86,50];
  return {barDetails:prices.map((c,i)=>({t:closed-(prices.length-i)*step,o:i===16||i===17?c-1:c,h:c,l:i===16||i===17?c-1:c,c,v:100}))};
 }
-test('closed-market Spring uses actual session/RSI but remains pending until closed reclaim and quality checks',()=>{
+test('closed-market Spring uses actual session/RSI and reports its lower-second-recovery blocker',()=>{
  const h=history(),r=analyzePreparation(h,{symbol:'AAPL',now});
- assert.equal(r.phase,'SPRING');assert.ok(r.rsi<=30);assert.equal(r.dataAt,closed);assert.equal(r.checkedAt,now);assert.equal(r.candidate,false);assert.equal(r.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(r.executionReady,false);assert.equal(r.closedOnly,true);
+ assert.equal(r.phase,'SPRING');assert.ok(r.rsi<=30);assert.equal(r.dataAt,closed);assert.equal(r.checkedAt,now);assert.equal(r.candidate,false);assert.equal(r.reason,'SECOND_RECOVERY_NOT_HIGHER');assert.equal(r.executionReady,false);assert.equal(r.closedOnly,true);
  // A weekend quote/open bar must not change the last valid market close.
  h.barDetails.push({t:now,o:5,h:6,l:4,c:5});assert.deepEqual(analyzePreparation(h,{symbol:'AAPL',now}),r);
  const old=history();old.barDetails=old.barDetails.map(b=>({...b,t:b.t-86400000}));
@@ -71,6 +71,6 @@ test('broker orders and known positions never qualify for empty account caching'
 
 test('preparation retains RSI between 30 and 40 but does not call an unconfirmed Spring a candidate',()=>{
  const h=history();Object.assign(h.barDetails.at(-1),{o:86,h:86,l:50,c:80});
- const ready=analyzePreparation(h,{symbol:'AAPL',now});assert.ok(ready.rsi>30&&ready.rsi<40);assert.equal(ready.candidate,false);assert.equal(ready.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(ready.executionReady,false);
- h.barDetails.at(-1).c=85;const high=analyzePreparation(h,{symbol:'AAPL',now});assert.equal(high.reason,'WAIT_CLOSED_CONFIRMATION');assert.equal(high.candidate,false);
+ const ready=analyzePreparation(h,{symbol:'AAPL',now});assert.ok(ready.rsi>30&&ready.rsi<40);assert.equal(ready.candidate,false);assert.equal(ready.reason,'SECOND_RECOVERY_NOT_HIGHER');assert.equal(ready.executionReady,false);
+ h.barDetails.at(-1).c=85;const high=analyzePreparation(h,{symbol:'AAPL',now});assert.equal(high.reason,'SECOND_RECOVERY_NOT_HIGHER');assert.equal(high.candidate,false);
 });

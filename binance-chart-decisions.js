@@ -39,9 +39,10 @@ function chartDecisionDetails(group,candles,interval){
    'החלטה: '+decisionLabel(row.decision||row.type||'HOLD')+' · '+(row.checks||1)+' בדיקות'];
   if(row.firstAt&&row.firstAt!==row.at)parts.push('הבדיקה הראשונה בקבוצה: '+new Date(row.firstAt).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}));
   if(row.analysisReason&&row.analysisReason!==row.buyReason)parts.push('תוצאת הניתוח לפני חסימת המסחר: '+decisionReasonLabel(row.analysisReason));
-  for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['springLow','שפל שני']]){
+  for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['rallyHigh','התאוששות ראשונה'],['secondRallyHigh','התאוששות שנייה'],['springLow','שפל שני']]){
    const value=setup[key]?.price;if(Number(value)>0)parts.push(label+': '+fmt(value,12));
   }
+  if(setup.recoveryComparison)parts.push('השוואת ההתאוששויות: '+(setup.recoveryComparison.passed?'עבר · השיא השני גבוה מהראשון':decisionReasonLabel(setup.recoveryComparison.reason)));
   if(setup.phase)parts.push('שלב: '+decisionReasonLabel(setup.phase));
   if(Number(row.targetPrice)>0)parts.push('יעד מחיר: '+fmt(row.targetPrice,12));
   if(kind==='signal'){
@@ -126,8 +127,8 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
  if(!active&&!chosen&&display?.stale)status.textContent='נתונים לא עדכניים · מוצגים סימוני הניתוח האחרון · אין אישור קנייה חדש';
  root.append(status);
  const width=root.clientWidth,height=root.clientHeight;
- const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']];
- const colors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
+ const points=[['initialPeak','שיא ראשוני'],['firstLow','שפל ראשוני'],['rallyHigh','התאוששות ראשונה'],['secondaryTest','בדיקה חוזרת'],['secondRallyHigh','התאוששות שנייה'],['springLow','Spring'],['confirmation','אישור כניסה']];
+ const colors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondRallyHigh:'#a5e67a',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
  const plotRight=left+step*view.length,gap=10,captionRows={top:{x:left,y:66},bottom:{x:left,y:height-27}};
  const risk=document.querySelector('#binanceTradeRisk');
  const rootBox=root.getBoundingClientRect?.(),riskBox=risk&&!risk.hidden?risk.getBoundingClientRect?.():null;
@@ -136,12 +137,12 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   else captionRows.top.y=Math.max(66,riskBox.bottom-rootBox.top+20);
  }
  for(const [key,label] of points){
-  const p=setup[key];if(!p||!(Number(p.price)>0))continue;
+  if(key==='confirmation'&&setup.requireHigherRecovery&&!setup.recoveryComparison?.passed)continue;const p=setup[key];if(!p||!(Number(p.price)>0))continue;
   const stamp=Number(p.time)-(key==='confirmation'&&p.live?0:1);const index=view.findIndex(c=>stamp>=Number(c.openTime)&&stamp<=Number(c.closeTime));if(index<0)continue;
   const button=document.createElement('button');button.type='button';button.className='wyckoff-pivot';
   button.style.setProperty('--pivot-color',colors[key]);button.dataset.pivot=key;
   const anchorX=left+step*(index+.5),anchorY=y(Number(p.price));
-  const above=['initialPeak','rallyHigh'].includes(key);
+  const above=['initialPeak','rallyHigh','secondRallyHigh'].includes(key);
   button.textContent=label;button.style.width='max-content';button.style.maxWidth=Math.max(30,plotRight-left)+'px';root.append(button);
   const labelWidth=Math.min(Math.max(30,plotRight-left),button.getBoundingClientRect?.().width||label.length*7+20);
   const row=above?captionRows.top:captionRows.bottom;
@@ -156,7 +157,7 @@ function renderWyckoffPivots(view,rows,step,left,y,digits){
   connector.style.transform='rotate('+Math.atan2(boxY-lineY,labelX-anchorX)+'rad)';root.append(connector);
   button.style.left=labelX+'px';button.style.top=labelY+'px';
   button.textContent=label;button.setAttribute('aria-label',label);button.title=label+' · '+fmt(p.price,digits)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
-  button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};
+  button.onclick=()=>{const panel=document.querySelector('#chartDecisionDetails');if(panel)panel.textContent=button.title+' · '+({initialPeak:'השיא שממנו החלה התבנית',firstLow:'רמת התמיכה שנקבעה בתבנית',rallyHigh:'שיא ההתאוששות לאחר השפל',secondRallyHigh:'השיא הראשון לאחר הבדיקה החוזרת; חייב להיות גבוה מההתאוששות הראשונה ולאשר נסיגה בנר סגור',secondaryTest:'בדיקה חוזרת של התמיכה לפני הדשדוש',springLow:'ירידה מתחת לשפל הראשוני לאחר הדשדוש',confirmation:setup.confirmation?.live?'המחיר החי חצה את השפל הראשוני לאחר ה־Spring, ללא המתנה לסגירת נר':'נר סגור שחזר מעל השפל הראשוני לאחר ה־Spring'}[key]);};
  }
 }
 
@@ -170,7 +171,7 @@ function renderNumberedWyckoff(view,step,left,y,digits){
   selectedWyckoffId=item.id;drawCandles(chartCandles);
   const panel=document.querySelector('#chartDecisionDetails');if(!panel)return;
   const parts=['תבנית וואיקוף '+item.number+' · '+(item.source==='TRADE_RECORDED_SETUP'?'תבנית מתועדת ביומן':'שחזור מנרות סגורים; אינו ביצוע עסקה')];
-  for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['rallyHigh','שיא התאוששות'],['secondaryTest','בדיקה חוזרת'],['springLow','Spring'],['confirmation','אישור כניסה']]){const p=item.setup[key];if(p)parts.push(label+': '+fmt(p.price,12)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}));}
+  for(const [key,label] of [['initialPeak','שיא ראשוני'],['firstLow','שפל ראשון'],['rallyHigh','התאוששות ראשונה'],['secondaryTest','בדיקה חוזרת'],['secondRallyHigh','התאוששות שנייה'],['springLow','Spring'],['confirmation','אישור כניסה']]){const p=item.setup[key];if(p)parts.push(label+': '+fmt(p.price,12)+' · '+new Date(p.time).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}));}
   if(!item.confirmedAt)parts.push('Spring זוהה; אין אישור כניסה מתועד בתבנית זו.');
   panel.textContent=parts.join('\n');
  };

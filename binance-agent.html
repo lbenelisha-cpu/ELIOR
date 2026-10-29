@@ -338,8 +338,8 @@
 
         <div class="rules-box">
           <h3>כללי מסחר</h3>
-          <p><b>קנייה:</b> נרות 5 דקות כולל פתילים: שיא → שפל ראשון → התאוששות → בדיקה משנית → לפחות 3 נרות דשדוש → Spring ו־RSI חי בין 0 ל־40, כולל 40. אין המתנה לסגירת הנר ואין דרישה למגמה עולה בשעה.</p>
-          <p><b>מסלול נוסף — גל מוקדם:</b> עלייה של לפחות 1% מהשפל בששת נרות 5 הדקות הסגורים האחרונים, ופריצה מעל הגבוה של שלושת הנרות האחרונים. למסלול זה אין תקרת RSI. נדרש מחיר חי ותבנית שלא נוצלה.</p><p><b>הגנת רווח:</b> ברירת המחדל: הפעלה ב־5% ומרחק נקודת אחוז ממחיר הקנייה. לדוגמה: קנייה 100 ← שיא 105 ← סטופ 104; שיא 106 ← סטופ 105. סטופ קודם אינו יורד.</p><p><b>SHORT:</b> אינו פעיל — החיבור הנוכחי פועל ב־Spot. נדרש חיבור מתאים לשורט.</p><p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
+          <p><b>קנייה:</b> נרות 5 דקות סגורים כולל פתילים: שיא → שפל ראשון → התאוששות ראשונה → בדיקה חוזרת → התאוששות שנייה גבוהה מהראשונה → דשדוש → Spring וחזרה מעל התמיכה בנר סגור. שיא ההתאוששות השנייה חייב להיות גבוה ממש מהראשון ומאושר בנר סגור; שוויון אינו מספיק. נבדקים גם RSI חי עד 40, מחזור האישור ומגמת MA100/200.</p>
+          <p><b>מסלול נוסף — גל מוקדם:</b> נדרשים אותם שני שיאי התאוששות מאושרים לפני נר הפריצה, בנוסף לעלייה של לפחות 1% מהשפל ופריצת שלושת הנרות הקודמים בנר סגור. המסלול כפוף לבדיקות המגמה והמחזור ולתבנית שלא נוצלה.</p><p><b>הגנת רווח:</b> ברירת המחדל: הפעלה ב־5% ומרחק נקודת אחוז ממחיר הקנייה. לדוגמה: קנייה 100 ← שיא 105 ← סטופ 104; שיא 106 ← סטופ 105. סטופ קודם אינו יורד.</p><p><b>SHORT:</b> אינו פעיל — החיבור הנוכחי פועל ב־Spot. נדרש חיבור מתאים לשורט.</p><p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
         </div>
       </div></details>
     </section>
@@ -432,13 +432,13 @@
 
   <dialog id="deviceConnectionDialog" aria-labelledby="deviceConnectionTitle"><h2 id="deviceConnectionTitle">חיבור מכשיר למסחר</h2><p>הזן את הקוד הקבוע שהוגדר בשרת. אותו קוד מתאים גם למכשיר נוסף. החיבור נשמר עד שנה; אין קוד בכל פעולה.</p><label>קוד חיבור — שש ספרות<input id="devicePairCode" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" dir="ltr"></label><p id="devicePairResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="devicePairSubmit" type="button">חבר מכשיר</button><button id="devicePairCancel" type="button">סגור</button></div></dialog>
   <dialog id="manualTradeDialog" aria-labelledby="manualTradeTitle"><h2 id="manualTradeTitle"></h2><p id="manualTradeSummary"></p><label id="manualAmountRow">סכום קנייה ב־USDT<input id="manualQuoteAmount" type="number" inputmode="decimal" min="5" step="0.01" autocomplete="off"></label><p id="manualTradePolicy" class="mini"></p><p id="manualTradeResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="manualTradeSubmit" type="button">אשר</button><button id="manualTradeCheck" type="button" hidden>בדוק מצב בקשה</button><button id="manualTradeCancel" type="button">סגור / ביטול</button></div></dialog>
-  <script src="/binance-chart-decisions.js?v=20261025-asset-search"></script>
+  <script src="/binance-chart-decisions.js?v=20261029-higher-recovery"></script>
   <script src="/binance-indicators.js?v=20261026-move-lanes"></script>
   <script src="/binance-control-session.js?v=20261019-device-access"></script>
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
-  <script src="/binance-agent.js?v=20261026-quality"></script>
+  <script src="/binance-agent.js?v=20261029-higher-recovery"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261025-stability"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
