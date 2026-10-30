@@ -6,13 +6,23 @@ Deployment, loading the page, opening the dialog, and GET requests never release
 the halt. The final user confirmation clearly states that future scheduled
 automatic entries and manual orders on other stocks become possible.
 
-The server accepts only the exact ID of one unacknowledged legacy automatic BUY
+The server accepts only the exact ID of one unacknowledged, non-quarantined automatic BUY
 under UNRESOLVED_ORDER_REQUIRES_REVIEW, with known positive quantity and limit
 price. It reads fresh broker history, orders, and positions; any open holding,
-order, matching historical order, unavailable history, changed identity, extra
-pending action, or different halt blocks release. The existing device
+order, matching historical order for any retained intent, unavailable history,
+changed identity, extra non-quarantined pending action, or different halt blocks
+release. Previously quarantined BUY intents are allowed alongside this single
+target; they cannot be selected or released again. The existing device
 authorization, origin checks, CAS lease and durable save apply. The release itself
 makes no broker write and returns the saved result idempotently.
+
+`ORDER_REVIEW_RECOVERY_V2` selects the target by its request ID even when an older
+quarantine occupies the primary pending field. The confirmation names all
+excluded stocks, the new and combined cash reservations, and reserved slots. It
+explicitly authorizes future LIVE automatic entries and warns that remaining
+cash may be insufficient. It never calls an unresolved order closed, cancelled,
+or rejected. The separate USD 200 diagnostic-purchase offer keeps its original
+single-intent restriction; this change does not broaden diagnostic trading.
 
 The original pending intent is retained with quarantinedAt, still reconciled on
 every normal broker snapshot. Its symbol AND instrument ID block new buys, and it

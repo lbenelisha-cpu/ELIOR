@@ -53,3 +53,12 @@ test('release dialog reads only until the user confirms; POST records a review a
  u.setResponse({ok:true,status:200,json:async()=>({status:'REVIEW_RELEASED',symbol:'AMD'})});await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
  const input=JSON.parse(u.calls[1].options.body);assert.equal(input.action,'release_review');assert.equal(input.side,undefined);assert.equal(input.amountUsd,undefined);assert.equal(input.reviewRequestId,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);assert.match(u.nodes.get('colmexManualStatus').textContent,/החסימה הגורפת הוסרה/);
 });
+test('targeted review discloses every isolated symbol, combined cash reservation and limited readiness before confirmation',async()=>{
+ const u=setup();u.setResponse({ok:true,status:200,json:async()=>({reviewRecovery:{available:true,blockedSymbol:'TGT',reservedUsd:605,existingReservedUsd:565.83,totalReservedUsd:1170.83,excludedSymbols:['AMD','TGT'],reservedSlots:2,reviewRequestId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc'}})});
+ await u.nodes.get('colmexReleaseReview').click();
+ const description=u.nodes.get('colmexTradeDescription').textContent;
+ for(const value of ['AMD, TGT','605.00','1170.83','2 מתוך 3','לא תספיק','אינה מבטלת'])assert.ok(description.includes(value),value);
+ assert.match(u.nodes.get('colmexTradeSubmit').textContent,/מסחר אוטומטי LIVE/);
+ assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');
+ u.nodes.get('colmexTradeCancel').click();assert.equal(u.calls.length,1);assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);
+});

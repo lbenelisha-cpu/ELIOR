@@ -55,9 +55,10 @@ $('colmexReleaseReview').addEventListener('click',async()=>{
   if(!offer.available)throw Error(explain('REVIEW_STATE_CHANGED'));
   busy=false;open('BUY');reviewReleaseId=offer.reviewRequestId;
   $('colmexTradeTitle').textContent='הסרת חסימה · המשך ללא '+offer.blockedSymbol;
-  $('colmexTradeDescription').textContent='האישור מאפשר שוב קניות ידניות ואוטומטיות במניות אחרות בחשבון האמיתי, לפי החוקים והיתרה הזמינה. '+offer.blockedSymbol+' תישאר מוחרגת מקניות, ותיעוד ההוראה יישמר. $'+Number(offer.reservedUsd).toFixed(2)+' יישארו שמורים כנגד ההוראה שלא אומתה. הפעולה אינה מבטלת הוראה אצל הברוקר ואינה מאשרת שלא בוצעה. אין צורך לפנות לתמיכה כדי לבצע פעולה זו.';
+  const excluded=offer.excludedSymbols||[offer.blockedSymbol],total=offer.totalReservedUsd??offer.reservedUsd;
+  $('colmexTradeDescription').textContent='האישור מסיר את חסימת הבירור הכללית ומאפשר קניות ידניות ואוטומטיות במניות אחרות בחשבון האמיתי, רק אם כל הבדיקות עוברות ויש די מזומן. מוחרגות מקניות: '+excluded.join(', ')+'. תיעוד ההוראות יישמר. $'+Number(offer.reservedUsd).toFixed(2)+' יישמרו עבור '+offer.blockedSymbol+'; סך כל הרזרבות לאחר האישור: $'+Number(total).toFixed(2)+', ב־'+(offer.reservedSlots||1)+' מתוך 3 מקומות. הסכום נשמר בחישוב הבוט, ואינו חיוב חדש. ייתכן שהיתרה לאחר הרזרבות לא תספיק לקנייה לפי התקציב הקיים, עד $800. הפעולה אינה מבטלת הוראה אצל הברוקר ואינה מאשרת שלא בוצעה.';
   $('colmexAmountLabel').hidden=true;$('colmexTradeAmount').disabled=true;
-  $('colmexTradeSubmit').textContent='אשר הסרת חסימה וחידוש המעקב';
+  $('colmexTradeSubmit').textContent='אני מאשר הסרת חסימה למסחר אוטומטי LIVE';
  }catch(error){say(error.message);}finally{busy=false;renderAccess();}
 });
  $('colmexDiagnosticBuy').addEventListener('click',async()=>{
@@ -77,7 +78,7 @@ $('colmexReleaseReview').addEventListener('click',async()=>{
 $('colmexManualSell').addEventListener('click',()=>open('SELL'));
 $('colmexTradeCancel').addEventListener('click',()=>$('colmexTradeDialog').close());
 function finishUnexecuted(data){
- if(data.status==='REVIEW_RELEASED'){say('החסימה הגורפת הוסרה · '+data.symbol+' מוחרגת מקניות · המעקב במניות אחרות יכול להמשיך לפי החוקים והיתרה.');rememberPending(null);return true;}
+ if(data.status==='REVIEW_RELEASED'){say('החסימה הגורפת הוסרה · '+(data.excludedSymbols||[data.symbol]).join(', ')+' מוחרגות מקניות · ההוראות נשארות בבירור אצל הברוקר. '+(Number.isFinite(data.availableCashAfterReservations)?'מזומן לאחר הרזרבות: $'+data.availableCashAfterReservations.toFixed(2)+'. ':'')+'קניות נוספות כפופות ליתרה, לאות חדש ולכל בדיקות המסחר.');rememberPending(null);return true;}
  if(!['REJECTED','NOT_SENT'].includes(data.status))return false;
  say((data.status==='NOT_SENT'?'ההוראה לא נשלחה לברוקר.':'הברוקר דחה את פרטי ההוראה; היא לא בוצעה.')+failureText(data));rememberPending(null);return true;
 }
