@@ -3,17 +3,25 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Trader Research · LEVI INVEST</title>
-  <link rel="stylesheet" href="/trader-research.css?v=20261030-auto1">
+  <link rel="stylesheet" href="/trader-research.css?v=20261030-live-review">
 </head>
 <body>
 <header class="topbar"><a class="brand" href="/">LEVI <span>INVEST</span></a><nav aria-label="סביבת עבודה"><a href="/binance-agent.html">Binance</a><a href="/colmex-pro.html">Colmex Pro</a><a href="/trader-research.html" aria-current="page">מחקר השקעות</a></nav></header>
 <main>
   <div class="eyebrow">TRADER SKILL · RESEARCH DESK</div>
-  <h1>מחקר השקעות ואוטומציית דמו</h1>
-  <p class="lead">שני תיקים מדומים שעוקבים אחר כללי המסחר, לצד חדשות, דוחות ותכנון סיכון. אין כאן ביצוע עסקאות בכסף אמיתי.</p>
+  <h1>עסקת LIVE — באישור שלך</h1>
+  <p class="lead">בדוק את נתוני החשבון והאיתותים, בחר נכס וסכום, ועבור למסך אישור מפורש לפני שליחת עסקה אמיתית.</p>
+  <section class="panel auto-panel" id="live-approval" aria-labelledby="liveTitle">
+    <div class="section-heading"><div><span class="eyebrow">LIVE TRADING / אישור ידני</span><h2 id="liveTitle">אתה בודק. אתה מאשר את העסקה.</h2></div><span class="badge live-badge">חשבון אמיתי</span></div>
+    <p class="hint">המסך קורא את מצב השרת הקיים. הכנת עסקה, בחירת איתות ורענון אינם שולחים פקודה. בכפתור האישור האחרון מוצגים הפלטפורמה, הנכס, סוג הפעולה והסכום. אין שליחה חוזרת אוטומטית.</p>
+    <p class="hint">מנועי מסחר אוטומטיים שכבר פועלים בחשבון אינם נעצרים מהמסך הזה. קנייה שתאשר תיכנס לניהול ההגנות הקיים, הכולל אפשרות למכירה אוטומטית לפי ההגדרות.</p>
+    <div id="liveCards" class="auto-cards"></div>
+  </section>
+  <dialog id="liveReviewDialog" aria-labelledby="liveReviewTitle"><h2 id="liveReviewTitle"></h2><p id="liveReviewSummary"></p><p id="liveReviewProtection" class="hint"></p><p id="liveReviewResult" role="status" aria-live="polite"></p><div class="live-dialog-actions"><button id="liveReviewConfirm" type="button">אני מאשר עסקה בכסף אמיתי</button><button id="liveReviewCheck" type="button" hidden>בדוק מצב — ללא שליחה חוזרת</button><button id="liveReviewCancel" type="button" class="secondary">סגור / ביטול</button></div></dialog>
+  <details id="paperHistory" class="paper-history"><summary>היסטוריית הדמו הקודם · נפרדת ממסחר LIVE</summary>
   <section class="panel auto-panel" id="auto-paper" aria-labelledby="autoTitle">
-    <div class="section-heading"><div><span class="eyebrow">PAPER TRADING / פועל בשרת</span><h2 id="autoTitle">האוטומציה בשתי הפלטפורמות</h2></div><span class="badge paper-badge">כסף ועסקאות מדומים</span></div>
-    <p class="hint">השרת מתוזמן לבדיקה כל 5 דקות, גם כשהאתר סגור. פוזיציות ואיתותים ממתינים נבדקים בכל מחזור; שני נכסים נוספים מהרשימה נסרקים בתור, ולכן סבב מלא אורך עד 15 דקות. מניות נבדקות בשעות המסחר הרגילות בארה״ב.</p>
+    <div class="section-heading"><div><span class="eyebrow">PAPER HISTORY / מדומה</span><h2 id="autoTitle">תיקי הדמו הקודמים</h2></div><span class="badge paper-badge">כסף ועסקאות מדומים</span></div>
+    <p class="hint">הדמו האוטומטי מושהה כברירת מחדל. הנתונים שנשמרו נשארים לעיון ואינם יתרות או עסקאות מהחשבון האמיתי.</p>
     <div class="auto-toolbar"><p id="autoStatus" role="status" aria-live="polite">קורא את מצב הדמו מהשרת…</p><button id="autoRefresh" type="button">רענן מצב דמו</button></div>
     <div id="autoCards" class="auto-cards"></div>
     <details class="paper-rules"><summary>כללי הדמו, מקורות והנחות הביצוע</summary>
@@ -24,6 +32,7 @@
       <p>בייננס משתמש בנתוני שוק ציבוריים של Binance; דמו קולמקס משתמש ב־Twelve Data, ולא בציטוטי חשבון Colmex. ליד איתותים זמינים מצורפים עד שלושה קישורי חדשות; למניות נבדקת גם זמינות דוחות SEC. המחקר הוא הקשר בלבד ואינו מפעיל קנייה. רשימות המעקב הן מדגם בדיקה קבוע, לא המלצת השקעה.</p>
     </details>
   </section>
+  </details>
   <div class="workspace">
     <section class="panel research" aria-labelledby="researchTitle">
       <div class="section-heading"><div><span class="eyebrow">01 / מחקר חברה</span><h2 id="researchTitle">מה עומד מאחורי המניה</h2></div><span class="badge">מניות ארה״ב</span></div>
@@ -65,6 +74,7 @@
   </div>
   <footer>התאמה של כלי <a href="https://github.com/Jakeschincariol/trader-skill" target="_blank" rel="noopener noreferrer">Trader Skill מאת Jake Schincariol</a> ברישיון MIT · חדשות, דוחות ותכנון סיכון. אין כאן דירוג תשואה צפויה או המלצת קנייה. <a href="/third_party/trader-skill/LICENSE">רישיון</a></footer>
 </main>
-<script type="module" src="/trader-research.js?v=20261030-auto1"></script>
-<script type="module" src="/trader-auto-ui.js?v=20261030-auto1"></script>
+<script type="module" src="/trader-research.js?v=20261030-live-review"></script>
+<script type="module" src="/trader-auto-ui.js?v=20261030-live-review"></script>
+<script type="module" src="/trader-live-ui.js?v=20261030-live-review"></script>
 </body></html>

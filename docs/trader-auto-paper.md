@@ -2,7 +2,7 @@
 
 `/trader-research#auto-paper` shows separate fictional Binance/USDT and Colmex/USD ledgers. This is forward paper observation, not a historical backtest or a broker account. It cannot place real orders or activate live trading. Existing live engines and settings are unchanged.
 
-The production-only Netlify function `trader-auto-monitor` runs every five minutes. No browser needs to remain open. `trader-auto-status` is GET-only and never initializes state or invokes a scan. The page refreshes that read-only status once a minute while visible. Until the first committed scheduled run, the UI says there is no saved cycle. A last cycle older than fifteen minutes is visibly stale.
+The production-only Netlify function `trader-auto-monitor` is dormant by default after the switch to live user review. It runs every five minutes only if `TRADER_PAPER_ENABLED=true` is explicitly set. No browser needs to remain open. `trader-auto-status` is GET-only and never initializes state or invokes a scan. The page refreshes that read-only status once a minute while visible. Until the first committed scheduled run, the UI says there is no saved cycle. A last cycle older than fifteen minutes is visibly stale.
 
 ## Data and scheduling
 
@@ -26,6 +26,6 @@ Exits inspect **only the latest observed close** each cycle and fill at that sam
 
 At a new qualifying signal, the time budget permitting, attach up to three dated Yahoo Finance RSS links; stocks additionally carry available SEC annual/quarterly data. `SEC_USER_AGENT` must contain an operator-supplied real contact for SEC requests; never invent one. Missing configuration is `CONFIG_REQUIRED`. Crypto company financials are `NOT_APPLICABLE`. Missing news is never interpreted as positive sentiment. Context is informational and does not drive entry. Research may be skipped if the cycle's remaining time is insufficient. News and financial data are timestamped snapshots, not a recommendation engine or all eleven upstream Trader Skill skills.
 
-Set `TRADER_PAPER_ENABLED=false` in the production environment to stop new simulated entries; existing paper positions continue receiving exit evaluations. There is no live-mode switch or mutation endpoint in this feature. The journal retains the latest 300 signals/buys/sells/cancellations per portfolio; cumulative accounting and counts survive truncation. The UI shows the last thirty events.
+Leave `TRADER_PAPER_ENABLED` unset (or set it to `false`) to suspend the entire paper worker, including simulated exits; saved records remain available as history. There is no live-mode switch or mutation endpoint in this feature. The journal retains the latest 300 signals/buys/sells/cancellations per portfolio; cumulative accounting and counts survive truncation. The UI shows the last thirty events.
 
 Tests exercise both real strategy paths, activation boundaries, delayed fills, invalid/stale data, cash/fees, exit accounting, concurrency, source failure, scheduler guards and read-only status. They make no broker requests.

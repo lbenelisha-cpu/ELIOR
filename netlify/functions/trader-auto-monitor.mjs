@@ -8,7 +8,7 @@ export function createPaperMonitor({getStore = paperStore, readMarket = createPa
   env = process.env} = {}) {
   return async (_request, context) => {
     // Runtime context, not a caller-controlled query/header or preview env flag.
-    if (context?.deploy?.context !== 'production') return new Response(null, {status: 204});
+    if (context?.deploy?.context !== 'production' || env.TRADER_PAPER_ENABLED !== 'true') return new Response(null, {status: 204});
     const now = clock(), store = getStore();
     const results = await Promise.allSettled(['BINANCE', 'COLMEX'].map(platform => runPaperPlatform({platform,
       store, readMarket, research, now, clock, deadline: now + 26000, enabled: env.TRADER_PAPER_ENABLED !== 'false'})));
