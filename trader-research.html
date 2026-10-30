@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trader Research · LEVI INVEST</title>
+  <link rel="stylesheet" href="/trader-research.css?v=20261030">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">LEVI <span>INVEST</span></a><nav aria-label="סביבת עבודה"><a href="/binance-agent.html">Binance</a><a href="/colmex-pro.html">Colmex Pro</a><a href="/trader-research.html" aria-current="page">מחקר השקעות</a></nav></header>
+<main>
+  <div class="eyebrow">TRADER SKILL · RESEARCH DESK</div>
+  <h1>יותר מידע לפני ההחלטה</h1>
+  <p class="lead">דוחות חברות וחדשות לצד תכנון התקציב והסיכון לעסקה. מחקר לפי בקשה, ללא ביצוע עסקאות.</p>
+  <div class="workspace">
+    <section class="panel research" aria-labelledby="researchTitle">
+      <div class="section-heading"><div><span class="eyebrow">01 / מחקר חברה</span><h2 id="researchTitle">מה עומד מאחורי המניה</h2></div><span class="badge">מניות ארה״ב</span></div>
+      <form id="researchForm" class="search-form">
+        <label for="symbol">סימול מניה</label>
+        <div class="search-row"><input id="symbol" name="symbol" placeholder="AAPL" dir="ltr" maxlength="8" autocapitalize="characters" autocomplete="off" required pattern="[A-Za-z]{1,5}([.\-][A-Za-z]{1,2})?"><button id="researchButton" type="submit">בדוק מניה</button></div>
+      </form>
+      <p class="hint">למשל AAPL, MSFT או NVDA. הנתונים מתעדכנים בלחיצה בלבד.</p>
+      <p id="researchStatus" role="status" aria-live="polite">בחר מניה כדי לקרוא את הדוחות והכותרות הזמינים.</p>
+      <div id="companyReport" hidden>
+        <div class="report-heading"><h3 id="companyName"></h3><a id="secLink" target="_blank" rel="noopener noreferrer">הדיווחים ב־SEC ↗</a></div>
+        <label class="period-label" for="period">תקופת דיווח <select id="period"><option value="quarterly">רבעונים מדווחים</option><option value="annual">דוחות שנתיים</option></select></label>
+        <p id="financialStatus" class="hint"></p><div id="financialTable"></div>
+        <p class="hint">סוף תקופה הוא תאריך הנתונים הכספיים. תאריך ההגשה עשוי להיות מאוחר יותר, כולל תיקון לדוח קודם. חסר מוצג כ־—; לא מחושב רבעון רביעי מלאכותי.</p>
+      </div>
+      <div class="news-section"><h3>כותרות מהשבוע האחרון</h3><p id="newsStatus" class="hint">הכותרות יופיעו לאחר בדיקה.</p><ul id="headlines" class="headlines"></ul></div>
+      <p class="hint">הכותרות מובאות ממקורות חיצוניים בשפת המקור. פתח את הכתבה לבדיקת ההקשר; כותרת לבדה אינה איתות קנייה.</p>
+    </section>
+    <section class="panel planner" aria-labelledby="plannerTitle">
+      <div class="section-heading"><div><span class="eyebrow">02 / תכנון עסקה</span><h2 id="plannerTitle">כמה להקצות ומה הסיכון</h2></div><span class="badge">תרחיש בלבד</span></div>
+      <p class="hint">הזן נתונים ידנית ובאותו מטבע. החישוב מיועד לרכישה ללא מינוף: עד 5 פוזיציות ועד 20% מהתיק לפוזיציה, כולל עתודת עלויות. הנתונים אינם נקראים מהחשבון.</p>
+      <form id="plannerForm">
+        <div class="fields">
+          <label>שווי תיק כולל<input name="equity" type="number" min="0.01" max="1000000000000" step="any" inputmode="decimal" required></label>
+          <label>מזומן זמין<input name="cash" type="number" min="0" step="any" inputmode="decimal" required></label>
+          <label>פוזיציות תפוסות<input name="occupied" type="number" min="0" max="5" step="1" inputmode="numeric" required></label>
+          <label>מחיר כניסה מתוכנן<input name="entry" type="number" min="0" step="any" inputmode="decimal" required></label>
+          <label>מחיר סטופ מתוכנן<input name="stop" type="number" min="0" step="any" inputmode="decimal" required></label>
+          <label>תקציב הפסד מהתיק (%)<input name="riskPct" type="number" min="0.001" max="100" step="any" inputmode="decimal" required></label>
+          <label class="full">עלות כוללת משוערת לקנייה ומכירה (%)<input name="costPct" type="number" min="0" max="100" step="any" inputmode="decimal" required></label>
+        </div>
+        <label class="check"><input name="wholeShares" type="checkbox" checked> חשב מניות שלמות בלבד — בטל עבור יחידות חלקיות או קריפטו</label>
+        <label class="check"><input name="alreadyHeld" type="checkbox"> הנכס כבר מוחזק בתיק</label>
+        <button type="submit" class="wide">חשב תרחיש ובדוק סיכון</button>
+      </form>
+      <div id="planResult" role="status" aria-live="polite" class="plan-result" hidden></div>
+      <p class="hint">תקציב ההפסד הוא הגבול שאתה בוחר לחישוב. מחיר הביצוע בסטופ אינו מובטח; פערי מחיר ועלויות בפועל עלולים להגדיל את ההפסד. החישוב אינו בודק מגבלות מינימום וצעדי כמות של הברוקר.</p>
+    </section>
+  </div>
+  <footer>התאמה של כלי <a href="https://github.com/Jakeschincariol/trader-skill" target="_blank" rel="noopener noreferrer">Trader Skill מאת Jake Schincariol</a> ברישיון MIT · חדשות, דוחות ותכנון סיכון. אין כאן דירוג תשואה צפויה או המלצת קנייה. <a href="/third_party/trader-skill/LICENSE">רישיון</a></footer>
+</main>
+<script type="module" src="/trader-research.js?v=20261030"></script>
+</body></html>
