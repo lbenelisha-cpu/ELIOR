@@ -156,11 +156,15 @@ function renderTradeControlStatus(s){
   const executable=s.mode==='demo'||(s.liveTradingEnabled===true&&s.autoExecution===true);
   el.classList.toggle('trading-active',active&&executable);
   el.classList.toggle('trading-paused',known&&paused);
-  const since=paused?s.tradeControl?.pausedAt:s.tradeControl?.resumedAt;
-  const timestamp=Date.parse(since);
-  const label=blocked?'קניות חסומות · '+(!health.journalReady?'יומן העסקאות דורש בדיקה':health.pendingOrder?'ממתין לאימות פקודה':health.reconciliation?.error?'לא ניתן לאמת את נתוני החשבון':health.missingProtection?.length?'הגנת בורסה טרם אומתה':'ממתין להתאמת חשבון'):!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
+  const reconciliation=health?.reconciliation||{};
+  const symbols=items=>(Array.isArray(items)?items:[]).map(item=>typeof item==='string'?item:item?.symbol).filter(symbol=>/^[A-Z0-9]{2,30}$/.test(symbol||'')).join(', ');
+  const reason=!health?.journalReady?'יומן העסקאות דורש בדיקה':health.pendingOrder?'ממתין לאימות פקודה':reconciliation.error?'לא ניתן לאמת את נתוני החשבון':health.missingProtection?.length?'הגנת בורסה טרם אומתה':symbols(reconciliation.unmanaged)?'יתרה לא מנוהלת ביומן: '+symbols(reconciliation.unmanaged):symbols(reconciliation.pending)?'פער בכמות ממתין לאימות: '+symbols(reconciliation.pending):symbols(reconciliation.unsettled)?'ממתין לאימות מילוי הגנה: '+symbols(reconciliation.unsettled):'ממתין להתאמת חשבון';
+  const label=blocked?'קניות חסומות · '+reason:!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
+  // A resume timestamp is not the start of a reconciliation failure.
+  const timestamp=Date.parse(blocked?reconciliation.checkedAt:paused?s.tradeControl?.pausedAt:known&&executable?s.tradeControl?.resumedAt:null);
   const minutes=Number.isFinite(timestamp)?Math.max(0,Math.floor((Date.now()-timestamp)/60000)):null;
-  el.textContent=label+(minutes===null?' · זמן שינוי לא זמין':' · מאז '+new Date(timestamp).toLocaleString('he-IL')+' · '+minutes+' דקות')+(s.mode==='demo'&&health?.managedPositions>0?' · ניהול החזקות LIVE ממשיך ברקע':'');
+  const timing=blocked?(minutes===null?' · מועד בדיקת החשבון לא זמין':' · בדיקת חשבון אחרונה: '+new Date(timestamp).toLocaleString('he-IL')):minutes===null?'':' · '+(paused?'המסחר הושהה ב־':'המסחר חודש ב־')+new Date(timestamp).toLocaleString('he-IL')+' · לפני '+minutes+' דקות';
+  el.textContent=label+timing+(s.mode==='demo'&&health?.managedPositions>0?' · ניהול החזקות LIVE ממשיך ברקע':'');
 }
 
 function mode(s){
