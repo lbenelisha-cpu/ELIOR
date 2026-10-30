@@ -15,7 +15,7 @@ test('explicit names and catalogued stock tokens avoid ambiguous symbol inferenc
  assert.equal(identifyNews('BlackRock buys 1000 bitcoin for its treasury').event.asset,'crypto:BTC');
 });
 test('only narrow completed purchases/outages qualify; rumors, negation, future plans and resolved incidents do not',()=>{
- for(const title of ['Strategy plans to buy 1000 bitcoin','Strategy buys 1000 bitcoin?','Strategy buys 1000 bitcoin, reportedly','Strategy buys 1000 bitcoin: fake report','Strategy buys 1000 bitcoin and Ethereum','Strategy buys 1000 bitcoin last year','Nvidia invests $1 billion in AI','Ethereum network suffers an outage after upgrade; service restored','Ethereum token suffers an outage','Solana testnet suffers outage'])assert.equal(identifyNews(title).event,null,title);
+ for(const title of ['Strategy plans to buy 1000 bitcoin','Strategy buys 1000 bitcoin last week','BlackRock buys 1000 bitcoin ETF shares','Strategy buys 1000 bitcoin futures','Tesla buys 1000 Ethereum Classic','Strategy buys 1000 Bitcoin Cash','Strategy buys 1000 BTC: hoax debunked','Strategy buys 1000 bitcoin?','Strategy buys 1000 bitcoin, reportedly','Strategy buys 1000 bitcoin: fake report','Strategy buys 1000 bitcoin and Ethereum','Strategy buys 1000 bitcoin last year','Nvidia invests $1 billion in AI','Ethereum network suffers an outage after upgrade; service restored','Ethereum token suffers an outage','Solana testnet suffers outage'])assert.equal(identifyNews(title).event,null,title);
  assert.equal(identifyNews('Ethereum network suffers an outage').event.direction,'negative');
  assert.equal(identifyNews('Strategy purchases 1,234.5 BTC').event.quantity,1234.5);
 });
