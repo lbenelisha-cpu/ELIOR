@@ -247,6 +247,8 @@
         <div id="chartTools"></div><div id="chartTimeNavigation" aria-label="בחירת חלון זמן בגרף"></div>
         <div class="chart-rise-controls"><label><input type="checkbox" id="showRises" checked> הצג עליות וירידות של 1% ומעלה</label><span>עליות מעל הגרף · ירידות מתחתיו · לחץ על אחוז להדגשת המהלך</span></div>
         <div id="chartRises" class="chart-move-lane" aria-label="עליות מעל הגרף"></div>
+        <div class="chart-rise-controls"><label><input id="showRegression" type="checkbox" checked> Regression Trend · תעלת רגרסיה</label><label>נרות <select id="regressionPeriod"><option>50</option><option selected>100</option><option>200</option></select></label><label>רוחב <select id="regressionDeviation"><option value="1">1σ</option><option value="2" selected>2σ</option><option value="3">3σ</option></select></label></div>
+        <p id="patternScenario" class="mini" role="status" style="padding:12px;border:1px solid #526879;border-radius:10px;line-height:1.8">ממתין לנרות לניתוח תרחיש</p>
         <p id="resistancePatternStatus" class="mini" role="status">טוען אזורי התנגדות ופריצה…</p>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
@@ -442,8 +444,9 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
-  <script src="/resistance-patterns.js?v=20261030-resistance"></script>
-  <script src="/binance-agent.js?v=20261030-resistance"></script>
+  <script src="/regression-trend.js?v=20261030-regression"></script>
+  <script src="/resistance-patterns.js?v=20261030-pattern-scenarios"></script>
+  <script src="/binance-agent.js?v=20261030-pattern-scenarios"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>

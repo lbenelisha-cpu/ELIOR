@@ -870,7 +870,7 @@ setInterval(()=>{
 },650);
 function drawCandles(candles){
   const canvas=$('#priceChart');
-  if(!canvas||!candles.length){chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();return;}
+  if(!canvas||!candles.length){put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -896,7 +896,7 @@ function drawCandles(candles){
   const view=visibleWindow.bars;
   const viewMas=mas.slice(start,end);
   drawIndicators(candles,{start,end});
-  if(!view.length){$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();return;}
+  if(!view.length){put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
@@ -915,6 +915,10 @@ function drawCandles(candles){
   if(sellLevel)vals.push(sellLevel.price);
   if(heldNow)for(const value of [selectedPosition.entryPrice,selectedPosition.peakPrice])if(Number(value)>0&&Number.isFinite(Number(value)))vals.push(Number(value));
   put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
+  const regressionOn=$('#showRegression')?.checked!==false;
+  const regression=regressionOn?globalThis.LEVI_REGRESSION?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||100),deviations:Number($('#regressionDeviation')?.value||2)}):null;
+  put('#patternScenario',regressionOn?(globalThis.LEVI_REGRESSION?.describe(regression)||'רכיב הרגרסיה לא נטען — נדרש רענון או עדכון שרת'):'תעלת הרגרסיה מוסתרת');
+  if(regression?.ready)for(const c of view){const at=Number(c.openTime);if(at>=regression.start&&at<=regression.end){const p=globalThis.LEVI_REGRESSION.levels(regression,at);vals.push(p.upper,p.lower);}}
   let min=Math.min(...vals),max=Math.max(...vals);
   const span=Math.max(max-min,Math.abs((max+min)/2)*0.002,1e-12)*priceRangeScale;
   const mid=(max+min)/2;min=mid-span*.58;max=mid+span*.58;
@@ -940,9 +944,10 @@ function drawCandles(candles){
     ctx.fillText(fmt(price,priceDigits),W-right+6,yy+4);
   }
 
+  if(regression?.ready)globalThis.LEVI_REGRESSION.draw({ctx,analysis:regression,view,x:i=>left+step*(i+.5),y,bounds:{left,right:W-right,top,bottom:top+ch}});
   const resistance=globalThis.LEVI_RESISTANCE?.detect(candles.slice(0,end),{interval:selectedInterval});
   const resistanceDecision=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions;
-  put('#resistancePatternStatus',(globalThis.LEVI_RESISTANCE?.describe(resistance,selectedInterval)||'')+(resistanceDecision?' · מסלול פריצה בשרת: '+buyReasonLabel(resistanceDecision.breakout.reason):''));
+  put('#resistancePatternStatus',(globalThis.LEVI_RESISTANCE?.describe(resistance,selectedInterval)||'')+(resistanceDecision?.breakout?' · מסלול פריצה בשרת: '+buyReasonLabel(resistanceDecision.breakout.reason):''));
   globalThis.LEVI_RESISTANCE?.drawCanvas({ctx,zone:resistance,view,x:i=>left+step*(i+.5),y,bounds:{left,right:W-right,top,bottom:top+ch}});
 
   const flashingIndices=new Set(),candleColors=new Map();
@@ -1247,3 +1252,5 @@ window.addEventListener('levi-dashboard-select',event=>{
   setDashboardView('trade');selectScannerAsset(event.detail,null);
   document.getElementById('chartSection')?.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
 });
+
+for(const id of ['showRegression','regressionPeriod','regressionDeviation'])document.getElementById(id)?.addEventListener('change',()=>drawCandles(chartCandles));
