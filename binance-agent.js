@@ -940,6 +940,11 @@ function drawCandles(candles){
     ctx.fillText(fmt(price,priceDigits),W-right+6,yy+4);
   }
 
+  const resistance=globalThis.LEVI_RESISTANCE?.detect(candles.slice(0,end),{interval:selectedInterval});
+  const resistanceDecision=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions;
+  put('#resistancePatternStatus',(globalThis.LEVI_RESISTANCE?.describe(resistance,selectedInterval)||'')+(resistanceDecision?' · מסלול פריצה בשרת: '+buyReasonLabel(resistanceDecision.breakout.reason):''));
+  globalThis.LEVI_RESISTANCE?.drawCanvas({ctx,zone:resistance,view,x:i=>left+step*(i+.5),y,bounds:{left,right:W-right,top,bottom:top+ch}});
+
   const flashingIndices=new Set(),candleColors=new Map();
   const candleSetup=heldNow?selectedPosition.setup:displayedWyckoffSetup(selectedSymbol,currentMode)?.setup;
   const pivotColors={initialPeak:'#ffb454',firstLow:'#49cfff',rallyHigh:'#c59aff',secondRallyHigh:'#a5e67a',secondaryTest:'#ff86b8',springLow:'#52e0a4',confirmation:'#fff08a'};
