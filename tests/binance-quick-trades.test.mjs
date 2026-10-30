@@ -25,15 +25,15 @@ function ui(){
  const c=vm.createContext({document:{getElementById:get},window:{LEVI_MANUAL_TRADES:{context:()=>state,submit:async input=>{calls.push({...input});return new Promise(r=>resolve=r);},refresh:async()=>refreshes++,forget(){}}},crypto:{randomUUID:()=>Math.random().toString().repeat(2)},setInterval(){}});
  vm.runInContext(read('binance-manual-trades.js'),c);return {get,calls,state,resolve:r=>resolve(r),get refreshes(){return refreshes;}};
 }
-test('sell click submits full balance immediately, double click never submits twice, uncertainty only checks same identity',async()=>{
- const h=ui();h.get('manualSellBtn').onclick();h.get('manualSellBtn').onclick();assert.equal(h.calls.length,1);assert.equal(h.calls[0].side,'SELL');assert.equal(h.calls[0].all,true);assert.equal(h.get('manualTradeSubmit').hidden,true);
+test('sell requires final confirmation, double click never submits twice, uncertainty only checks same identity',async()=>{
+ const h=ui();h.get('manualSellBtn').onclick();h.get('manualSellBtn').onclick();assert.equal(h.calls.length,0);h.get('manualTradeSubmit').onclick();h.get('manualTradeSubmit').onclick();assert.equal(h.calls.length,1);assert.equal(h.calls[0].side,'SELL');assert.equal(h.calls[0].all,true);assert.equal(h.get('manualTradeSubmit').disabled,true);
  const id=h.calls[0].requestId;h.resolve({ok:false,uncertain:true,error:'unknown'});await new Promise(r=>setImmediate(r));assert.equal(h.get('manualTradeCheck').hidden,false);
  h.get('manualBuyBtn').onclick();assert.equal(h.calls.length,1);
  const check=h.get('manualTradeCheck').onclick();assert.equal(h.calls.length,2);assert.equal(h.calls[1].requestId,id);assert.equal(h.calls[1].statusOnly,true);
  h.resolve({ok:true,order:{status:'FILLED',executedQty:.038,orderId:1}});await check;assert.equal(h.refreshes,1);
 });
 test('buy requires only an amount and buy button, and honors symbol changes',async()=>{
- const h=ui();h.get('manualBuyBtn').onclick();assert.equal(h.calls.length,0);assert.equal(h.get('manualTradeSubmit').textContent,'קנה');
+ const h=ui();h.get('manualBuyBtn').onclick();assert.equal(h.calls.length,0);assert.equal(h.get('manualTradeSubmit').textContent,'אני מאשר קנייה בכסף אמיתי');
  h.get('manualQuoteAmount').value='10';const buy=h.get('manualTradeSubmit').onclick();assert.equal(h.calls.length,1);assert.equal(h.calls[0].quoteUsdt,10);h.resolve({ok:true,order:{status:'FILLED',executedQty:1,orderId:2}});await buy;
  const other=ui();other.get('manualBuyBtn').onclick();other.state.symbol='UNIUSDT';other.get('manualQuoteAmount').value='10';await other.get('manualTradeSubmit').onclick();assert.equal(other.calls.length,0);
 });

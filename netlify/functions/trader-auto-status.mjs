@@ -12,7 +12,7 @@ export function createPaperStatus({getStore = paperStore, now = Date.now} = {}) 
         if (state) checkPaperState(state, platform);
         return {platform, ...market, state, summary: state ? paperSummary(state) : null};
       }));
-      return reply(200, {version: PAPER_VERSION, mode: 'PAPER_ONLY', servedAt: now(), policy: PAPER_POLICY, platforms});
+      return reply(200, {version: PAPER_VERSION, mode: 'PAPER_ONLY', servedAt: now(), policy: {...PAPER_POLICY, enabled: process.env.TRADER_PAPER_ENABLED === 'true'}, platforms});
     } catch {return reply(503, {error: 'PAPER_STATUS_UNAVAILABLE'});}
   };
 }

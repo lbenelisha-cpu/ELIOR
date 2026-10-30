@@ -49,7 +49,7 @@ function context(host, data) {
     add('small', time(Date.parse(news.publishedAt)), box);
   }
 }
-function render(platform, now) {
+function render(platform, now, enabled = false) {
   const card = add('article', '', $('autoCards'), 'paper-card');
   const heading = add('div', '', card, 'section-heading');
   add('h3', platform.platform === 'BINANCE' ? 'Binance · קריפטו' : 'Colmex Pro · מניות', heading);
@@ -58,7 +58,7 @@ function render(platform, now) {
   const state = platform.state;
   if (!state) {add('p', 'עדיין אין מחזור דמו שמור. הפעילות תוצג לאחר שהשרת ישלים את ההרצה הראשונה.', card); return;}
   const stale = now - state.lastCompletedAt > 15 * 60000;
-  add('p', stale ? 'השרת לא עדכן את הדמו מעל 15 דקות — יש לבדוק את ההרצה.' : explain(state.status), card, 'paper-state' + (stale || state.status === 'PARTIAL_DATA' ? ' attention' : ''));
+  add('p', !enabled ? 'הדמו האוטומטי מושהה · מוצגים נתונים שמורים' : stale ? 'השרת לא עדכן את הדמו מעל 15 דקות — יש לבדוק את ההרצה.' : explain(state.status), card, 'paper-state' + (enabled && (stale || state.status === 'PARTIAL_DATA') ? ' attention' : ''));
   add('p', 'מחזור שמור אחרון: ' + time(state.lastCompletedAt) + ' · נתון שוק אחרון: ' + time(state.lastDataAt), card, 'hint');
   const dl = add('dl', '', card, 'paper-metrics'), summary = platform.summary;
   for (const [label, value] of [['שווי תיק מדומה', num(summary.equity)], ['מזומן מדומה', num(summary.cash)],
@@ -102,7 +102,7 @@ async function refresh() {
     const data = await response.json();
     if (!response.ok || data.version !== 'TRADER_AUTO_PAPER_V1' || data.mode !== 'PAPER_ONLY' || !Array.isArray(data.platforms)) throw Error('UNAVAILABLE');
     const opened = [...$('autoCards').querySelectorAll('details[open]')].map(el => el.id);
-    $('autoCards').replaceChildren(); data.platforms.forEach(p => render(p, data.servedAt));
+    $('autoCards').replaceChildren(); data.platforms.forEach(p => render(p, data.servedAt, data.policy?.enabled === true));
     for (const id of opened) {const el = $(id); if (el) el.open = true;}
     $('autoStatus').textContent = 'מצב שהתקבל מהשרת: ' + time(data.servedAt) + ' · התצוגה מתרעננת בכל דקה כשהעמוד פתוח.';
   } catch {
@@ -111,4 +111,4 @@ async function refresh() {
 }
 $('autoRefresh').addEventListener('click', refresh);
 refresh();
-setInterval(() => {if (!document.hidden) refresh();}, 60000);
+setInterval(() => {if (!document.hidden && document.getElementById('paperHistory')?.open) refresh();}, 60000);

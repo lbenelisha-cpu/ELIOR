@@ -21,7 +21,7 @@
         <div class="brand-mark">◈</div>
         <div>
           <div class="brand-title">LEVI <span>INVEST</span></div>
-          <div class="brand-links"><a class="tradingview-link" href="https://www.tradingview.com/chart/?trade-now=BINANCE&amp;trade-now-source=broker_profile" target="_blank" rel="noopener noreferrer" title="פתיחת חיבור Binance ב־TradingView; ההתחברות מתבצעת שם">חבר חשבון ב־TradingView ↗</a><a class="platform-switch" href="/colmex-pro.html">מעבר לקולמקס־פרו ←</a><a href="/trader-research.html" class="tradingview-link">מחקר ודמו אוטומטי · Trader Skill</a><a href="/push.html" class="tradingview-link">🔔 הפעל התראות לאייפון</a></div>
+          <div class="brand-links"><a class="tradingview-link" href="https://www.tradingview.com/chart/?trade-now=BINANCE&amp;trade-now-source=broker_profile" target="_blank" rel="noopener noreferrer" title="פתיחת חיבור Binance ב־TradingView; ההתחברות מתבצעת שם">חבר חשבון ב־TradingView ↗</a><a class="platform-switch" href="/colmex-pro.html">מעבר לקולמקס־פרו ←</a><a href="/trader-research.html" class="tradingview-link">מחקר ואישור עסקאות LIVE</a><a href="/push.html" class="tradingview-link">🔔 הפעל התראות לאייפון</a></div>
           <div class="brand-sub">Binance · מעקב, תכנון ומסחר</div>
         </div>
       </div>
@@ -61,6 +61,7 @@
         <div class="overview-connection"><span id="overviewMode" class="mode-tag">ממתין לחיבור</span><button id="overviewConnect" type="button">חיבור מכשיר</button><span id="overviewUpdated">טרם התקבלו נתונים</span></div>
       </div>
       <div id="overviewHealth" class="health-banner" role="status"><span class="health-dot" aria-hidden="true"></span><span id="overviewHealthText">ממתין לאימות מצב החשבון</span></div>
+      <details id="overviewHealthDetails" class="mini" hidden><summary>למה החשבון עדיין לא מאומת?</summary><ul id="overviewHealthReasons"></ul><p>זהו מצב הבדיקות האחרון מהשרת, ולא הוכחה שבוצעה עסקה או שהכסף נפגע.</p></details>
       <div class="overview-metrics">
         <article class="metric-card featured"><span>שווי התיק <small id="overviewCurrency"></small></span><strong id="overviewValue">—</strong><small id="overviewValueNote">לפי נתוני החשבון</small><svg class="metric-art" viewBox="0 0 120 50" aria-hidden="true"><circle cx="24" cy="50" r="46" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="32" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="18" fill="none" stroke="currentColor"/></svg></article>
         <article class="metric-card"><span>מזומן זמין</span><strong id="overviewCash">—</strong><small>יתרה זמינה להקצאה</small></article>
@@ -212,7 +213,7 @@
           </div>
         </div>
 
-        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה ידנית</button><button id="manualSellBtn" type="button" disabled>מכור מיד את כל הכמות</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
+        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה ידנית</button><button id="manualSellBtn" type="button" disabled>בדוק ואשר מכירת כל הכמות</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
         <details class="chart-menu"><summary class="refresh">פירוט · הגדרות גרף</summary>
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
@@ -440,10 +441,10 @@
   <script src="/trade-risk.js?v=20261026-wave-trail5"></script>
   <script src="/binance-agent.js?v=20261029-time-nav"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
-  <script src="/binance-manual-trades.js?v=20261025-stability"></script>
+  <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-quality"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261026-history"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261029-entry-comparison"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261026-quality"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261030-live-review"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261029-entry-comparison"></script></body>
 </html>

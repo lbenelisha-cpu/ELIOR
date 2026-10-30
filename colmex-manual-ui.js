@@ -37,7 +37,7 @@ $('colmexDisconnect').addEventListener('click',async()=>{
 function selected(){return $('selectedSymbol').textContent.trim();}
 function open(side){
  if(!token||busy||pending)return;
- diagnosticReviewId=null;reviewReleaseId=null;$('colmexTradeAmount').max='800';$('colmexTradeSubmit').textContent='שלח הוראה בחשבון האמיתי';
+ diagnosticReviewId=null;reviewReleaseId=null;$('colmexTradeAmount').max='800';$('colmexTradeSubmit').textContent='אני מאשר עסקה בכסף אמיתי';
  const symbol=selected();$('colmexTradeSide').value=side;$('colmexTradeSymbol').value=symbol;
  $('colmexTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+symbol+' · LIVE';
  $('colmexAmountLabel').hidden=side!=='BUY';

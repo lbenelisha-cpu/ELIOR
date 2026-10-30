@@ -1,4 +1,4 @@
-import {finite,tradeScenario,allocationParts,accountSummary,protectionState} from './lib/binance-dashboard-math.mjs';
+import {finite,tradeScenario,allocationParts,accountSummary,protectionState,accountCheckDetails} from './lib/binance-dashboard-math.mjs?v=20261030-live-review';
 import {positionChangeBadge} from './position-map-change.js?v=20261026-position-side';
 
 const $=id=>document.getElementById(id);
@@ -25,6 +25,12 @@ function renderHealth(){
   }else if(snapshot?.receivedAt)state={kind:'warning',text:'הנתונים לא אומתו בדקה האחרונה · ממתין לרענון'};
   $('overviewHealth').dataset.state=state.kind;
   text('overviewHealthText',state.text);
+  const details=$('overviewHealthDetails'),list=$('overviewHealthReasons');
+  if(details&&list){
+    const health=snapshot?.mode==='live'&&!snapshot?.error?snapshot?.agent?.config?.liveState:null;
+    const reasons=health?accountCheckDetails(health):[];
+    details.hidden=!reasons.length;list.replaceChildren(...reasons.map(reason=>node('li',reason)));
+  }
   text('overviewMode',snapshot?.mode==='live'?'LIVE · חשבון אמיתי':snapshot?.mode==='demo'?'DEMO · סימולציה':'ממתין לחיבור');
   $('overviewMode').dataset.mode=snapshot?.mode||'unknown';
   text('overviewUpdated',snapshot?.receivedAt?'עדכון התקבל ב־'+new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(snapshot.receivedAt)+(age>60000?' · לא עדכני':''):'טרם התקבלו נתונים');

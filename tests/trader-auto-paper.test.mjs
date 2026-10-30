@@ -143,7 +143,7 @@ test('source failure on any holding blocks a different pending entry; paused mod
 });
 test('production schedule is guarded; public API is read-only and never starts a cycle', async () => {
   let stores = 0, reads = 0; const store = memoryStore();
-  const monitor = createPaperMonitor({getStore: () => {stores++; return store;}, readMarket: async () => {reads++; return spring();}, clock: () => end + 1000, env: {}});
+  const monitor = createPaperMonitor({getStore: () => {stores++; return store;}, readMarket: async () => {reads++; return spring();}, clock: () => end + 1000, env: {TRADER_PAPER_ENABLED: 'true'}});
   for (const context of [{}, {deploy: {context: 'deploy-preview'}}, {deploy: {context: 'branch-deploy'}}])
     assert.equal((await monitor(new Request('https://example.test'), context)).status, 204);
   assert.equal(stores, 0); assert.equal(reads, 0);

@@ -27,9 +27,9 @@ update; publishing the web page alone does not update the trading process.
 
 ## Quick controls and remembered device authorization
 
-The selected-symbol sell button immediately submits one full-free-balance sell;
-the dialog displays progress and the outcome rather than requesting confirmation.
-Buy opens the amount field, and its single Buy button submits that amount.
+The selected-symbol sell button now opens a full-free-balance sale review.
+The final real-money confirmation button submits the sale; opening the dialog does not.
+Buy opens the amount field, and its final real-money confirmation button submits that amount.
 Uncertain results still allow only a status check using the same request identity.
 
 The control credential is remembered only on this browser/device after a successful
