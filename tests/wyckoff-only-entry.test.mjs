@@ -5,7 +5,7 @@ test('entry eligibility is independent of exit sizing and preserves stablecoin e
  const start=source.indexOf('    if(!p){\n      ev.entryFilters='),end=source.indexOf('    ev.demoTradable=',start);
  for(const ok of [true,false]){
   const ev={analysisSignal:true,entryConfirmed:true,entryEligible:true,buyQualified:true,rawDecision:'BUY',wyckoffTrade:{patternId:'fresh'},strategy:{buyConfirmed:true}};
-  const context={p:null,ev,s:'BTCUSDT',entryBars:[],ENTRY_POLICY_VERSION:'test',assessQualityEntry:()=>({ok,code:ok?'HOURLY_TREND_DISABLED':'WAIT_STABLECOIN',enabled:!ok})};
+  const context={mode:'live',newsEntryAssessment:()=>({action:'NONE'}),p:null,ev,s:'BTCUSDT',entryBars:[],ENTRY_POLICY_VERSION:'test',assessQualityEntry:()=>({ok,code:ok?'HOURLY_TREND_DISABLED':'WAIT_STABLECOIN',enabled:!ok})};
   vm.createContext(context);vm.runInContext(source.slice(start,end),context);assert.equal(ev.entryConfirmed,ok);assert.equal(ev.analysisSignal,true);assert.equal(ev.entryFilters.enabled,!ok);
   if(ok){assert.equal(ev.wyckoffTrade.atrStopPct,undefined);assert.equal(ev.wyckoffTrade.hourlyTrend.ok,true);}else{assert.equal(ev.wyckoffTrade,null);assert.equal(ev.rawDecision,'HOLD');assert.equal(ev.buyReason,'WAIT_STABLECOIN');}
  }
