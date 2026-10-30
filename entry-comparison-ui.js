@@ -6,7 +6,7 @@ const date=t=>Number.isFinite(t)?new Date(t).toLocaleString('he-IL',{timeZone:'A
 export function renderEntryComparison(host,data,{document:doc=globalThis.document}={}){
  const add=(tag,text,parent=host)=>{const e=doc.createElement(tag);e.textContent=text;parent.append(e);return e;};
  const box=add('details','');box.id='entryMethodComparison';box.className='research-details';add('summary','וואיקוף מול פריצה עצמאית · סימולציית עסקאות',box);
- add('p','השוואה בלבד. מסלול הפריצה אינו שולח פקודות קנייה. הוא אינו דורש Spring, שתי התאוששויות או RSI נמוך.',box);
+ add('p','השוואה בלבד. מסלול הפריצה בסימולציה אינו שולח פקודות קנייה. הוא אינו דורש Spring, שתי התאוששויות או RSI נמוך. הרשאת מסלול הפריצה בלייב מוצגת בנפרד לפי מצב השרת.',box);
  if(!data){add('p','ממתין לאימות מנוע ההשוואה ולאיסוף נרות. אין תוצאות מחושבות עדיין.',box);return;}
  add('p','פריצה: סגירת נר 5 דקות מעל שיא 20 קודמיו, מחזור לפחות פי 1.5 מהממוצע ושווי מחזור ממוצע של 10,000 דולר לנר לפחות. מסנן MA100/200 משותף. אלו ספי ניסוי קבועים, לא יתרון שהוכח.',box);
  add('p','תחילת איסוף: '+date(data.startedAt)+' · עדכון: '+date(data.lastAt)+' · '+data.universe.length+' נכסים ברשימת הסריקה. מניה שאינה ברשימה אינה נבדקת אוטומטית.',box);

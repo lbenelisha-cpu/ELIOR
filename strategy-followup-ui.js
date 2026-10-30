@@ -1,6 +1,6 @@
-import {renderEntryComparison} from './entry-comparison-ui.js?v=20261029-entry-comparison';
+import {renderEntryComparison} from './entry-comparison-ui.js?v=20261030-independent-entry';
 import {renderTradingResearch} from './trading-research-ui.js?v=20261027-research2';
-const modes={spring_rsi_live:'Spring מיידי · קודם',early_wave_live:'גל מוקדם · קודם',spring_reclaim_confirmed:'Spring לאחר חזרה',early_wave_confirmed:'גל מוקדם מאושר',unknown:'מקור לא ידוע',manual_external:'ידני',mixed_or_multiple_entries:'כניסות מעורבות'};
+const modes={spring_rsi_live:'Spring מיידי · קודם',early_wave_live:'גל מוקדם · קודם',spring_reclaim_confirmed:'Spring לאחר חזרה',early_wave_confirmed:'גל מוקדם מאושר',independent_breakout:'פריצה עצמאית · LIVE',unknown:'מקור לא ידוע',manual_external:'ידני',mixed_or_multiple_entries:'כניסות מעורבות'};
 const variants={legacy:'כללים קודמים',confirmed:'אישור נר בלבד',confirmed_trend:'אישור + מגמה',confirmed_volume:'אישור + מחזור',full_quality:'אישור + מגמה + מחזור'};
 const number=(n,suffix='')=>Number.isFinite(n)?n.toLocaleString('he-IL',{maximumFractionDigits:3})+suffix:'—';
 export function renderStrategyReview(host,data,{document:doc=globalThis.document,currency='USD'}={}){
@@ -11,6 +11,13 @@ export function renderStrategyReview(host,data,{document:doc=globalThis.document
  const add=(tag,text,parent=host)=>{const e=doc.createElement(tag);e.textContent=text;parent.append(e);return e;};
  if(!data){add('p','ממתין לנתוני גרסת האסטרטגיה מהשרת. תצוגה זו אינה מאשרת שהעדכון הותקן במנוע המסחר.');renderEntryComparison(host,null,{document:doc});renderTradingResearch(host,null,{document:doc,modes,variants});restore();return;}
  add('p','מעקב נפרד לכל מסלול וגרסה · נרות 5 דקות סגורים · MA100/200 על ארבעה נרות · מחזור נר האישור לפחות כממוצע 20 קודמיו. מרחק הסטופ בבייננס נקבע ב־SETTINGS; בקולמקס קיימת גם התאמה ל־ATR ולמבנה, עד 3%.');
+ if(data.independentEntry){
+  const route=data.independentEntry;
+  add('h3','מסלול פריצה עצמאית · קבלת החלטות בלייב');
+  add('p',route.enabled&&route.executionEnabled?'מאופשר בלייב · יכול לפתוח עסקה גם בלי Spring, בכפוף לבדיקות החשבון, ההקצאה וההגנות.':route.enabled?'המסלול מאופשר, אך ביצוע LIVE אינו מופעל כרגע.':'מסלול הפריצה העצמאית אינו מופעל בשרת.');
+  add('p','נר 5 דקות סגור מעל שיא 20 הנרות הקודמים · מחזור לפחות פי 1.5 · שווי מחזור ממוצע לפחות 10,000 דולר לנר · בדיקת MA100/200. איתות תקף לחמש דקות ונבדק שוב לפני ההוראה. למסלול הקיים קדימות כששניהם מאשרים כניסה.');
+  add('p','תוצאות המחקר והסימולציה ממשיכות להימדד בנפרד. הן אינן משנות את הכללים אוטומטית.');
+ }
  if(data.error||data.dropped)add('p','חלק מתיעוד ההשוואה חסר או לא נשמר. אין להסיק מסקנות מהנתונים החלקיים.');
  const table=(headers,rows)=>{const wrap=add('div','');wrap.className='strategy-table-wrap';const t=add('table','',wrap),head=add('thead','',t),hr=add('tr','',head);for(const h of headers)add('th',h,hr);const body=add('tbody','',t);for(const row of rows){const tr=add('tr','',body);for(const value of row)add('td',String(value),tr);}};
  renderEntryComparison(host,data.entryComparison,{document:doc});
