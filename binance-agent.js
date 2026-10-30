@@ -870,7 +870,7 @@ setInterval(()=>{
 },650);
 function drawCandles(candles){
   const canvas=$('#priceChart');
-  if(!canvas||!candles.length){put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();return;}
+  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -896,7 +896,7 @@ function drawCandles(candles){
   const view=visibleWindow.bars;
   const viewMas=mas.slice(start,end);
   drawIndicators(candles,{start,end});
-  if(!view.length){put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();return;}
+  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
@@ -986,16 +986,23 @@ function drawCandles(candles){
     {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −'+tradeRisk.sl+'%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
-  const labelRows=[];
-  for(const level of priceLevels){
+  const legend=$('#chartPriceLegend');
+  const legendRows=priceLevels.map(level=>{
     const yy=y(level.price),inside=yy>=top&&yy<=top+ch;
     if(inside){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();ctx.strokeStyle=level.color;ctx.lineWidth=1.5;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.restore();}
-    let labelY=Math.max(top+14,Math.min(top+ch-10,yy-8));
-    while(labelRows.some(row=>Math.abs(row-labelY)<19)&&labelY<top+ch-20)labelY+=20;
-    if(labelRows.some(row=>Math.abs(row-labelY)<19))labelY=Math.max(top+14,labelY-40);
-    labelRows.push(labelY);
-    const text=level.label+' '+fmt(level.price,priceDigits)+(inside?'':' · מחוץ לטווח');
-    ctx.save();ctx.font='12px Arial';ctx.textAlign='left';ctx.fillStyle='#081522';ctx.fillRect(left+4,labelY-14,Math.min(cw-8,ctx.measureText(text).width+12),19);ctx.fillStyle=level.color;ctx.fillText(text,left+10,labelY);ctx.restore();
+    return {...level,value:fmt(level.price,priceDigits),outside:!inside};
+  });
+  if(legend){
+    const key=JSON.stringify(legendRows);legend.hidden=!legendRows.length;
+    if(legend._renderKey!==key){
+      legend._renderKey=key;legend.replaceChildren();
+      for(const level of legendRows){
+        const row=document.createElement('div');row.className='chart-price-legend-item';row.style.setProperty('--level-color',level.color);
+        const label=document.createElement('span');label.textContent=level.label+(level.outside?' · מחוץ לטווח':'');
+        const value=document.createElement('bdi');value.dir='ltr';value.textContent=level.value;
+        row.append(label,value);legend.append(row);
+      }
+    }
   }
   ctx.save();
   ctx.restore();
