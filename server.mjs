@@ -2247,6 +2247,8 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/regression-trend.js':['regression-trend.js','text/javascript'],
+    '/resistance-patterns.js':['resistance-patterns.js','text/javascript'],
     '/market-news':['market-news.html','text/html'],
     '/market-news.html':['market-news.html','text/html'],
     '/market-news.js':['market-news.js','text/javascript'],
