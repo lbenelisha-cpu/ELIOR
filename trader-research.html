@@ -3,14 +3,27 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Trader Research · LEVI INVEST</title>
-  <link rel="stylesheet" href="/trader-research.css?v=20261030">
+  <link rel="stylesheet" href="/trader-research.css?v=20261030-auto1">
 </head>
 <body>
 <header class="topbar"><a class="brand" href="/">LEVI <span>INVEST</span></a><nav aria-label="סביבת עבודה"><a href="/binance-agent.html">Binance</a><a href="/colmex-pro.html">Colmex Pro</a><a href="/trader-research.html" aria-current="page">מחקר השקעות</a></nav></header>
 <main>
   <div class="eyebrow">TRADER SKILL · RESEARCH DESK</div>
-  <h1>יותר מידע לפני ההחלטה</h1>
-  <p class="lead">דוחות חברות וחדשות לצד תכנון התקציב והסיכון לעסקה. מחקר לפי בקשה, ללא ביצוע עסקאות.</p>
+  <h1>מחקר השקעות ואוטומציית דמו</h1>
+  <p class="lead">שני תיקים מדומים שעוקבים אחר כללי המסחר, לצד חדשות, דוחות ותכנון סיכון. אין כאן ביצוע עסקאות בכסף אמיתי.</p>
+  <section class="panel auto-panel" id="auto-paper" aria-labelledby="autoTitle">
+    <div class="section-heading"><div><span class="eyebrow">PAPER TRADING / פועל בשרת</span><h2 id="autoTitle">האוטומציה בשתי הפלטפורמות</h2></div><span class="badge paper-badge">כסף ועסקאות מדומים</span></div>
+    <p class="hint">השרת מתוזמן לבדיקה כל 5 דקות, גם כשהאתר סגור. פוזיציות ואיתותים ממתינים נבדקים בכל מחזור; שני נכסים נוספים מהרשימה נסרקים בתור, ולכן סבב מלא אורך עד 15 דקות. מניות נבדקות בשעות המסחר הרגילות בארה״ב.</p>
+    <div class="auto-toolbar"><p id="autoStatus" role="status" aria-live="polite">קורא את מצב הדמו מהשרת…</p><button id="autoRefresh" type="button">רענן מצב דמו</button></div>
+    <div id="autoCards" class="auto-cards"></div>
+    <details class="paper-rules"><summary>כללי הדמו, מקורות והנחות הביצוע</summary>
+      <p>כל תיק מתחיל ב־10,000 יחידות מדומות: USDT לבייננס ו־USD לקולמקס. עד 5 פוזיציות, עד 20% מהתיק לפוזיציה כולל עתודת עלויות. עלות מדומה של 0.1% בכל צד; תקציב הפסד מחושב של עד 8 יחידות לעסקה כולל עלויות משוערות. בקולמקס הכמות מעוגלת למניות שלמות.</p>
+      <p>הכניסה מבוססת על כללי האפליקציה: Spring מאושר או פריצה מוקדמת מאושרת בנרות 5 דקות, התאוששות גבוהה יותר, מסנן ממוצעים 100/200 ונפח אישור שאינו נמוך מהממוצע של 20 הנרות הקודמים. איתות חדש ממתין לסגירת נר לאחר שנצפה בשרת ונבדק שוב לפני קנייה מדומה.</p>
+      <p>הנחות הדמו קבועות ואינן מסונכרנות עם הגדרות החשבון: סטופ בסיסי 1%; בקולמקס התאמה לתנודתיות ולמבנה עד 3%. הגנה נגררת מופעלת ברווח 5%, במרחק נקודת אחוז אחת ממחיר הכניסה; יעד רווח 50%. נתונים חסרים או ישנים עוצרים כניסות.</p>
+      <p>המחירים הם סגירות נרות שנצפו, ולא מחירי ביצוע מהברוקר. היציאות נבדקות בסגירות שנדגמו בלבד; תנועה בתוך הנר, החלקה, מרווחים, השהיות וחלק ממגבלות הברוקר אינם מדומים. ההפסד בפועל עשוי לחרוג מהתקציב. תוצאות הדמו אינן תחזית לתוצאות אמיתיות.</p>
+      <p>בייננס משתמש בנתוני שוק ציבוריים של Binance; דמו קולמקס משתמש ב־Twelve Data, ולא בציטוטי חשבון Colmex. ליד איתותים זמינים מצורפים עד שלושה קישורי חדשות; למניות נבדקת גם זמינות דוחות SEC. המחקר הוא הקשר בלבד ואינו מפעיל קנייה. רשימות המעקב הן מדגם בדיקה קבוע, לא המלצת השקעה.</p>
+    </details>
+  </section>
   <div class="workspace">
     <section class="panel research" aria-labelledby="researchTitle">
       <div class="section-heading"><div><span class="eyebrow">01 / מחקר חברה</span><h2 id="researchTitle">מה עומד מאחורי המניה</h2></div><span class="badge">מניות ארה״ב</span></div>
@@ -52,5 +65,6 @@
   </div>
   <footer>התאמה של כלי <a href="https://github.com/Jakeschincariol/trader-skill" target="_blank" rel="noopener noreferrer">Trader Skill מאת Jake Schincariol</a> ברישיון MIT · חדשות, דוחות ותכנון סיכון. אין כאן דירוג תשואה צפויה או המלצת קנייה. <a href="/third_party/trader-skill/LICENSE">רישיון</a></footer>
 </main>
-<script type="module" src="/trader-research.js?v=20261030"></script>
+<script type="module" src="/trader-research.js?v=20261030-auto1"></script>
+<script type="module" src="/trader-auto-ui.js?v=20261030-auto1"></script>
 </body></html>
