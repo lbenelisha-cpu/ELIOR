@@ -447,3 +447,12 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 #binanceTradeRisk.trade-risk-table{position:static;max-width:100%;width:max-content;margin-top:10px;pointer-events:auto;font-size:12px}
 #binanceTradeRisk.trade-risk-table td{padding:4px 8px}
 .chart-rise-details{max-height:130px;overflow:auto}
+
+/* Keep exact price lines in the plot, but text in normal document flow. */
+.chart-price-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:8px;margin:10px 0;min-width:0}
+.chart-price-legend[hidden]{display:none}
+.chart-price-legend-item{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;padding:10px 12px;border:1px solid #294155;border-inline-start:4px solid var(--level-color);border-radius:10px;background:#0b1b29;color:var(--level-color);line-height:1.5;text-align:start}
+.chart-price-legend-item span{font-size:12px;white-space:normal;overflow-wrap:anywhere}
+.chart-price-legend-item bdi{font-size:15px;font-weight:700;max-width:100%;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.chart-price-legend{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-price-legend-item{padding:8px}.chart-price-legend-item bdi{font-size:14px}}
+@media(max-width:340px){.chart-price-legend{grid-template-columns:1fr}}

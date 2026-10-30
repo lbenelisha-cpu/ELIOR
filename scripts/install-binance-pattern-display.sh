@@ -8,7 +8,7 @@ systemctl is-active --quiet levi-binance
 git cat-file -e "$revision^{commit}"
 stage=$(mktemp -d /tmp/levi-pattern-display.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
-files=(binance-agent.html binance-agent.js resistance-patterns.js regression-trend.js)
+files=(binance-agent.html binance-agent.css binance-agent.js resistance-patterns.js regression-trend.js)
 for file in "${files[@]}"; do git show "$revision:$file" > "$stage/$file"; done
 mkdir "$stage/tests"
 git show "$revision:tests/resistance-patterns.test.mjs" > "$stage/tests/resistance-patterns.test.mjs"
