@@ -7,6 +7,7 @@ import {validateLiveState,hasBlockingPending} from '../lib/colmex-live-state.mjs
 import {AUTO_POLICY,LIVE_ACK} from '../lib/colmex-auto-policy.mjs';
 import {makeHandler} from '../netlify/functions/colmex-auto-status.mjs';
 import {monitorView} from '../lib/colmex-monitor-view.mjs';
+import {orderReviewOffer,manualDiagnosticOffer} from '../lib/colmex-manual-diagnostic.mjs';
 const now=Date.parse('2026-10-27T16:00:00Z'),id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',actionId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123'};
 const input={action:'release_review',requestId:actionId,reviewRequestId:id};
@@ -74,4 +75,62 @@ test('public status separates symbol quarantine from a globally pending action',
  const h=makeHandler({env,storeFactory:()=>({get:async()=>({state:s})})});
  const data=JSON.parse((await h({httpMethod:'GET'})).body);assert.equal(data.status,'MONITORING');assert.equal(data.halt,null);assert.equal(data.pending.quarantined,true);assert.equal(data.pending.reservedUsd,805);assert.equal(data.reviewRecovery.available,false);
  assert.equal(monitorView({...data,scanActivity:{at:now,mode:'OBSERVATION_ONLY',dataAvailable:true}},now).observationScanning,false);
+});
+const secondId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+function secondReview(){
+ const s=state();s.pending.quarantinedAt=now-300000;
+ s.pending.order={...s.pending.order,qty:3,price:186.94333333333333};
+ s.riskPending=[{...structuredClone(state().pending),id:secondId,tag:'levi-auto:'+secondId,symbol:'TGT',order:{tradableInstrumentId:10,qty:6,price:100}}];
+ return s;
+}
+const secondInput={...input,reviewRequestId:secondId};
+test('targeted review selects the blocking TGT intent after isolated AMD and preserves both reservations',async()=>{
+ for(const reversed of [false,true]){
+  const s=secondReview(),b=broker();if(reversed)[s.pending,s.riskPending[0]]=[s.riskPending[0],s.pending];
+  const offer=orderReviewOffer(s);assert.equal(offer.reviewRequestId,secondId);assert.equal(offer.blockedSymbol,'TGT');assert.equal(offer.available,true);assert.equal(manualDiagnosticOffer(s).available,false);
+  assert.ok(Math.abs(offer.existingReservedUsd-565.83)<1e-8);assert.ok(Math.abs(offer.totalReservedUsd-1170.83)<1e-8);assert.deepEqual(offer.excludedSymbols,['AMD','TGT']);assert.equal(offer.reservedSlots,2);
+  const result=await releaseOrderReview({...args(s,b),input:secondInput});
+  assert.equal(result.symbol,'TGT');assert.equal(hasBlockingPending(s),false);assert.equal(s.halt,null);assert.equal(b.writes.length,0);
+  assert.ok(Math.abs(result.availableCashAfterReservations-116.83)<1e-8);assert.equal(reservedAccount(s,snapshot()).orders.length,2);
+  const all=[s.pending,...s.riskPending];assert.equal(all.find(i=>i.id===id).quarantinedAt,now-300000);assert.equal(all.find(i=>i.id===secondId).quarantinedAt,now);
+  assert.deepEqual(await releaseOrderReview({...args(s,b),input:secondInput,broker:{snapshot(){throw Error('must not reread');}}}),result);
+ }
+});
+test('targeted release never hides a second blocker or accepts an isolated, manual or acknowledged target',async()=>{
+ for(const change of ['extra-buy','extra-exit','manual','ack','old-id','isolated']){
+  const s=secondReview(),b=broker();let request=secondInput;
+  if(change==='extra-buy')s.riskPending.push({...structuredClone(s.riskPending[0]),id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',symbol:'AAPL'});
+  if(change==='extra-exit')s.riskPending.push({kind:'CLOSE',id:'other',positionId:'p',symbol:'AAPL',at:now});
+  if(change==='manual')s.riskPending[0].manual=true;
+  if(change==='ack')s.riskPending[0].acceptedAt=now;
+  if(change==='old-id')request=input;
+  if(change==='isolated')s.riskPending[0].quarantinedAt=now;
+  await assert.rejects(releaseOrderReview({...args(s,b),input:request}),/REVIEW_STATE_CHANGED/,change);
+  assert.equal(s.halt,'UNRESOLVED_ORDER_REQUIRES_REVIEW');assert.equal(b.writes.length,0);
+ }
+});
+test('fresh broker evidence for either pending stock prevents blind release',async()=>{
+ for(const evidence of ['AMD','TGT','TGT-no-fill']){
+  const s=secondReview(),b=broker(),target=evidence==='AMD'?s.pending:s.riskPending[0];
+  b.snapshot=async()=>({...snapshot(),history:[{id:'broker-order',userComment:target.tag,tradableInstrumentId:target.order.tradableInstrumentId,status:evidence==='TGT-no-fill'?'cancelled':'accepted',filledQty:0}]});
+  await assert.rejects(releaseOrderReview({...args(s,b),input:secondInput}));assert.equal(b.writes.length,0);assert.equal(s.pending.quarantinedAt,now-300000);
+  if(evidence==='TGT-no-fill'){assert.equal(s.riskPending.length,0);assert.equal(s.halt,null);assert.ok(s.events.some(e=>e.reason==='BUY_FINISHED_WITHOUT_FILL'&&e.symbol==='TGT'));}
+  else {assert.equal(s.riskPending[0].quarantinedAt,undefined);assert.equal(s.halt,'UNRESOLVED_ORDER_REQUIRES_REVIEW');}
+ }
+});
+test('combined reservations still block automatic and manual overspending and both isolated symbols',async()=>{
+ const s=secondReview(),b=broker();await releaseOrderReview({...args(s,b),input:secondInput});
+ await runCycle({...args(s,b),deadline:now+24000,signal:()=>({ready:true,setup:{patternId:'fixture-multi',targetPrice:100}})});
+ assert.equal(b.writes.length,0);assert.ok(Object.values(s.checks).some(c=>c.reason==='INSUFFICIENT_UNLEVERAGED_CASH'));
+ for(const symbol of ['AAPL','AMD','TGT']){
+  const expected=symbol==='AAPL'?'INSUFFICIENT_UNLEVERAGED_CASH':'SYMBOL_ORDER_UNRESOLVED';
+  const realInstruments=b.instruments;b.instruments=async()=>[...(await realInstruments()).filter(i=>i.name!=='TGT'),{name:'TGT',type:'EQUITY',tradableInstrumentId:10}];
+  await assert.rejects(manualTrade({...args(s,b),input:{side:'BUY',symbol,amountUsd:200,requestId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'},deadline:now+24000}),new RegExp(expected));
+ }
+ assert.equal(b.writes.length,0);assert.equal(reservedAccount(s,snapshot()).orders.length,2);
+});
+test('status GET offers the exact blocking order without releasing it or expanding diagnostic buys',async()=>{
+ const s=secondReview(),original=structuredClone(s),h=makeHandler({env,storeFactory:()=>({get:async()=>({state:s})})});
+ const data=JSON.parse((await h({httpMethod:'GET'})).body);
+ assert.equal(data.reviewRecovery.available,true);assert.equal(data.reviewRecovery.reviewRequestId,secondId);assert.equal(data.reviewRecovery.version,'ORDER_REVIEW_RECOVERY_V2');assert.equal(data.manualDiagnostic.available,false);assert.deepEqual(s,original);
 });
