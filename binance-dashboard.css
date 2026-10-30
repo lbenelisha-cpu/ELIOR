@@ -46,3 +46,6 @@ button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,s
 .topbar>.topnav{grid-row:2;grid-column:1/-1;justify-content:center;border-top:1px solid #263a43;padding-top:13px}
 @media(max-width:1000px){.topbar{grid-template-columns:minmax(0,1fr) auto}.topbar>.header-utilities,.topbar>.dashboard-menu{grid-column:2}.platform-tabs{grid-row:2;grid-column:1/-1}.topbar>.topnav{grid-row:3}}
 @media(max-width:440px){.brand-block>div:last-child{min-width:0}.brand-sub{max-width:100%}.platform-tabs a{padding:10px 17px}.topbar>.topnav{gap:3px}.topbar .nav-pill{padding:10px 7px;font-size:11px}}
+
+/* Keep the news channel visible alongside the trading platforms. */
+.platform-tabs{flex-wrap:wrap}.platform-tabs .news-channel-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;background:#173c48;border-color:#447d8c;color:#bef1ff;direction:rtl;font-weight:700;text-decoration:none}.platform-tabs .news-channel-link:hover{background:#235463;color:#fff}.platform-tabs .news-channel-link:focus-visible{outline:2px solid #8bd5ee;outline-offset:3px}
