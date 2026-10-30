@@ -2,6 +2,8 @@
 // the real reconciliation, journal and protection implementations separately.
 import {validateTradeSettings} from '../../lib/trade-settings.mjs';
 export function withLiveSafety(context){
+ context.newsEntryAssessment??=()=>({action:'NONE',priority:0,reason:'OBSERVATION_ONLY'});
+ context.newsEntryCandidates??=evals=>evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade);
  context.tradeSettings??={values:validateTradeSettings({})};
  context.liveStateHealth??={journalReady:true};
  context.liveReadiness??=()=>({ready:true});

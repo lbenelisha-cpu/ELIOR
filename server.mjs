@@ -1,3 +1,5 @@
+import {newsConfig,assessNewsEntry} from './lib/market-news.mjs';
+import {fileNewsCollector} from './lib/market-news-file.mjs';
 import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
 import {independentEntryConfig,assertIndependentBreakoutSubmission} from './lib/binance-independent-entry.mjs';
@@ -102,6 +104,11 @@ const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
 const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
 const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
 const independentEntry=independentEntryConfig(process.env);
+const marketNewsConfig=newsConfig(process.env);
+const marketNews=fileNewsCollector(process.env.MARKET_NEWS_FILE||'/var/data/market-news.json');
+function newsEntryAssessment(symbol){return assessNewsEntry(marketNews.snapshot(),symbol,marketNewsConfig);}
+function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade).map(e=>({...e,newsDecision:newsEntryAssessment(e.symbol)})).filter(e=>e.newsDecision.action!=='BLOCK').sort((a,b)=>b.newsDecision.priority-a.newsDecision.priority);}
+function newsChannelSnapshot(){const data=marketNews.snapshot();const assets=[...new Set(data.items.flatMap(r=>r.assets.filter(a=>a.id.startsWith('crypto:')).map(a=>a.id.slice(7)+'USDT')))];return {...data,config:marketNewsConfig,executionEnabled:marketNewsConfig.enabled&&mode==='live'&&LIVE&&AUTO_EXECUTION,decisions:assets.map(s=>({symbol:s,...newsEntryAssessment(s)}))};}
 const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
@@ -857,6 +864,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
 
+  if(reason!=='MANUAL_BUY'){const newsDecision=newsEntryAssessment(symbol);if(newsDecision.action==='BLOCK')throw Error(newsDecision.reason);meta={...meta,newsDecision};}
   const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
   try{await nativeProtection.sync(symbol,liveManagedPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
   catch(error){recordLiveError(symbol,error);order.protectionWarning=error.message;}
@@ -994,7 +1002,7 @@ async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
   account=await reconcileLiveHoldings();
   if(!liveReadiness().ready)return;
   if(Object.entries(liveManagedPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
-  for(const ev of evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade)){
+  for(const ev of newsEntryCandidates(evals)){
     if(owned(ev.symbol)||sold.has(ev.symbol))continue;
     if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
     const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
@@ -1555,6 +1563,7 @@ async function evaluateSymbol(s){
         if(ev.wyckoffTrade.entryMode!=='independent_breakout')ev.wyckoffTrade.entryPolicyVersion=ENTRY_POLICY_VERSION;
       }
     }
+    if(!p&&mode==='live'){ev.newsDecision=newsEntryAssessment(s);if(ev.entryConfirmed&&ev.newsDecision.action==='BLOCK'){ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';ev.buyReason=ev.newsDecision.reason;ev.wyckoffTrade=null;if(ev.strategy)ev.strategy.buyConfirmed=false;}}
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     if(mode==='live')observeMaDecision({symbol:s,position:p||null,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
@@ -1593,6 +1602,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     entryConfirmed:ev.entryConfirmed,
     entryFilters:ev.entryFilters||null,
     entryDecisions:ev.entryDecisions||null,
+    newsDecision:ev.newsDecision||null,
     entryBasePrice:ev.entryBasePrice,
     entryTargetPrice:ev.entryTargetPrice,
     entryGainPct:ev.entryGainPct,
@@ -2060,6 +2070,7 @@ async function runEvaluation(){
       analysisReason:ev.analysisReason||ev.error||null,
       setup:ev.strategy?.wyckoff||null,
       entryDecisions:ev.entryDecisions||null,
+    newsDecision:ev.newsDecision||null,
       targetPrice:ev.entryTargetPrice??null,
       buyQualified:Boolean(ev.buyQualified),
       buyReason:ev.buyReason||null,
@@ -2210,6 +2221,7 @@ const server=http.createServer((req,res)=>{
     return send(res,{ok:false,error:'Authenticated control required: configure BINANCE_CONTROL_TOKEN (at least 32 characters) and send a Bearer token'},401);
   }
 
+  if(u.pathname==='/api/market-news'){if(req.method!=='GET')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);return send(res,{ok:true,...newsChannelSnapshot()});}
   if(u.pathname==='/api/binance-settings'){
    if(req.method==='GET')return send(res,{ok:true,...tradeSettings});
    if(req.method!=='POST')return send(res,{ok:false},405);
@@ -2235,6 +2247,10 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/market-news':['market-news.html','text/html'],
+    '/market-news.html':['market-news.html','text/html'],
+    '/market-news.js':['market-news.js','text/javascript'],
+    '/market-news.css':['market-news.css','text/css'],
     '/chart-time-navigation.js':['chart-time-navigation.js','text/javascript'],
     '/chart-time-navigation.css':['chart-time-navigation.css','text/css'],
     '/lib/chart-viewport.mjs':['lib/chart-viewport.mjs','text/javascript'],
@@ -2350,7 +2366,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,marketNews:marketNewsConfig,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
@@ -2540,7 +2556,7 @@ const server=http.createServer((req,res)=>{
         volumeFilterEnabled:true,
         liveState:liveReadiness(),
         hourlyTrendFilter:HOURLY_TREND_RULE,
-        entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,
+        entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,marketNews:marketNewsConfig,
         entryMode:'confirmed_quality',
         entryModes:['spring_reclaim_confirmed','early_wave_confirmed',...(mode==='live'&&independentEntry.enabled?['independent_breakout']:[])],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
         entryConfirmation:'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',
@@ -2623,6 +2639,8 @@ async function refreshEntryComparison(){
 setInterval(()=>refreshEntryComparison().catch(()=>{}),60000).unref();
 
 server.listen(PORT,'0.0.0.0',async()=>{
+  marketNews.poll().catch(()=>{});
+  setInterval(()=>marketNews.poll().catch(()=>{}),60000).unref();
   console.log('Server',server.address().port);
   loadTradeControl();
   loadPaperState();
