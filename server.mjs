@@ -1,5 +1,6 @@
 import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
+import {independentEntryConfig,assertIndependentBreakoutSubmission} from './lib/binance-independent-entry.mjs';
 import {RESEARCH_PROTOCOL} from './lib/trading-research.mjs';
 import {sizeRisk} from './lib/confirmed-risk-sizing.mjs';
 import {recordStrategyObservation} from './lib/strategy-followup.mjs';
@@ -100,6 +101,7 @@ const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
 const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
 const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
+const independentEntry=independentEntryConfig(process.env);
 const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
@@ -839,12 +841,18 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
   if(reason!=='MANUAL_BUY'){
-    const hourlyTrend=assessQualityEntry(symbol,await candles(symbol));
+    const executionBars=await candles(symbol);
+    const hourlyTrend=assessQualityEntry(symbol,executionBars);
     if(!hourlyTrend.ok)throw Error(hourlyTrend.code);
-    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:ENTRY_POLICY_VERSION}};
+    if(meta.wyckoffTrade?.entryMode==='independent_breakout'){
+      const actions=liveActionLog.filter(a=>a.symbol===symbol);
+      const entryAfter=Math.max(Date.parse(tradeControl.resumedAt)||0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite));
+      assertIndependentBreakoutSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.liveBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId)},independentEntry,meta.wyckoffTrade);
+    }
+    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,hourlyTrend,entryPolicyVersion:meta.wyckoffTrade?.entryMode==='independent_breakout'?meta.wyckoffTrade.entryPolicyVersion:ENTRY_POLICY_VERSION}};
   }
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
-  if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live','spring_reclaim_confirmed','early_wave_confirmed'].includes(meta.wyckoffTrade?.entryMode)){
+  if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live','spring_reclaim_confirmed','early_wave_confirmed','independent_breakout'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
@@ -1512,7 +1520,7 @@ async function evaluateSymbol(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
     if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
@@ -1544,7 +1552,7 @@ async function evaluateSymbol(s){
         if(ev.strategy)ev.strategy.buyConfirmed=false;
       }else if(ev.entryConfirmed&&ev.wyckoffTrade){
         ev.wyckoffTrade.hourlyTrend=ev.entryFilters;
-        ev.wyckoffTrade.entryPolicyVersion=ENTRY_POLICY_VERSION;
+        if(ev.wyckoffTrade.entryMode!=='independent_breakout')ev.wyckoffTrade.entryPolicyVersion=ENTRY_POLICY_VERSION;
       }
     }
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
@@ -1584,6 +1592,7 @@ function setAgentFromEval(ev,decision='HOLD',execution='IDLE',strategy=null){
     entryEligible:ev.entryEligible,
     entryConfirmed:ev.entryConfirmed,
     entryFilters:ev.entryFilters||null,
+    entryDecisions:ev.entryDecisions||null,
     entryBasePrice:ev.entryBasePrice,
     entryTargetPrice:ev.entryTargetPrice,
     entryGainPct:ev.entryGainPct,
@@ -1621,7 +1630,7 @@ function candidateBlocker(ev,evals){
   if(ev.position==='LONG')return {code:['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(ev.strategy?.strategyId)?'ACTIVE_LONG':'LEGACY_POSITION_REQUIRES_REVIEW',text:ev.strategy?.exitPolicy===TRAILING_EXIT_POLICY?'הגנת רווח נגררת לפי SETTINGS · הסטופ אינו יורד':'פוזיציה קודמת — נדרש בירור'};
   if(!ev.entryConfirmed)return {code:ev.buyReason,text:ev.buyReason==='WAIT_HOURLY_TREND'?'וויקוף אושר · ממתין למגמה עולה: סגירת שעה > ממוצע 20 > ממוצע 50':ev.buyReason==='WAIT_HOURLY_TREND_DATA'?'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה':ev.buyReason==='WAIT_SPRING_RETEST'?`וויקוף אושר · ממתין לחזרה ל־Spring במחיר ${ev.strategy.springEntryPrice}`:'וויקוף 5 דקות: '+ev.buyReason};
   if(Object.keys(tradingPositions()).length>=(mode==='live'?LIVE_MAX_POSITIONS:MAX))return {code:'NO_SLOT',text:'אין מקום פנוי'};
-  return {code:'BUY_READY',text:ev.wyckoffTrade?.entryMode==='early_wave_live'?'גל מוקדם אושר · עלייה של 1% ופריצת 3 נרות · ללא תקרת RSI':'Spring ו־RSI חי 0–40 אושרו · מגמת שעה אינה תנאי כניסה · קנייה ללא המתנה לסגירת נר'};
+  return {code:'BUY_READY',text:ev.wyckoffTrade?.entryMode==='independent_breakout'?'פריצה עצמאית אושרה · נר סגור מעל 20 שיאים ומחזור מוגבר':ev.wyckoffTrade?.entryMode==='early_wave_confirmed'?'גל מוקדם אושר בנר סגור · התאוששות שנייה גבוהה, מגמה ומחזור':ev.wyckoffTrade?.entryMode==='early_wave_live'?'גל מוקדם אושר · עלייה של 1% ופריצת 3 נרות · ללא תקרת RSI':'Spring אושר בנר סגור · התאוששות שנייה גבוהה, RSI, מגמה ומחזור'};
 }
 
 function weakestHeldEvaluation(evals){
@@ -2050,6 +2059,7 @@ async function runEvaluation(){
       analysisSignal:ev.analysisSignal===true,
       analysisReason:ev.analysisReason||ev.error||null,
       setup:ev.strategy?.wyckoff||null,
+      entryDecisions:ev.entryDecisions||null,
       targetPrice:ev.entryTargetPrice??null,
       buyQualified:Boolean(ev.buyQualified),
       buyReason:ev.buyReason||null,
@@ -2340,7 +2350,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
@@ -2415,7 +2425,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-action-log'&&req.method==='GET'){
     return send(res,{
       mode,
-      strategyReview:{...binanceStrategyReport(strategyReviewState,liveActionLog),error:strategyReviewError},
+      strategyReview:{...binanceStrategyReport(strategyReviewState,liveActionLog),independentEntry:{...independentEntry,executionEnabled:mode==='live'&&LIVE&&AUTO_EXECUTION},error:strategyReviewError},
       netJournal:{live:buildNetTradeJournal(liveActionLog),demo:buildNetTradeJournal(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[])},
       demo:(DEMO_TRADING?demoTrader.state.actionLog:paper.actionLog||[]).slice(0,100),
       live:(liveActionLog||[]).slice(0,100)
@@ -2530,9 +2540,9 @@ const server=http.createServer((req,res)=>{
         volumeFilterEnabled:true,
         liveState:liveReadiness(),
         hourlyTrendFilter:HOURLY_TREND_RULE,
-        entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,
+        entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,independentEntry,
         entryMode:'confirmed_quality',
-        entryModes:['spring_reclaim_confirmed','early_wave_confirmed'],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
+        entryModes:['spring_reclaim_confirmed','early_wave_confirmed',...(mode==='live'&&independentEntry.enabled?['independent_breakout']:[])],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
         entryConfirmation:'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',
         readPerformanceVersion:1,
         historyPerformanceVersion:1,

@@ -195,6 +195,8 @@ function mode(s){
 }
 
 function buyReasonLabel(r){
+  const independent={INDEPENDENT_BREAKOUT_READY:'פריצה עצמאית אושרה בנר סגור',WAIT_BREAKOUT:'ממתין לסגירה מעל שיא 20 הנרות',WAIT_BREAKOUT_HISTORY:'חסרים נרות לבדיקת פריצה',BREAKOUT_VOLUME_LOW:'מחזור הפריצה נמוך מפי 1.5 מהממוצע',BREAKOUT_LIQUIDITY_LOW:'שווי מחזור נמוך מהמינימום',GAPPED_BREAKOUT_HISTORY:'חסרים נרות ברצף המחירים',INVALID_BREAKOUT_HISTORY:'נתוני הפריצה אינם תקינים',WAIT_NEW_BREAKOUT_SIGNAL:'ממתין לפריצה חדשה אחרי ההפעלה או המכירה',BREAKOUT_PATTERN_ALREADY_USED:'איתות הפריצה כבר נוצל',BREAKOUT_SIGNAL_EXPIRED:'איתות הפריצה פג',BREAKOUT_PRICE_INVALIDATED:'המחיר חזר לרמת הפריצה או מתחתיה',WAIT_BREAKOUT_LIVE_BAR:'ממתין לנתוני הנר החי',INDEPENDENT_ENTRY_DISABLED:'מסלול הפריצה כבוי',READY:'תנאי הכניסה מתקיימים'};
+  if(independent[r])return independent[r];
   if(['WAIT_SECOND_RECOVERY_CONFIRMATION','SECOND_RECOVERY_NOT_HIGHER','WAIT_CLOSED_CONFIRMATION','WAIT_MA_HISTORY','MA_DOWNTREND_BLOCK','WAIT_VOLUME_HISTORY','CONFIRMATION_VOLUME_LOW','WAIT_ATR_HISTORY','VOLATILITY_RISK_TOO_HIGH','QUALITY_SIGNAL_INVALIDATED'].includes(r))return decisionReasonLabel(r);
   if(/^WAIT_PROFIT_ACTIVATION_/.test(r||''))return 'ממתין לרווח '+String(r).replace('WAIT_PROFIT_ACTIVATION_','').replace('_PERCENT','')+'% להפעלת ההגנה';
   if(['EARLY_WAVE_BREAKOUT','TRAILING_PROFIT_HOLD','TRAILING_PROFIT_EXIT'].includes(r))return decisionReasonLabel(r);
@@ -436,6 +438,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartWave',fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
+  put('#entryRouteDecision',a.entryDecisions?'מסלול קיים: '+buyReasonLabel(a.entryDecisions.current.reason)+' · פריצה עצמאית: '+buyReasonLabel(a.entryDecisions.breakout.reason):'');
   const hourly=a.entryFilters;
   put('#hourlyTrendStatus',d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' או גל 1% ופריצת 3 נרות · ללא מסנן שעה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
     'מגמת שעה: '+(hourly.ok?'מאושרת':'ממתינה')+' · סגירה '+fmt(hourly.close,8)+' · ממוצע 20 '+fmt(hourly.sma20,8)+' · ממוצע 50 '+fmt(hourly.sma50,8)+' · '+new Date(hourly.asOf).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'מגמת שעה: ממתין ל־50 שעות מלאות ועדכניות');
@@ -444,7 +447,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':a.strategy?.entryMode==='independent_breakout'?'פריצה עצמאית · נר 5 דקות סגור, מחזור ומגמה · '+buyReasonLabel(a.buyReason):(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
