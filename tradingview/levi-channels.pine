@@ -1,5 +1,5 @@
 //@version=6
-indicator("LEVI · Swing channel + Regression", overlay=true, max_lines_count=6, max_labels_count=2, max_bars_back=300)
+indicator("LEVI · Swing channel + Regression", overlay=true, max_lines_count=10, max_labels_count=6, max_bars_back=300)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
 int n = input.int(100, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
@@ -122,3 +122,64 @@ if barstate.islast and bar_index >= n
             float edge = (lo+hi)/2+band*(hi-lo)/2
             array.push(drawings,line.new(first+a,edge+s*a,last,edge+s*(n-1),color=color.orange,style=line.style_dashed,width=band==0 ? 1 : 2))
         array.push(captions,label.new(last,lo+s*(n-1),"Swing · "+str.tostring(lc)+" low / "+str.tostring(hc)+" high touches"+(lc<2 or hc<2 ? " · provisional" : " · confirmed"),style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white))
+
+
+// Broker exit thresholds are imported explicitly. Pine does not read the bot account.
+// No trading logic, reconstructed peak, alerts or assumed fills are used here.
+string exitSnapshot = input.text_area("", "Bot exit snapshot", group="Bot exit levels", tooltip="Copy from LEVI app. One-time price snapshot; not a live connection. Refresh after two minutes or any position/settings change.")
+bool showExitTarget = input.bool(false, "Show Take Profit line", group="Bot exit levels", tooltip="A distant target can compress the chart. Its value is always shown in the table.")
+bool showExitActivation = input.bool(false, "Show profit activation line", group="Bot exit levels")
+var array<line> exitLines = array.new<line>()
+var array<label> exitLabels = array.new<label>()
+var table exitTable = table.new(position.bottom_left, 1, 4, bgcolor=color.new(color.black, 15))
+
+if barstate.islast
+    for item in exitLines
+        line.delete(item)
+    array.clear(exitLines)
+    for item in exitLabels
+        label.delete(item)
+    array.clear(exitLabels)
+    table.clear(exitTable, 0, 0, 0, 3)
+    string raw = str.trim(exitSnapshot)
+    if str.length(raw) > 0
+        array<string> fields = str.split(raw, "|")
+        bool valid = array.size(fields) == 10 and str.length(raw) <= 800
+        string status = "Invalid bot snapshot - copy again from LEVI"
+        if valid
+            string version = array.get(fields, 0)
+            string symbol = array.get(fields, 1)
+            float atValue = str.tonumber(array.get(fields, 2))
+            float entryAtValue = str.tonumber(array.get(fields, 3))
+            float entryValue = str.tonumber(array.get(fields, 4))
+            float stopValue = str.tonumber(array.get(fields, 5))
+            float targetValue = str.tonumber(array.get(fields, 6))
+            float activationValue = str.tonumber(array.get(fields, 7))
+            float armedValue = str.tonumber(array.get(fields, 8))
+            float brokerStopValue = str.tonumber(array.get(fields, 9))
+            valid := version == "LEVI_EXIT_V1" and not na(atValue) and not na(entryAtValue) and not na(entryValue) and not na(stopValue) and not na(targetValue) and not na(activationValue) and not na(armedValue) and not na(brokerStopValue)
+            valid := valid and atValue > 0 and entryAtValue > 0 and entryAtValue <= atValue and entryValue > 0 and stopValue > 0 and targetValue > entryValue and activationValue >= 0 and brokerStopValue >= 0 and (armedValue == 0 or armedValue == 1)
+            if valid
+                if symbol != syminfo.prefix + ":" + syminfo.ticker
+                    valid := false
+                    status := "Snapshot is for " + symbol + " - select that symbol or copy again"
+                else if atValue > timenow or timenow - atValue > 120000
+                    valid := false
+                    status := "Snapshot expired - refresh in LEVI and copy again"
+            if valid
+                int at = int(atValue)
+                string stamp = str.format_time(at, "HH:mm:ss", "Asia/Jerusalem")
+                array.push(exitLines, line.new(at, stopValue, at + 60000, stopValue, xloc=xloc.bar_time, extend=extend.right, color=color.red, style=line.style_dashed, width=2))
+                array.push(exitLabels, label.new(at, stopValue, (armedValue == 1 ? "Bot trailing stop " : "Bot stop ") + str.tostring(stopValue, format.mintick) + " · snapshot " + stamp, xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.red, 25), textcolor=color.white, size=size.small))
+                if showExitTarget
+                    array.push(exitLines, line.new(at, targetValue, at + 60000, targetValue, xloc=xloc.bar_time, extend=extend.right, color=color.lime, style=line.style_dotted))
+                    array.push(exitLabels, label.new(at, targetValue, "Bot Take Profit " + str.tostring(targetValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.green, 25), textcolor=color.white, size=size.small))
+                if showExitActivation and activationValue > 0
+                    array.push(exitLines, line.new(at, activationValue, at + 60000, activationValue, xloc=xloc.bar_time, extend=extend.right, color=color.yellow, style=line.style_dotted))
+                    array.push(exitLabels, label.new(at, activationValue, "Protection activation (not a sale) " + str.tostring(activationValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.orange, 25), textcolor=color.white, size=size.small))
+                table.cell(exitTable, 0, 0, "BOT SNAPSHOT · " + stamp + " Israel · NOT LIVE", text_color=color.orange, text_size=size.small)
+                table.cell(exitTable, 0, 1, "Stop " + str.tostring(stopValue, format.mintick) + " · TP " + str.tostring(targetValue, format.mintick), text_color=color.white, text_size=size.small)
+                table.cell(exitTable, 0, 2, activationValue > 0 ? "Activation " + str.tostring(activationValue, format.mintick) + (armedValue == 1 ? " · armed" : " · waiting") : "Fixed exit policy", text_color=color.white, text_size=size.small)
+                table.cell(exitTable, 0, 3, brokerStopValue > 0 ? "Exchange stop at snapshot: " + str.tostring(brokerStopValue, format.mintick) : "Exchange stop not verified", text_color=brokerStopValue > 0 ? color.silver : color.orange, text_size=size.small)
+        if not valid
+            table.cell(exitTable, 0, 0, status, text_color=color.orange, text_size=size.small)

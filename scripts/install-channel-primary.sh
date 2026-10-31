@@ -19,7 +19,7 @@ while IFS= read -r file; do
  mkdir -p "$stage/$(dirname "$file")"
  git show "$revision:$file" > "$stage/$file"
 done < <(git ls-tree -r --name-only "$revision" -- lib tests)
-files=(lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js binance-dashboard.js strategy-followup-ui.js lib/channel-profit-protection.mjs lib/trade-settings.mjs lib/trailing-profit-exit.mjs app-settings.js trade-risk.js tradingview-link.js tradingview-channels.html tradingview/levi-channels.pine)
+files=(lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js binance-dashboard.js strategy-followup-ui.js lib/channel-profit-protection.mjs lib/trade-settings.mjs lib/trailing-profit-exit.mjs app-settings.js trade-risk.js tradingview-link.js tradingview-exit-snapshot.js tradingview-exit-snapshot.css tradingview-channels.html tradingview/levi-channels.pine)
 for file in "${files[@]}" scripts/patch-channel-primary.mjs scripts/channel-primary-server-patches.json; do mkdir -p "$stage/$(dirname "$file")"; git show "$revision:$file" > "$stage/$file"; done
 cp server.mjs "$stage/server.mjs"
 node "$stage/scripts/patch-channel-primary.mjs" "$stage"
