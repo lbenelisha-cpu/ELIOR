@@ -20,6 +20,17 @@ export function renderStrategyReview(host,data,{document:doc=globalThis.document
  }
  if(data.error||data.dropped)add('p','חלק מתיעוד ההשוואה חסר או לא נשמר. אין להסיק מסקנות מהנתונים החלקיים.');
  const table=(headers,rows)=>{const wrap=add('div','');wrap.className='strategy-table-wrap';const t=add('table','',wrap),head=add('thead','',t),hr=add('tr','',head);for(const h of headers)add('th',h,hr);const body=add('tbody','',t);for(const row of rows){const tr=add('tr','',body);for(const value of row)add('td',String(value),tr);}};
+ if(currency==='USDT'){
+  add('h3','השוואת תעלות · תצפית בלבד');
+  const c=data.channelComparison;
+  add('p','רגרסיה מול תעלה מקבילה · 100 נרות של 5 דקות · תחזית קפואה ל־30 דקות. המדגם משותף לשתי השיטות; אינו בודק רווחי מסחר ואינו משנה החלטות. הגדרות התצוגה בגרף אינן משנות את המחקר.');
+  if(!c)add('p','השרת טרם מסר נתוני מעקב תעלות. נדרשת התקנת עדכון המעקב בשרת; הצגת הקווים לבדה אינה מפעילה אותו.');
+  else{
+   add('p','מדגמים שהושלמו: '+c.resolved+' · ממתינים: '+c.pending+' · חסרי המשך: '+c.expired+' · זוגות תקפים: '+c.paired+' מתוך '+c.eligible+' בדיקות · עדכון אחרון: '+new Date(c.lastAt).toLocaleString('he-IL'));
+   table(['שיטה','שגיאת מרכז ממוצעת ↓','כיוון נכון','סגירה בתוך התעלה','רוחב ממוצע'],[['regression','רגרסיה · כחול/סגול'],['parallel','מקבילה · כתום']].map(([key,label])=>[label,number(c[key].meanErrorPct,'%'),number(c[key].directionPct,'%')+' (n='+c[key].directionCount+')',number(c[key].containmentPct,'%'),number(c[key].meanWidthPct,'%')]));
+   add('p','יותר הכלה יכולה לנבוע מתעלה רחבה יותר. המדגם כולל רק זמנים ששתי השיטות היו זמינות, כולל תעלות מקבילות ראשוניות. אין הכרזה אוטומטית על שיטה מנצחת.');
+  }
+ }
  renderEntryComparison(host,data.entryComparison,{document:doc});
  add('h3','עסקאות אמיתיות שנסגרו');
  if(!data.actual?.length)add('p','טרם נצברו עסקאות סגורות ביומן הזמין.');

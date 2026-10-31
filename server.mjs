@@ -1,3 +1,4 @@
+import {observeChannels} from './lib/channel-comparison.mjs';
 import {newsConfig,assessNewsEntry} from './lib/market-news.mjs';
 import {fileNewsCollector} from './lib/market-news-file.mjs';
 import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
@@ -2247,6 +2248,7 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/parallel-channel.js':['parallel-channel.js','text/javascript'],
     '/regression-trend.js':['regression-trend.js','text/javascript'],
     '/resistance-patterns.js':['resistance-patterns.js','text/javascript'],
     '/market-news':['market-news.html','text/html'],
@@ -2630,9 +2632,9 @@ async function refreshEntryComparison(){
  comparisonReading=true;
  try{
   const open=(strategyReviewState.entryComparison?.cohorts||[]).flatMap(c=>Object.values(c.items).filter(i=>Object.values(i.methods).some(m=>m.position||m.pending)).map(i=>i.symbol));
-  for(const symbol of new Set([...SYMBOLS,...open])){
+  for(const symbol of new Set([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})])){
    if(mode!=='live')break;
-   try{const bars=await candles(symbol);observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
+   try{const bars=await candles(symbol);observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
    catch{recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}
    saveStrategyReview();
   }
