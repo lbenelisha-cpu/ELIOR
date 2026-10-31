@@ -1,13 +1,47 @@
-# Channel profit protection and TradingView
+# Channel Take Profit (V2)
 
-Opt-in `channelProfitProtection: true` in platform trade settings affects NEW channel-breakout entries only. UI saves `channelActivationFraction: 0.5` as requested. Existing/manual positions without a saved plan keep fixed activation. No automatic migration enables this mode.
+New `channel_breakout` entries automatically freeze a `CHANNEL_TAKE_PROFIT_V2`
+plan from the confirmed pre-breakout channel. The absolute Take Profit is:
 
-At the signal, save full width (`2 * model.width`) and target `breakout upper + full width`. Freeze the plan in setup through durable intent, fill and position reconciliation. At actual fill, activation price is entry + half(target - entry). Runtime uses the frozen geometric target, never redraws it from subsequent candles. Current owner trailing gap and existing platform stop sizing remain unchanged. Take Profit is still the owner's separate hard exit, NOT the geometric target. Colmex retains its existing ATR/structure risk sizing; this update does not change that policy.
+`breakout boundary + full channel width`
 
-Fresh final submission compares the plan with reconstructed evidence. Reject a price already at/past target and activation beyond configured TP; Colmex also checks the executable IOC limit. Market slippage beyond target after submission is marked TARGET_PASSED_AT_FILL; fixed activation is retained and initial/native stops remain in force. Gap >= activation is explicitly labelled as not locking profit at activation. Saved stronger stops never decrease. Target and percentages are pre-fee estimates, not probabilities.
+The actual fill changes only the percentage return to that target. It never
+moves the absolute target. The configured stop-loss, profit activation percentage
+and trailing gap remain settings; there is no half-distance activation in V2.
+A channel target below the configured activation is valid: Take Profit can close
+first, before trailing is armed. The stored raw settings remain valid even when
+an individual target is less than 0.1% above the fill.
 
-Install using the pinned `scripts/install-channel-primary.sh SHA --install-only`; this preserves live mode and strategy enablement. Then owner enables the checkbox and saves in each platform. The extended installer stages dependencies/tests, copies narrowly, backs up and rolls back code on failure. It does not change account settings or enable channel protection itself.
+Both Binance and Colmex channel entries use the exact configured stop percentage.
+Risk-budget sizing remains in force. Other Colmex routes/older positions retain
+the existing frozen volatility risk. Already-earned stronger protection is never
+lowered. Current settings can still change stop/activation/gap on managed trades,
+while the V2 channel target remains frozen.
 
-TradingView: private Pine v6 indicator includes orange dashed strict swing channel plus cyan OLS/RMS residual channel. Uses closed bars and 2+2 pivots; provisional channels are labelled. Optional full-confirmation filter. The visual rolling model is not the frozen pre-breakout signal. TradingView sessions/data may differ. Script compiled and added on the owner's account. With authorization one duplicate CG-GapFill was replaced, preserving the other. No publication or paid upgrade.
+Final submission reconstructs the signal, target and fixed settings. A target
+already reached at the final executable price blocks entry. If a Binance market
+fill nevertheless slips past the target, the frozen target is retained and the
+normal exit evaluator reports Take Profit immediately; it does not silently
+substitute the distant configured target.
 
-The UI stores an exact HTTPS www.tradingview.com/chart/<id>/ layout URL on the device, then supplies symbol and interval=5. No drawings or account data are sent through URLs. Invalid URLs fall back to an ordinary chart. The install guide and downloadable Pine are served by the app. Broker trading is never connected from TradingView.
+Binance native protection uses the absolute target. Colmex submits an absolute
+Take Profit bracket (rounded to the instrument tick), and reconciliation retains
+that target from the confirmed fill onward. Stop-only Binance broker mode still
+relies on the running server for Take Profit, as before.
+
+Existing `CHANNEL_HALF_TARGET_V1` positions retain their recorded half-distance
+activation and configured Take Profit. Manual/other strategy positions are not
+silently migrated. Legacy settings fields are preserved for compatibility but
+are no longer offered as a switch for new V2 entries. The fixed Take Profit input
+continues to apply to non-V2 positions.
+
+Deployment: Netlify publishes the Colmex runtime/frontend. Binance requires the
+pinned `scripts/install-channel-primary.sh <commit> --install-only` on the VPS.
+That installation preserves activation flags and current settings but changes
+future channel entries to V2; it does not change the policy of saved positions.
+Do not equate published frontend text with an upgraded Binance server.
+
+Validation includes both final submission paths, real-fill reconstruction,
+Binance native brackets, legacy replay, sub-0.1% targets, current configured
+Colmex stops, and malformed/consumed/stale/changed signal rejection. No live
+orders are used for testing.

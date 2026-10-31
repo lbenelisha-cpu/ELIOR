@@ -19,7 +19,7 @@ while IFS= read -r file; do
  mkdir -p "$stage/$(dirname "$file")"
  git show "$revision:$file" > "$stage/$file"
 done < <(git ls-tree -r --name-only "$revision" -- lib tests)
-files=(lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js binance-dashboard.js strategy-followup-ui.js lib/channel-profit-protection.mjs lib/trade-settings.mjs lib/trailing-profit-exit.mjs app-settings.js trade-risk.js tradingview-link.js tradingview-exit-snapshot.js tradingview-exit-snapshot.css tradingview-channels.html tradingview/levi-channels.pine)
+files=(lib/confirmed-risk-sizing.mjs lib/binance-native-protection.mjs lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js binance-dashboard.js strategy-followup-ui.js lib/channel-profit-protection.mjs lib/trade-settings.mjs lib/trailing-profit-exit.mjs app-settings.js trade-risk.js tradingview-link.js tradingview-exit-snapshot.js tradingview-exit-snapshot.css tradingview-channels.html tradingview/levi-channels.pine)
 for file in "${files[@]}" scripts/patch-channel-primary.mjs scripts/channel-primary-server-patches.json; do mkdir -p "$stage/$(dirname "$file")"; git show "$revision:$file" > "$stage/$file"; done
 cp server.mjs "$stage/server.mjs"
 node "$stage/scripts/patch-channel-primary.mjs" "$stage"
@@ -78,4 +78,4 @@ JS
 systemctl is-active --quiet levi-binance
 trap - ERR
 echo "Installed $revision ($action). Backup: $backup"
-echo 'Verify channel-primary status in the app. Enabling changes automatic entries, preserves exit settings, and requires a new signal. Disabling restores previously configured entry routes.'
+echo 'Verify channel-primary status in the app. New channel entries use the V2 channel Take Profit with configured stop, activation and trailing gap. Existing saved trades retain their policy. Enabling requires a new signal. Disabling restores previously configured entry routes.'
