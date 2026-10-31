@@ -19,13 +19,13 @@ while IFS= read -r file; do
  mkdir -p "$stage/$(dirname "$file")"
  git show "$revision:$file" > "$stage/$file"
 done < <(git ls-tree -r --name-only "$revision" -- lib tests)
-files=(lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js strategy-followup-ui.js)
-for file in "${files[@]}" scripts/patch-channel-primary.mjs scripts/channel-primary-server-patches.json; do git show "$revision:$file" > "$stage/$file"; done
+files=(lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs regression-trend.js parallel-channel.js binance-agent.html binance-agent.js strategy-followup-ui.js lib/channel-profit-protection.mjs lib/trade-settings.mjs lib/trailing-profit-exit.mjs app-settings.js trade-risk.js tradingview-link.js tradingview-channels.html tradingview/levi-channels.pine)
+for file in "${files[@]}" scripts/patch-channel-primary.mjs scripts/channel-primary-server-patches.json; do mkdir -p "$stage/$(dirname "$file")"; git show "$revision:$file" > "$stage/$file"; done
 cp server.mjs "$stage/server.mjs"
 node "$stage/scripts/patch-channel-primary.mjs" "$stage"
 files+=(server.mjs)
 for file in "${files[@]}"; do case "$file" in *.js|*.mjs) node --check "$stage/$file";; esac; done
-node --test "$stage/tests/channel-primary-entry.test.mjs" "$stage/tests/binance-independent-entry.test.mjs" "$stage/tests/binance-settings-stop.test.mjs" "$stage/tests/colmex-independent-entry.test.mjs"
+node --test "$stage/tests/channel-profit-protection.test.mjs" "$stage/tests/channel-primary-entry.test.mjs" "$stage/tests/binance-independent-entry.test.mjs" "$stage/tests/binance-settings-stop.test.mjs" "$stage/tests/colmex-independent-entry.test.mjs"
 dropin=/etc/systemd/system/levi-binance.service.d/91-channel-primary.conf
 if [[ -e "$dropin" ]] && [[ "$(head -n 1 "$dropin")" != '# LEVI channel primary configuration' ]]; then echo 'Unrecognized service override; no changes.' >&2; exit 1; fi
 backup="/root/levi-before-channel-primary-$(date +%Y%m%d-%H%M%S)-$$"
@@ -48,7 +48,7 @@ rollback(){
 }
 trap rollback ERR
 systemctl stop levi-binance
-for file in "${files[@]}"; do cp "$stage/$file" "$file"; done
+for file in "${files[@]}"; do mkdir -p "$(dirname "$file")"; cp "$stage/$file" "$file"; done
 if [[ "$action" != --install-only ]]; then
  mkdir -p "$(dirname "$dropin")"
  enabled=false

@@ -1,0 +1,124 @@
+//@version=6
+indicator("LEVI · Swing channel + Regression", overlay=true, max_lines_count=6, max_labels_count=2, max_bars_back=300)
+// Visual aid only. Broker data, sessions and candle boundaries can differ.
+int n = input.int(100, "Closed bars", minval=20, maxval=200)
+float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
+bool confirmedOnly = input.bool(false, "Require two touches on each swing boundary")
+var array<line> drawings = array.new<line>()
+var array<label> captions = array.new<label>()
+
+// Same strict 2-left/2-right pivots and candidate selection as the app.
+swingCandidate(array<float> lows, array<float> highs, array<float> closes, bool lowSide, int count) =>
+    array<int> anchors = array.new<int>()
+    array<int> opposite = array.new<int>()
+    for i = 2 to count - 3
+        bool pl = true
+        bool ph = true
+        for j = -2 to 2
+            if j != 0
+                pl := pl and array.get(lows, i) < array.get(lows, i+j)
+                ph := ph and array.get(highs, i) > array.get(highs, i+j)
+        if lowSide ? pl : ph
+            array.push(anchors, i)
+        if lowSide ? ph : pl
+            array.push(opposite, i)
+    float slope = na
+    float lower = na
+    float upper = na
+    int a = na
+    int b = na
+    int lc = 0
+    int hc = 0
+    bool valid = false
+    if array.size(anchors) >= 2 and array.size(opposite) > 0
+        b := array.last(anchors)
+        for k = 0 to array.size(anchors)-2
+            int candidate = array.get(anchors, k)
+            if b-candidate >= 3
+                a := candidate
+        if not na(a)
+            array<float> values = lowSide ? lows : highs
+            slope := (array.get(values,b)-array.get(values,a))/(b-a)
+            float edge = array.get(values,a)-slope*a
+            float other = na
+            for k = 0 to array.size(opposite)-1
+                int i = array.get(opposite,k)
+                if i >= a
+                    float value = array.get(lowSide ? highs : lows,i)-slope*i
+                    other := na(other) ? value : lowSide ? math.max(other,value) : math.min(other,value)
+            lower := lowSide ? edge : other
+            upper := lowSide ? other : edge
+            float tolerance = math.max((upper-lower)*0.025,array.last(closes)*0.0001)
+            valid := not na(other) and upper > lower
+            for i = a to count-1
+                float closeValue = array.get(closes,i)
+                if closeValue < lower+slope*i-tolerance or closeValue > upper+slope*i+tolerance
+                    valid := false
+            for k = 0 to array.size(anchors)-1
+                int i = array.get(anchors,k)
+                if i >= a and math.abs(array.get(values,i)-(edge+slope*i)) <= tolerance
+                    if lowSide
+                        lc += 1
+                    else
+                        hc += 1
+            for k = 0 to array.size(opposite)-1
+                int i = array.get(opposite,k)
+                if i >= a and math.abs(array.get(lowSide ? highs : lows,i)-(other+slope*i)) <= tolerance
+                    if lowSide
+                        hc += 1
+                    else
+                        lc += 1
+    [valid, slope, lower, upper, a, b, lc, hc]
+
+if barstate.islast and bar_index >= n
+    for item in drawings
+        line.delete(item)
+    array.clear(drawings)
+    for item in captions
+        label.delete(item)
+    array.clear(captions)
+    int offset = barstate.isconfirmed ? 0 : 1
+    int first = bar_index-offset-n+1
+    int last = bar_index-offset
+    array<float> lows = array.new<float>()
+    array<float> highs = array.new<float>()
+    array<float> closes = array.new<float>()
+    float sumY = 0
+    float sumXY = 0
+    for i = 0 to n-1
+        int back = offset+n-1-i
+        float value = close[back]
+        array.push(lows,low[back])
+        array.push(highs,high[back])
+        array.push(closes,value)
+        sumY += value
+        sumXY += i*value
+    float sumX = n*(n-1)/2.0
+    float sumXX = n*(n-1)*(2*n-1)/6.0
+    float slope = (n*sumXY-sumX*sumY)/(n*sumXX-sumX*sumX)
+    float intercept = (sumY-slope*sumX)/n
+    float squaredError = 0
+    for i = 0 to n-1
+        squaredError += math.pow(array.get(closes,i)-intercept-slope*i,2)
+    float width = deviations*math.sqrt(squaredError/n)
+    for band = -1 to 1
+        array.push(drawings,line.new(first,intercept+band*width,last,intercept+slope*(n-1)+band*width,color=color.aqua,width=band==0 ? 1 : 2))
+    array.push(captions,label.new(last,intercept+slope*(n-1)+width,"Regression · closed bars",style=label.style_label_left,color=color.new(color.blue,65),textcolor=color.white))
+    [v1,s1,l1,u1,a1,b1,lc1,hc1] = swingCandidate(lows,highs,closes,true,n)
+    [v2,s2,l2,u2,a2,b2,lc2,hc2] = swingCandidate(lows,highs,closes,false,n)
+    v1 := v1 and (not confirmedOnly or (lc1>=2 and hc1>=2))
+    v2 := v2 and (not confirmedOnly or (lc2>=2 and hc2>=2))
+    bool provisional1 = lc1<2 or hc1<2
+    bool provisional2 = lc2<2 or hc2<2
+    bool choose1 = v1 and (not v2 or b1>b2 or (b1==b2 and ((not provisional1 and provisional2) or (provisional1==provisional2 and u1-l1<=u2-l2))))
+    if v1 or v2
+        float s = choose1 ? s1 : s2
+        float lo = choose1 ? l1 : l2
+        float hi = choose1 ? u1 : u2
+        int a = choose1 ? a1 : a2
+        int lc = choose1 ? lc1 : lc2
+        int hc = choose1 ? hc1 : hc2
+        for band = -1 to 1
+            float edge = (lo+hi)/2+band*(hi-lo)/2
+            array.push(drawings,line.new(first+a,edge+s*a,last,edge+s*(n-1),color=color.orange,style=line.style_dashed,width=band==0 ? 1 : 2))
+        array.push(captions,label.new(last,lo+s*(n-1),"Swing · "+str.tostring(lc)+" low / "+str.tostring(hc)+" high touches"+(lc<2 or hc<2 ? " · provisional" : " · confirmed"),style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white))

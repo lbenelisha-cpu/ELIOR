@@ -57,7 +57,7 @@ function executor(overrides={}){
   assessQualityEntry,ENTRY_POLICY_VERSION,candles:async()=>bars(),signedBinancePost(){throw Error('network forbidden');},recordLiveFill(){},requireLivePrice,
   streams:{ABCUSDT:{status:'connected',lastPrice:106,lastEventAt:new Date(now).toISOString(),liveBar:input().liveBar}},assertSpringEntryReady,tradeControl:{paused:false},
   liveOrders:{submit:async(params,meta)=>{writes.push({params,meta});return {};}},...overrides});
- vm.runInContext(fn,withLiveSafety(context));return {context,writes,protectedSymbols,run:()=>context.placeLiveMarketBuy('ABCUSDT',20,'CHANNEL_BREAKOUT_READY',{wyckoffTrade:evaluateDailyTrade({...input(),priceAsOf:new Date(now).toISOString(),channelPrimary:config()}).wyckoffTrade})};
+ vm.runInContext(fn,withLiveSafety(context));return {context,writes,protectedSymbols,run:()=>context.placeLiveMarketBuy('ABCUSDT',20,'CHANNEL_BREAKOUT_READY',{wyckoffTrade:evaluateDailyTrade({...input(),priceAsOf:new Date(now).toISOString(),channelPrimary:config(),exitSettings:context.tradeSettings.values}).wyckoffTrade})};
 }
 
 test('Binance final order path preserves settings, protection and provenance and blocks cached old routes',async()=>{
@@ -102,4 +102,11 @@ test('targeted server installer is idempotent and refuses mismatched integration
   const file=path.join(root,'server.mjs'),patches=[{before:'old observer',after:'new observer'}];fs.writeFileSync(file,'owner code\nold observer');patchServer(root,patches);assert.equal(fs.readFileSync(file,'utf8'),'owner code\nnew observer');patchServer(root,patches);assert.equal(fs.readFileSync(file,'utf8'),'owner code\nnew observer');
   assert.throws(()=>patchServer(root,[{before:'missing',after:'replacement'}]));assert.equal(fs.readFileSync(file,'utf8'),'owner code\nnew observer');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('enabled channel protection crosses both final submission paths with frozen geometry and rejects settings changes',async()=>{
+ const values=validateTradeSettings({channelProfitProtection:true,channelActivationFraction:.5});
+ const x=executor({tradeSettings:{values}});await x.run();assert.equal(x.writes.length,1);const setup=x.writes[0].meta.meta.wyckoffTrade.setup;assert.ok(setup.channelProtection.targetPrice>106);assert.equal(setup.channelProtection.width,setup.channelWidth);
+ const f=colmexFixture();f.state.settings=values;await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.writes[0].setup.channelProtection.activationFraction,.5);
+ const check=channelEntry({...input(),settings:values},config());assert.throws(()=>assertChannelSubmission({...input(),settings:{}},config(),{entryMode:'channel_breakout',patternId:check.setup.patternId,setup:check.setup}),/PROTECTION_CHANGED/);
 });

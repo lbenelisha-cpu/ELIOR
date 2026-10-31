@@ -431,7 +431,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
 
   put('#chartSymbol',a.symbol);
   put('#chartSectionLabel',a.symbol+' · נרות, RSI ותבנית וויקוף');
-  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+a.symbol);
+  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol);
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
   put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');
@@ -985,7 +985,7 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
-    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+tradeRisk.activation+'%':'יעד רווח +4%',color:'#64e1ae'},
+    {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
     {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −'+tradeRisk.sl+'%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
