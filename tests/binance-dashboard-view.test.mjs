@@ -42,7 +42,7 @@ test('managed entry remains visible while wallet cost is unknown, without invent
  const u=ui(d);assert.match(u.text('positionMapContent'),/כניסה\|50/);assert.match(u.text('positionMapContent'),/\+2.00%/);assert.match(u.text('positionMapContent'),/מחיר הכניסה לפי העסקה המנוהלת/);assert.equal(u.text('overviewPnl'),'—');
  d.account.balances[0].entryPrice=50.1;u.update(d);assert.match(u.text('positionMapContent'),/\+2.00%/);
 });
-test('position map identifies the actual Spot long and opens that Binance market on TradingView',()=>{const u=ui(fixture());assert.match(u.text('positionMapContent'),/LONG/);assert.match(u.get('positionMapChart').href,/symbol=BINANCE%3ABTCUSDT/);assert.match(u.get('positionMapChart').href,/trade-now=BINANCE/);});
+test('position map identifies the actual Spot long and opens that Binance market on TradingView',()=>{const u=ui(fixture());assert.match(u.text('positionMapContent'),/LONG/);assert.match(u.get('positionMapChart').href,/symbol=BINANCE%3ABTCUSDT/);assert.match(u.get('positionMapChart').href,/interval=5/);assert.doesNotMatch(u.get('positionMapChart').href,/trade-now=/);});
 test('directional badge reverses percentage return for a short and keeps missing sides unknown',()=>{
  const create=(tag,text)=>({textContent:text??'',children:[],dataset:{},setAttribute(){},append(...nodes){this.children.push(...nodes);}}),text=n=>n.textContent+n.children.map(text).join('|');
  const short=positionChangeBadge(create,100,95,'SHORT');assert.equal(short.dataset.direction,'gain');assert.match(text(short),/SHORT/);assert.match(text(short),/\+5.00%/);assert.equal(positionChangeBadge(create,100,105,'SHORT').dataset.direction,'loss');assert.equal(positionChangeBadge(create,100,95,'unknown').dataset.direction,'unknown');

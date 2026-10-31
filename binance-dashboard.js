@@ -45,7 +45,7 @@ function renderPosition(summary,fresh){
   select.value=selected||'';select.hidden=list.length<2;
   const host=$('positionMapContent');host.replaceChildren();
   $('positionMapChart').hidden=!selected||!fresh;
-  if(selected&&fresh)$('positionMapChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+selected)+'&interval=5&trade-now=BINANCE&trade-now-source=broker_profile';
+  if(selected&&fresh)$('positionMapChart').href=(globalThis.LEVI_TRADINGVIEW_URL?.('BINANCE:'+selected)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+selected)+'&interval=5');
   text('positionMapTitle',selected||(!summary?'ממתין לפוזיציות':'אין פוזיציה פעילה'));
   if(!selected||!fresh){host.append(node('p',!fresh?'נתוני הפוזיציה יוצגו לאחר אימות עדכני של החשבון.':'מפת המחירים תופיע כשיש פוזיציה פעילה.','quiet-empty'));return;}
   const p=list.find(p=>p.symbol===selected),agent=snapshot.agent.agents?.find(a=>a.symbol===selected),s=agent?.strategy;
