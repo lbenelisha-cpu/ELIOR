@@ -26,8 +26,9 @@
    const lowTouches=touches(lows,lowerIntercept),highTouches=touches(highs,upperIntercept),middle=intercept+slope*(base.n-1);
    candidates.push({...base,slope,intercept,width,middle,upper:middle+width,lower:middle-width,lowTouches,highTouches,anchorStart:base.start+a.i*base.duration,anchorEnd:base.start+b.i*base.duration,side,provisional:lowTouches<2||highTouches<2});
   }
-  candidates.sort((a,b)=>b.anchorEnd-a.anchorEnd||Number(a.provisional)-Number(b.provisional)||a.width-b.width);
-  return candidates[0]||{ready:false,reason:'NO_VALID_SWINGS'};
+  const eligible=options.requireConfirmed?candidates.filter(c=>!c.provisional):candidates;
+  eligible.sort((a,b)=>b.anchorEnd-a.anchorEnd||Number(a.provisional)-Number(b.provisional)||a.width-b.width);
+  return eligible[0]||{ready:false,reason:'NO_VALID_SWINGS'};
  }
  function describe(a){return !a?.ready?'תעלה מקבילה · אין מספיק נקודות קיצון מאושרות לתעלה תקפה':'תעלה מקבילה · כתום · '+a.lowTouches+' נגיעות תחתונות / '+a.highTouches+' עליונות · '+(a.provisional?'ראשונית — חסרה נגיעה שנייה באחד הגבולות':'לפחות שתי נגיעות בכל גבול')+' · קיצון מאושר אחרי שני נרות נוספים · המרכז הוא אמצע התעלה · הגעה לגבול הנגדי אינה מובטחת';}
  function draw(args){
