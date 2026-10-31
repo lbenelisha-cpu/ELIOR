@@ -1,0 +1,13 @@
+# Channel profit protection and TradingView
+
+Opt-in `channelProfitProtection: true` in platform trade settings affects NEW channel-breakout entries only. UI saves `channelActivationFraction: 0.5` as requested. Existing/manual positions without a saved plan keep fixed activation. No automatic migration enables this mode.
+
+At the signal, save full width (`2 * model.width`) and target `breakout upper + full width`. Freeze the plan in setup through durable intent, fill and position reconciliation. At actual fill, activation price is entry + half(target - entry). Runtime uses the frozen geometric target, never redraws it from subsequent candles. Current owner trailing gap and existing platform stop sizing remain unchanged. Take Profit is still the owner's separate hard exit, NOT the geometric target. Colmex retains its existing ATR/structure risk sizing; this update does not change that policy.
+
+Fresh final submission compares the plan with reconstructed evidence. Reject a price already at/past target and activation beyond configured TP; Colmex also checks the executable IOC limit. Market slippage beyond target after submission is marked TARGET_PASSED_AT_FILL; fixed activation is retained and initial/native stops remain in force. Gap >= activation is explicitly labelled as not locking profit at activation. Saved stronger stops never decrease. Target and percentages are pre-fee estimates, not probabilities.
+
+Install using the pinned `scripts/install-channel-primary.sh SHA --install-only`; this preserves live mode and strategy enablement. Then owner enables the checkbox and saves in each platform. The extended installer stages dependencies/tests, copies narrowly, backs up and rolls back code on failure. It does not change account settings or enable channel protection itself.
+
+TradingView: private Pine v6 indicator includes orange dashed strict swing channel plus cyan OLS/RMS residual channel. Uses closed bars and 2+2 pivots; provisional channels are labelled. Optional full-confirmation filter. The visual rolling model is not the frozen pre-breakout signal. TradingView sessions/data may differ. Script compiled and added on the owner's account. With authorization one duplicate CG-GapFill was replaced, preserving the other. No publication or paid upgrade.
+
+The UI stores an exact HTTPS www.tradingview.com/chart/<id>/ layout URL on the device, then supplies symbol and interval=5. No drawings or account data are sent through URLs. Invalid URLs fall back to an ordinary chart. The install guide and downloadable Pine are served by the app. Broker trading is never connected from TradingView.

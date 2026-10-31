@@ -44,7 +44,7 @@ function render(preserveForm=false,preserveChart=false){
  $('#watchCount').textContent=String(state.symbols.length);
  const coverage=PAPER_MODE?null:scanCoverage(liveSearchState);if($('#watchScanStatus'))$('#watchScanStatus').textContent=coverage?.summary||'';
  syncWatchRows($('#watchList'),state.symbols,{selected,createElement:tag=>document.createElement(tag),onSelect:s=>{selected=s;render();loadMarket(false);},describe:s=>{const m=mark(s);return {...(!PAPER_MODE?stockScanStatus(s,liveSearchState,Date.now(),coverage):{}),text:m?money(m.price):(quoteStatus[s]||'ממתין לטעינה'),title:m?m.source+(quoteStatus[s]?' · '+quoteStatus[s]:''):''};}});
- $('#selectedSymbol').textContent=selected;if(PAPER_MODE)$('#positionSymbol').textContent=selected;$('#externalChart').href='https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected);
+ $('#selectedSymbol').textContent=selected;if(PAPER_MODE)$('#positionSymbol').textContent=selected;$('#externalChart').href=(globalThis.LEVI_TRADINGVIEW_URL?.(selected)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(selected));
  const m=mark(selected),p=state.positions[selected],r=pnl(selected);$('#selectedPrice').textContent=m?money(m.price):'—';$('#priceSource').textContent=m?m.source:'אין נתוני מחיר';
  if(PAPER_MODE){$('#selectedPnl').textContent=!p?'אין פוזיציה במעקב':!r?'ממתין למחיר למעקב':(r.gain>0?'+':'')+money(r.gain)+' ('+(r.pct>0?'+':'')+r.pct.toFixed(2)+'%)';$('#selectedPnl').className=r?(r.gain>=0?'profit':'loss'):'';
  const f=$('#positionForm');if(!preserveForm){f.elements.entry.value=p?.entry??'';f.elements.qty.value=p?.qty??'';f.elements.mark.value=p?.mark??'';}

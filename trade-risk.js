@@ -18,9 +18,11 @@
   host.className='trade-risk-table';host.setAttribute('aria-label','יעד רווח וסף הפסד לפוזיציה בפועל');
   const format=n=>n.toLocaleString('en-US',{maximumFractionDigits:n<1?8:4});
   const table=document.createElement('table'),caption=document.createElement('caption');caption.textContent=(risk.displayOnly?'החזקה ידנית · יעדים להמחשה':'עסקה מנוהלת')+' · '+currency;table.append(caption);
-  const rows=[['מחיר עלות',risk.entry,null,'entry']];
+  const channel=position.channelProfitProtection;
+ const rows=[['מחיר עלות',risk.entry,null,'entry']];
+  if(channel?.status==='ACTIVE')rows.push(['יעד תעלה משוער +'+format(channel.targetPct)+'%',channel.targetPrice,(channel.targetPrice-risk.entry)*risk.qty,'profit']);
   if(risk.current!==null)rows.push(['רווח / הפסד כעת',risk.current,risk.pnl,risk.pnl>=0?'profit':'loss']);
-  rows.push([risk.displayOnly?'המחשה +4%':risk.trailing?'הפעלת הגנה +'+risk.activation+'%':'יעד +4%',risk.target,risk.profit,'profit']);
+  rows.push([risk.displayOnly?'המחשה +4%':risk.trailing?'הפעלת הגנה +'+format(risk.activation)+'%':'יעד +4%',risk.target,risk.profit,'profit']);
   if(risk.trailing&&!risk.displayOnly)rows.push(['Take Profit +'+risk.tp+'%',risk.brokerTarget,(risk.brokerTarget-risk.entry)*risk.qty,'profit']);
   if(risk.trailing)rows.push(['שיא מאז הקנייה',risk.peak,(risk.peak-risk.entry)*risk.qty,'profit']);
   rows.push([risk.displayOnly?'המחשה −1%':risk.armed?'סף נגרר +'+format((risk.stop/risk.entry-1)*100)+'%':'סטופ −'+risk.sl+'%',risk.stop,risk.trailing?risk.protectedPnl:-risk.loss,risk.armed?'profit':'loss']);
@@ -28,7 +30,7 @@
    const tr=document.createElement('tr');tr.className=kind;
    for(const value of [name,format(price),amount===null?'כמות '+format(risk.qty):(amount>0?'+':'−')+format(Math.abs(amount))+' '+currency]){const td=document.createElement('td');td.textContent=value;tr.append(td);}table.append(tr);
   }
-  const note=document.createElement('small');note.textContent=risk.displayOnly?'ללא ניהול אוטומטי; היעדים אינם הוראות מסחר.':risk.trailing?'הגנה מ־'+risk.activation+'%; מרחק נגרר '+risk.gap+' נקודות אחוז; יעד '+risk.tp+'%. לפני עמלות; ביצוע אינו מובטח.':'סכומים מתוכננים לפני עמלות; הביצוע עלול לחרוג מהסף.';if(risk.brokerProtection)note.textContent+=' · הגנה בבייננס: '+({MISSING:'טרם אושרה',ACTIVE:'אושרה',CREATING:'ממתינה לאישור',CANCELING:'ביטול נבדק',REJECTED:'נדחתה'}[risk.brokerProtection.status]||risk.brokerProtection.status);host.append(table,note);
+  const note=document.createElement('small');note.textContent=risk.displayOnly?'ללא ניהול אוטומטי; היעדים אינם הוראות מסחר.':risk.trailing?'הגנה מ־'+format(risk.activation)+'%; מרחק נגרר '+risk.gap+' נקודות אחוז; יעד '+risk.tp+'%. לפני עמלות; ביצוע אינו מובטח.':'סכומים מתוכננים לפני עמלות; הביצוע עלול לחרוג מהסף.';if(channel?.status==='ACTIVE'&&risk.gap>=risk.activation)note.textContent+=' · מרווח הנסיגה גדול מסף ההפעלה: ההגנה אינה נועלת רווח ברגע ההפעלה.';if(channel&&channel.status!=='ACTIVE')note.textContent+=' · יעד התעלה אינו תקף במחיר הביצוע; ההגנה משתמשת בסף הקבוע.';if(risk.brokerProtection)note.textContent+=' · הגנה בבייננס: '+({MISSING:'טרם אושרה',ACTIVE:'אושרה',CREATING:'ממתינה לאישור',CANCELING:'ביטול נבדק',REJECTED:'נדחתה'}[risk.brokerProtection.status]||risk.brokerProtection.status);host.append(table,note);
  }
  global.LEVI_TRADE_RISK={levels,render};
 })(globalThis);
