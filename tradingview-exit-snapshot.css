@@ -1,0 +1,7 @@
+.exit-snapshot{border:1px solid #b78a4b;border-radius:14px;background:#152431;padding:16px;margin:12px 0;display:grid;gap:10px;min-width:0;text-align:start}
+.exit-snapshot>strong{color:#ffbd80;font-size:1.15rem;overflow-wrap:anywhere}
+.exit-snapshot p{margin:0;line-height:1.65;color:#b6cbdc;font-size:.9rem;overflow-wrap:anywhere}
+.exit-snapshot button{justify-self:start;white-space:normal;max-width:100%;padding:10px 16px}
+.exit-snapshot a{color:#83dfd5;font-size:.9rem}
+.exit-snapshot textarea{box-sizing:border-box;width:100%;max-width:100%;background:#091723;color:#e8f5ff;border:1px solid #416178;border-radius:8px;padding:10px;font:13px/1.5 monospace;overflow-wrap:anywhere}
+.exit-snapshot [hidden]{display:none}

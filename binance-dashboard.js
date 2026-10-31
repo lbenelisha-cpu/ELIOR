@@ -43,7 +43,7 @@ function renderPosition(summary,fresh){
   if(select.dataset.options!==optionsKey){select.replaceChildren(...list.map(p=>{const o=node('option',p.symbol);o.value=p.symbol;return o;}));select.dataset.options=optionsKey;}
   if(!list.some(p=>p.symbol===selected))selected=list[0]?.symbol||null;
   select.value=selected||'';select.hidden=list.length<2;
-  const host=$('positionMapContent');host.replaceChildren();
+  const host=$('positionMapContent'),existingExitHost=host._exitSnapshotHost;host.replaceChildren();
   $('positionMapChart').hidden=!selected||!fresh;
   if(selected&&fresh)$('positionMapChart').href=(globalThis.LEVI_TRADINGVIEW_URL?.('BINANCE:'+selected)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent('BINANCE:'+selected)+'&interval=5');
   text('positionMapTitle',selected||(!summary?'ממתין לפוזיציות':'אין פוזיציה פעילה'));
@@ -74,6 +74,8 @@ function renderPosition(summary,fresh){
   host.append(node('p',verified?(serverTarget?'● הסטופ אומת בבורסה · יעד הרווח תלוי בפעילות השרת':'● מחירי ההגנה אומתו בבורסה'):snapshot.mode==='demo'?'סימולציה · רמות מתוכננות, ללא הגנה בחשבון LIVE':managed?'הגנות הבורסה טרם אומתו · הרמות מוצגות לפי הגדרות הפוזיציה':'לא אומתה פוזיציה מנוהלת · אין רמות הגנה להצגה',verified?'map-note positive':'map-note'));
   if(recordedEntry!==null)host.append(node('small','מחיר הכניסה לפי העסקה המנוהלת · לפני עמלות.'));
   host.append(node('small','רמות הסטופ והיעד לפני עמלות; מחיר הביצוע עשוי להיות שונה.'));
+  const exitHost=existingExitHost||node('div');host._exitSnapshotHost=exitHost;host.append(exitHost);
+  globalThis.LEVI_EXIT_SNAPSHOT?.render(exitHost,snapshot,selected);
 }
 
 function render(){

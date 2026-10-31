@@ -4,12 +4,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import * as math from '../lib/binance-dashboard-math.mjs';
-function ui(snapshot){
+function ui(snapshot,{exitLevels=false}={}){
  const elements=new Map(),handlers={};
- function element(){return {children:[],hidden:false,textContent:'',dataset:{},value:'',style:{setProperty(){}},classList:{toggle(){}},append(...nodes){this.children.push(...nodes);},replaceChildren(...nodes){this.children=nodes;},setAttribute(k,v){this[k]=v;},addEventListener(){}};}
+ function element(){return {children:[],hidden:false,textContent:'',dataset:{},value:'',style:{setProperty(){}},classList:{toggle(){},add(){}},append(...nodes){this.children.push(...nodes);},replaceChildren(...nodes){this.children=nodes;},setAttribute(k,v){this[k]=v;},addEventListener(){}};}
  const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
  const window={LEVI_DASHBOARD_SNAPSHOT:snapshot,LEVI_MANUAL_TRADES:{connected:()=>true},addEventListener(name,fn){handlers[name]=fn;}};
  const context={...math,positionChangeBadge,window,document:{hidden:false,getElementById:get,createElement:element,querySelector:()=>null},setInterval(){},Intl,Date};
+ if(exitLevels)vm.runInNewContext(fs.readFileSync(new URL('../tradingview-exit-snapshot.js',import.meta.url),'utf8'),context);
  vm.runInNewContext(fs.readFileSync(new URL('../binance-dashboard.js',import.meta.url),'utf8').replace(/^import .*?;\n/gm,''),context);
  const text=n=>n.textContent+n.children.map(text).join('|');
  return {get,text:id=>text(get(id)),update:detail=>handlers['levi:binance-dashboard']({detail})};
@@ -52,4 +53,12 @@ test('a closed, empty or unrelated strategy cannot supply a missing entry price'
   const d=fixture();delete d.account.balances[0].entryPrice;change(d);const u=ui(d);
   assert.equal(u.get('positionMapContent').children[0].dataset.direction,'unknown');assert.doesNotMatch(u.text('positionMapContent'),/\+2.00%/);
  }
+});
+
+test('position map integrates server exit levels and removes them when the account is no longer verified',()=>{
+ const d=fixture(),p=d.agent.agents[0].strategy;
+ Object.assign(p,{exitPolicy:'PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2',entryAt:new Date(Date.now()-3600000).toISOString(),positionQuoteAt:Date.now()-1000,price:51,effectiveStopPrice:50.25,targetPrice:70,activationPrice:52,profitFloorArmed:true});
+ Object.assign(d.account,{connected:true,updatedAt:new Date().toISOString()});
+ const u=ui(d,{exitLevels:true});assert.match(u.text('positionMapContent'),/סף מכירה נגרר · 50.25/);assert.match(u.text('positionMapContent'),/העתק ספי מכירה/);
+ u.update({...d,error:true});assert.doesNotMatch(u.text('positionMapContent'),/50.25|העתק ספי מכירה/);
 });

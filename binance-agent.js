@@ -430,6 +430,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
+  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),{agent:d,account:liveAccount,mode:currentModeArg,receivedAt:Date.now()},a.symbol);
   put('#chartSectionLabel',a.symbol+' · נרות, RSI ותבנית וויקוף');
   const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol);
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
@@ -1082,6 +1083,7 @@ async function load(){
   }catch(e){
     put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));
     currentLiveAccount=null;
+    globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),{mode:currentMode,error:true},selectedSymbol);
     if(scannerVerifiedMode==='live')put('#scannerFreshness','נתוני הטבלה מהעדכון האחרון · '+tradeExecutionTime(scannerVerifiedAt)+' · החיבור לא אומת מחדש');
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
