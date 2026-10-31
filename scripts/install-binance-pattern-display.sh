@@ -8,7 +8,7 @@ systemctl is-active --quiet levi-binance
 git cat-file -e "$revision^{commit}"
 stage=$(mktemp -d /tmp/levi-pattern-display.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
-files=(binance-agent.html binance-agent.css binance-agent.js resistance-patterns.js regression-trend.js)
+files=(binance-agent.html binance-agent.css binance-agent.js resistance-patterns.js regression-trend.js parallel-channel.js)
 for file in "${files[@]}"; do git show "$revision:$file" > "$stage/$file"; done
 mkdir "$stage/tests"
 git show "$revision:tests/resistance-patterns.test.mjs" > "$stage/tests/resistance-patterns.test.mjs"
@@ -19,7 +19,7 @@ import fs from 'node:fs';
 const file=process.argv[2],source=fs.readFileSync(file,'utf8'),anchor='  const sf={',route="    '/resistance-patterns.js':['resistance-patterns.js','text/javascript'],";
 if(!source.includes("'/binance-agent.js':['binance-agent.js','text/javascript']")||source.split(anchor).length!==2)throw Error('Unrecognized installed static file map; no files changed');
 let patched=source;
-for(const asset of ['resistance-patterns','regression-trend']){
+for(const asset of ['resistance-patterns','regression-trend','parallel-channel']){
  const route="    '/"+asset+".js':['"+asset+".js','text/javascript'],";
 if(!patched.includes(route)){
  if(patched.includes("'/"+asset+".js'"))throw Error('Conflicting route; no files changed');
