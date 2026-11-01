@@ -424,15 +424,17 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     const trendLabel=({UP:'עולה',DOWN:'יורדת'}[s.direction]||'לא ידועה');
     const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive,liveAccount);
     const displayBlocker=isLive&&!held?liveEntryStatus(a,liveAccount,maxPositions).blocker:a.blocker;
+    const watch=window.LEVI_CHANNEL_WATCH?.candidate({reason:a.entryDecisions?.primary==='channel_breakout'?a.entryDecisions.channel?.reason:null,at:a.lastDecisionAt,enabled:isLive&&d.config?.channelPrimary?.enabled===true,held,stale:a.staleData||!!a.lastError});
     const rowClasses=[
       a.symbol===selectedSymbol?'selected':'',
       held?'active-position':'',
+      watch?'channel-watch':'',
       held?pnl.className:'',
       (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return {symbol:a.symbol,className:rowClasses,cells:[
-      {html:`<b>${a.symbol.replace('USDT','')}</b><div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
+      {html:`<b>${a.symbol.replace('USDT','')}</b>${watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+watch.text+' · לא אישור קנייה</div>':''}<div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
       {html:fmt(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice,Math.abs(Number(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice))<10?8:4)},
       {className:held?pnl.className:'',html:held?pnl.text:'—'},
       {className:'decision '+String(dec).toLowerCase().replaceAll(' ','-'),html:decisionLabel(dec)}

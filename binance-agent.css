@@ -456,3 +456,9 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .chart-price-legend-item bdi{font-size:15px;font-weight:700;max-width:100%;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 @media(max-width:600px){.chart-price-legend{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-price-legend-item{padding:8px}.chart-price-legend-item bdi{font-size:14px}}
 @media(max-width:340px){.chart-price-legend{grid-template-columns:1fr}}
+
+/* Preliminary technical candidates, distinct from actual positions and BUY-ready. */
+.asset-table tbody tr.channel-watch:not(.active-position) td{animation:channelWatchPulse 2s ease-in-out infinite;border-bottom-color:#d7ae42;}
+.channel-watch-badge{color:#ffe49a;font-weight:600;line-height:1.5;white-space:normal;}
+@keyframes channelWatchPulse{0%,100%{background-color:#302a17}50%{background-color:#62501c}}
+@media(prefers-reduced-motion:reduce){.asset-table tbody tr.channel-watch:not(.active-position) td{animation:none;background-color:#39301b;}}

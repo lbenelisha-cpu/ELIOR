@@ -45,7 +45,10 @@
   html+='</tbody></table></div><p class="mini">רווח / הפסד לא ממומש מחושב לפי מחיר הקנייה החוזרת (Ask), לפני עמלות ומימון. מחיר חסר או ישן לא מוצג כרווח אפס. זמני התצוגה בשעון ישראל.</p>';
   const checks=Object.entries(f.checks||{}).sort((a,b)=>Number(b[1]?.at||0)-Number(a[1]?.at||0));
   html+='<details data-short-detail="checks"><summary>סריקת SHORT · '+checks.length+' נכסים עם תוצאה מתועדת</summary><div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס</th><th>בדיקה אחרונה</th><th>סיבת המתנה / תוצאה</th></tr></thead><tbody>';
-  for(const [symbol,c] of checks)html+='<tr><td>'+esc(symbol)+'</td><td>'+esc(time(c.at))+(fresh(c.at,now,60000)?'':' · נתון קודם')+'</td><td>'+esc(reason(c.reason))+'</td></tr>';
+  for(const [symbol,c] of checks){
+   const watch=root.LEVI_CHANNEL_WATCH?.candidate({reason:c.reason,at:c.at,now,enabled:f.enabled===true&&!f.halt&&fresh(f.checkedAt,now,60000),held:rows.some(p=>p.symbol===symbol)});
+   html+='<tr'+(watch?' class="channel-watch"':'')+'><td>'+esc(symbol)+'</td><td>'+esc(time(c.at))+(fresh(c.at,now,60000)?'':' · נתון קודם')+'</td><td>'+esc(reason(c.reason))+(watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+esc(watch.text)+' · לא אישור מכירה</div>':'')+'</td></tr>';
+  }
   if(!checks.length)html+='<tr><td colspan="3">טרם התקבלו תוצאות סריקה. אין בכך אישור שאין מועמדים.</td></tr>';
   html+='</tbody></table></div></details>';
   const closed=Array.isArray(f.closed)?f.closed:[];
