@@ -31,7 +31,7 @@ function harness(options={}){
   if(p==='/fapi/v1/exchangeInfo')return {symbols:[info]};
   if(p==='/fapi/v1/ticker/24hr')return [{symbol:'ABCUSDT',quoteVolume:'10000000'}];
   if(p==='/fapi/v1/klines')return [...input().bars,{...input().liveBar,closeTime:end+D,open:104,close:104,volume:20}].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);
-  if(p==='/fapi/v1/algoOrder'){const o=algos.get(q.clientAlgoId);if(!o)throw Error('ALGO_UNKNOWN');return structuredClone(o);}
+  if(p==='/fapi/v1/algoOrder'){const o=q.algoId?[...algos.values()].find(o=>o.algoId===q.algoId):algos.get(q.clientAlgoId);if(!o)throw Error('ALGO_UNKNOWN');return structuredClone(o);}
   if(p==='/fapi/v1/order'){const o=orders.get(q.origClientOrderId);if(!o)throw Error('ORDER_UNKNOWN');return structuredClone(o);}
   throw Error('Unexpected read '+p);
  },async post(p,q){
@@ -46,13 +46,13 @@ function harness(options={}){
   }
   if(p==='/fapi/v1/algoOrder'){
    if(options.rejectProtection){const e=Error('PROTECTION_REJECTED');e.status=400;e.code=-2021;throw e;}
-   const o={...q,orderType:q.type,algoStatus:'NEW',closePosition:true};algos.set(q.clientAlgoId,o);return o;
+   const o={...q,algoId:algos.size+1000,orderType:q.type,algoStatus:'NEW',closePosition:true};algos.set(q.clientAlgoId,o);return o;
   }
   if(p==='/fapi/v1/marginType'){symbolConfig.marginType=q.marginType;return {};}
   if(p==='/fapi/v1/leverage'){symbolConfig.leverage=q.leverage;return {};}
   throw Error('Unexpected mutation '+p);
  },async del(p,q){writes.push({p,q});algos.get(q.clientAlgoId).algoStatus='CANCELED';return {};}};
- const runner=new FuturesShortRunner({api,file:'/unused',config:options.config||config,settings:()=>ownerSettings,control:()=>control,permission:async()=>({enableFutures:true,ipRestrict:true}),now:()=>now,save:(_,s)=>{saved=structuredClone(s);options.onSave?.(s,control,ownerSettings);}});
+ const runner=new FuturesShortRunner({api,file:'/unused',config:options.config||config,settings:()=>ownerSettings,control:()=>control,permission:async()=>({enableFutures:true,ipRestrict:true}),now:()=>now,sleep:options.sleep||(()=>Promise.resolve()),save:(_,s)=>{saved=structuredClone(s);options.onSave?.(s,control,ownerSettings);}});
  runner.infos.ABCUSDT=info;runner.marketAt=now;
  return {runner,api,writes,algos,orders,a,symbolConfig,control,ownerSettings,setQuote:q=>quote={...quote,...q},setPositions:p=>positions=p,get saved(){return saved;}};
 }
@@ -167,4 +167,50 @@ test('50 pre-breakout SHORT bars suffice; recovered upper wick passes but curren
  for(const price of [ceiling,ceiling+.01])assert.equal(shortSignal({...i,price},config).reason,'SHORT_PRICE_INVALIDATED');
  assert.equal(shortSignal({...i,bars:i.bars.slice(1)},config).reason,'WAIT_FUTURES_HISTORY');
  assert.equal(shortSignal({...i,now:end+D,priceAsOf:end+D},config).reason,'SHORT_SIGNAL_EXPIRED');
+});
+
+const missingAlgo=()=>Object.assign(Error('FUTURES_API_-2013'),{code:-2013,status:400});
+test('delayed Binance visibility verifies the original stop and TP without a duplicate order or emergency close',async()=>{
+ const attempts=new Map(),delays=[];
+ const h=harness({sleep:async ms=>delays.push(ms),onGet(path,q){
+  if(path!=='/fapi/v1/algoOrder')return;
+  assert.ok(q.algoId,'use the exchange ID persisted from the acknowledgement');
+  const n=(attempts.get(q.algoId)||0)+1;attempts.set(q.algoId,n);
+  if(n<4)throw missingAlgo();
+ }});
+ await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ assert.equal(h.runner.state.halt,null);assert.ok(h.runner.state.positions.ABCUSDT.protectedAt);
+ assert.equal(h.writes.filter(x=>x.p==='/fapi/v1/algoOrder'&&x.q.type).length,2);
+ assert.equal(h.writes.filter(x=>x.q.type==='MARKET').length,0);
+ assert.deepEqual(delays,[150,300,600,150,300,600]);
+ assert.ok(h.saved.positions.ABCUSDT.algos.every(x=>Number.isSafeInteger(x.algoId)));
+});
+test('persistent missing protection remains bounded, closes the owned short and keeps the durable halt',async()=>{
+ let reads=0;const delays=[];
+ const h=harness({sleep:async ms=>delays.push(ms),onGet(path){if(path==='/fapi/v1/algoOrder'){reads++;throw missingAlgo();}}});
+ await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ assert.equal(reads,5);assert.deepEqual(delays,[150,300,600,950]);
+ assert.equal(h.writes.filter(x=>x.p==='/fapi/v1/algoOrder').length,1);
+ assert.equal(h.writes.filter(x=>x.q.type==='MARKET'&&x.q.reduceOnly==='true').length,1);
+ assert.equal(h.saved.halt,'FUTURES_API_-2013');await assert.rejects(h.runner.entryGate(),/-2013/);
+});
+test('identity mismatch and non-visibility API failures are not retried or accepted as protection',async()=>{
+ for(const code of [-2015,-1007]){
+  const h=harness({sleep:()=>assert.fail('must not retry'),onGet(path){if(path==='/fapi/v1/algoOrder')throw Object.assign(Error('API_FAILURE'),{code,status:400});}});
+  await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+  assert.equal(h.runner.state.halt,'API_FAILURE');assert.equal(h.writes.filter(x=>x.q.type==='MARKET').length,1);
+ }
+ const h=harness();const original=h.api.get;h.api.get=async(path,q)=>{const r=await original(path,q);return path==='/fapi/v1/algoOrder'?{...r,algoId:999999}:r;};
+ await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ assert.equal(h.runner.state.halt,'FUTURES_PROTECTION_IDENTITY_MISMATCH');
+ assert.equal(h.writes.filter(x=>x.q.type==='MARKET').length,1);
+});
+test('restart reconciles a pending protection identity without resubmitting it and a release rejects old signals',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ const restored=structuredClone(h.saved);restored.positions.ABCUSDT.algos[0].status='PENDING';
+ delete restored.positions.ABCUSDT.algos[0].algoId; // legacy journals have only clientAlgoId
+ let calls=0;const original=h.api.get;h.api.get=async(p,q)=>{if(p==='/fapi/v1/algoOrder'&&++calls===1)throw missingAlgo();return original(p,q);};
+ const r=new FuturesShortRunner({api:h.api,file:'/unused',config,settings:()=>settings,control:()=>({allowEntries:false}),permission:async()=>({}),now:()=>now,sleep:async()=>{},save:()=>{},initialState:restored});
+ const before=h.writes.length;await r.cycle();assert.equal(h.writes.length,before);assert.ok(r.state.positions.ABCUSDT.protectedAt);
+ r.state.resumedAt=now;const i=await r.input('ABCUSDT');assert.equal(i.entryAfter,now);assert.equal(shortSignal(i,config).ready,false);
 });
