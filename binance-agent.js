@@ -938,11 +938,11 @@ function drawCandles(candles){
   if(heldNow)for(const value of [selectedPosition.entryPrice,selectedPosition.peakPrice])if(Number(value)>0&&Number.isFinite(Number(value)))vals.push(Number(value));
   put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
   const parallelOn=$('#showParallel')?.checked!==false;
-  const parallel=parallelOn?globalThis.LEVI_PARALLEL?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||100)}):null;
+  const parallel=parallelOn?globalThis.LEVI_PARALLEL?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||50)}):null;
   put('#parallelChannelStatus',parallelOn?(globalThis.LEVI_PARALLEL?.describe(parallel)||'רכיב התעלה המקבילה לא נטען — נדרש עדכון'):'התעלה המקבילה מוסתרת');
   if(parallel?.ready)for(const c of view){const at=Number(c.openTime);if(at>=parallel.anchorStart&&at<=parallel.end){const p=globalThis.LEVI_REGRESSION.levels(parallel,at);vals.push(p.upper,p.lower);}}
   const regressionOn=$('#showRegression')?.checked!==false;
-  const regression=regressionOn?globalThis.LEVI_REGRESSION?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||100),deviations:Number($('#regressionDeviation')?.value||2)}):null;
+  const regression=regressionOn?globalThis.LEVI_REGRESSION?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||50),deviations:Number($('#regressionDeviation')?.value||2)}):null;
   put('#patternScenario',regressionOn?(globalThis.LEVI_REGRESSION?.describe(regression)||'רכיב הרגרסיה לא נטען — נדרש רענון או עדכון שרת'):'תעלת הרגרסיה מוסתרת');
   if(regression?.ready)for(const c of view){const at=Number(c.openTime);if(at>=regression.start&&at<=regression.end){const p=globalThis.LEVI_REGRESSION.levels(regression,at);vals.push(p.upper,p.lower);}}
   let min=Math.min(...vals),max=Math.max(...vals);
