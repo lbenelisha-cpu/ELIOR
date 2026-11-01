@@ -70,7 +70,20 @@ swingCandidate(array<float> lows, array<float> highs, array<float> closes, bool 
                         lc += 1
     [valid, slope, lower, upper, a, b, lc, hc]
 
-if barstate.islast and bar_index >= n
+// Rebuild the last valid geometry on reload from a bounded 200-bar history.
+// Only closed candles update the snapshot; no bot entry state is inferred.
+var float savedSlope = na
+var float savedLower = na
+var float savedUpper = na
+var int savedFirst = na
+var int savedStart = na
+var int savedLast = na
+var int savedLowTouches = 0
+var int savedHighTouches = 0
+var int brokenAt = na
+var string brokenDirection = ""
+
+if bar_index >= n and bar_index >= last_bar_index - 200
     for item in drawings
         line.delete(item)
     array.clear(drawings)
@@ -101,9 +114,10 @@ if barstate.islast and bar_index >= n
     for i = 0 to n-1
         squaredError += math.pow(array.get(closes,i)-intercept-slope*i,2)
     float width = deviations*math.sqrt(squaredError/n)
-    for band = -1 to 1
-        array.push(drawings,line.new(first,intercept+band*width,last,intercept+slope*(n-1)+band*width,color=color.aqua,width=band==0 ? 1 : 2))
-    array.push(captions,label.new(last,intercept+slope*(n-1)+width,"Regression · closed bars",style=label.style_label_left,color=color.new(color.blue,65),textcolor=color.white))
+    if barstate.islast
+        for band = -1 to 1
+            array.push(drawings,line.new(first,intercept+band*width,last,intercept+slope*(n-1)+band*width,color=color.aqua,width=band==0 ? 1 : 2))
+        array.push(captions,label.new(last,intercept+slope*(n-1)+width,"Regression · closed bars",style=label.style_label_left,color=color.new(color.blue,65),textcolor=color.white))
     [v1,s1,l1,u1,a1,b1,lc1,hc1] = swingCandidate(lows,highs,closes,true,n)
     [v2,s2,l2,u2,a2,b2,lc2,hc2] = swingCandidate(lows,highs,closes,false,n)
     bool geometryFound = v1 or v2
@@ -112,20 +126,40 @@ if barstate.islast and bar_index >= n
     bool provisional1 = lc1<2 or hc1<2
     bool provisional2 = lc2<2 or hc2<2
     bool choose1 = v1 and (not v2 or b1>b2 or (b1==b2 and ((not provisional1 and provisional2) or (provisional1==provisional2 and u1-l1<=u2-l2))))
+    if not na(savedLast) and last > savedLast and na(brokenAt)
+        float tolerance = math.max((savedUpper-savedLower)*0.025,close[offset]*0.0001)
+        float projectedLower = savedLower+savedSlope*(last-savedFirst)
+        float projectedUpper = savedUpper+savedSlope*(last-savedFirst)
+        if close[offset] < projectedLower-tolerance or close[offset] > projectedUpper+tolerance
+            brokenAt := last
+            brokenDirection := close[offset] < projectedLower-tolerance ? "נשברה מטה" : "נפרצה מעלה"
     if v1 or v2
-        float s = choose1 ? s1 : s2
-        float lo = choose1 ? l1 : l2
-        float hi = choose1 ? u1 : u2
-        int a = choose1 ? a1 : a2
-        int lc = choose1 ? lc1 : lc2
-        int hc = choose1 ? hc1 : hc2
-        for band = -1 to 1
-            float edge = (lo+hi)/2+band*(hi-lo)/2
-            array.push(drawings,line.new(first+a,edge+s*a,last,edge+s*(n-1),color=color.orange,style=line.style_dashed,width=band==0 ? 1 : 2))
-        array.push(captions,label.new(last,lo+s*(n-1),"Swing · "+str.tostring(lc)+" low / "+str.tostring(hc)+" high touches"+(lc<2 or hc<2 ? " · provisional" : " · confirmed"),style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white))
-    else
-        string missing = geometryFound ? "Swing · waiting for two touches on each boundary" : "Swing · no valid pivot channel in " + str.tostring(n) + " closed bars"
-        array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
+        savedSlope := choose1 ? s1 : s2
+        savedLower := choose1 ? l1 : l2
+        savedUpper := choose1 ? u1 : u2
+        savedFirst := first
+        savedStart := first+(choose1 ? a1 : a2)
+        savedLast := last
+        savedLowTouches := choose1 ? lc1 : lc2
+        savedHighTouches := choose1 ? hc1 : hc2
+        brokenAt := na
+        brokenDirection := ""
+    if barstate.islast
+        bool active = v1 or v2
+        bool retained = not na(savedLast) and last-savedLast <= 200
+        if active or retained
+            int endBar = active ? last : (na(brokenAt) ? savedLast : brokenAt)
+            color channelColor = active ? color.orange : color.gray
+            for band = -1 to 1
+                float edge = (savedLower+savedUpper)/2+band*(savedUpper-savedLower)/2
+                array.push(drawings,line.new(savedStart,edge+savedSlope*(savedStart-savedFirst),endBar,edge+savedSlope*(endBar-savedFirst),color=channelColor,style=active ? line.style_dashed : line.style_dotted,width=band==0 ? 1 : 2))
+            string touches = str.tostring(savedLowTouches)+" low / "+str.tostring(savedHighTouches)+" high touches"
+            string confirmation = savedLowTouches<2 or savedHighTouches<2 ? " · provisional" : " · confirmed"
+            string status = active ? "Swing · "+touches+confirmation : "תעלה קודמת · "+(na(brokenAt) ? "לא תקפה כעת" : brokenDirection)+" · "+touches+confirmation+" · לא איתות בוט"
+            array.push(captions,label.new(endBar,savedLower+savedSlope*(endBar-savedFirst),status,style=label.style_label_left,color=color.new(channelColor,65),textcolor=color.white,tooltip="Gray dotted lines preserve previous geometry. Break direction uses a closed candle beyond the boundary tolerance. A new valid channel replaces this snapshot. History retention: up to 200 bars."))
+        else
+            string missing = geometryFound ? "Swing · waiting for two touches on each boundary" : "Swing · no valid pivot channel in " + str.tostring(n) + " closed bars"
+            array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
 
 // Broker exit thresholds are imported explicitly. Pine does not read the bot account.
 // No trading logic, reconstructed peak, alerts or assumed fills are used here.
