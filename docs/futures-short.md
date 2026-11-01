@@ -37,3 +37,25 @@ First verify the authenticated SHORT panel and the GET-only `scripts/check-binan
 Official endpoint contracts: [Futures trade API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/trade), [Futures account API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account).
 
 Entry recalibration: a previous high above the breakout ceiling is allowed if the fresh price is now below it. The current live bar must still be present and consistent. Closed-bar confirmation, volume, expiry, budgets and protection remain unchanged.
+
+## Protection visibility and operator release
+
+Binance can acknowledge a conditional order before `GET /fapi/v1/algoOrder`
+can find it. The runner now persists the acknowledged exchange `algoId` and
+checks that identity, falling back to the persisted client ID for older journals.
+Only `-2013` reads are retried: four waits of 150, 300, 600 and 950 ms, with five
+reads total. No POST is repeated. Both IDs and all protection fields must still
+match; every other API/identity failure keeps the fail-closed behavior.
+A continuing failure closes the owned position and leaves the durable halt.
+
+`install-futures-protection-visibility.sh <reviewed-sha>` installs this fix with
+runtime tests, a code backup and a version guard. It never clears a halt.
+After an operator explicitly requests resumption, run
+`node scripts/release-futures-short-halt.mjs --release` on the VPS. It accepts only
+the reviewed `FUTURES_API_-2013` / `PROTECTION_FAILURE` incident, confirms flat
+Futures positions, no pending or open orders, the account modes, and inactive
+incident protections. It stops the service, repeats the checks, backs up the
+journal, records the release, and starts the service. It never places/cancels an
+exchange order. Funding/budget history, closed positions and consumed signals
+are retained. Entry must use a signal after the release time. Other halts and
+unresolved identities require separate investigation.
