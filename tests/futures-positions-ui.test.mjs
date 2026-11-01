@@ -24,3 +24,9 @@ test('agent fallback cannot erase mode data, expired auth clears it, and panel i
  browser.LEVI_FUTURES_TABLE.update(snapshot);const good=panel.innerHTML;browser.LEVI_FUTURES_TABLE.update({mode:'live'});assert.equal(panel.innerHTML,good);events['trade-device-expired']();assert.doesNotMatch(panel.innerHTML,/ABCUSDT/);
  const html=fs.readFileSync(new URL('../binance-agent.html',import.meta.url),'utf8');assert.match(html,/id="futuresPositionsPanel" class="panel app-view trade-view portfolio-view"/);assert.ok(html.indexOf('/binance-futures-positions.js')<html.indexOf('/binance-agent.js'));
 });
+
+test('SHORT exposes scan reasons and recorded closures without fabricating realized profit',()=>{
+ const x=structuredClone(snapshot);x.shortTrading.checks={'<bad>':{at:now-120000,reason:'WAIT_TWO_TOUCHES_PER_SIDE'}};
+ x.shortTrading.closed=[{symbol:'ABCUSDT',entryAt:now-600000,closedAt:now,entryPrice:100,reason:'BROKER_OR_EXTERNAL_CLOSE'}];
+ const html=view(x,now);assert.match(html,/נתון קודם/);assert.match(html,/ממתין לתעלה עם שתי נגיעות/);assert.match(html,/&lt;bad&gt;/);assert.doesNotMatch(html,/<bad>/);assert.match(html,/סגירות SHORT אחרונות · 1/);assert.match(html,/רווח ממומש אינם כלולים/);assert.match(html,/סגירה בבורסה או ממקור חיצוני/);
+});
