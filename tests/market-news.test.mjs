@@ -62,3 +62,9 @@ test('collector limits bytes including streamed bodies and refuses redirects at 
  const c=createNewsCollector({sources:[sources[0]],now:()=>now,fetchImpl:async(url,o)=>{assert.equal(url,sources[0].url);options=o;return new Response('x'.repeat(2000001));}});
  await c.poll();assert.equal(options.redirect,'error');assert.equal(c.snapshot().sources[0].error,'FEED_TOO_LARGE');assert.equal(c.snapshot().items.length,0);
 });
+test('CoinDesk uses the direct canonical feed and a changed endpoint resets stale retry backoff once',async()=>{
+ const source=NEWS_SOURCES.find(s=>s.id==='coindesk');assert.equal(source.url,'https://www.coindesk.com/arc/outboundfeeds/rss');
+ let calls=0;
+ const c=createNewsCollector({sources:[source],now:()=>now,load:()=>({version:'MARKET_NEWS_V1',baselineAt:now-1000,items:[],sources:[{id:'coindesk',status:'UNAVAILABLE',failures:6,nextAttemptAt:now+3600000,feedUrl:source.url+'/'}]}),fetchImpl:async(url,options)=>{calls++;assert.equal(url,source.url);assert.equal(options.redirect,'error');return new Response(xml(undefined,source));}});
+ await c.poll();assert.equal(calls,1);assert.equal(c.snapshot().sources[0].status,'OK');await c.poll();assert.equal(calls,1);
+});
