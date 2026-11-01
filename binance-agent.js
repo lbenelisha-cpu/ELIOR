@@ -188,6 +188,7 @@ function renderFuturesShortStatus(s){
 }
 function mode(s){
   renderFuturesShortStatus(s);
+  window.LEVI_FUTURES_TABLE?.update(s);
   const isDemo=s.mode==='demo';
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';

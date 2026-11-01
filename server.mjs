@@ -2310,6 +2310,7 @@ const server=http.createServer((req,res)=>{
     '/binance-indicators.js':['binance-indicators.js','text/javascript'],
     '/binance-agent.html':['binance-agent.html','text/html'],
     '/binance-agent.js':['binance-agent.js','text/javascript'],
+    '/binance-futures-positions.js':['binance-futures-positions.js','text/javascript'],
     '/binance-agent.css':['binance-agent.css','text/css'],
     '/trade-risk.js':['trade-risk.js','text/javascript'],
     '/trade-risk.css':['trade-risk.css','text/css'],

@@ -350,7 +350,7 @@
         <div class="rules-box">
           <h3>כללי מסחר</h3>
           <p><b>קנייה:</b> נרות 5 דקות סגורים כולל פתילים: שיא → שפל ראשון → התאוששות ראשונה → בדיקה חוזרת → התאוששות שנייה גבוהה מהראשונה → דשדוש → Spring וחזרה מעל התמיכה בנר סגור. שיא ההתאוששות השנייה חייב להיות גבוה ממש מהראשון ומאושר בנר סגור; שוויון אינו מספיק. נבדקים גם RSI חי עד 40, מחזור האישור ומגמת MA100/200.</p>
-          <p><b>מסלול נוסף — גל מוקדם:</b> נדרשים אותם שני שיאי התאוששות מאושרים לפני נר הפריצה, בנוסף לעלייה של לפחות 1% מהשפל ופריצת שלושת הנרות הקודמים בנר סגור. המסלול כפוף לבדיקות המגמה והמחזור ולתבנית שלא נוצלה.</p><p><b>הגנת רווח:</b> ברירת המחדל: הפעלה ב־5% ומרחק נקודת אחוז ממחיר הקנייה. לדוגמה: קנייה 100 ← שיא 105 ← סטופ 104; שיא 106 ← סטופ 105. סטופ קודם אינו יורד.</p><p><b>SHORT:</b> אינו פעיל — החיבור הנוכחי פועל ב־Spot. נדרש חיבור מתאים לשורט.</p><p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
+          <p><b>מסלול נוסף — גל מוקדם:</b> נדרשים אותם שני שיאי התאוששות מאושרים לפני נר הפריצה, בנוסף לעלייה של לפחות 1% מהשפל ופריצת שלושת הנרות הקודמים בנר סגור. המסלול כפוף לבדיקות המגמה והמחזור ולתבנית שלא נוצלה.</p><p><b>הגנת רווח:</b> ברירת המחדל: הפעלה ב־5% ומרחק נקודת אחוז ממחיר הקנייה. לדוגמה: קנייה 100 ← שיא 105 ← סטופ 104; שיא 106 ← סטופ 105. סטופ קודם אינו יורד.</p><p><b>SHORT:</b> מסלול Futures נפרד. מצב ההפעלה, הפוזיציות וההגנות מופיעים בטבלת SHORT Futures.</p><p><b>מכירה:</b> יעד הרווח, הסטופ ההתחלתי, סף הפעלת ההגנה והמרחק הנגרר נקבעים בחלון SETTINGS. הסטופ הקיים אינו יורד. המחירים לפני עמלות והביצוע אינו מובטח. לאחר מכירה אוטומטית נדרשת תבנית חדשה.</p>
         </div>
       </div></details>
     </section>
@@ -415,6 +415,10 @@
       <div id="paperHistory" class="paper-history" hidden></div>
     </section>
 
+    <section id="futuresPositionsPanel" class="panel app-view trade-view portfolio-view" aria-label="פוזיציות SHORT פעילות">
+      <h2>פוזיציות פעילות · SHORT Futures</h2><p>ממתין לנתוני SHORT מהשרת…</p>
+    </section>
+
     <section id="demoRealtimePositionsSection" class="panel app-view portfolio-view" hidden>
       <div class="panel-title-row">
         <h2>פוזיציות פעילות – שווי בזמן אמת</h2>
@@ -453,7 +457,8 @@
   <script src="/trade-risk.js?v=20261031-channel-tp-v2"></script>
   <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261031-channel-primary"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
-  <script src="/binance-agent.js?v=20261031-exit-levels"></script>
+  <script src="/binance-futures-positions.js?v=20261101-short-table"></script>
+  <script src="/binance-agent.js?v=20261101-short-table"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
