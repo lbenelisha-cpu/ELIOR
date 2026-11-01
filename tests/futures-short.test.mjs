@@ -58,7 +58,7 @@ function harness(options={}){
 }
 test('SHORT requires a fresh confirmed lower break, falling regression and volume; replay and invalidation are rejected',()=>{
  const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.ok(good.setup.regressionSlope<0);
- for(const mutate of [i=>i.priceAsOf=now-11000,i=>i.bars.splice(150,1),i=>i.bars.at(-1).high=1,i=>i.bars.at(-1).volume=1000,i=>i.liveBar.high=110,i=>i.price=110,i=>i.price=1,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
+ for(const mutate of [i=>i.priceAsOf=now-11000,i=>i.bars.splice(150,1),i=>i.bars.at(-1).high=1,i=>i.bars.at(-1).volume=1000,i=>i.liveBar.high=NaN,i=>i.price=110,i=>i.price=1,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
  assert.equal(shortSignal(input(),shortConfig({})).ready,false);
  assert.equal(shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true'}).enabled,false);
 });
@@ -157,4 +157,14 @@ test('targeted installer patches are idempotent and reject an unknown context wi
   patchFutures(dir,patches);const once=fs.readFileSync(path.join(dir,'server.mjs'),'utf8');patchFutures(dir,patches);assert.equal(fs.readFileSync(path.join(dir,'server.mjs'),'utf8'),once);
   const bad=patches.map(p=>({...p}));bad.push({file:'server.mjs',before:'nonexistent context',after:'unrecognized result'});assert.throws(()=>patchFutures(dir,bad),/Unrecognized/);assert.equal(fs.readFileSync(path.join(dir,'server.mjs'),'utf8'),once);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('50 pre-breakout SHORT bars suffice; recovered upper wick passes but current ceiling and expiry block',()=>{
+ const i=input();i.bars=i.bars.slice(-51);i.liveBar.high=110;
+ const r=shortSignal(i,config);assert.equal(config.period,50);assert.equal(r.ready,true,r.reason);
+ assert.deepEqual(r.setup,shortSignal({...i,bars:input().bars},config).setup);
+ const ceiling=Math.min(r.setup.level,r.setup.liveLevel,r.setup.regressionCenter);
+ for(const price of [ceiling,ceiling+.01])assert.equal(shortSignal({...i,price},config).reason,'SHORT_PRICE_INVALIDATED');
+ assert.equal(shortSignal({...i,bars:i.bars.slice(1)},config).reason,'WAIT_FUTURES_HISTORY');
+ assert.equal(shortSignal({...i,now:end+D,priceAsOf:end+D},config).reason,'SHORT_SIGNAL_EXPIRED');
 });
