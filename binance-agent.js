@@ -930,6 +930,8 @@ setInterval(()=>{
 },650);
 function drawCandles(candles){
   const canvas=$('#priceChart');
+  const channelBadge=$('#channelTouchBadge');
+  if(channelBadge){channelBadge.hidden=true;channelBadge.replaceChildren();}
   if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
@@ -997,6 +999,17 @@ function drawCandles(candles){
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
+  const visibleChannel=parallel?.ready&&view.filter(c=>Number(c.openTime)>=parallel.anchorStart&&Number(c.openTime)<=parallel.end).length>=2;
+  const touchBadge=visibleChannel?globalThis.LEVI_PARALLEL?.badge(parallel):null;
+  if(channelBadge&&touchBadge){
+    const title=document.createElement('strong'),counts=document.createElement('span');
+    title.textContent=touchBadge.title;counts.textContent=touchBadge.counts;
+    channelBadge.append(title,counts);channelBadge.dataset.state=touchBadge.provisional?'provisional':'confirmed';
+    channelBadge.style.right=((right+10)/W*100)+'%';
+    channelBadge.style.top=(Math.max(top+8,Math.min(top+ch-62,y(parallel.lower)+12))/H*100)+'%';
+    channelBadge.title='נגיעות בנקודות קיצון מאושרות על התעלה המוצגת · אישור קיצון לאחר שני נרות נוספים · אינו אישור כניסה';
+    channelBadge.hidden=false;
+  }
   const body=Math.max(.5,Math.min(18,step*.68));
   if(tradeRisk){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();const rx=left+cw*.72,rw=cw*.28;ctx.fillStyle='rgba(38,197,129,.14)';ctx.fillRect(rx,y(tradeRisk.target),rw,y(tradeRisk.entry)-y(tradeRisk.target));ctx.fillStyle='rgba(244,75,102,.16)';ctx.fillRect(rx,y(tradeRisk.entry),rw,y(tradeRisk.stop)-y(tradeRisk.entry));ctx.restore();}
 
