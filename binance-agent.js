@@ -44,7 +44,12 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartWorkbench=null;
 let chartTimeNavigation=null;
-import('./chart-time-navigation.js?v=20261029-time-nav').then(({createChartTimeNavigation})=>{
+let chartTerminal=null;
+import('./chart-terminal.js?v=20261101-chart-terminal').then(({createChartTerminal})=>{
+ chartTerminal=createChartTerminal({host:$('#priceChart').parentElement,toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),navigation:()=>chartTimeNavigation,onChange:()=>drawCandles(chartCandles)});
+ drawCandles(chartCandles);
+}).catch(()=>put('#chartTerminalTools','כלי הגרף לא נטענו · רענן את העמוד.'));
+import('./chart-time-navigation.js?v=20261101-chart-terminal').then(({createChartTimeNavigation})=>{
  chartTimeNavigation=createChartTimeNavigation({host:$('#chartTimeNavigation'),onChange:()=>drawCandles(chartCandles)});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTimeNavigation','מחוון הזמן לא נטען · רענן את העמוד.'));
@@ -925,7 +930,7 @@ setInterval(()=>{
 },650);
 function drawCandles(candles){
   const canvas=$('#priceChart');
-  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();return;}
+  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -951,7 +956,7 @@ function drawCandles(candles){
   const view=visibleWindow.bars;
   const viewMas=mas.slice(start,end);
   drawIndicators(candles,{start,end});
-  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();return;}
+  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();chartTerminal?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
@@ -978,8 +983,9 @@ function drawCandles(candles){
   const regression=regressionOn?globalThis.LEVI_REGRESSION?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||50),deviations:Number($('#regressionDeviation')?.value||2)}):null;
   put('#patternScenario',regressionOn?(globalThis.LEVI_REGRESSION?.describe(regression)||'רכיב הרגרסיה לא נטען — נדרש רענון או עדכון שרת'):'תעלת הרגרסיה מוסתרת');
   if(regression?.ready)for(const c of view){const at=Number(c.openTime);if(at>=regression.start&&at<=regression.end){const p=globalThis.LEVI_REGRESSION.levels(regression,at);vals.push(p.upper,p.lower);}}
-  let min=Math.min(...vals),max=Math.max(...vals);
-  const span=Math.max(max-min,Math.abs((max+min)/2)*0.002,1e-12)*priceRangeScale;
+  const scaleValues=chartTerminal?.fitCandles!==false?view.flatMap(c=>[+c.high,+c.low]):vals;
+  let min=Math.min(...scaleValues),max=Math.max(...scaleValues);
+  const span=Math.max(max-min,Math.abs((max+min)/2)*0.0001,1e-12)*priceRangeScale;
   const mid=(max+min)/2;min=mid-span*.58;max=mid+span*.58;
   const autoDigits=Math.min(12,Math.max(2,Math.ceil(-Math.log10((max-min)/5))+1));
   const priceDigits=autoDigits;
@@ -989,7 +995,7 @@ function drawCandles(candles){
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
-  const body=Math.max(.5,Math.min(7,step*.55));
+  const body=Math.max(.5,Math.min(18,step*.68));
   if(tradeRisk){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();const rx=left+cw*.72,rw=cw*.28;ctx.fillStyle='rgba(38,197,129,.14)';ctx.fillRect(rx,y(tradeRisk.target),rw,y(tradeRisk.entry)-y(tradeRisk.target));ctx.fillStyle='rgba(244,75,102,.16)';ctx.fillRect(rx,y(tradeRisk.entry),rw,y(tradeRisk.stop)-y(tradeRisk.entry));ctx.restore();}
 
   ctx.font='11px Arial';
@@ -1087,6 +1093,7 @@ function drawCandles(candles){
     ctx.fillText(parts[0],labelX,H-86);ctx.fillText(parts[1]||'',labelX,H-71);
   }
   chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
+  chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
 }
 
 let dashboardLoadInFlight=false;

@@ -1,4 +1,4 @@
-import {createChartViewport,candleTime} from './lib/chart-viewport.mjs?v=20261029-time-nav';
+import {createChartViewport,candleTime} from './lib/chart-viewport.mjs?v=20261101-chart-terminal';
 
 export function createChartTimeNavigation({host,onChange}){
  const viewport=createChartViewport();let current=null,frame=0;
@@ -25,7 +25,12 @@ export function createChartTimeNavigation({host,onChange}){
  const help=document.createElement('small');help.textContent='גרור את המחוון לצפייה בעבר. לחזרה למעקב בחר ״לנר האחרון״.';
  host.replaceChildren(header,actions,timeline,dates,help);
  const time=new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
- return {view(bars,options){
+ return {
+  zoom(factor,fraction){viewport.zoom(factor,fraction);notify();},
+  move(delta){viewport.move(delta);notify();},
+  latest(){viewport.latest();notify();},
+  reset(){viewport.reset();notify();},
+  view(bars,options){
   current=viewport.view(bars,options);
   const {total,size,maxStart,following}=current;
   range.max=String(maxStart);range.value=String(current.start);range.disabled=!maxStart;
