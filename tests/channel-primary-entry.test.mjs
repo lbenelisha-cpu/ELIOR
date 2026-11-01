@@ -104,11 +104,15 @@ test('targeted server installer is idempotent and refuses mismatched integration
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('enabled channel protection crosses both final submission paths with frozen geometry and rejects settings changes',async()=>{
+test('Binance channel protection retains frozen geometry and rejects settings changes',async()=>{
  const values=validateTradeSettings({channelProfitProtection:true,channelActivationFraction:.5});
  const x=executor({tradeSettings:{values}});await x.run();assert.equal(x.writes.length,1);const setup=x.writes[0].meta.meta.wyckoffTrade.setup;assert.ok(setup.channelProtection.targetPrice>106);assert.equal(setup.channelProtection.width,setup.channelWidth);
- const f=colmexFixture();f.state.settings=values;await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.writes[0].setup.channelProtection.version,'CHANNEL_TAKE_PROFIT_V2');assert.equal(f.b.writes[0].order.takeProfitType,'absolute');assert.ok(Math.abs(f.b.writes[0].order.takeProfit-f.b.writes[0].setup.channelProtection.targetPrice)<.011);
  const check=channelEntry({...input(),settings:values},config());assert.throws(()=>assertChannelSubmission({...input(),settings:{profitActivationPct:6}},config(),{entryMode:'channel_breakout',patternId:check.setup.patternId,setup:check.setup}),/PROTECTION_CHANGED/);
+});
+
+test('Colmex channel protection submits the frozen absolute target',async()=>{
+ const values=validateTradeSettings({channelProfitProtection:true,channelActivationFraction:.5});
+ const f=colmexFixture();f.state.settings=values;await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.writes[0].setup.channelProtection.version,'CHANNEL_TAKE_PROFIT_V2');assert.equal(f.b.writes[0].order.takeProfitType,'absolute');assert.ok(Math.abs(f.b.writes[0].order.takeProfit-f.b.writes[0].setup.channelProtection.targetPrice)<.011);
 });
 
 test('50 pre-breakout LONG bars suffice; recovered wick passes while current invalid price and expiry still block',()=>{

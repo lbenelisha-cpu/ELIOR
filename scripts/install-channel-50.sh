@@ -10,12 +10,18 @@ stage=$(mktemp -d /tmp/levi-channel-50.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 files=(lib/channel-primary-entry.mjs lib/futures-short-policy.mjs)
 for file in "${files[@]}"; do test -f "$file"; done
-# Offline checks run against installed runtime dependencies.
+# First verify the complete release, including Colmex, in isolation.
+mkdir "$stage/release"
+git archive "$revision" | tar -x -C "$stage/release"
+node --test "$stage/release/tests/channel-primary-entry.test.mjs" "$stage/release/tests/futures-short.test.mjs" "$stage/release/tests/channel-profit-protection.test.mjs"
+# The VPS runs Binance. Validate its actual runtime without depending on the
+# unrelated, possibly older Colmex runner installed alongside it.
 git archive "$revision" tests scripts | tar -x -C "$stage"
 cp -a lib "$stage/lib"
 for file in *.js *.mjs *.html; do [[ ! -f "$file" ]] || cp "$file" "$stage/"; done
 for file in "${files[@]}"; do git show "$revision:$file" > "$stage/$file"; node --check "$stage/$file"; done
-node --test "$stage/tests/channel-primary-entry.test.mjs" "$stage/tests/futures-short.test.mjs" "$stage/tests/channel-profit-protection.test.mjs"
+echo 'Checking installed Binance runtime; Colmex tests already ran against the isolated release.'
+node --test --test-skip-pattern=Colmex "$stage/tests/channel-primary-entry.test.mjs" "$stage/tests/futures-short.test.mjs" "$stage/tests/channel-profit-protection.test.mjs"
 backup="/root/levi-before-channel-50-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -m 700 "$backup"
 tar -czf "$backup/code.tgz" "${files[@]}"
