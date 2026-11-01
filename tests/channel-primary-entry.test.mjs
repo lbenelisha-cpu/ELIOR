@@ -36,7 +36,7 @@ test('stale, consumed, malformed, gapped, weak-volume, falling-regression and in
  for(const mutate of [
   x=>x.priceAsOf=now-15001,x=>x.bars.splice(150,1),x=>x.bars.push({...x.bars.at(-1)}),x=>x.bars.at(-1).high=1,
   x=>x.bars.at(-1).closed=false,x=>x.bars.at(-1).volume=1000,x=>x.entryAfter=end,x=>x.now=end+D,
-  x=>x.usedPatternIds=[good.setup.patternId],x=>x.liveBar.low=100,x=>x.liveBar=null,
+  x=>x.usedPatternIds=[good.setup.patternId],x=>x.liveBar.low=NaN,x=>x.liveBar=null,
   x=>{x.bars=x.bars.map((b,i)=>({...b,open:b.open-i*.05,high:b.high-i*.05,low:b.low-i*.05,close:b.close-i*.05}));},
  ]){const x=structuredClone(i);mutate(x);assert.equal(channelEntry(x,c).ready,false);}
  assert.equal(channelEntry(i,{}).ready,false);
@@ -109,4 +109,22 @@ test('enabled channel protection crosses both final submission paths with frozen
  const x=executor({tradeSettings:{values}});await x.run();assert.equal(x.writes.length,1);const setup=x.writes[0].meta.meta.wyckoffTrade.setup;assert.ok(setup.channelProtection.targetPrice>106);assert.equal(setup.channelProtection.width,setup.channelWidth);
  const f=colmexFixture();f.state.settings=values;await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.writes[0].setup.channelProtection.version,'CHANNEL_TAKE_PROFIT_V2');assert.equal(f.b.writes[0].order.takeProfitType,'absolute');assert.ok(Math.abs(f.b.writes[0].order.takeProfit-f.b.writes[0].setup.channelProtection.targetPrice)<.011);
  const check=channelEntry({...input(),settings:values},config());assert.throws(()=>assertChannelSubmission({...input(),settings:{profitActivationPct:6}},config(),{entryMode:'channel_breakout',patternId:check.setup.patternId,setup:check.setup}),/PROTECTION_CHANGED/);
+});
+
+test('50 pre-breakout LONG bars suffice; recovered wick passes while current invalid price and expiry still block',()=>{
+ for(const platform of ['BINANCE','COLMEX']){
+  const c=config(platform),i=input(platform);i.bars=i.bars.slice(-51);i.liveBar.low=100;
+  const r=channelEntry(i,c);assert.equal(c.period,50);assert.equal(r.ready,true,r.reason);
+  assert.deepEqual(r.setup,channelEntry({...i,bars:bars(platform)},c).setup);
+  const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};
+  assert.doesNotThrow(()=>assertChannelSubmission(i,c,trade));
+  const floor=Math.max(r.setup.level,r.setup.liveLevel,r.setup.regressionCenter);
+  for(const price of [floor,floor-.01])assert.throws(()=>assertChannelSubmission({...i,price},c,trade),/INVALIDATED/);
+  assert.equal(channelEntry({...i,bars:i.bars.slice(1)},c).reason,'WAIT_CHANNEL_HISTORY');
+  assert.equal(channelEntry({...i,now:end+D,priceAsOf:end+D},c).reason,'CHANNEL_SIGNAL_EXPIRED');
+ }
+});
+test('LONG final order accepts a recovered wick and still installs protection',async()=>{
+ const e=executor();e.context.streams.ABCUSDT.liveBar.low=100;await e.run();
+ assert.equal(e.writes.length,1);assert.deepEqual(e.protectedSymbols,['ABCUSDT']);
 });
