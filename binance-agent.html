@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-entry-alpha">
 <link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
 <link rel="stylesheet" href="/binance-equity-history.css?v=20261026-equity">
-<link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"><link rel="stylesheet" href="/chart-time-navigation.css?v=20261029-time-nav"></head>
+<link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"><link rel="stylesheet" href="/chart-time-navigation.css?v=20261029-time-nav"><link rel="stylesheet" href="/chart-terminal.css?v=20261101-chart-terminal"></head>
 <body>
   <main class="app-shell">
     <header class="topbar">
@@ -255,6 +255,7 @@
         <p id="parallelChannelStatus" class="mini" role="status"></p>
         <p id="patternScenario" class="mini" role="status" style="padding:12px;border:1px solid #526879;border-radius:10px;line-height:1.8">ממתין לנרות לניתוח תרחיש</p>
         <p id="resistancePatternStatus" class="mini" role="status">טוען אזורי התנגדות ופריצה…</p>
+        <section id="chartTerminal" class="chart-terminal" aria-label="גרף אינטראקטיבי"><div id="chartTerminalTools"></div>
         <div id="chartPriceLegend" class="chart-price-legend" aria-label="מקרא מחירי העסקה" hidden></div>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
@@ -263,12 +264,13 @@
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
         </div>
 
+        <div id="chartVolume"></div></section>
         <div id="chartFalls" class="chart-move-lane down" aria-label="ירידות מתחת לגרף"></div>
         <section id="binanceSlope" aria-label="ניתוח שיפוע הממוצעים"></section>
         <details id="chartRiskDetails" class="chart-risk-details" hidden><summary>מחירי העסקה וטבלת ההגנה</summary><div id="binanceTradeRisk" hidden></div></details>
         <p id="chartRiseDetails" class="mini chart-rise-details" role="status"></p>
         <details id="chartMoveBreakdown" class="chart-rise-breakdown"><summary id="chartRiseSummary">ממתין לנרות</summary><p class="mini">נרות סגורים בלבד. אחוזי שינוי מחושבים בין מחירי סגירה. שינוי נגדי של 1% מסיים מהלך. כשיש צפיפות מוצגות שתי שורות ולחצן ״עוד״ פותח את הפירוט המלא; האחוזים אינם מתחברים. מסגרת מקווקוות: מהלך מתהווה או נתונים שנקטעו. החישוב מתייחס לטווח ולמשך הנר שבחרת ואינו רווח מעסקה.</p><div id="chartRiseList"></div></details>
-        <div id="chartVolume"></div>
+
         <div id="rsiPanel" class="indicator-panel"><h3 class="indicator-heading rsi-heading">RSI (14) · מדד עוצמה יחסית</h3><canvas id="rsiChart" aria-label="RSI 14"></canvas></div>
         <div id="rocPanel" class="indicator-panel"><h3 class="indicator-heading roc-heading">ROC (12) · שיעור שינוי המחיר (%)</h3><canvas id="rocChart" aria-label="ROC 12 באחוזים"></canvas></div>
         <p class="mini" id="rsiRuleNote">RSI ו־ROC הם מדדי תצוגה. תנאי הכניסה נקבעים לפי המסלול הפעיל בשרת.</p>
@@ -459,7 +461,7 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261101-watch"></script>
   <script src="/binance-futures-positions.js?v=20261101-channel-watch"></script>
-  <script src="/binance-agent.js?v=20261101-channel-watch"></script>
+  <script src="/binance-agent.js?v=20261101-chart-terminal"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>

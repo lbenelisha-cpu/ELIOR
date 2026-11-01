@@ -28,3 +28,9 @@ test('Colmex calendar gaps are navigated by actual candles; both timestamp forma
  const stock=[...rows.slice(0,80),...rows.slice(900,980)].map(b=>({date:new Date(b.openTime).toISOString()}));
  const v=createChartViewport();v.view(stock,{width:320});v.seek(65);const r=v.view(stock,{width:320});assert.equal(r.size,24);assert.deepEqual(r.bars,stock.slice(65,89));
 });
+test('pointer zoom preserves the selected candle and latest-following can resume',()=>{
+ const v=createChartViewport();v.view(rows,{context:'A',width:1000});v.seek(500);const before=v.view(rows,{context:'A',width:1000});
+ const selected=before.start+before.size*.5;v.zoom(.5,.5);const after=v.view(rows,{context:'A',width:1000});assert.ok(Math.abs(after.start+after.size*.5-selected)<=.5);assert.equal(after.following,false);
+ v.latest();const live=v.view(rows,{context:'A'});v.zoom(.5,1);const right=v.view(rows,{context:'A'});assert.equal(right.bars.at(-1),live.bars.at(-1));assert.equal(right.following,true);
+ v.zoom(NaN,.5);assert.equal(v.view(rows,{context:'A'}).size,right.size);
+});
