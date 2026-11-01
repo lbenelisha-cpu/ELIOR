@@ -7,7 +7,7 @@ const ctx=vm.createContext({});vm.runInContext(code,ctx);const view=ctx.LEVI_FUT
 const now=Date.now();
 const snapshot={mode:'live',shortTrading:{enabled:true,checkedAt:now,account:{walletUsdt:70,availableUsdt:36},positions:[{symbol:'ABCUSDT',qty:2,entryPrice:100,currentPrice:95,entryAt:now-600000,priceAt:now,targetPrice:90,stopPrice:99,protectedAt:now,algos:[{kind:'STOP_MARKET',status:'NEW'},{kind:'TAKE_PROFIT_MARKET',status:'NEW'}]}]}};
 test('SHORT table calculates profit when price falls and shows independent wallet and count',()=>{
- const html=view(snapshot,now);assert.match(html,/1\/2/);assert.match(html,/70 USDT/);assert.match(html,/36 USDT/);assert.match(html,/\+10/);assert.match(html,/\+5%/);assert.match(html,/אומתו בבורסה/);
+ const html=view(snapshot,now);assert.match(html,/1\/2/);assert.match(html,/>70</);assert.match(html,/>36</);assert.match(html,/\+10/);assert.match(html,/\+5%/);assert.match(html,/אומתו בבורסה/);
  const loss=structuredClone(snapshot);loss.shortTrading.positions[0].currentPrice=105;assert.match(view(loss,now),/-10/);assert.match(view(loss,now),/-5%/);
 });
 test('missing and stale prices are unknown instead of zero PnL; stale protection is not verified',()=>{
