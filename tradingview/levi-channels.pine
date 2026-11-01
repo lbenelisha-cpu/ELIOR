@@ -106,6 +106,7 @@ if barstate.islast and bar_index >= n
     array.push(captions,label.new(last,intercept+slope*(n-1)+width,"Regression · closed bars",style=label.style_label_left,color=color.new(color.blue,65),textcolor=color.white))
     [v1,s1,l1,u1,a1,b1,lc1,hc1] = swingCandidate(lows,highs,closes,true,n)
     [v2,s2,l2,u2,a2,b2,lc2,hc2] = swingCandidate(lows,highs,closes,false,n)
+    bool geometryFound = v1 or v2
     v1 := v1 and (not confirmedOnly or (lc1>=2 and hc1>=2))
     v2 := v2 and (not confirmedOnly or (lc2>=2 and hc2>=2))
     bool provisional1 = lc1<2 or hc1<2
@@ -122,7 +123,9 @@ if barstate.islast and bar_index >= n
             float edge = (lo+hi)/2+band*(hi-lo)/2
             array.push(drawings,line.new(first+a,edge+s*a,last,edge+s*(n-1),color=color.orange,style=line.style_dashed,width=band==0 ? 1 : 2))
         array.push(captions,label.new(last,lo+s*(n-1),"Swing · "+str.tostring(lc)+" low / "+str.tostring(hc)+" high touches"+(lc<2 or hc<2 ? " · provisional" : " · confirmed"),style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white))
-
+    else
+        string missing = geometryFound ? "Swing · waiting for two touches on each boundary" : "Swing · no valid pivot channel in " + str.tostring(n) + " closed bars"
+        array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
 
 // Broker exit thresholds are imported explicitly. Pine does not read the bot account.
 // No trading logic, reconstructed peak, alerts or assumed fills are used here.

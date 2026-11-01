@@ -31,7 +31,7 @@ function render(){
  for(const s of data.sources){
   const card=add('div','',$('sources'),'source');add('strong',s.name,card);const good=s.status==='OK'&&Date.now()-s.lastSuccessAt<=900000;
   add('span',good?'מקור זמין':s.status?'מקור אינו זמין כעת':'ממתין לאיסוף',card,good?'good':'warn');
-  add('small','הצלחה אחרונה: '+date(s.lastSuccessAt),card);if(!good&&s.nextAttemptAt)add('small','ניסיון איסוף הבא: '+date(s.nextAttemptAt),card);add('small','דיווחים באיסוף האחרון: '+(s.count??'—'),card);
+  if(!good&&s.error)add('small','סיבת האיסוף: '+({SOURCE_UNAVAILABLE:'המקור לא החזיר תוכן זמין לשרת',RATE_LIMITED:'המקור הגביל את קצב הבקשות',INVALID_FEED:'תוכן המקור אינו בפורמט התקין',FEED_TOO_LARGE:'התוכן גדול ממגבלת האיסוף'}[s.error]||s.error),card);add('small','הצלחה אחרונה: '+date(s.lastSuccessAt),card);if(!good&&s.nextAttemptAt)add('small','ניסיון איסוף הבא: '+date(s.nextAttemptAt),card);add('small','דיווחים באיסוף האחרון: '+(s.count??'—'),card);
   const option=add('option',s.name,$('source'));option.value=s.id;
  }
  $('source').value=selected;$('decisions').replaceChildren();

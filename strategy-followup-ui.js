@@ -10,12 +10,12 @@ export function renderStrategyReview(host,data,{document:doc=globalThis.document
  host.replaceChildren();
  const add=(tag,text,parent=host)=>{const e=doc.createElement(tag);e.textContent=text;parent.append(e);return e;};
  if(!data){add('p','ממתין לנתוני גרסת האסטרטגיה מהשרת. תצוגה זו אינה מאשרת שהעדכון הותקן במנוע המסחר.');renderEntryComparison(host,null,{document:doc});renderTradingResearch(host,null,{document:doc,modes,variants});restore();return;}
- add('p','מעקב נפרד לכל מסלול וגרסה · נרות 5 דקות סגורים · MA100/200 על ארבעה נרות · מחזור נר האישור לפחות כממוצע 20 קודמיו. מרחק הסטופ בבייננס נקבע ב־SETTINGS; בקולמקס קיימת גם התאמה ל־ATR ולמבנה, עד 3%.');
+ if(!data.channelPrimary?.requested)add('p','מעקב נפרד לכל מסלול וגרסה · נרות 5 דקות סגורים · MA100/200 על ארבעה נרות · מחזור נר האישור לפחות כממוצע 20 קודמיו. מרחק הסטופ בבייננס נקבע ב־SETTINGS; בקולמקס קיימת גם התאמה ל־ATR ולמבנה, עד 3%.');
  if(data.channelPrimary?.requested){
   const route=data.channelPrimary;
   add('h3','מסלול ראשי · תעלת קיצון + אישור רגרסיה');
   add('p',route.enabled&&route.executionEnabled?'מאופשר בלייב · כניסות אוטומטיות דורשות תעלת קיצון. וואיקוף והפריצה העצמאית אינם מסלולי קנייה חלופיים.':'המסלול אינו מורשה לביצוע כרגע · '+(route.error||'נדרשת הפעלה מאומתת בשרת'));
-  add('p','100 נרות 5 דקות קודמים · לפחות שתי נגיעות בכל גבול · נר סגור פורץ את הגבול העליון · רגרסיה עולה ומחיר מעל המרכז · מחזור לפחות פי 1.5. בדיקה חוזרת לפני שליחה. היציאות נשארות במנגנון הקיים של הפלטפורמה.');
+  add('p',(route.period??'לא נמסר מספר')+' נרות 5 דקות קודמים · לפחות שתי נגיעות בכל גבול · נר סגור פורץ את הגבול העליון · רגרסיה עולה ומחיר מעל המרכז · מחזור לפחות פי 1.5 מממוצע 20 הנרות הקודמים. בדיקה חוזרת של המחיר והאיתות לפני שליחה. יעד עסקת תעלה חדשה: הגבול העליון + רוחב התעלה; סטופ והגנה לפי הגדרות הפוזיציה.');
   add('p','ההשוואות להלן ממשיכות כתצפית; דיוק חיזוי אינו הוכחת רווחיות.');
  }
  if(data.independentEntry&&!data.channelPrimary?.requested){
