@@ -1,3 +1,6 @@
+import {FuturesShortAPI} from './lib/futures-short-api.mjs';
+import {FuturesShortRunner} from './lib/futures-short-runner.mjs';
+import {shortConfig} from './lib/futures-short-policy.mjs';
 import {channelEntryConfig,assertChannelSubmission} from './lib/channel-primary-entry.mjs';
 import {observeChannels} from './lib/channel-comparison.mjs';
 import {newsConfig,assessNewsEntry} from './lib/market-news.mjs';
@@ -2213,6 +2216,13 @@ const send=(res,o,c=200)=>{
 
 const powerCache=new Map();
 const displayChartReader=createChartReader(j);
+const futuresShort=new FuturesShortRunner({
+ api:new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET}),
+ file:process.env.BINANCE_FUTURES_SHORT_FILE||LIVE_LOG_FILE+'.futures-short',
+ config:shortConfig(process.env),settings:()=>tradeSettings.values,
+ control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
+ permission:getApiRestrictions
+});
 const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
@@ -2327,6 +2337,7 @@ const server=http.createServer((req,res)=>{
         }
         if(action==='start'){
           if(mode==='live'){await reconcileLiveHoldings();if(!liveReadiness().ready)throw Error('LIVE_STATE_NOT_READY');}
+          if(Object.keys(futuresShort.state.positions).length||futuresShort.state.pending)return send(res,{ok:false,error:'יש פוזיציות או פקודות Futures שטרם נסגרו ואומתו.'},409);
           // Remain stopped until previous positions are actually closed.
           if(DEMO_TRADING && Object.keys(demoTrader.state.positions).length)
             return send(res,{ok:false,error:'יש פוזיציות דמו שלא נסגרו. יש להשלים עצירה לפני התחלה.'},409);
@@ -2341,6 +2352,8 @@ const server=http.createServer((req,res)=>{
         saveTradeControl();
         // The execution lock excludes orders and protection replacement for the entire liquidation.
         const sold=[],failed=[];
+        const futuresResult=await futuresShort.closeAll();
+        sold.push(...futuresResult.sold);failed.push(...futuresResult.failed);
         if(mode==='live'){
           if(!LIVE || !AUTO_EXECUTION)return send(res,{ok:false,tradeControl,error:'LIVE execution is not enabled; no liquidation was attempted'},409);
           const gate=liveTradingGate(await getApiRestrictions());
@@ -2379,7 +2392,7 @@ const server=http.createServer((req,res)=>{
       entryRsi:BINANCE_ENTRY_RSI,
       entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
-      shortTrading:{enabled:false,market:'SPOT',reason:'SHORT_EXECUTOR_AND_ACCOUNT_REQUIRED'},
+      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
@@ -2657,6 +2670,7 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadPaperState();
   loadLiveActionLog();
   loadDecisionHistory();
+  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
   /* Wyckoff upgrade preserves existing holdings and journals. */
   await refreshUniverse();
 });

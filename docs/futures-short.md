@@ -1,0 +1,37 @@
+# Binance channel SHORT
+
+This adds a separate USDⓈ-M USDT perpetual executor. It does not reinterpret Spot SELL as SHORT, change Spot entry rules, or implement Colmex SHORT.
+
+## Owner policy
+
+- Maximum 70 USDT capital allocation, two positions, equal 35-USDT slots, 1x and Isolated. Each order uses at most 34 USDT notional, reserving 1 USDT per slot for costs. Lot rounding and partial fills may leave different actual amounts.
+- No transfers, withdrawals, loans, auto-add margin, portfolio margin, Multi-Assets or Hedge Mode. Empty candidate symbols can be configured to Isolated and 1x. Auto-add must already be off.
+- Realized losses, USDT commissions and funding reduce the available budget; deposits and profits cannot raise the 70-USDT ceiling. Income truncation, non-USDT costs and a history period over 80 days require review. This allocation cap is not a guaranteed maximum loss: gaps, execution costs and funding can exceed reserves.
+- Scan the top 50 eligible USDT perpetuals by quote volume. 5m futures candles; 100 frozen pre-breakout bars; confirmed swing channel with at least two touches on each side; falling regression and price below its center; fresh closed candle crossing the lower boundary; volume at least 1.5 times the prior 20-bar average and mean dollar volume at least 10,000. Reject gaps, stale quotes, recovered live candles, consumed patterns and targets already reached.
+- Frozen TP = lower breakout boundary minus the full channel width. Owner stop-loss percentage, trailing activation and trailing gap are read from existing settings. A SHORT trailing stop follows the lowest observed ask, and never loosens a previously earned stop. This is sampled, not a tick-by-tick guarantee.
+
+## Execution and recovery
+
+Default disabled. Enabling needs both `BINANCE_FUTURES_SHORT_ENABLED=true` and a valid `BINANCE_FUTURES_SHORT_AFTER` boundary; only later signals qualify. Common pause/resume applies to entries; existing owned positions remain managed. Stop-all includes owned Futures positions. Futures ledger and API host are separate from Spot. Account data is returned only to authenticated devices in `/api/binance-mode`.
+
+Entry uses a bounded SELL LIMIT IOC. The actual fill creates the position, including partial fills. Native BUY closePosition STOP_MARKET and TAKE_PROFIT_MARKET algos are verified using their saved IDs. Trigger basis is CONTRACT_PRICE. A tighter native stop is installed and verified before removing the previous one. Software exits use BUY MARKET reduceOnly. The two native orders are not an atomic bracket: there is a short unprotected window after entry; protection failure triggers an attempted reduce-only close and a persistent entry halt. Network failure may delay that close.
+
+A durable intent is saved before each trade or protection write. Unknown trade results are queried by the original ID and are never blindly resubmitted. An unresolved trade can block subsequent software orders; already installed native protections remain with Binance. Pending algo IDs are queried, not recreated as if they never existed. The serialized loop runs nominally every two seconds; network latency and retries increase that interval.
+
+Unknown positions/orders block entries. Manual changes to direction, size increases or entry price stop automatic ownership assumptions. Do not share an owned Futures symbol with manual trading. A smaller exchange position is reconciled to the remaining quantity. Keep the journal (`BINANCE_FUTURES_SHORT_FILE`, default `LIVE_LOG_FILE + '.futures-short'`) across restarts and upgrades. Do not delete it to clear a halt.
+
+A persistent `halt` requires checking the saved pending ID, actual positions and native orders before recovery. No automatic reset of a reconciliation/protection failure is provided in this release. Contact the maintainer with the sanitized status; do not send API secrets.
+
+## Owner-run installation
+
+Fetch the reviewed commit, extract `scripts/install-futures-short.sh`, then run with the full SHA and one of:
+
+- `--install-only` (default): preserve existing activation state; initially disabled.
+- `--enable-live`: enable SHORT entries with a fresh activation boundary on first activation. Existing active boundaries survive repeat installations.
+- `--disable-entries`: disable new SHORTs, continue managing owned positions.
+
+Installer patches recognized integration anchors, tests against installed dependencies, backs up changed files and restarts `levi-binance`. A failed service verification restores code/configuration. It does not roll back exchange trades or delete the Futures journal. No credentials are printed. Service port verification currently assumes the existing port 8080.
+
+First verify the authenticated SHORT panel and the GET-only `scripts/check-binance-futures-access.mjs`. A zero balance intentionally blocks entry. Passing offline tests or installing the code does not prove a live fill or native protection acceptance. Live order execution has not been tested against the owner's account by the author.
+
+Official endpoint contracts: [Futures trade API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/trade), [Futures account API](https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/account).

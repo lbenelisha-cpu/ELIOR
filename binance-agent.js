@@ -167,7 +167,27 @@ function renderTradeControlStatus(s){
   el.textContent=label+timing+(s.mode==='demo'&&health?.managedPositions>0?' · ניהול החזקות LIVE ממשיך ברקע':'');
 }
 
+function renderFuturesShortStatus(s){
+ const anchor=document.querySelector('#tradeControlStatus');if(!anchor)return;
+ let panel=document.querySelector('#futuresShortStatus');
+ if(!panel){panel=document.createElement('div');panel.id='futuresShortStatus';panel.style.cssText='padding:12px;margin:10px 0;border:1px solid #52647c;border-radius:8px;white-space:pre-line';anchor.insertAdjacentElement('afterend',panel);}
+ const f=s.shortTrading;
+ if(f?.policy?.version!=='FUTURES_CHANNEL_SHORT_V1'){panel.textContent='SHORT Futures: העדכון עדיין לא מותקן בשרת';return;}
+ const p=f.policy;
+ let text='SHORT · USDⓈ-M Perpetual · Isolated · 1x\nתקציב 70 USDT · עד 2 פוזיציות · 35 USDT לכל מקום, כולל רזרבה לעמלות';
+ text+='\n'+(f.enabled?'מסלול מופעל; כל כניסה כפופה לבדיקה חדשה':'כניסות SHORT כבויות');
+ if(f.account)text+=' · יתרה פנויה: '+Number(f.account.availableUsdt).toFixed(2)+' USDT';
+ if(f.reason)text+='\nמצב: '+f.reason;
+ if(f.halt)text+='\nכניסות חסומות עד בדיקת התקלה: '+f.halt;
+ if(Array.isArray(f.positions)){
+  text+='\nפוזיציות SHORT: '+f.positions.length+'/2';
+  for(const row of f.positions)text+='\n'+row.symbol+' · כניסה '+row.entryPrice+' · TP '+row.targetPrice+' · סטופ '+(row.stopPrice??'ממתין לאימות')+' · '+(row.protectedAt?'הגנות אומתו':'הגנות דורשות בדיקה');
+ }else text+='\nחבר מכשיר כדי לראות יתרות ופוזיציות';
+ text+='\n'+(f.checkedAt?'בדיקה אחרונה: '+new Date(f.checkedAt).toLocaleString('he-IL'):'טרם נבדק מול הבורסה');
+ panel.textContent=text;
+}
 function mode(s){
+  renderFuturesShortStatus(s);
   const isDemo=s.mode==='demo';
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
