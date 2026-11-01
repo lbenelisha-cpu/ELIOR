@@ -280,7 +280,7 @@ function observeMaDecision(event){
   const at=event.at??Date.now(),bars=inputBars??dailyCandleCache.get(event.symbol)?.rows??[],bucket=Math.floor(at/600000),old=maAuditContexts.get(event.symbol);
   let snapshots=old?.snapshots;
   if(!old||old.bars!==bars||old.bucket!==bucket){snapshots=auditSnapshots(bars,at);maAuditContexts.set(event.symbol,{bars,bucket,snapshots});}
-  maAudit.record(makeAuditRecord({platform:'BINANCE',at,price:Number(streams[event.symbol]?.lastPrice),priceAt:Number(streams[event.symbol]?.lastEventAt),...details,position:Object.hasOwn(event,'position')?event.position:liveManagedPositions()[event.symbol]||null,positionBars:bars,snapshots}));
+  maAudit.record(makeAuditRecord({platform:'BINANCE',at,price:Number(streams[event.symbol]?.lastPrice),priceAt:streams[event.symbol]?.lastEventAt,...details,position:Object.hasOwn(event,'position')?event.position:liveManagedPositions()[event.symbol]||null,positionBars:bars,snapshots}));
  }catch{maAudit.error='AUDIT_CAPTURE_FAILED';}
 }
 setInterval(()=>{void maAudit.flush();},60000).unref();
