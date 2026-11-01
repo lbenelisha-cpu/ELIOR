@@ -8,16 +8,26 @@
  function view(snapshot,now=Date.now()){
   const f=snapshot?.shortTrading;
   const title='<div class="panel-title-row"><h2>פוזיציות פעילות · SHORT Futures</h2></div>';
-  if(snapshot?.mode==='demo')return title+'<p>פוזיציות SHORT שייכות לחשבון LIVE. עבור לתצוגת LIVE כדי לראות אותן.</p>';
-  if(!f)return title+'<p>ממתין לנתוני SHORT מהשרת…</p>';
-  if(!Array.isArray(f.positions))return title+'<p>נתוני הפוזיציות אינם זמינים. יש לחבר מכשיר כדי לראות את החשבון.</p>';
+  if(snapshot?.mode==='demo')return title+'<p class="quiet-empty">פוזיציות SHORT שייכות לחשבון LIVE. עבור לתצוגת LIVE כדי לראות אותן.</p>';
+  if(!f)return title+'<p class="quiet-empty">ממתין לנתוני SHORT מהשרת…</p>';
+  if(!Array.isArray(f.positions))return title+'<p class="quiet-empty">נתוני הפוזיציות אינם זמינים. יש לחבר מכשיר כדי לראות את החשבון.</p>';
   const rows=f.positions,account=f.account;
-  let html=title+'<p><b>'+rows.length+'/2</b> פוזיציות SHORT · '+(f.enabled?'כניסות מופעלות בכפוף לתנאים':'כניסות כבויות')+' · Isolated · 1x</p>';
-  html+='<p>יתרת ארנק Futures: <b>'+format(account?.walletUsdt,2)+' USDT</b> · יתרה פנויה: <b>'+format(account?.availableUsdt,2)+' USDT</b></p>';
-  html+='<p class="mini">תקציב המסלול: 70 USDT · עד 35 USDT לכל מקום, כולל רזרבה לעמלות · יתרה זו נפרדת מארנק Spot.</p>';
-  if(f.reason)html+='<p>מצב המסלול: <span dir="ltr">'+esc(f.reason)+'</span></p>';
-  if(f.halt)html+='<p class="pnl-loss">כניסות חסומות עד בדיקת התקלה: '+esc(f.halt)+'</p>';
-  if(!fresh(f.checkedAt,now,60000))html+='<p class="pnl-unknown">נתוני המסלול לא עודכנו לאחרונה. מוצגים הנתונים האחרונים שהתקבלו.</p>';
+  const quotesFresh=rows.every(p=>number(p.entryPrice)&&Number(p.entryPrice)>0&&number(p.qty)&&Number(p.qty)>0&&number(p.currentPrice)&&Number(p.currentPrice)>0&&fresh(p.priceAt,now,60000));
+  const totalPnl=quotesFresh&&fresh(f.checkedAt,now,60000)?rows.reduce((sum,p)=>sum+(Number(p.entryPrice)-Number(p.currentPrice))*Number(p.qty),0):null;
+  const signedTotal=number(totalPnl)?(totalPnl>0?'+':'')+format(totalPnl,2):'—';
+  const warning=!!f.halt||!fresh(f.checkedAt,now,60000)||/API_|UNVERIFIED|NETWORK|UNREADABLE/.test(f.reason||'');
+  const stateText=f.halt?'כניסות SHORT חסומות · נדרשת בדיקת התקלה':warning?'נתוני SHORT דורשים בדיקה · מוצג העדכון האחרון':f.enabled?'מסלול SHORT מופעל · כניסה רק לאחר אישור כל התנאים':'כניסות SHORT כבויות';
+  let html=title+'<div class="health-banner" data-state="'+(warning?'warning':f.enabled?'good':'neutral')+'" role="status"><span class="health-dot" aria-hidden="true"></span><span>'+stateText+'</span></div>';
+  const card=(label,value,note,extra='',sign='')=>'<article class="metric-card '+extra+'"><span>'+label+'</span><strong'+(sign?' data-sign="'+sign+'"':'')+'>'+value+'</strong><small>'+note+'</small></article>';
+  const art='<svg class="metric-art" viewBox="0 0 120 50" aria-hidden="true"><circle cx="24" cy="50" r="46" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="32" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="18" fill="none" stroke="currentColor"/></svg>';
+  html+='<div class="overview-metrics">';
+  html+=card('יתרת ארנק Futures · USDT',format(account?.walletUsdt,2),'יתרת הארנק · ללא רווח / הפסד פתוח'+art,'featured');
+  html+=card('מזומן זמין · Futures',format(account?.availableUsdt,2),'USDT פנויים להקצאה');
+  html+=card('רווח / הפסד לא ממומש · USDT',signedTotal,number(totalPnl)?'לפני עמלות ומימון · לפי מחיר Ask':'ממתין למחירים עדכניים','',totalPnl>0?'positive':totalPnl<0?'negative':'');
+  const dots='<div class="slot-dots" aria-hidden="true">'+[0,1].map(i=>'<i'+(i<rows.length?' class="used"':'')+'></i>').join('')+'</div>';
+  html+=card('פוזיציות SHORT פעילות',rows.length+'/2',dots+'עד 35 USDT לכל מקום · כולל רזרבה לעמלות');
+  html+='</div><div class="workspace-heading"><h2>הפוזיציות שלך · SHORT</h2><span class="mode-tag">USDⓈ-M · Isolated · 1x</span></div>';
+  html+='<details class="mini"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>תקציב 70 USDT · ארנק Futures נפרד מ־Spot</p><p dir="ltr">'+esc(f.halt||f.reason||'')+'</p></details>';
   html+='<div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table wide-table"><thead><tr><th>נכס / כיוון</th><th>מועד כניסה</th><th>כמות</th><th>מחיר כניסה</th><th>מחיר נוכחי (Ask)</th><th>סכום כניסה USDT</th><th>רווח / הפסד USDT</th><th>רווח / הפסד %</th><th>יעד רווח TP</th><th>סטופ נוכחי</th><th>הגנות</th></tr></thead><tbody>';
   for(const p of rows){
    const valid=number(p.entryPrice)&&Number(p.entryPrice)>0&&number(p.qty)&&Number(p.qty)>0;
