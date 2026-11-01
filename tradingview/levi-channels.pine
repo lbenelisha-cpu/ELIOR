@@ -1,7 +1,7 @@
 //@version=6
 indicator("LEVI · Swing channel + Regression", overlay=true, max_lines_count=10, max_labels_count=6, max_bars_back=300)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
-int n = input.int(100, "Closed bars", minval=20, maxval=200)
+int n = input.int(50, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
 bool confirmedOnly = input.bool(false, "Require two touches on each swing boundary")
 var array<line> drawings = array.new<line>()
