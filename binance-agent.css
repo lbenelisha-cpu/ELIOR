@@ -462,3 +462,11 @@ linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px),
 .channel-watch-badge{color:#ffe49a;font-weight:600;line-height:1.5;white-space:normal;}
 @keyframes channelWatchPulse{0%,100%{background-color:#302a17}50%{background-color:#62501c}}
 @media(prefers-reduced-motion:reduce){.asset-table tbody tr.channel-watch:not(.active-position) td{animation:none;background-color:#39301b;}}
+
+/* Count the same confirmed pivots used by the orange channel drawing. */
+.channel-touch-badge{position:absolute;z-index:3;max-width:min(245px,72%);padding:7px 11px;background:rgba(84,57,16,.94);border:1px solid #b98232;border-radius:5px;color:#ffe3ae;box-shadow:0 3px 12px #0005;pointer-events:none;text-align:right;direction:rtl;font-size:12px;line-height:1.5;}
+.channel-touch-badge[hidden]{display:none;}
+.channel-touch-badge strong,.channel-touch-badge span{display:block;white-space:normal;}
+.channel-touch-badge strong{font-size:12px;}
+.channel-touch-badge[data-state="confirmed"]{border-color:#ffb454;color:#fff0d4;}
+@media(max-width:600px){.channel-touch-badge{font-size:11px;padding:5px 7px;max-width:69%;}.channel-touch-badge strong{font-size:11px;}}

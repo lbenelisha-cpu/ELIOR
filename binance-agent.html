@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="/binance-agent.css?v=20261101-watch">
+  <link rel="stylesheet" href="/binance-agent.css?v=20261101-channel-touches">
 <link rel="stylesheet" href="/tradingview-exit-snapshot.css?v=20261031-exit-levels"><link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
   <link rel="stylesheet" href="/binance-dashboard.css?v=20261030-news-nav">
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-entry-alpha">
@@ -259,6 +259,7 @@
         <div id="chartPriceLegend" class="chart-price-legend" aria-label="מקרא מחירי העסקה" hidden></div>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
+          <div id="channelTouchBadge" class="channel-touch-badge" role="status" hidden></div>
           <div id="wyckoffPivots" class="wyckoff-pivots"></div>
           <div id="wyckoffOccurrences" class="wyckoff-occurrences"></div>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
@@ -457,11 +458,11 @@
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261031-channel-tp-v2"></script>
-  <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261031-channel-primary"></script>
+  <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261101-watch"></script>
   <script src="/binance-futures-positions.js?v=20261101-channel-watch"></script>
-  <script src="/binance-agent.js?v=20261101-chart-terminal-2"></script>
+  <script src="/binance-agent.js?v=20261101-channel-touches"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>

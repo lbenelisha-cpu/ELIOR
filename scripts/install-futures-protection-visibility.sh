@@ -16,7 +16,7 @@ current_hash=$(sha256sum lib/futures-short-runner.mjs | cut -d ' ' -f 1)
 new_hash=$(sha256sum "$stage/release/lib/futures-short-runner.mjs" | cut -d ' ' -f 1)
 [[ "$current_hash" == "$old_hash" || "$current_hash" == "$new_hash" ]] || { echo 'Unknown SHORT runner version; nothing changed.' >&2; exit 1; }
 cp -a lib "$stage/runtime/lib"
-cp server.mjs binance-agent.js "$stage/runtime/"
+cp server.mjs binance-agent.js regression-trend.js parallel-channel.js "$stage/runtime/"
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
 cp "$stage/release/lib/futures-short-runner.mjs" "$stage/release/lib/futures-short-recovery.mjs" "$stage/runtime/lib/"
 node --test "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs"

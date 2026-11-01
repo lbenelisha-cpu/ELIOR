@@ -31,6 +31,10 @@
   return eligible[0]||{ready:false,reason:'NO_VALID_SWINGS'};
  }
  function describe(a){return !a?.ready?'תעלה מקבילה · אין מספיק נקודות קיצון מאושרות לתעלה תקפה':'תעלה מקבילה · כתום · '+a.lowTouches+' נגיעות תחתונות / '+a.highTouches+' עליונות · '+(a.provisional?'ראשונית — חסרה נגיעה שנייה באחד הגבולות':'לפחות שתי נגיעות בכל גבול')+' · קיצון מאושר אחרי שני נרות נוספים · המרכז הוא אמצע התעלה · הגעה לגבול הנגדי אינה מובטחת';}
+ function badge(a){
+  if(!a?.ready||!Number.isInteger(a.lowTouches)||!Number.isInteger(a.highTouches))return null;
+  return {title:'תעלת קיצון · '+(a.provisional?'זמנית':'מאושרת'),counts:'למעלה: '+a.highTouches+' · למטה: '+a.lowTouches+' נגיעות',provisional:!!a.provisional};
+ }
  function draw(args){
   const {ctx,analysis:a,view,x,y,bounds}=args;if(!a?.ready)return;
   const points=view.map((b,i)=>({at:+b.openTime,i})).filter(b=>b.at>=a.anchorStart&&b.at<=a.end);if(points.length<2)return;
@@ -38,5 +42,5 @@
   ctx.save();ctx.beginPath();ctx.rect(bounds.left,bounds.top,bounds.right-bounds.left,bounds.bottom-bounds.top);ctx.clip();
   for(const key of ['upper','middle','lower']){ctx.strokeStyle='#ffb454';ctx.lineWidth=key==='middle'?1:2;ctx.setLineDash(key==='middle'?[2,5]:[10,4]);ctx.beginPath();ctx.moveTo(x(first.i),y(p[key]));ctx.lineTo(x(last.i),y(q[key]));ctx.stroke();}ctx.restore();
  }
- root.LEVI_PARALLEL=Object.freeze({analyze,describe,draw});
+ root.LEVI_PARALLEL=Object.freeze({analyze,describe,draw,badge});
 })(globalThis);
