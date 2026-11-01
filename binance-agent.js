@@ -871,14 +871,14 @@ function chartSellLevel(data,liveAccount,mode,symbol){
  return {price:stop,reason:strategy.profitProtectionPending?'עצירת הפסד · הגנת רווח תופעל ב־'+tradeExecutionTime(strategy.profitProtectionStartsAt):strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
 }
 
-function renderPositionPoints(view,step,left,y,digits){
+function renderPositionPoints(view,step,left,y,digits,plotBounds=null){
  const root=$('#wyckoffPivots');if(!root)return;
  const level=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);if(!level)return;
  const strategy=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
  for(const [kind,label,at,price] of [['buy','קנייה בפועל',strategy.entryAt,strategy.entryPrice],['peak','השיא מאז הקנייה',strategy.peakAt,strategy.peakPrice]]){
   const time=Date.parse(at);if(!Number.isFinite(time)||!(Number(price)>0))continue;
   const index=view.findIndex(c=>time>=Number(c.openTime)&&time<=Number(c.closeTime));if(index<0)continue;
-  const yy=y(Number(price));if(yy<94||yy>root.clientHeight-112)continue;
+  const yy=y(Number(price));if(yy<(plotBounds?.top??94)||yy>(plotBounds?.bottom??root.clientHeight-112))continue;
   const dot=document.createElement('button');dot.type='button';dot.className='position-candle-hit';
   dot.style.left=(left+step*(index+.5))+'px';dot.style.top=Math.min(y(Number(view[index].high)),y(Number(view[index].low)))-5+'px';dot.style.width=Math.max(12,step*.7)+'px';dot.style.height=Math.max(16,Math.abs(y(Number(view[index].high))-y(Number(view[index].low)))+10)+'px';
   dot.title=label+' · '+fmt(price,digits)+' USDT · '+tradeExecutionTime(at);dot.setAttribute('aria-label',dot.title);
@@ -991,7 +991,9 @@ function drawCandles(candles){
   const priceDigits=autoDigits;
   put('#pricePrecisionValue',priceRangeScale===1?'אוטומטי':fmt(1/priceRangeScale,2)+'×');
 
-  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=130,bottom=112;
+  const setupInView=setup=>Object.values(setup||{}).some(p=>p&&Number(p.time)>=Number(view[0].openTime)&&Number(p.time)<=Number(view.at(-1).closeTime));
+  const hasPivotLabels=setupInView(selectedPosition.setup)||setupInView(displayedWyckoffSetup(selectedSymbol,currentMode)?.setup)||chartWyckoffHistory.some(item=>setupInView(item.setup));
+  const left=18,right=Math.min(120,Math.max(70,priceDigits*7+25)),top=hasPivotLabels?130:48,bottom=hasPivotLabels?112:60;
   const cw=W-left-right,ch=H-top-bottom;
   const y=v=>top+(max-v)/(max-min)*ch;
   const step=cw/view.length;
@@ -1076,7 +1078,7 @@ function drawCandles(candles){
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
   renderNumberedWyckoff(view,step,left,y,priceDigits);
-  renderPositionPoints(view,step,left,y,priceDigits);
+  renderPositionPoints(view,step,left,y,priceDigits,{top,bottom:top+ch});
 
   const labelCount=Math.max(2,Math.min(5,Math.floor(cw/150)));
   ctx.textAlign='center';
@@ -1090,7 +1092,7 @@ function drawCandles(candles){
     const d=new Date(c.openTime);
     const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(d).split(', ');
     const labelX=Math.max(55,Math.min(W-right-45,x));
-    ctx.fillText(parts[0],labelX,H-86);ctx.fillText(parts[1]||'',labelX,H-71);
+    ctx.fillText(parts[0],labelX,axisY+18);ctx.fillText(parts[1]||'',labelX,axisY+33);
   }
   chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
   chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
