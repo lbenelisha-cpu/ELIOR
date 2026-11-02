@@ -9,7 +9,7 @@ export function renderRsiChart(root,bars,live=null){
  const snapshot=currentRsiValue(bars,live,{marketClosed,isSessionGap:stockSessionGap});if(!snapshot.live)live=null;
  const rows=[...(bars||[])];if(live)rows.push(live);
  const entryMax=window.LEVI_COLMEX_STATUS?.data?.policy?.entryRsi?.max??40;
- const title=document.createElement('p');title.textContent='RSI (14) · נרות 5 דקות · תנאי כניסה: Spring ו־RSI בין 0 ל־'+entryMax+' · ללא דרישת מגמת שעה';root.append(title);
+ const title=document.createElement('p');title.textContent='RSI (14) · נרות 5 דקות · תצוגת עזר. תנאי הכניסה נקבעים לפי המסלול הפעיל בשרת; במסלול התעלות אין תנאי כניסה של RSI.';root.append(title);
  if(rows.length<15){const p=document.createElement('p');p.textContent='נדרשים לפחות 15 מחירי נרות לחישוב RSI';root.append(p);return;}
  const values=rsiSeries(rows.map(b=>Number(b.close))),cut=Math.max(0,rows.length-156),view=values.slice(cut),ns='http://www.w3.org/2000/svg';
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 850 180');svg.setAttribute('role','img');svg.setAttribute('aria-label','RSI 14 בטווח 0 עד 100');svg.style.width='100%';root.append(svg);
