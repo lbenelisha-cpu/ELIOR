@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {futuresFillPrice} from '../lib/futures-short-fill.mjs';
 import {prepareRoundedFillRecovery} from '../lib/futures-short-ownership-recovery.mjs';
 const symbol='IDOLUSDT',old=.0234917,qty=1445,exact=33.945447/qty,client='lvs-'+'a'.repeat(28);
-const order={symbol,orderId:826920194,clientOrderId:client,status:'FILLED',side:'SELL',positionSide:'BOTH',type:'LIMIT',timeInForce:'IOC',executedQty:'1445',avgPrice:'0.0234917',cumQuote:'33.9454470'};
+const order={symbol,orderId:7,clientOrderId:client,status:'FILLED',side:'SELL',positionSide:'BOTH',type:'LIMIT',timeInForce:'IOC',executedQty:'1445',avgPrice:'0.0234917',cumQuote:'33.9454470'};
 function fixture(){
  const state={version:'FUTURES_CHANNEL_SHORT_V1',halt:'FUTURES_POSITION_OWNERSHIP_CHANGED',startedAt:100,used:[{symbol,patternId:'consumed'}],closed:[{reason:'old'}],pending:null,positions:{[symbol]:{symbol,qty,entryPrice:old,entryOrderId:order.orderId,lowPrice:old,targetPrice:.0233447,settings:{stopLossPct:1},algos:[],protectedAt:null}}};
  const account={canTrade:true,multiAssetsMargin:false,positions:[{symbol,positionSide:'BOTH',positionAmt:'-1445',entryPrice:'0.0234916588235',isolated:true,leverage:'1'}]};
