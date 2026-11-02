@@ -5,7 +5,8 @@ import {FuturesShortRunner} from './lib/futures-short-runner.mjs';
 import {shortConfig} from './lib/futures-short-policy.mjs';
 import {channelEntryConfig,assertChannelSubmission} from './lib/channel-primary-entry.mjs';
 import {observeChannels} from './lib/channel-comparison.mjs';
-import {newsConfig,assessNewsEntry} from './lib/market-news.mjs';
+import {newsConfig} from './lib/market-news.mjs';
+import {ATTENTION_POLICY,newsAttention,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from './lib/market-attention.mjs';
 import {fileNewsCollector} from './lib/market-news-file.mjs';
 import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
@@ -112,11 +113,12 @@ const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
 const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
 const independentEntry=independentEntryConfig(process.env);
 const channelPrimary=channelEntryConfig(process.env);
-const marketNewsConfig=newsConfig(process.env);
+const marketNewsConfig={...newsConfig(process.env),enabled:false,error:null,policy:'OBSERVATION_ONLY',scope:'ASSET_WATCH'};
 const marketNews=fileNewsCollector(process.env.MARKET_NEWS_FILE||'/var/data/market-news.json');
-function newsEntryAssessment(symbol){return assessNewsEntry(marketNews.snapshot(),symbol,marketNewsConfig);}
-function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade).map(e=>({...e,newsDecision:newsEntryAssessment(e.symbol)})).filter(e=>e.newsDecision.action!=='BLOCK').sort((a,b)=>b.newsDecision.priority-a.newsDecision.priority);}
-function newsChannelSnapshot(){const data=marketNews.snapshot();const assets=[...new Set(data.items.flatMap(r=>r.assets.filter(a=>a.id.startsWith('crypto:')).map(a=>a.id.slice(7)+'USDT')))];return {...data,config:marketNewsConfig,executionEnabled:marketNewsConfig.enabled&&mode==='live'&&LIVE&&AUTO_EXECUTION,decisions:assets.map(s=>({symbol:s,...newsEntryAssessment(s)}))};}
+function newsEntryAssessment(symbol){return {action:'NONE',priority:0,reason:'OBSERVATION_ONLY',symbol};}
+function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade);}
+function newsChannelSnapshot(){const data=marketNews.snapshot(),now=Date.now();const assets=[...new Set(data.items.flatMap(r=>r.assets.map(a=>a.id.split(':')[1]+(a.id.startsWith('crypto:')?'USDT':''))))];return {...data,config:marketNewsConfig,executionEnabled:false,decisions:[],attention:assets.map(symbol=>({symbol,...newsAttention(data,symbol,now)}))};}
+function marketAttentionSnapshot(){return attentionSnapshot({state:strategyReviewState,news:marketNews.snapshot(),symbols:SYMBOLS,mode,storageError:strategyReviewError,diagnostics:strategyReviewState.entryComparison?.diagnostics,shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason});}
 const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
@@ -877,7 +879,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
   }
 
-  if(reason!=='MANUAL_BUY'){const newsDecision=newsEntryAssessment(symbol);if(newsDecision.action==='BLOCK')throw Error(newsDecision.reason);meta={...meta,newsDecision};}
+  // News changes observation attention only; execution uses the existing technical/account checks.
   if(reason!=='MANUAL_BUY'&&pocEntries.reserved(symbol,'LONG'))throw Error('POC_PENDING_FOR_SYMBOL');
   if(pocGuard)await pocGuard();
   const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
@@ -1578,7 +1580,7 @@ async function evaluateSymbol(s){
         if(!['independent_breakout','channel_breakout'].includes(ev.wyckoffTrade.entryMode))ev.wyckoffTrade.entryPolicyVersion=ENTRY_POLICY_VERSION;
       }
     }
-    if(!p&&mode==='live'){ev.newsDecision=newsEntryAssessment(s);if(ev.entryConfirmed&&ev.newsDecision.action==='BLOCK'){ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';ev.buyReason=ev.newsDecision.reason;ev.wyckoffTrade=null;if(ev.strategy)ev.strategy.buyConfirmed=false;}}
+    if(!p&&mode==='live')ev.newsDecision=newsEntryAssessment(s);
     ev.demoTradable=DEMO_TRADING?(await demoTradableSymbols()).has(s):true;
     ev.decisionPriceSource=ev.strategy?.entryMode==='early_wave_live'?'LIVE_EARLY_WAVE_BREAKOUT':ev.strategy?.entryRsi!=null?'LIVE_SPRING_RSI_0_'+BINANCE_ENTRY_RSI.max:ev.strategy?.wyckoff?.confirmation?.live?'LIVE_PRICE_CONFIRMED_AFTER_5M_SPRING':'5M_CONFIRMED_WITH_LIVE_EXECUTION';
     if(mode==='live')observeMaDecision({symbol:s,position:p||null,at:Date.parse(ev.at),bars:rsiBars,price:Number(ev.strategy?.price),priceAt:ev.priceAsOf,action:ev.entryConfirmed?'ENTER':ev.rawDecision==='SELL'?'EXIT':p?'HOLD':'WAIT',reason:ev.buyReason||ev.rawDecision});
@@ -2446,7 +2448,7 @@ const server=http.createServer((req,res)=>{
       liveState:authorized?liveReadiness():null,
       hourlyTrendFilter:HOURLY_TREND_RULE,
       entryRsi:BINANCE_ENTRY_RSI,
-      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
+      entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,marketAttention:ATTENTION_POLICY,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
@@ -2589,6 +2591,7 @@ const server=http.createServer((req,res)=>{
     const wyckoffStats={...tradeCounts(statsActions,{dustThresholdUsdt:mode==='live'?5:1}),fees:tradeFeeTotals(statsActions),scope:'available_execution_journal'};
     return send(res,{
       wyckoffStats,
+      marketAttention:marketAttentionSnapshot(),
       mode,
       tradeControl,
       symbols:SYMBOLS,
@@ -2714,10 +2717,10 @@ async function refreshEntryComparison(){
  comparisonReading=true;
  try{
   const open=(strategyReviewState.entryComparison?.cohorts||[]).flatMap(c=>Object.values(c.items).filter(i=>Object.values(i.methods).some(m=>m.position||m.pending)).map(i=>i.symbol));
-  for(const symbol of new Set([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})])){
+  for(const symbol of prioritizeObservationSymbols([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})],marketNews.snapshot())){
    if(mode!=='live')break;
-   try{const bars=await candles(symbol);observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
-   catch{recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}
+   try{const bars=await candles(symbol);recordAttention(strategyReviewState,{symbol,bars,at:Date.now()});observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
+   catch{recordAttention(strategyReviewState,{symbol,at:Date.now(),error:'HISTORY_UNAVAILABLE'});recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}
    saveStrategyReview();
   }
  }finally{comparisonReading=false;}

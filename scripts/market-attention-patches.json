@@ -1,0 +1,77 @@
+[
+  {
+    "file": "server.mjs",
+    "before": "import {newsConfig,assessNewsEntry} from './lib/market-news.mjs';",
+    "after": "import {newsConfig} from './lib/market-news.mjs';\nimport {ATTENTION_POLICY,newsAttention,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from './lib/market-attention.mjs';"
+  },
+  {
+    "file": "server.mjs",
+    "before": "const marketNewsConfig=newsConfig(process.env);",
+    "after": "const marketNewsConfig={...newsConfig(process.env),enabled:false,error:null,policy:'OBSERVATION_ONLY',scope:'ASSET_WATCH'};"
+  },
+  {
+    "file": "server.mjs",
+    "before": "function newsEntryAssessment(symbol){return assessNewsEntry(marketNews.snapshot(),symbol,marketNewsConfig);}",
+    "after": "function newsEntryAssessment(symbol){return {action:'NONE',priority:0,reason:'OBSERVATION_ONLY',symbol};}"
+  },
+  {
+    "file": "server.mjs",
+    "before": "function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade).map(e=>({...e,newsDecision:newsEntryAssessment(e.symbol)})).filter(e=>e.newsDecision.action!=='BLOCK').sort((a,b)=>b.newsDecision.priority-a.newsDecision.priority);}",
+    "after": "function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade);}"
+  },
+  {
+    "file": "server.mjs",
+    "before": "function newsChannelSnapshot(){const data=marketNews.snapshot();const assets=[...new Set(data.items.flatMap(r=>r.assets.filter(a=>a.id.startsWith('crypto:')).map(a=>a.id.slice(7)+'USDT')))];return {...data,config:marketNewsConfig,executionEnabled:marketNewsConfig.enabled&&mode==='live'&&LIVE&&AUTO_EXECUTION,decisions:assets.map(s=>({symbol:s,...newsEntryAssessment(s)}))};}",
+    "after": "function newsChannelSnapshot(){const data=marketNews.snapshot(),now=Date.now();const assets=[...new Set(data.items.flatMap(r=>r.assets.map(a=>a.id.split(':')[1]+(a.id.startsWith('crypto:')?'USDT':''))))];return {...data,config:marketNewsConfig,executionEnabled:false,decisions:[],attention:assets.map(symbol=>({symbol,...newsAttention(data,symbol,now)}))};}\nfunction marketAttentionSnapshot(){return attentionSnapshot({state:strategyReviewState,news:marketNews.snapshot(),symbols:SYMBOLS,mode,storageError:strategyReviewError,diagnostics:strategyReviewState.entryComparison?.diagnostics,shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason});}"
+  },
+  {
+    "file": "server.mjs",
+    "before": "  if(reason!=='MANUAL_BUY'){const newsDecision=newsEntryAssessment(symbol);if(newsDecision.action==='BLOCK')throw Error(newsDecision.reason);meta={...meta,newsDecision};}",
+    "after": "  // News changes observation attention only; execution uses the existing technical/account checks."
+  },
+  {
+    "file": "server.mjs",
+    "before": "    if(!p&&mode==='live'){ev.newsDecision=newsEntryAssessment(s);if(ev.entryConfirmed&&ev.newsDecision.action==='BLOCK'){ev.entryConfirmed=false;ev.entryEligible=false;ev.buyQualified=false;ev.rawDecision='HOLD';ev.buyReason=ev.newsDecision.reason;ev.wyckoffTrade=null;if(ev.strategy)ev.strategy.buyConfirmed=false;}}",
+    "after": "    if(!p&&mode==='live')ev.newsDecision=newsEntryAssessment(s);"
+  },
+  {
+    "file": "server.mjs",
+    "before": "marketNews:marketNewsConfig,researchMonitoring:",
+    "after": "marketNews:marketNewsConfig,marketAttention:ATTENTION_POLICY,researchMonitoring:"
+  },
+  {
+    "file": "server.mjs",
+    "before": "      wyckoffStats,\n      mode,",
+    "after": "      wyckoffStats,\n      marketAttention:marketAttentionSnapshot(),\n      mode,"
+  },
+  {
+    "file": "server.mjs",
+    "before": "  for(const symbol of new Set([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})])){",
+    "after": "  for(const symbol of prioritizeObservationSymbols([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})],marketNews.snapshot())){"
+  },
+  {
+    "file": "server.mjs",
+    "before": "try{const bars=await candles(symbol);observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});",
+    "after": "try{const bars=await candles(symbol);recordAttention(strategyReviewState,{symbol,bars,at:Date.now()});observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});"
+  },
+  {
+    "file": "server.mjs",
+    "before": "   catch{recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}",
+    "after": "   catch{recordAttention(strategyReviewState,{symbol,at:Date.now(),error:'HISTORY_UNAVAILABLE'});recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}"
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "</head>",
+    "after": "  <link rel=\"stylesheet\" href=\"/market-attention.css?v=20261103-attention\">\n</head>"
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "<details id=\"strategyReviewPanel\"",
+    "after": "<section id=\"marketAttentionPanel\" class=\"attention-panel app-view trade-view scans-view\" aria-label=\"איתותי חדשות ותצפיתנים\"><h2>איתותים ותצפיתנים</h2><p>ממתין למידע מהשרת. נדרש חיבור המכשיר לצפייה בתצפיות.</p></section>\n<details id=\"strategyReviewPanel\""
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "  <script src=\"/binance-poc.js?v=20261103-poc\"></script>",
+    "after": "  <script src=\"/binance-poc.js?v=20261103-poc\"></script>\n  <script src=\"/market-attention.js?v=20261103-attention\"></script>"
+  }
+]

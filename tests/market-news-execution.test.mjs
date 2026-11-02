@@ -18,15 +18,17 @@ function executor({manual=false,blocked=false,late=false}={}){
  vm.createContext(context);vm.runInContext(buy,context);
  return {writes,checks,run:()=>context.placeLiveMarketBuy('BTCUSDT',20,manual?'MANUAL_BUY':'READY',{wyckoffTrade:{entryMode:'test'}})};
 }
-test('final automatic BUY rechecks news after history reads and records evidence without changing order sizing',async()=>{
- const good=executor();await good.run();assert.equal(good.writes.length,1);assert.equal(Number(good.writes[0].params.quoteOrderQty),20);assert.equal(good.writes[0].meta.meta.newsDecision.evidence[0].id,'news-proof');
- for(const opt of [{blocked:true},{late:true}]){const x=executor(opt);await assert.rejects(x.run,/NEWS_NETWORK_OUTAGE/);assert.equal(x.writes.length,0);}
- const manual=executor({manual:true,blocked:true});await manual.run();assert.equal(manual.writes.length,1);assert.equal(manual.checks.length,0);
+test('news never changes final automatic or manual submission, sizing or protection',async()=>{
+ for(const opt of [{},{blocked:true},{late:true},{manual:true,blocked:true}]){
+  const x=executor(opt);await x.run();assert.equal(x.writes.length,1);assert.equal(Number(x.writes[0].params.quoteOrderQty),20);assert.equal(x.checks.length,0);
+ }
 });
-test('priority only sorts technical candidates; veto removes entries, neither news state nor outage affects sell function',()=>{
+test('news cannot filter, reorder or create technical candidates and does not enter exits',()=>{
  const start=source.indexOf('function newsEntryCandidates('),end=source.indexOf('\nfunction newsChannelSnapshot',start);
- const context=vm.createContext({newsEntryAssessment:s=>({action:s==='VETO'?'BLOCK':s==='GOOD'?'PRIORITIZE':'NONE',priority:s==='GOOD'?1:0})});vm.runInContext(source.slice(start,end),context);
+ const context=vm.createContext({newsEntryAssessment:()=>{throw Error('news must not affect candidates');}});vm.runInContext(source.slice(start,end),context);
  const candidate=s=>({symbol:s,ok:true,entryConfirmed:true,wyckoffTrade:{}});
- assert.deepEqual(Array.from(context.newsEntryCandidates([candidate('NORMAL'),candidate('GOOD'),candidate('VETO'),{...candidate('NO_TECHNICAL'),entryConfirmed:false}]),x=>x.symbol),['GOOD','NORMAL']);
+ assert.deepEqual(Array.from(context.newsEntryCandidates([candidate('NORMAL'),candidate('GOOD'),candidate('VETO'),{...candidate('NO_TECHNICAL'),entryConfirmed:false}]),x=>x.symbol),['NORMAL','GOOD','VETO']);
  const sell=source.slice(source.indexOf('async function placeLiveMarketSell('),source.indexOf('async function executeLiveCycle('));assert.doesNotMatch(sell,/newsEntryAssessment|marketNews/);
+ assert.match(source,/const marketNewsConfig=\{\.\.\.newsConfig\(process.env\),enabled:false/);
+ const evaluate=source.slice(source.indexOf('async function evaluateSymbol('),source.indexOf('function setAgentFromEval('));assert.doesNotMatch(evaluate,/newsDecision.action/);
 });
