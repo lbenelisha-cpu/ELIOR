@@ -24,7 +24,9 @@ const server=http.createServer((req,res)=>{`);
     '/binance-trading-pnl.js':['binance-trading-pnl.js','text/javascript'],
     '/binance-trading-pnl.css':['binance-trading-pnl.css','text/css'],`);
  change('lib/futures-short-api.mjs',"'/fapi/v1/openOrders','/fapi/v1/openAlgoOrders'","'/fapi/v1/userTrades','/fapi/v1/openOrders','/fapi/v1/openAlgoOrders'");
- for(const file of ['binance-agent.js','netlify/functions/binance-read-proxy.mjs'])change(file,"'/api/binance-action-log','/api/binance-trade-history'","'/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history'");
+ change('binance-agent.js',"'/api/binance-action-log','/api/binance-trade-history'","'/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history'");
+ const proxyFile='netlify/functions/binance-read-proxy.mjs';
+ if(!fs.readFileSync(path.join(root,proxyFile),'utf8').includes("'/api/binance-trading-pnl'"))change(proxyFile,'const READ_PATHS=new Set([',"const READ_PATHS=new Set(['/api/binance-trading-pnl',");
  change('binance-agent.js',"activeView=['trade','portfolio','scans','journal'].includes(view)?view:'trade';","activeView=['trade','portfolio','scans','journal','pnl'].includes(view)?view:'trade';");
  change('binance-agent.js',"  const grid=$('.trading-grid');","  window.dispatchEvent(new CustomEvent('levi:trading-pnl-view'));\n  const grid=$('.trading-grid');");
  change('binance-agent.html','<button class="nav-pill" data-view="journal">יומן פעולות</button>','<button class="nav-pill" data-view="journal">יומן פעולות</button>\n        <button class="nav-pill" data-view="pnl">רווח והפסד</button>');
