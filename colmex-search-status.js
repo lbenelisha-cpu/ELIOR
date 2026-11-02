@@ -1,4 +1,4 @@
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261026-quality';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261102-channels';
 const reasons={INITIAL_PEAK_REACHED:'המחיר חזר לשיא הראשוני לפני השלמת התבנית',LOW_BROKEN_BEFORE_TEST:'השפל הראשון נשבר לפני שאושרה בדיקה חוזרת',LOW_BROKEN_BEFORE_CONSOLIDATION:'השפל הראשון נשבר לפני שלב הדשדוש',LOW_BROKEN_TOO_EARLY:'השפל הראשון נשבר לפני שהושלמו שלושה נרות דשדוש',NEWER_PEAK:'זוהה שיא מקומי חדש והחיפוש עבר לתבנית עדכנית',SPRING_EXPIRED:'חלון ה־Spring הסתיים בלי כניסה',SETUP_EXPIRED:'התבנית לא הושלמה בתוך חלון החיפוש',CONFIRMATION_ENDED:'אישור התבנית הקודמת פג או נפסל'};
 const time=at=>Number.isFinite(at)?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'—';
 const price=n=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:6}):'—';
@@ -8,9 +8,18 @@ export function searchResetText(reset){
  const values=reset.reason.startsWith('LOW_BROKEN')?' · שפל קודם '+price(reset.firstLow?.price)+' ← שפל בנר '+price(reset.barLow):reset.reason==='INITIAL_PEAK_REACHED'?' · שיא קודם '+price(reset.initialPeak?.price)+' ← גבוה בנר '+price(reset.barHigh):'';
  return time(reset.at)+' · '+(reasons[reset.reason]||'החיפוש התחיל מחדש')+values;
 }
-export function renderSearchStatus(host,diagnostic,{symbol='',check=null,position=false,manual=false,progress=null,scan=null}={}){
+export function renderSearchStatus(host,diagnostic,{symbol='',check=null,position=false,manual=false,progress=null,scan=null,channelPrimary=null}={}){
  if(!host)return;host.replaceChildren();
  const add=(tag,text,cls)=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;host.append(el);return el;};
+ if(channelPrimary?.requested&&!manual&&!position){
+  add('strong',symbol+' · חיפוש כניסה לפי תעלת קיצון ורגרסיה');
+  if(scan)add('p',scan.scanText,'search-coverage');
+  if(!channelPrimary.enabled)add('p','כניסות חסומות: נדרש זמן הפעלה תקין למסלול התעלות.');
+  else if(check?.entryDecisions?.primary==='channel_breakout')add('p','בדיקת שרת אחרונה: '+time(check.at)+' · '+entryReasonLabel(check.reason),'search-server-check');
+  else add('p','ממתין לבדיקה מתועדת במסלול התעלות; בדיקות מהמסלול הקודם אינן איתות כניסה.');
+  add('small','50 נרות לפני הפריצה · שתי נגיעות בכל גבול · רגרסיה עולה · סגירת פריצה ומחזור. הסימון בגרף הוא תצוגה; ההחלטה נקבעת לפי נתונים עדכניים בשרת.');
+  return;
+ }
  add('strong',symbol+' · '+(manual?'תצוגה ידנית':position?'פוזיציה פתוחה · מוצגות נקודות העסקה':diagnostic?'חיפוש נוכחי: '+entryReasonLabel(diagnostic.phase):'ממתין לנרות לניתוח'));
  if(!manual&&scan)add('p',scan.scanText,'search-coverage');
  if(!manual&&!position&&progress){
