@@ -1,3 +1,5 @@
+> Current policy (2026-11-03): news is observation-only. The legacy entry overlay described below is disabled in the running server regardless of its environment flag. See [market-attention.md](market-attention.md) for watch signals, freshness, verification limits and observers. No news signal blocks, authorizes or reorders an entry.
+
 # Market news channel
 
 `/market-news.html` is a Hebrew RTL news reader linked from Binance, Colmex and
