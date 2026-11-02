@@ -1,4 +1,4 @@
-import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-channels';
+import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-labels-pnl';
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261102-channels';
 import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
@@ -96,7 +96,7 @@ function renderChart(){
   const pulse=marks.some(p=>!p.provisional);for(const el of [line,body]){if(pulse){el.classList.add('sim-candle-flash');el.setAttribute('data-pulse-candle',String(i));}const title=document.createElementNS(ns,'title');title.textContent=b.date+' · O '+b.open+' · H '+b.high+' · L '+b.low+' · C '+b.close;el.append(title);}
   if(marks.length){const hit=add('rect',{x:x(i)-Math.max(6,w/2),y:Math.min(y(b.high),y(b.low))-5,width:Math.max(12,w),height:Math.max(14,Math.abs(y(b.high)-y(b.low))+10),fill:'transparent',stroke:'transparent','data-mark-id':marks.map(m=>m.id).join('|'),tabindex:0,role:'button','aria-label':marks.map(m=>m.name+' '+m.price).join(' · ')});const title=document.createElementNS(ns,'title');title.textContent=marks.map(m=>m.name+' · '+m.price+' USD').join(' / ');hit.append(title);const show=()=>{$('#chartMarkDetails').textContent=marks.map(detail).join(' | ');};hit.onclick=e=>{e.stopPropagation();show();};hit.onpointerdown=e=>e.stopPropagation();hit.onkeydown=e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();e.stopPropagation();show();}};}
  });
- drawColmexChannels({svg,segments,x,y,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
+ const channelLabels=drawColmexChannels({svg,segments,x,y,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
  if(entry>=lo&&entry<=hi)add('line',{x1:15,x2:plotRight,y1:y(entry),y2:y(entry),stroke:'#74b8ff','stroke-dasharray':'6 4'});
  const money=p=>p.toLocaleString('en-US',{maximumFractionDigits:p<10?6:4}),atTime=at=>Number.isFinite(at)?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'זמן שיא לא תועד';
  const detail=point=>point.name+' · '+money(point.price)+' USD'+(Number.isFinite(point.at)?' · '+atTime(point.at):point.kind==='peak'?' · זמן השיא לא תועד':'');
@@ -124,7 +124,7 @@ function renderChart(){
    const top=Math.max(bounds.top,y(b)),bottom=Math.min(bounds.bottom,y(a));if(bottom>top)add('rect',{x:20+plotWidth*.74,y:top,width:plotWidth*.26,height:bottom-top,fill:color,opacity:.13,'pointer-events':'none'});
   }
  }
- root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
+ svg.append(channelLabels);root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
  workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:W,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · '+bars.length+' נרות בחלון הזמן הנבחר.');
  chartTerminal.update({symbol:selected,interval,bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
 }
