@@ -218,7 +218,7 @@ test('restart reconciles a pending protection identity without resubmitting it a
 test('a low-priced weighted fill installs both protections despite rounded order avgPrice',async()=>{
  const h=harness(),client='lvs-'+'a'.repeat(28),qty=1445,exact=33.945447/qty;
  h.runner.state.pending={kind:'ENTRY',params:{symbol:'ABCUSDT',side:'SELL',newClientOrderId:client,quantity:String(qty)},setup:{targetPrice:.0233447},settings};
- await h.runner.finishOrder({symbol:'ABCUSDT',clientOrderId:client,orderId:7,side:'SELL',positionSide:'BOTH',status:'FILLED',executedQty:String(qty),avgPrice:'.0234917'.replace(/^\./,'0.'),cumQuote:'33.9454470'});
+ await h.runner.finishOrder({symbol:'ABCUSDT',clientOrderId:client,orderId:7,side:'SELL',positionSide:'BOTH',status:'FILLED',executedQty:String(qty),avgPrice:'0.0234917',cumQuote:'33.9454470'});
  h.setPositions([{symbol:'ABCUSDT',positionSide:'BOTH',positionAmt:String(-qty),entryPrice:'0.0234916588235'}]);
  h.setQuote({bidPrice:'.02349',askPrice:'.023491'});
  h.runner.infos.ABCUSDT={...info,filters:info.filters.map(f=>f.filterType==='PRICE_FILTER'?{...f,tickSize:'.0000001'}:f)};
