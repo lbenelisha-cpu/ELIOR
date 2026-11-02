@@ -10,12 +10,22 @@ trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/release" "$stage/runtime"
 git archive "$revision" | tar -x -C "$stage/release"
 cp -a "$stage/release/." "$stage/runtime/"
+# Verify both platforms in the complete release before overlaying Binance runtime files.
+tests=(market-attention.test.mjs market-attention-ui.test.mjs market-news.test.mjs market-news-execution.test.mjs channel-primary-entry.test.mjs binance-poc.test.mjs futures-short.test.mjs futures-short-recovery.test.mjs live-execution-lock.test.mjs)
+ln -s /opt/levi-binance/node_modules "$stage/release/node_modules"
+release_tests=()
+for file in "${tests[@]}"; do release_tests+=("$stage/release/tests/$file"); done
+node --test "${release_tests[@]}"
+
 cp -a lib/. "$stage/runtime/lib/"
 cp server.mjs binance-agent.html regression-trend.js parallel-channel.js "$stage/runtime/"
 cp "$stage/release/lib/market-attention.mjs" "$stage/runtime/lib/"
 node "$stage/release/scripts/patch-market-attention.mjs" "$stage/runtime"
 ln -s /opt/levi-binance/node_modules "$stage/runtime/node_modules"
-node --test "$stage/runtime/tests/market-attention.test.mjs" "$stage/runtime/tests/market-attention-ui.test.mjs" "$stage/runtime/tests/market-news.test.mjs" "$stage/runtime/tests/market-news-execution.test.mjs" "$stage/runtime/tests/channel-primary-entry.test.mjs" "$stage/runtime/tests/binance-poc.test.mjs" "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/live-execution-lock.test.mjs"
+# This service runs Binance. Colmex integration was checked in the isolated release above.
+runtime_tests=()
+for file in "${tests[@]}"; do runtime_tests+=("$stage/runtime/tests/$file"); done
+node --test --test-skip-pattern="^Colmex" "${runtime_tests[@]}"
 files=(server.mjs binance-agent.html lib/market-attention.mjs market-attention.js market-attention.css market-news.js market-news.html)
 for file in "${files[@]}"; do
  if [[ "$file" == *.mjs || "$file" == *.js ]]; then node --check "$stage/runtime/$file"; fi
