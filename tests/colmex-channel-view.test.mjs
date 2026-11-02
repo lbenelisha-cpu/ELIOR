@@ -19,7 +19,19 @@ test('stock chart matches shared 50-bar channel geometry across verified overnig
 const element=tag=>({tag,attributes:{},children:[],textContent:'',setAttribute(k,v){this.attributes[k]=v;},append(...n){this.children.push(...n);},replaceChildren(){this.children=[];}});
 test('SVG channels stay within the measured visible bars and include counted upper/lower touches',()=>{
  const input=bars(),r=colmexChartChannels(input,{now:end}),segments=channelSegments(r,input.slice(-20)),prior=globalThis.document;globalThis.document={createElementNS:(_,tag)=>element(tag)};
- try{const svg=element('svg');drawColmexChannels({svg,segments,x:i=>20+i*5,y:p=>400-p,bounds:{left:20,right:200,top:30,bottom:300}});const group=svg.children[0];assert.equal(group.attributes.overflow,'hidden');assert.equal(group.children.filter(n=>n.tag==='line').length,6);const badge=group.children.find(n=>n.attributes['data-channel-label']==='swing');assert.match(badge.textContent,/למעלה: \d+ · למטה: \d+ נגיעות/);assert.ok(segments.every(s=>s.last.i<20&&s.first.i>=0));assert.deepEqual(channelSegments(r,input.slice(0,2)),[]);}finally{globalThis.document=prior;}
+ try{
+  for(const width of [205,700]){
+   const svg=element('svg'),bounds={left:20,right:20+width,top:30,bottom:300};
+   const labels=drawColmexChannels({svg,segments,x:i=>20+i*width/20,y:p=>400-p,bounds});
+   const group=svg.children[1];assert.match(group.attributes['clip-path'],/^url/);assert.equal(group.tag,'g');assert.equal(group.children.filter(n=>n.tag==='line').length,6);
+   assert.ok(group.children.some(n=>n.tag==='line'&&n.attributes.stroke==='#b7a3ff'));
+   const badge=labels.children.find(n=>n.attributes['data-channel-label']==='swing');assert.match(badge.attributes['aria-label'],/למעלה: \d+ · למטה: \d+ נגיעות/);
+   for(const label of labels.children){const rect=label.children[0];assert.ok(rect.attributes.x>=bounds.left);assert.ok(rect.attributes.x+rect.attributes.width<=bounds.right);assert.ok(rect.attributes.y>=bounds.top);assert.ok(rect.attributes.y+rect.attributes.height<=bounds.bottom);}
+  }
+  assert.ok(segments.every(s=>s.last.i<20&&s.first.i>=0));assert.deepEqual(channelSegments(r,input.slice(0,2)),[]);
+  const labels=drawColmexChannels({svg:element('svg'),segments:[],x:i=>i,y:p=>p,bounds:{left:20,right:225,top:30,bottom:300}});assert.equal(labels.children.length,0);
+ }finally{globalThis.document=prior;}
+
 });
 test('strategy description follows server activation and cannot present a disabled or unknown route as active',()=>{
  assert.match(colmexStrategyView(null).title,/אינו זמין/);

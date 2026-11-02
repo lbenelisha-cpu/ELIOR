@@ -1,4 +1,4 @@
-import {stockScenario,protectionView,closedTradeSummary,marketHealthView} from './lib/colmex-dashboard-math.mjs';
+import {stockScenario,protectionView,marketHealthView} from './lib/colmex-dashboard-math.mjs';
 import {monitorView} from './lib/colmex-monitor-view.mjs';
 import {positionChangeBadge} from './position-map-change.js?v=20261026-position-side';
 const $=id=>document.getElementById(id),txt=(id,value)=>{if($(id))$(id).textContent=value;};
@@ -64,10 +64,6 @@ function render(){
   for(const [label,value] of [['כמות',n(p.qty)],['כניסה','$'+price(p.entryPrice)],['מחיר שנצפה',freshAt(p.lastQuoteAt,now,120000)&&p.lastBid>0?'$'+price(p.lastBid):'—'],['סטופ מאושר',protection.stop>0?'$'+price(protection.stop):'—'],['יעד מאושר',protection.target>0?'$'+price(protection.target):'—'],['שיא שנצפה','$'+price(p.peakPrice)]]){const item=el('div');item.append(el('span',label),el('b',value));grid.append(item);}card.append(grid);
   card.append(el('p','נבדק: '+time(p.brokerProtection?.verifiedAt)+' · מחיר הביצוע עשוי להיות שונה.','small muted'));host.append(card);
  }
- const trades=status&&!statusFailed?status.closedTrades||[]:[],summary=closedTradeSummary(trades);
- txt('colmexClosedSummary',!status||statusFailed?'ממתין ליומן':!summary.count?'היומן יציג סגירות שיתועדו מעדכון זה ואילך.':`${summary.count} סגירות אחרונות · רווח גולמי ידוע: $${n(summary.gross)} מתוך ${summary.known} סגירות · נטו ממתין לאימות עמלות`);
- const rows=$('colmexClosedRows');rows.replaceChildren();
- for(const t of [...trades].reverse()){const row=el('tr');for(const value of [t.symbol,time(t.closedObservedAt),n(t.qty),price(t.entryPrice),price(t.exitPrice),t.accountingAdjusted?'כמות שונתה':signed(t.grossPnl),'לא אומת'])row.append(el('td',value));rows.append(row);}
 }
 window.addEventListener('levi:colmex-account',e=>{account=e.detail;render();});
 window.addEventListener('levi-colmex-rsi',e=>{status=e.detail;statusFailed=false;render();});
