@@ -14,11 +14,11 @@ try {
  const entries=fs.readFileSync('/proc/'+pid+'/environ','utf8').split('\0');
  const value=n=>entries.find(x=>x.startsWith(n+'='))?.slice(n.length+1).trim();
  const file=value('BINANCE_FUTURES_SHORT_FILE')||(value('BINANCE_LIVE_LOG_FILE')||'/var/data/binance-live-actions.json')+'.futures-short';
- const s=JSON.parse(fs.readFileSync(file,'utf8')),p=s.positions?.[symbol];
+ const s=JSON.parse(fs.readFileSync(file,'utf8')),p=s.positions?.[symbol]||s.closed?.findLast(x=>x.symbol===symbol);
  const {FuturesShortAPI}=await import(pathToFileURL(path.resolve('lib/futures-short-api.mjs')));
  const api=new FuturesShortAPI({key:value('BINANCE_API_KEY'),secret:value('BINANCE_API_SECRET')});
  show('READ_ONLY',{at:new Date().toISOString(),halt:s.halt,pending:!!s.pending});
- show('JOURNAL',pick(p,['symbol','qty','entryPrice','entryAt','entryOrderId','targetPrice','stopPrice','protectedAt','algos']));
+ show('JOURNAL',pick(p,['symbol','qty','entryPrice','entryAt','entryOrderId','targetPrice','stopPrice','protectedAt','algos','reason','closedAt','currentPrice']));
  const a=await api.get('/fapi/v2/account');
  show('EXCHANGE',a.positions.filter(x=>x.symbol===symbol).map(x=>pick(x,['symbol','positionSide','positionAmt','entryPrice','isolated','leverage','updateTime'])));
  if(p?.entryOrderId){
@@ -36,6 +36,11 @@ try {
    const o=await api.get('/fapi/v1/algoOrder',ref.algoId?{algoId:ref.algoId}:{clientAlgoId:ref.clientAlgoId});
    show('OWN_ALGO',pick(o,['algoId','clientAlgoId','symbol','orderType','algoStatus','side','positionSide','closePosition','triggerPrice','actualOrderId']));
   }catch(e){show('OWN_ALGO_ERROR',{kind:ref.kind,error:/^FUTURES_[A-Z0-9_-]+$/.test(e.message)?e.message:'READ_FAILED'});}
+ }
+ if(p?.entryAt){
+  const rows=await api.get('/fapi/v1/income',{symbol,startTime:p.entryAt-5000,endTime:Date.now(),limit:100});
+  const relevant=rows.filter(x=>x.symbol===symbol&&['REALIZED_PNL','COMMISSION','FUNDING_FEE'].includes(x.incomeType));
+  show('INCOME',{complete:rows.length<100,rows:relevant.map(x=>pick(x,['incomeType','income','asset','time','tradeId']))});
  }
  show('COMPLETE',{readOnly:true,ordersSubmitted:0});
 }catch(e){
