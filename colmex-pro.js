@@ -4,7 +4,7 @@ import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
 import {renderSearchStatus} from './colmex-search-status.js?v=20261102-channels';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
-import {renderRsiChart} from './rsi-chart.js?v=20261026-rsi40';
+import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
 import {wyckoffArrowPoints,drawWyckoffArrows,wyckoffEdgeBands} from './lib/colmex-wyckoff-arrows.mjs?v=20261029-time-nav';
 import {mergeWyckoffOccurrences} from './lib/wyckoff-occurrences.mjs';
