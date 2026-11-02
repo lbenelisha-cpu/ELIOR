@@ -39,7 +39,7 @@ function harness(options={}){
   if(options.beforePost)await options.beforePost(p,q);
   if(p==='/fapi/v1/order'){
    const qty=q.side==='SELL'?Number(q.quantity)*(options.fillFraction??1):Number(q.quantity);
-   const o={...q,clientOrderId:q.newClientOrderId,orderId:orders.size+1,status:options.fillFraction?'EXPIRED':'FILLED',executedQty:String(qty),avgPrice:'104'};orders.set(q.newClientOrderId,o);
+   const o={...q,clientOrderId:q.newClientOrderId,orderId:orders.size+1,status:options.fillFraction?'EXPIRED':'FILLED',executedQty:String(qty),avgPrice:'104',cumQuote:String(qty*104)};orders.set(q.newClientOrderId,o);
    if(q.side==='SELL')positions.push({symbol:q.symbol,positionSide:'BOTH',positionAmt:String(-qty),entryPrice:'104'});else positions=positions.filter(x=>x.symbol!==q.symbol);
    if(options.unknownOnce){options.unknownOnce=false;throw Error('FUTURES_NETWORK_OUTCOME_UNKNOWN');}
    return o;
@@ -213,4 +213,19 @@ test('restart reconciles a pending protection identity without resubmitting it a
  const r=new FuturesShortRunner({api:h.api,file:'/unused',config,settings:()=>settings,control:()=>({allowEntries:false}),permission:async()=>({}),now:()=>now,sleep:async()=>{},save:()=>{},initialState:restored});
  const before=h.writes.length;await r.cycle();assert.equal(h.writes.length,before);assert.ok(r.state.positions.ABCUSDT.protectedAt);
  r.state.resumedAt=now;const i=await r.input('ABCUSDT');assert.equal(i.entryAfter,now);assert.equal(shortSignal(i,config).ready,false);
+});
+
+test('a low-priced weighted fill installs both protections despite rounded order avgPrice',async()=>{
+ const h=harness(),client='lvs-'+'a'.repeat(28),qty=1445,exact=33.945447/qty;
+ h.runner.state.pending={kind:'ENTRY',params:{symbol:'ABCUSDT',side:'SELL',newClientOrderId:client,quantity:String(qty)},setup:{targetPrice:.0233447},settings};
+ await h.runner.finishOrder({symbol:'ABCUSDT',clientOrderId:client,orderId:7,side:'SELL',positionSide:'BOTH',status:'FILLED',executedQty:String(qty),avgPrice:'0.0234917',cumQuote:'33.9454470'});
+ h.setPositions([{symbol:'ABCUSDT',positionSide:'BOTH',positionAmt:String(-qty),entryPrice:'0.0234916588235'}]);
+ h.setQuote({bidPrice:'.02349',askPrice:'.023491'});
+ h.runner.infos.ABCUSDT={...info,filters:info.filters.map(f=>f.filterType==='PRICE_FILTER'?{...f,tickSize:'.0000001'}:f)};
+ await h.runner.manage(await h.runner.snapshot());
+ const p=h.runner.state.positions.ABCUSDT;assert.equal(p.entryPrice,exact);assert.equal(h.runner.state.halt,null);assert.ok(p.protectedAt);assert.equal(p.algos.length,2);assert.ok(p.algos.every(a=>a.status==='NEW'));
+ const count=h.writes.length;
+ h.setPositions([{symbol:'ABCUSDT',positionSide:'BOTH',positionAmt:String(-qty),entryPrice:'.02355'}]);
+ await h.runner.manage(await h.runner.snapshot());
+ assert.equal(h.runner.state.halt,'FUTURES_POSITION_OWNERSHIP_CHANGED');assert.equal(h.writes.length,count);
 });
