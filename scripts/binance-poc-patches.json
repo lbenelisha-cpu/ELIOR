@@ -76,8 +76,8 @@
   },
   {
     "file": "binance-agent.html",
-    "before": "<link rel=\"stylesheet\" href=\"/position-map-change.css?v=20261026-position-side\"><link rel=\"stylesheet\" href=\"/binance-trade-history.css?v=20261026-history\">\n<link rel=\"stylesheet\" href=\"/binance-equity-history.css?v=20261026-equity\">\n<link rel=\"stylesheet\" href=\"/ma-decision-journal.css?v=20261026-audit\"><link rel=\"stylesheet\" href=\"/strategy-followup.css?v=20261027-research\"><link rel=\"stylesheet\" href=\"/chart-time-navigation.css?v=20261029-time-nav\"><link rel=\"stylesheet\" href=\"/chart-terminal.css?v=20261101-chart-terminal\"><link rel=\"stylesheet\" href=\"/binance-trading-pnl.css?v=20261102-pnl\">\n</head>\n<body>\n  <main class=\"app-shell\">\n",
-    "after": "<link rel=\"stylesheet\" href=\"/position-map-change.css?v=20261026-position-side\"><link rel=\"stylesheet\" href=\"/binance-trade-history.css?v=20261026-history\">\n<link rel=\"stylesheet\" href=\"/binance-equity-history.css?v=20261026-equity\">\n<link rel=\"stylesheet\" href=\"/ma-decision-journal.css?v=20261026-audit\"><link rel=\"stylesheet\" href=\"/strategy-followup.css?v=20261027-research\"><link rel=\"stylesheet\" href=\"/chart-time-navigation.css?v=20261029-time-nav\"><link rel=\"stylesheet\" href=\"/chart-terminal.css?v=20261101-chart-terminal\"><link rel=\"stylesheet\" href=\"/binance-trading-pnl.css?v=20261102-pnl\">\n  <link rel=\"stylesheet\" href=\"/binance-poc.css?v=20261103-poc\">\n</head>\n<body>\n  <main class=\"app-shell\">\n"
+    "before": "<link rel=\"stylesheet\" href=\"/binance-trading-pnl.css?v=20261102-pnl\">\n</head>\n<body>\n  <main class=\"app-shell\">\n",
+    "after": "<link rel=\"stylesheet\" href=\"/binance-trading-pnl.css?v=20261102-pnl\">\n  <link rel=\"stylesheet\" href=\"/binance-poc.css?v=20261103-poc\">\n</head>\n<body>\n  <main class=\"app-shell\">\n"
   },
   {
     "file": "binance-agent.html",
@@ -86,8 +86,8 @@
   },
   {
     "file": "binance-agent.html",
-    "before": "  <script src=\"/resistance-patterns.js?v=20261031-channel\"></script>\n  <script src=\"/channel-watch.js?v=20261101-watch\"></script>\n  <script src=\"/binance-futures-positions.js?v=20261101-channel-watch\"></script>\n  <script src=\"/binance-agent.js?v=20261102-pnl\"></script>\n  <script src=\"/binance-device-access.js?v=20261025-stability\"></script>\n  <script src=\"/binance-manual-trades.js?v=20261030-live-review\"></script>\n  <script src=\"/binance-agent-portfolio.js?v=20261022-credit-saving\"></script>\n<script src=\"/binance-demo-account.js?v=20261025-stability\"></script>\n",
-    "after": "  <script src=\"/resistance-patterns.js?v=20261031-channel\"></script>\n  <script src=\"/channel-watch.js?v=20261101-watch\"></script>\n  <script src=\"/binance-futures-positions.js?v=20261101-channel-watch\"></script>\n  <script src=\"/binance-agent.js?poc=1&v=20261102-pnl\"></script>\n  <script src=\"/binance-device-access.js?v=20261025-stability\"></script>\n  <script src=\"/binance-poc.js?v=20261103-poc\"></script>\n  <script src=\"/binance-manual-trades.js?v=20261030-live-review\"></script>\n  <script src=\"/binance-agent-portfolio.js?v=20261022-credit-saving\"></script>\n<script src=\"/binance-demo-account.js?v=20261025-stability\"></script>\n"
+    "before": "  <script src=\"/binance-agent.js?v=20261102-pnl\"></script>\n  <script src=\"/binance-device-access.js?v=20261025-stability\"></script>\n  <script src=\"/binance-manual-trades.js?v=20261030-live-review\"></script>\n",
+    "after": "  <script src=\"/binance-agent.js?poc=1&v=20261102-pnl\"></script>\n  <script src=\"/binance-device-access.js?v=20261025-stability\"></script>\n  <script src=\"/binance-poc.js?v=20261103-poc\"></script>\n  <script src=\"/binance-manual-trades.js?v=20261030-live-review\"></script>\n"
   },
   {
     "file": "lib/futures-short-policy.mjs",

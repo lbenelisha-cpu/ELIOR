@@ -15,6 +15,18 @@ test('POC installer patches reproduce reviewed code, are idempotent and leave un
  }
  patchPoc(dir,patches);patchPoc(dir,patches);
  for(const file of files)assert.equal(fs.readFileSync(path.join(dir,file),'utf8'),expected[file]);
+ const htmlFile=path.join(dir,'binance-agent.html');
+ let html=expected['binance-agent.html'];
+ for(const p of patches.filter(p=>p.file==='binance-agent.html').reverse())html=html.replace(p.after,p.before);
+ // Production may have older independent chart assets; POC must preserve them.
+ html=html.replace('<link rel="stylesheet" href="/chart-terminal.css?v=20261101-chart-terminal">','').replace('  <script src="/channel-watch.js?v=20261101-watch"></script>\n','').replace('binance-futures-positions.js?v=20261101-channel-watch','binance-futures-positions.js?v=20261101-short-table');
+ fs.writeFileSync(htmlFile,html);patchPoc(dir,patches);patchPoc(dir,patches);
+ const patchedHtml=fs.readFileSync(htmlFile,'utf8');
+ assert.ok(patchedHtml.includes('id="pocPanel"'));
+ assert.ok(patchedHtml.includes('/binance-poc.js'));
+ assert.ok(patchedHtml.includes('binance-futures-positions.js?v=20261101-short-table'));
+ assert.ok(!patchedHtml.includes('/chart-terminal.css'));
+ fs.writeFileSync(htmlFile,expected['binance-agent.html']);
  assert.throws(()=>patchPoc(dir,[...patches,{file:'server.mjs',before:'unknown-context',after:'oops'}]),/Unknown/);
  for(const file of files)assert.equal(fs.readFileSync(path.join(dir,file),'utf8'),expected[file]);
 });
