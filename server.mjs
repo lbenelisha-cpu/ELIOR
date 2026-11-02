@@ -1,3 +1,4 @@
+import {BinancePoc} from './lib/binance-poc.mjs';
 import {createTradingPnlReader} from './lib/binance-trading-pnl-reader.mjs';
 import {FuturesShortAPI} from './lib/futures-short-api.mjs';
 import {FuturesShortRunner} from './lib/futures-short-runner.mjs';
@@ -790,7 +791,7 @@ async function recordLiveFill(order,intent){
  if(intent.params.side==='BUY'&&intent.meta?.wyckoffTrade)intent={...intent,meta:{...intent.meta,wyckoffTrade:{...intent.meta.wyckoffTrade,exitSettings:intent.meta.wyckoffTrade.exitSettings||tradeSettings.values}}};
  pushLiveAction(liveFillAction(order,intent,fills));
 }
-async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
+async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard=null){
   await reconcileLiveHoldings();
   if(!liveReadiness().ready)throw Error('LIVE_STATE_NOT_READY');
   if(nativeProtection.uncertain())throw Error('NATIVE_PROTECTION_PENDING_RECONCILIATION');
@@ -817,7 +818,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   }
   if(reason==='MANUAL_BUY'){
     quoteUsdt=manualBuyAmount(quoteUsdt,funding,{...info,symbol},{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
-    meta={...meta,wyckoffTrade:manualPosition()};
+    meta={...meta,wyckoffTrade:{...manualPosition(),...(meta.pocId?{entrySource:'POC',pocId:meta.pocId,poc:meta.poc}: {})}};
   }else{
     const allocation=liveNextBuyAllocation(funding,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
     if(!allocation.ok)throw Error('LIVE buy allocation blocked: '+allocation.code);
@@ -877,6 +878,8 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={}){
   }
 
   if(reason!=='MANUAL_BUY'){const newsDecision=newsEntryAssessment(symbol);if(newsDecision.action==='BLOCK')throw Error(newsDecision.reason);meta={...meta,newsDecision};}
+  if(reason!=='MANUAL_BUY'&&pocEntries.reserved(symbol,'LONG'))throw Error('POC_PENDING_FOR_SYMBOL');
+  if(pocGuard)await pocGuard();
   const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
   try{await nativeProtection.sync(symbol,liveManagedPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
   catch(error){recordLiveError(symbol,error);order.protectionWarning=error.message;}
@@ -949,7 +952,7 @@ const liveExecution=new LiveExecutionLock();
 async function maybeExecuteLive(evals){
  return liveExecution.automatic(()=>executeLiveCycle(evals));
 }
-async function executeManualTrade(body){
+async function executeManualTrade(body,{pocGuard=null,poc=null}={}){
  const input=manualTradeInput(body);
  if(mode!=='live'&&!manualRequests.rows?.[input.requestId]&&!input.statusOnly)throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
  return liveExecution.manual(()=>manualRequests.execute(input,{
@@ -957,7 +960,7 @@ async function executeManualTrade(body){
    if(request.side==='BUY'&&tradeControl.paused)throw Error('המסחר מושהה. יש לחדש אותו לפני קנייה.');
    await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
    if(mode!=='live')throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
-   if(request.side==='BUY')return placeLiveMarketBuy(request.symbol,request.quoteUsdt,'MANUAL_BUY',{manualRequestId:request.requestId});
+   if(request.side==='BUY')return placeLiveMarketBuy(request.symbol,request.quoteUsdt,'MANUAL_BUY',{manualRequestId:request.requestId,...(poc?{pocId:poc.requestId,poc:poc.poc}:{})},pocGuard);
    return placeLiveMarketSell(request.symbol,'MANUAL_SELL',{manualRequestId:request.requestId,sellAllBalance:true});
   },
   reconcile:async request=>{
@@ -2224,6 +2227,40 @@ const futuresShort=new FuturesShortRunner({
  control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
  permission:getApiRestrictions
 });
+futuresShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');
+// POC waits are server-owned; the browser can close after explicit creation.
+const pocControl=()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,paused:tradeControl.paused,mode});
+const pocManualInput=row=>({requestId:row.requestId,mode:'live',side:'BUY',symbol:row.symbol,quoteUsdt:row.quoteUsdt});
+const pocEntries=new BinancePoc({
+ file:process.env.BINANCE_POC_FILE||LIVE_LOG_FILE+'.poc',maxLongUsdt:LIVE_MAX_USDT,
+ control:pocControl,settings:()=>tradeSettings.values,
+ validate:async row=>{
+  if(row.side==='SHORT'){
+   if(!futuresShort.config.enabled)throw Error('FUTURES_SHORT_DISABLED');
+   if(tradeSettings.values.takeProfitPct>=100)throw Error('POC_SHORT_TP_BELOW_100_REQUIRED');
+   await futuresShort.info(row.symbol);
+  }else{
+   if(!SYMBOLS.includes(row.symbol))throw Error('POC_SELECT_SCANNED_SYMBOL');
+   const info=await symbolExchangeInfo(row.symbol);
+   if(info?.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false||info.ocoAllowed!==true)throw Error('NATIVE_PROTECTION_NOT_SUPPORTED');
+  }
+ },
+ quote:async row=>{
+  if(row.side==='SHORT'){const q=await futuresShort.quote(row.symbol);return {price:Number(q.bidPrice),at:Number(q.time)};}
+  // A live stream must also be available to manage the holding after entry.
+  requireLivePrice(streams[row.symbol],Date.now(),10000);
+  const started=Date.now(),q=await j('/api/v3/ticker/bookTicker?symbol='+encodeURIComponent(row.symbol));
+  const bid=Number(q.bidPrice),ask=Number(q.askPrice);
+  if(q.symbol!==row.symbol||!(bid>0&&ask>=bid)||(ask/bid-1)>.003)throw Error('POC_SPREAD_BLOCK');
+  return {price:ask,at:started};
+ },
+ execute:async(row,guard)=>row.side==='LONG'
+  ?(liveExecution.busy?{deferred:true,error:'POC_EXECUTION_BUSY'}:executeManualTrade(pocManualInput(row),{pocGuard:guard,poc:row}))
+  :futuresShort.enterPoc(row,guard),
+ reconcile:async row=>row.side==='LONG'
+  ?executeManualTrade({...pocManualInput(row),statusOnly:true})
+  :futuresShort.state.pocResults?.[row.requestId]||null
+});
 const pnlReadApi=new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET});
 const tradingPnlReader=createTradingPnlReader({get:(route,params)=>pnlReadApi.get(route,params),file:process.env.BINANCE_TRADING_PNL_FILE||LIVE_LOG_FILE+'.trading-pnl'});
 const server=http.createServer((req,res)=>{
@@ -2243,6 +2280,15 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/market-news'){if(req.method!=='GET')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);return send(res,{ok:true,...newsChannelSnapshot()});}
+  if(u.pathname==='/api/binance-live/poc'){
+   if(req.method==='GET')return send(res,pocEntries.snapshot(),pocEntries.fatal?503:200);
+   if(req.method!=='POST')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);
+   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>2000)req.destroy();});
+   req.on('end',async()=>{try{
+    const input=JSON.parse(body),row=input.action==='create'?await pocEntries.create(input):input.action==='cancel'?pocEntries.cancel(input.requestId):null;
+    if(!row)throw Error('POC_INVALID_ACTION');send(res,{ok:true,row});
+   }catch(error){send(res,{ok:false,error:error.message},400);}});return;
+  }
   if(u.pathname==='/api/binance-settings'){
    if(req.method==='GET')return send(res,{ok:true,...tradeSettings});
    if(req.method!=='POST')return send(res,{ok:false},405);
@@ -2250,6 +2296,7 @@ const server=http.createServer((req,res)=>{
    req.on('end',async()=>{try{const input=JSON.parse(text);await liveExecution.manual(async()=>{
     if(input.revision!==tradeSettings.revision)throw Error('SETTINGS_CHANGED_RELOAD');
     const next={policyVersion:TRADE_SETTINGS_VERSION,revision:tradeSettings.revision+1,values:validateTradeSettings(input.values),updatedAt:new Date().toISOString()};
+    if(next.values.takeProfitPct>=100&&(Object.values(futuresShort.state.positions).some(p=>p.setup?.entryMode==='POC')||pocEntries.state.rows.some(r=>r.side==='SHORT'&&['WAITING','EXECUTING','UNKNOWN'].includes(r.status))))throw Error('POC_SHORT_TP_BELOW_100_REQUIRED');
     fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(next),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);tradeSettings=next;
    });send(res,{ok:true,...tradeSettings});}catch(e){send(res,{ok:false,error:e.message},400);}});return;
   }
@@ -2308,6 +2355,8 @@ const server=http.createServer((req,res)=>{
     '/binance-control-session.js':['binance-control-session.js','text/javascript'],
     '/binance-device-access.js':['binance-device-access.js','text/javascript'],
     '/binance-manual-trades.js':['binance-manual-trades.js','text/javascript'],
+    '/binance-poc.js':['binance-poc.js','text/javascript'],
+    '/binance-poc.css':['binance-poc.css','text/css'],
     '/lib/wyckoff-spring-rsi.mjs':['lib/wyckoff-spring-rsi.mjs','text/javascript'],
     '/lib/wyckoff-strategy.mjs':['lib/wyckoff-strategy.mjs','text/javascript'],
     '/binance-indicators.js':['binance-indicators.js','text/javascript'],
@@ -2356,6 +2405,7 @@ const server=http.createServer((req,res)=>{
         tradeControl.paused=true;
         tradeControl.pausedAt=new Date().toISOString();
         saveTradeControl();
+        try{pocEntries.cancelWaiting();}catch(error){recordLiveError(null,error);}
         // The execution lock excludes orders and protection replacement for the entire liquidation.
         const sold=[],failed=[];
         const futuresResult=await futuresShort.closeAll();
@@ -2400,6 +2450,7 @@ const server=http.createServer((req,res)=>{
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
+      pocTrading:{version:1},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
@@ -2680,6 +2731,7 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadTradeControl();
   loadPaperState();
   loadLiveActionLog();
+  setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
   setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
   /* Wyckoff upgrade preserves existing holdings and journals. */
