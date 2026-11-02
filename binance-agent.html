@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
 <link rel="stylesheet" href="/binance-equity-history.css?v=20261026-equity">
 <link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"><link rel="stylesheet" href="/chart-time-navigation.css?v=20261029-time-nav"><link rel="stylesheet" href="/chart-terminal.css?v=20261101-chart-terminal"><link rel="stylesheet" href="/binance-trading-pnl.css?v=20261102-pnl">
+  <link rel="stylesheet" href="/binance-poc.css?v=20261103-poc">
 </head>
 <body>
   <main class="app-shell">
@@ -219,6 +220,27 @@
 
         <div id="binanceExitSnapshot" aria-label="ספי המכירה של הבוט"></div>
         <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה ידנית</button><button id="manualSellBtn" type="button" disabled>בדוק ואשר מכירת כל הכמות</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
+        <details id="pocPanel" class="poc-panel">
+          <summary>POC · כניסה אוטומטית במחיר שתבחר</summary>
+          <p class="mini">בחר נכס בגרף, הזן מחיר כניסה וקבע LONG או SHORT. זו הוראה ידנית מתוזמנת לפי מחיר, ללא המתנה לאיתות התעלות. לאחר המילוי הבוט מנהל את הפוזיציה.</p>
+          <form id="pocForm">
+            <div class="poc-fields">
+              <label>הנכס שנבחר בגרף<input id="pocSymbol" readonly dir="ltr" required></label>
+              <label>סוג כניסה<select id="pocSide"><option value="LONG">LONG · קנייה ב־Spot</option><option value="SHORT">SHORT · Futures Isolated 1x</option></select></label>
+              <label>מחיר כניסה POC<input id="pocPrice" type="number" inputmode="decimal" min="0.00000001" step="any" required autocomplete="off"></label>
+              <label>הפעלת הכניסה<select id="pocDirection"><option value="BELOW">כשהמחיר יורד אל ה־POC</option><option value="ABOVE">כשהמחיר עולה אל ה־POC</option></select></label>
+              <label>תקציב ב־USDT<input id="pocAmount" type="number" inputmode="decimal" min="5" step="0.01" required autocomplete="off"></label>
+              <label>תוקף ההמתנה<select id="pocExpiry"><option value="1">שעה</option><option value="4">4 שעות</option><option value="12">12 שעות</option><option value="24" selected>24 שעות</option></select></label>
+            </div>
+            <p id="pocPolicy" class="mini"></p>
+            <p class="mini">LONG: עד תקרת הפעולה והמקומות הפנויים ב־Spot. SHORT: עד 35 USDT כולל רזרבה של 1 USDT לעמלות, במסגרת שתי הפוזיציות הקיימת. הכסף אינו נשמר בצד בזמן ההמתנה. כניסה אוטומטית רגילה לאותו נכס ובאותו מסלול ממתינה לסיום הוראת POC.</p>
+            <p class="mini">POC הוא מחיר הפעלה, לא מחיר מילוי מובטח. הבדיקה משתמשת ב־Ask ל־LONG וב־Bid ל־SHORT. סטייה של יותר מ־0.15% מה־POC בזמן ההפעלה מבטלת את ההזדמנות. אין כניסה חוזרת אוטומטית. ההמתנה פועלת בשרת גם כשהמסך סגור; עצירת המסחר מבטלת הוראות ממתינות.</p>
+            <label class="poc-confirm"><input id="pocConfirm" type="checkbox" required><span>אני מאשר כניסה אוטומטית בכסף אמיתי לפי הפרטים שהזנתי, וניהול ההגנות לפי SETTINGS.</span></label>
+            <div class="poc-toolbar"><button id="pocCreate" type="submit" disabled>שמור והפעל המתנה ל־POC</button><button id="pocUseSelected" type="button">השתמש בנכס שנבחר בגרף</button><button id="pocRefresh" type="button">רענן הוראות</button><button id="pocRetry" type="button" hidden>בדוק / שמור את אותה בקשה</button></div>
+          </form>
+          <p id="pocMessage" role="status" aria-live="polite"></p><p id="pocChecked" class="mini"></p>
+          <div class="poc-table-wrap"><table class="poc-table"><thead><tr><th>נכס / מסלול</th><th>מחיר POC</th><th>תקציב</th><th>מצב / סיבה</th><th>תוקף · ישראל</th><th>פעולה</th></tr></thead><tbody id="pocRows"></tbody></table></div>
+        </details>
         <details class="chart-menu"><summary class="refresh">פירוט · הגדרות גרף</summary>
         <div class="chart-toolbar multi-toolbar">
           <div class="toolbar-group">
@@ -466,8 +488,9 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261101-watch"></script>
   <script src="/binance-futures-positions.js?v=20261101-channel-watch"></script>
-  <script src="/binance-agent.js?v=20261102-pnl"></script>
+  <script src="/binance-agent.js?poc=1&v=20261102-pnl"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
+  <script src="/binance-poc.js?v=20261103-poc"></script>
   <script src="/binance-manual-trades.js?v=20261030-live-review"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>

@@ -1,0 +1,16 @@
+.poc-panel{margin:1rem 0;padding:1.1rem;border:1px solid #29434e;border-radius:18px;background:#10212a;color:#e6f4f6}
+.poc-panel summary{cursor:pointer;font-weight:700;font-size:1.05rem;color:#7edbc8}
+.poc-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}
+.poc-fields label{display:grid;gap:7px;font-size:.85rem;color:#adc6cf}
+.poc-fields input,.poc-fields select{width:100%;min-width:0;box-sizing:border-box;padding:10px;border:1px solid #355262;border-radius:10px;background:#132e3a;color:#edf7fa;font:inherit}
+.poc-panel button{border:1px solid #3a716e;border-radius:10px;background:#195b57;color:#effffb;padding:10px 16px;cursor:pointer;font:inherit}
+.poc-panel button:disabled{opacity:.5;cursor:default}
+.poc-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:14px}
+.poc-warning{color:#f5cc80}.poc-table-wrap{overflow:auto;margin-top:15px}
+.poc-table{width:100%;min-width:690px;border-collapse:collapse;text-align:right;font-size:.86rem}
+.poc-table th,.poc-table td{padding:12px 8px;border-bottom:1px solid #29434e;vertical-align:top}
+.poc-table small{display:block;color:#a8c0ca;margin-top:5px;max-width:260px;overflow-wrap:anywhere}
+.poc-status-WAITING{color:#f5cc80}.poc-status-FILLED{color:#7edbc8}
+.poc-confirm{display:flex;gap:8px;align-items:flex-start;line-height:1.6;font-size:.88rem}
+.poc-confirm input{margin-top:6px}
+@media(max-width:650px){.poc-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.poc-panel{padding:14px}.poc-fields input,.poc-fields select{font-size:16px}}

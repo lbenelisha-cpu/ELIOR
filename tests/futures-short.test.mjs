@@ -229,3 +229,31 @@ test('a low-priced weighted fill installs both protections despite rounded order
  await h.runner.manage(await h.runner.snapshot());
  assert.equal(h.runner.state.halt,'FUTURES_POSITION_OWNERSHIP_CHANGED');assert.equal(h.writes.length,count);
 });
+
+test('manual POC SHORT bypasses channel signals but uses actual fill settings, reserve, native protection and durable receipt',async()=>{
+ const h=harness(),intent={requestId:'poc-short-1234567890123456',symbol:'ABCUSDT',side:'SHORT',quoteUsdt:20,poc:104,expiresAt:now+60000};let checks=0;
+ h.runner.input=()=>{throw Error('TECHNICAL_SIGNAL_MUST_NOT_BE_REQUIRED');};
+ const result=await h.runner.enterPoc(intent,async()=>{checks++;});
+ assert.equal(result.ok,true);assert.ok(checks>=2);
+ const p=h.runner.state.positions.ABCUSDT;assert.equal(p.setup.entryMode,'POC');assert.ok(Math.abs(p.targetPrice-52)<1e-9);assert.ok(p.qty*p.entryPrice<=19);assert.ok(p.protectedAt);assert.equal(p.algos.length,2);
+ assert.equal((await h.runner.enterPoc(intent,async()=>{})).order.orderId,result.order.orderId);assert.equal(h.writes.filter(x=>x.q.side==='SELL').length,1);
+ h.ownerSettings.takeProfitPct=10;await h.runner.manage(await h.runner.snapshot());assert.ok(Math.abs(p.targetPrice-93.6)<1e-9);
+});
+test('POC SHORT retains ambiguous entry identity and reconciles its receipt without a new SELL',async()=>{
+ const h=harness({unknownOnce:true}),intent={requestId:'poc-short-ambiguous123456',symbol:'ABCUSDT',side:'SHORT',quoteUsdt:35,poc:104,expiresAt:now+60000};
+ assert.equal((await h.runner.enterPoc(intent,async()=>{})).uncertain,true);const original=h.runner.state.pending.params.newClientOrderId;
+ const restarted=new FuturesShortRunner({api:h.api,file:'/unused',config,settings:()=>settings,control:()=>h.control,permission:async()=>({enableFutures:true,ipRestrict:true}),now:()=>now,save:()=>{},initialState:h.saved});
+ await restarted.recover();assert.ok(restarted.state.pocResults[intent.requestId].ok);assert.equal(restarted.state.positions.ABCUSDT.entryClientOrderId,original);
+ await restarted.enterPoc(intent,async()=>{});assert.equal(h.writes.filter(x=>x.q.side==='SELL').length,1);
+});
+test('POC SHORT final guard rejects pause/price change after durable intent without an exchange entry',async()=>{
+ const h=harness(),intent={requestId:'poc-short-final-12345678',symbol:'ABCUSDT',side:'SHORT',quoteUsdt:35,poc:104,expiresAt:now+60000};let calls=0;
+ const result=await h.runner.enterPoc(intent,async()=>{if(++calls===2)throw Error('POC_PRICE_MOVED');});assert.equal(result.ok,false);assert.equal(result.uncertain,false);assert.equal(h.runner.state.pending,null);assert.equal(h.writes.filter(x=>x.q.side==='SELL').length,0);
+});
+test('POC SHORT preserves the halt, account guards and two slot budget and protects partial fills',async()=>{
+ const intent={requestId:'poc-short-gates-12345678',symbol:'ABCUSDT',side:'SHORT',quoteUsdt:35,poc:104,expiresAt:now+60000};
+ for(const mutate of [h=>h.runner.state.halt='FUTURES_POSITION_OWNERSHIP_CHANGED',h=>h.a.assets[0].availableBalance='34',h=>h.a.multiAssetsMargin=true,h=>h.control.allowEntries=false,h=>h.ownerSettings.takeProfitPct=100]){
+  const h=harness();mutate(h);assert.equal((await h.runner.enterPoc(intent,async()=>{})).ok,false);assert.equal(h.writes.filter(x=>x.q.side==='SELL').length,0);
+ }
+ const h=harness({fillFraction:.5});assert.equal((await h.runner.enterPoc(intent,async()=>{})).ok,true);assert.ok(h.runner.state.positions.ABCUSDT.protectedAt);assert.ok(h.runner.state.positions.ABCUSDT.qty<.2);
+});

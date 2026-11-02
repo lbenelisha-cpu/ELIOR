@@ -3,7 +3,7 @@ window.API_BASE=B;
 window.binanceReadUrl=url=>{
   if(['localhost','127.0.0.1'].includes(window.location.hostname)||window.location.origin===new URL(B).origin)return url;
   const target=new URL(url,window.location.origin);
-  const paths=['/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
+  const paths=['/api/binance-live/poc','/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account'];
   return target.origin===new URL(B).origin&&paths.includes(target.pathname)?'/.netlify/functions/binance-read-proxy?path='+encodeURIComponent(target.pathname+target.search):url;
 };
 window.binanceReadHeaders=url=>{
@@ -1299,6 +1299,7 @@ document.getElementById('pricePrecisionUp')?.addEventListener('click',()=>{price
 document.getElementById('pricePrecisionDown')?.addEventListener('click',()=>{priceRangeScale=Math.min(10,priceRangeScale*1.25);drawCandles(chartCandles);});
 document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{priceRangeScale=1;drawCandles(chartCandles);});
 
+window.LEVI_POC={read:()=>J(B+'/api/binance-live/poc'),write:body=>authenticatedControl(B+'/api/binance-live/poc',body)};
 window.LEVI_MANUAL_TRADES={
  context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
  submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},

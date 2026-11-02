@@ -44,3 +44,11 @@ test('a previously ambiguous order that is confirmed rejected unlocks the UI wit
  const ctx=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,release:async()=>{},sync:async()=>{}},console:{error(){}},liveManagedPositions:()=>({}),manualTradeInput,mode:'live',liveExecution:new LiveExecutionLock(),manualRequests:{rows:{[request.requestId]:{}},execute:async(input,options)=>options.reconcile(input)},liveOrders:{pending:{meta:{manualRequestId:request.requestId}},recover:async()=>({status:'REJECTED',executedQty:'0'})},liveActionLog:[],recordLiveFill(){}});
  vm.runInContext(source.slice(source.indexOf('async function executeManualTrade('),source.indexOf('async function executeLiveCycle(')),withLiveSafety(ctx));const result=await ctx.executeManualTrade({...request,statusOnly:true});assert.equal(result.ok,false);assert.equal(result.uncertain,false);assert.match(result.error,/REJECTED/);assert.equal(result.requestId,request.requestId);
 });
+
+test('POC LONG rechecks its guard at the last submission point and passes actual user amount and provenance to managed exits',async()=>{
+ let sent,meta,guards=0;const ctx=vm.createContext({nativeProtection:{rows:{},uncertain:()=>false,sync:async()=>{}},liveManagedPositions:()=>({}),manualBuyAmount,manualPosition,requireLivePrice:()=>10,streams:{UNIUSDT:{}},LIVE_MAX_POSITIONS:5,LIVE_MAX_USDT:400,getApiRestrictions:async()=>({}),liveTradingGate:()=>({ready:true}),symbolExchangeInfo:async()=>info,getLiveAccountSnapshot:async()=>account,recordLiveFill(){},liveOrders:{submit:async(p,m)=>{assert.equal(guards,1);sent=p;meta=m;return {status:'FILLED'};}}});
+ vm.runInContext(source.slice(source.indexOf('async function placeLiveMarketBuy('),source.indexOf('async function placeLiveMarketSell(')),withLiveSafety(ctx));
+ await ctx.placeLiveMarketBuy('UNIUSDT',12,'MANUAL_BUY',{pocId:'poc-1234567890123456',poc:10},async()=>{guards++;});
+ assert.equal(Number(sent.quoteOrderQty),12);assert.equal(meta.meta.wyckoffTrade.entrySource,'POC');assert.equal(meta.meta.wyckoffTrade.exitSettings.stopLossPct,1);
+ sent=null;await assert.rejects(ctx.placeLiveMarketBuy('UNIUSDT',12,'MANUAL_BUY',{},async()=>{throw Error('POC_PRICE_MOVED');}),/POC_PRICE_MOVED/);assert.equal(sent,null);
+});
