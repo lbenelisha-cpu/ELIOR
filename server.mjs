@@ -1,3 +1,4 @@
+import {createTradingPnlReader} from './lib/binance-trading-pnl-reader.mjs';
 import {FuturesShortAPI} from './lib/futures-short-api.mjs';
 import {FuturesShortRunner} from './lib/futures-short-runner.mjs';
 import {shortConfig} from './lib/futures-short-policy.mjs';
@@ -2223,6 +2224,8 @@ const futuresShort=new FuturesShortRunner({
  control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
  permission:getApiRestrictions
 });
+const pnlReadApi=new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET});
+const tradingPnlReader=createTradingPnlReader({get:(route,params)=>pnlReadApi.get(route,params),file:process.env.BINANCE_TRADING_PNL_FILE||LIVE_LOG_FILE+'.trading-pnl'});
 const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
@@ -2310,6 +2313,8 @@ const server=http.createServer((req,res)=>{
     '/binance-indicators.js':['binance-indicators.js','text/javascript'],
     '/binance-agent.html':['binance-agent.html','text/html'],
     '/binance-agent.js':['binance-agent.js','text/javascript'],
+    '/binance-trading-pnl.js':['binance-trading-pnl.js','text/javascript'],
+    '/binance-trading-pnl.css':['binance-trading-pnl.css','text/css'],
     '/binance-futures-positions.js':['binance-futures-positions.js','text/javascript'],
     '/binance-agent.css':['binance-agent.css','text/css'],
     '/trade-risk.js':['trade-risk.js','text/javascript'],
@@ -2457,6 +2462,11 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-ma-audit'&&req.method==='GET'){maAudit.read({symbol:u.searchParams.get('symbol')||''}).then(data=>send(res,data)).catch(error=>send(res,{ok:false,error:error.message==='INVALID_SYMBOL'?'INVALID_SYMBOL':'AUDIT_READ_UNAVAILABLE'},error.message==='INVALID_SYMBOL'?400:503));return;}
   if(u.pathname==='/api/binance-equity-history'&&req.method==='GET')return send(res,equityHistory.today());
+
+  if(u.pathname==='/api/binance-trading-pnl'&&req.method==='GET'){
+    try{return send(res,tradingPnlReader.read(liveActionLog,futuresShort.state.closed,{spotHealthy:liveStateHealth.journalReady===true,shortHealthy:!futuresShort.fatal}));}
+    catch{return send(res,{ok:false,error:'PNL_REPORT_UNAVAILABLE'},503);}
+  }
 
   if(u.pathname==='/api/binance-trade-history'&&req.method==='GET'){
     let symbol;try{symbol=historySymbol(u.searchParams.get('symbol'));}catch{return send(res,{ok:false,error:'יש להזין צמד USDT תקין'},400);}
