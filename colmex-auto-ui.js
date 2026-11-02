@@ -1,4 +1,5 @@
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261029-higher-recovery';
+import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261102-channels';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261102-channels';
 import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
@@ -22,6 +23,7 @@ function renderPreparation(){
 }
 function renderMonitor(){
  if(!latest)return;
+ renderColmexStrategy(document,latest);
  renderPreparation();
  const view=monitorView(latest);
  const messages={disabled:'המעקב כבוי בשרת',error:'תקלה או עצירה · יש לבדוק את מצב השרת',waiting:'טרם תועד סבב שהושלם',stale:'לא תועד סבב שהושלם בחמש הדקות האחרונות',recent:'התקבל סבב שרת שהושלם לאחרונה'};
@@ -53,7 +55,7 @@ async function refresh(){if(document.hidden||loading)return;loading=true;refresh
  badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt&&d.halt!==d.lastResult?' · '+reason(d.halt):'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
  positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · כמות ${p.qty} · כניסה $${p.entryPrice} · שיא שנצפה $${p.peakPrice}`);
  if(!d.positions?.length)line(positions,'אין פוזיציות שמנוהלות בידי המנגנון הזה. פוזיציות ידניות מוצגות בחלונית החשבון.');
- }catch{if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:null,error:true};if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-status-error'));latest=null;badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';health.textContent='אין חיבור לתצוגת המעקב · לא ניתן לאמת שהבדיקות ממשיכות';health.dataset.health='error';summary.textContent='זמן הסבב האחרון אינו מאומת כעת.';positions.replaceChildren();checks.replaceChildren();document.getElementById('autoMonitorHistory').replaceChildren();}finally{loading=false;refreshButton.disabled=false;}}
+ }catch{renderColmexStrategy(document,null);if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:null,error:true};if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-status-error'));latest=null;badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';health.textContent='אין חיבור לתצוגת המעקב · לא ניתן לאמת שהבדיקות ממשיכות';health.dataset.health='error';summary.textContent='זמן הסבב האחרון אינו מאומת כעת.';positions.replaceChildren();checks.replaceChildren();document.getElementById('autoMonitorHistory').replaceChildren();}finally{loading=false;refreshButton.disabled=false;}}
 refreshButton.addEventListener('click',refresh);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 refresh();setInterval(refresh,60000);setInterval(renderMonitor,30000);
