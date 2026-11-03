@@ -1,0 +1,57 @@
+[
+  {
+    "file": "server.mjs",
+    "before": "import {BinancePoc} from './lib/binance-poc.mjs';",
+    "after": "import {PocPaperService} from './lib/poc-paper-service.mjs';\nimport {BinancePoc} from './lib/binance-poc.mjs';"
+  },
+  {
+    "file": "server.mjs",
+    "before": "const server=http.createServer((req,res)=>{",
+    "after": "const pocPaper=new PocPaperService({\n file:process.env.BINANCE_POC_PAPER_FILE||LIVE_LOG_FILE+'.poc-paper',\n spotAccount:getDisplayAccountSnapshot,spotGet:j,\n futuresGet:(route,params)=>pnlReadApi.get(route,params),symbols:()=>SYMBOLS\n});\nconst server=http.createServer((req,res)=>{"
+  },
+  {
+    "file": "server.mjs",
+    "before": "  if(u.pathname==='/api/binance-trading-pnl'&&req.method==='GET'){",
+    "after": "  if(u.pathname==='/api/binance-poc-paper'&&req.method==='GET')return send(res,pocPaper.snapshot(),pocPaper.ledger.fatal?503:200);\n\n  if(u.pathname==='/api/binance-trading-pnl'&&req.method==='GET'){"
+  },
+  {
+    "file": "server.mjs",
+    "before": "      pocTrading:{version:1},",
+    "after": "      pocTrading:{version:1},\n      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},"
+  },
+  {
+    "file": "server.mjs",
+    "before": "    '/binance-poc.js':['binance-poc.js','text/javascript'],",
+    "after": "    '/binance-poc-paper.js':['binance-poc-paper.js','text/javascript'],\n    '/binance-poc-paper.css':['binance-poc-paper.css','text/css'],\n    '/binance-poc.js':['binance-poc.js','text/javascript'],"
+  },
+  {
+    "file": "server.mjs",
+    "before": "  loadLiveActionLog();",
+    "after": "  loadLiveActionLog();\n  if(KEYS_CONFIGURED)pocPaper.start();"
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "</head>",
+    "after": "  <link rel=\"stylesheet\" href=\"/binance-poc-paper.css?v=20261103-paper\">\n</head>"
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "    <section id=\"futuresPositionsPanel\"",
+    "after": "    <section id=\"pocPaperPanel\" class=\"poc-paper app-view trade-view portfolio-view pnl-view\" aria-label=\"השוואת POC דמו מול יתרות אמיתיות\"></section>\n    <section id=\"futuresPositionsPanel\""
+  },
+  {
+    "file": "binance-agent.html",
+    "before": "</body>",
+    "after": "<script type=\"module\" src=\"/binance-poc-paper.js?v=20261103-paper\"></script></body>"
+  },
+  {
+    "file": "binance-agent.js",
+    "before": "['/api/binance-live/poc',",
+    "after": "['/api/binance-poc-paper','/api/binance-live/poc',"
+  },
+  {
+    "file": "netlify/functions/binance-read-proxy.mjs",
+    "before": "['/api/binance-live/poc',",
+    "after": "['/api/binance-poc-paper','/api/binance-live/poc',"
+  }
+]

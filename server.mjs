@@ -1,3 +1,4 @@
+import {PocPaperService} from './lib/poc-paper-service.mjs';
 import {BinancePoc} from './lib/binance-poc.mjs';
 import {createTradingPnlReader} from './lib/binance-trading-pnl-reader.mjs';
 import {FuturesShortAPI} from './lib/futures-short-api.mjs';
@@ -2265,6 +2266,11 @@ const pocEntries=new BinancePoc({
 });
 const pnlReadApi=new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET});
 const tradingPnlReader=createTradingPnlReader({get:(route,params)=>pnlReadApi.get(route,params),file:process.env.BINANCE_TRADING_PNL_FILE||LIVE_LOG_FILE+'.trading-pnl'});
+const pocPaper=new PocPaperService({
+ file:process.env.BINANCE_POC_PAPER_FILE||LIVE_LOG_FILE+'.poc-paper',
+ spotAccount:getDisplayAccountSnapshot,spotGet:j,
+ futuresGet:(route,params)=>pnlReadApi.get(route,params),symbols:()=>SYMBOLS
+});
 const server=http.createServer((req,res)=>{
   const u=new URL(req.url,`http://${req.headers.host}`);
 
@@ -2357,6 +2363,8 @@ const server=http.createServer((req,res)=>{
     '/binance-control-session.js':['binance-control-session.js','text/javascript'],
     '/binance-device-access.js':['binance-device-access.js','text/javascript'],
     '/binance-manual-trades.js':['binance-manual-trades.js','text/javascript'],
+    '/binance-poc-paper.js':['binance-poc-paper.js','text/javascript'],
+    '/binance-poc-paper.css':['binance-poc-paper.css','text/css'],
     '/binance-poc.js':['binance-poc.js','text/javascript'],
     '/binance-poc.css':['binance-poc.css','text/css'],
     '/lib/wyckoff-spring-rsi.mjs':['lib/wyckoff-spring-rsi.mjs','text/javascript'],
@@ -2453,6 +2461,7 @@ const server=http.createServer((req,res)=>{
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
       pocTrading:{version:1},
+      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
@@ -2515,6 +2524,8 @@ const server=http.createServer((req,res)=>{
 
   if(u.pathname==='/api/binance-ma-audit'&&req.method==='GET'){maAudit.read({symbol:u.searchParams.get('symbol')||''}).then(data=>send(res,data)).catch(error=>send(res,{ok:false,error:error.message==='INVALID_SYMBOL'?'INVALID_SYMBOL':'AUDIT_READ_UNAVAILABLE'},error.message==='INVALID_SYMBOL'?400:503));return;}
   if(u.pathname==='/api/binance-equity-history'&&req.method==='GET')return send(res,equityHistory.today());
+
+  if(u.pathname==='/api/binance-poc-paper'&&req.method==='GET')return send(res,pocPaper.snapshot(),pocPaper.ledger.fatal?503:200);
 
   if(u.pathname==='/api/binance-trading-pnl'&&req.method==='GET'){
     try{return send(res,tradingPnlReader.read(liveActionLog,futuresShort.state.closed,{spotHealthy:liveStateHealth.journalReady===true,shortHealthy:!futuresShort.fatal}));}
@@ -2734,6 +2745,7 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadTradeControl();
   loadPaperState();
   loadLiveActionLog();
+  if(KEYS_CONFIGURED)pocPaper.start();
   setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
   setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
