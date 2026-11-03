@@ -1,4 +1,4 @@
-import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261102-channels';
+import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261103-channel-conditions';
 import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261102-channels';
 import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
@@ -27,11 +27,11 @@ function renderMonitor(){
  renderPreparation();
  const view=monitorView(latest);
  const messages={disabled:'המעקב כבוי בשרת',error:'תקלה או עצירה · יש לבדוק את מצב השרת',waiting:'טרם תועד סבב שהושלם',stale:'לא תועד סבב שהושלם בחמש הדקות האחרונות',recent:'התקבל סבב שרת שהושלם לאחרונה'};
- health.textContent=(view.observationScanning?'סריקת המניות נמשכת · קניות חדשות חסומות עד בירור ההוראה':messages[view.health])+(latest.lastResult==='OUTSIDE_REGULAR_SESSION'?' · השוק סגור; ניתוח ההכנה מוצג בטבלה הנפרדת':'');health.dataset.health=view.health;
+ health.textContent=(view.observationScanning?'סריקת המניות נמשכת · קניות חדשות חסומות עד בירור ההוראה':messages[view.health])+(latest.lastResult==='OUTSIDE_REGULAR_SESSION'?' · השוק סגור; מוצגות תוצאות בדיקות הכניסה האחרונות':'');health.dataset.health=view.health;
  summary.textContent=`סבב שרת אחרון שהושלם: ${time(view.completed)} · ${view.age===null?'':`לפני ${Math.floor(view.age/60000)} דקות · `}תועדה בדיקה ל־${view.checked} מתוך ${view.total} מניות`;
  checks.replaceChildren();
  for(const row of view.rows){
-  const tr=document.createElement('tr');tr.dataset.state=row.state;const recovery=latest.checks?.[row.symbol]?.quality?.recovery;const recoveryText=recovery?.firstPrice!=null?' · התאוששות 1: '+recovery.firstPrice+' · התאוששות 2: '+(recovery.secondPrice??'טרם אושרה'):'';
+  const tr=document.createElement('tr');tr.dataset.state=row.state;const recovery=latest.channelPrimary?.requested?null:latest.checks?.[row.symbol]?.quality?.recovery;const recoveryText=recovery?.firstPrice!=null?' · התאוששות 1: '+recovery.firstPrice+' · התאוששות 2: '+(recovery.secondPrice??'טרם אושרה'):'';
   for(const value of [row.symbol,row.reason?reason(row.reason)+recoveryText+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):'')+(row.entryBlockReason?' · '+reason(row.entryBlockReason):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
    const td=document.createElement('td');td.textContent=value;tr.append(td);
   }
