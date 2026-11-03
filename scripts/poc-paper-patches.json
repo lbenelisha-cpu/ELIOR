@@ -51,7 +51,7 @@
   },
   {
     "file": "netlify/functions/binance-read-proxy.mjs",
-    "before": "['/api/binance-live/poc',",
-    "after": "['/api/binance-poc-paper','/api/binance-live/poc',"
+    "before": "const READ_PATHS=new Set([",
+    "after": "const READ_PATHS=new Set(['/api/binance-poc-paper',"
   }
 ]
