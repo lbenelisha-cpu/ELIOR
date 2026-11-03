@@ -11,3 +11,10 @@ test('installer patches are additive and idempotent and reject unknown source be
 test('installer syntax, rollback and no credentials or trading settings mutations',()=>{
  const file=new URL('scripts/install-poc-paper.sh',root);execFileSync('bash',['-n',file.pathname]);const text=fs.readFileSync(file,'utf8');assert.match(text,/trap rollback ERR/);assert.doesNotMatch(text,/\.env|AUTO_EXECUTION=|BINANCE_MODE=|api\/binance-live\/buy/);
 });
+test('legacy server proxy receives only the paper GET route without replacing its allowlist',t=>{
+ const dir=fixture(t),file=path.join(dir,'netlify/functions/binance-read-proxy.mjs');
+ const legacy="const READ_PATHS=new Set(['/api/binance-trading-pnl','/api/binance-mode']);\nconst preserved='legacy';\n";
+ fs.writeFileSync(file,legacy);patchPaper(dir);
+ const expected=legacy.replace('const READ_PATHS=new Set([',"const READ_PATHS=new Set(['/api/binance-poc-paper',");
+ assert.equal(fs.readFileSync(file,'utf8'),expected);patchPaper(dir);assert.equal(fs.readFileSync(file,'utf8'),expected);
+});
