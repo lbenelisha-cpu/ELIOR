@@ -16,8 +16,9 @@
 <link rel="stylesheet" href="/ma-decision-journal.css?v=20261026-audit"><link rel="stylesheet" href="/strategy-followup.css?v=20261027-research"><link rel="stylesheet" href="/chart-time-navigation.css?v=20261029-time-nav"><link rel="stylesheet" href="/chart-terminal.css?v=20261101-chart-terminal"><link rel="stylesheet" href="/binance-trading-pnl.css?v=20261102-pnl">
   <link rel="stylesheet" href="/binance-poc.css?v=20261103-poc">
   <link rel="stylesheet" href="/market-attention.css?v=20261103-attention">
+  <link rel="stylesheet" href="/binance-terminal.css?v=20261103-terminal">
 </head>
-<body>
+<body class="portfolio-terminal">
   <main class="app-shell">
     <header class="topbar">
       <div class="brand-block">
@@ -62,25 +63,46 @@
     </header>
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-heading">
-        <div><p class="eyebrow">התמונה הגדולה</p><h1 id="overviewTitle">התיק שלך, במבט אחד.</h1><p class="overview-sub">המספרים החשובים כאן. כל השאר נפתח לפי הצורך.</p></div>
+        <div><p class="eyebrow">PORTFOLIO TERMINAL <time id="terminalDate" class="terminal-date"></time></p><h1 id="overviewTitle">מרכז המסחר שלך</h1><p class="overview-sub">תמונת החשבון, ביצועי המסחר והפוזיציות · במקום אחד</p></div>
         <div class="overview-connection"><span id="overviewMode" class="mode-tag">ממתין לחיבור</span><button id="overviewConnect" type="button">חיבור מכשיר</button><span id="overviewUpdated">טרם התקבלו נתונים</span></div>
       </div>
       <div id="overviewHealth" class="health-banner" role="status"><span class="health-dot" aria-hidden="true"></span><span id="overviewHealthText">ממתין לאימות מצב החשבון</span></div>
       <details id="overviewHealthDetails" class="mini" hidden><summary>למה החשבון עדיין לא מאומת?</summary><ul id="overviewHealthReasons"></ul><p>זהו מצב הבדיקות האחרון מהשרת, ולא הוכחה שבוצעה עסקה או שהכסף נפגע.</p></details>
       <div class="overview-metrics">
-        <article class="metric-card featured"><span>שווי התיק <small id="overviewCurrency"></small></span><strong id="overviewValue">—</strong><small id="overviewValueNote">לפי נתוני החשבון</small><svg class="metric-art" viewBox="0 0 120 50" aria-hidden="true"><circle cx="24" cy="50" r="46" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="32" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="18" fill="none" stroke="currentColor"/></svg></article>
-        <article class="metric-card"><span>מזומן זמין</span><strong id="overviewCash">—</strong><small>יתרה זמינה להקצאה</small></article>
+        <article class="metric-card featured"><span>שווי תיק Spot <small id="overviewCurrency"></small></span><strong id="overviewValue">—</strong><small id="overviewValueNote">לפי נתוני החשבון</small><svg class="metric-art" viewBox="0 0 120 50" aria-hidden="true"><circle cx="24" cy="50" r="46" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="32" fill="none" stroke="currentColor"/><circle cx="24" cy="50" r="18" fill="none" stroke="currentColor"/></svg></article>
+        <article class="metric-card"><span>מזומן זמין · Spot</span><strong id="overviewCash">—</strong><small>יתרה זמינה להקצאה</small></article>
         <article class="metric-card"><span id="overviewPnlLabel">רווח / הפסד לא ממומש</span><strong id="overviewPnl">—</strong><small id="overviewPnlNote">ממתין לעלות קנייה מאומתת</small></article>
-        <article class="metric-card"><span>פוזיציות פעילות</span><strong id="overviewSlots">—</strong><div id="overviewSlotDots" class="slot-dots" aria-hidden="true"></div><small>ללא שאריות קטנות</small></article>
+        <article class="metric-card"><span>פוזיציות פעילות · Spot</span><strong id="overviewSlots">—</strong><div id="overviewSlotDots" class="slot-dots" aria-hidden="true"></div><small>ללא שאריות קטנות</small></article>
+        <article class="metric-card"><span>רווח / הפסד ממומש · היום</span><strong id="terminalRealized">—</strong><small id="terminalRealizedNote">LONG + SHORT · ממתין לדוח מאומת</small></article>
+        <article class="metric-card"><span>יציאות מהמסחר · היום</span><strong id="terminalClosedCount">—</strong><small id="terminalClosedNote">LONG + SHORT · לפי שעון ישראל</small></article>
       </div>
-<section id="marketAttentionPanel" class="attention-panel app-view trade-view scans-view" aria-label="איתותי חדשות ותצפיתנים"><h2>איתותים ותצפיתנים</h2><p>ממתין למידע מהשרת. נדרש חיבור המכשיר לצפייה בתצפיות.</p></section>
-<details id="strategyReviewPanel" class="strategy-review"><summary>מעקב שיטת הכניסה · תוצאות והשוואה</summary><div id="strategyReviewBody"></div></details><section id="maDecisionJournal" class="ma-journal app-view trade-view portfolio-view" data-platform="BINANCE" aria-label="יומן השוואת החלטות אוטומטיות לממוצעים"></section>
+      <div class="terminal-analytics app-view trade-view portfolio-view">
       <section id="binanceEquityPanel" class="equity-panel app-view trade-view portfolio-view" aria-label="שווי התיק לאורך היום"></section>
       <div class="overview-visuals app-view trade-view portfolio-view">
         <article class="allocation-card"><div class="section-kicker">חלוקת התיק</div><div class="allocation-layout"><div id="allocationRing" class="allocation-ring" role="img" aria-label="חלוקת תיק טרם זמינה"><div><strong id="allocationPercent">—</strong><span>מזומן זמין</span></div></div><div class="allocation-legend"><p><i class="cash-key"></i>מזומן זמין <b id="allocationCash">—</b></p><p><i class="asset-key"></i>נכסים ויתרות נעולות <b id="allocationOther">—</b></p><small id="allocationNote">יוצג לאחר אימות נתוני החשבון</small></div></div></article>
         <article class="position-map"><div class="position-map-head"><div><div class="section-kicker">מפת הפוזיציה</div><h2 id="positionMapTitle">ממתין לפוזיציות</h2></div><label class="visually-hidden" for="positionMapSelect">בחר פוזיציה למפת המחירים</label><select id="positionMapSelect" hidden></select></div><div id="positionMapContent"><p class="quiet-empty">כאן יוצגו מחיר הכניסה, המחיר הנוכחי וגבולות ההגנה של פוזיציה פעילה.</p></div><a id="positionMapChart" class="text-action" target="_blank" rel="noopener noreferrer" hidden>פתיחת הגרף והניתוח ב־TradingView ↗</a><p class="mini">Binance · חיבור חשבון המסחר מתבצע ב־TradingView.</p></article>
       </div>
+      </div>
+      <div id="terminalLedgers" class="terminal-ledgers app-view trade-view portfolio-view">
+        <section class="terminal-panel" aria-label="החזקות Spot נוכחיות">
+          <div class="terminal-panel-head"><h2>החזקות נוכחיות <span id="terminalHoldingsCount">—</span></h2><button type="button" class="text-action" data-terminal-view="portfolio">לתיק המלא ←</button></div>
+          <div class="terminal-table-wrap" tabindex="0" role="region" aria-label="טבלת החזקות · גלילה אופקית"><table class="terminal-table"><thead><tr><th scope="col">נכס / מסלול</th><th scope="col">כמות</th><th scope="col">מחיר נוכחי</th><th scope="col">שווי</th><th scope="col">רווח / הפסד</th><th scope="col">משקל בתיק</th></tr></thead><tbody id="terminalHoldingsBody"></tbody></table></div>
+          <p id="terminalHoldingsNote" class="terminal-note">ממתין לנתוני החשבון.</p>
+        </section>
+        <section class="terminal-panel" aria-label="יציאות אחרונות ממסחר LONG ו-SHORT">
+          <div class="terminal-panel-head"><h2>יציאות אחרונות</h2><button type="button" class="text-action" data-terminal-view="pnl">לדוח רווח והפסד ←</button></div>
+          <div class="terminal-table-wrap" tabindex="0" role="region" aria-label="טבלת יציאות · גלילה אופקית"><table class="terminal-table"><thead><tr><th scope="col">נכס / כיוון</th><th scope="col">מועד יציאה</th><th scope="col">רווח נטו</th><th scope="col">סיבת יציאה</th></tr></thead><tbody id="terminalClosedBody"></tbody></table></div>
+          <p id="terminalReportNote" class="terminal-note">ממתין לדוח המסחר.</p>
+        </section>
+      </div>
+
     </section>
+
+    <section id="futuresPositionsPanel" class="panel app-view trade-view portfolio-view" aria-label="פוזיציות SHORT פעילות">
+      <h2>פוזיציות פעילות · SHORT Futures</h2><p>ממתין לנתוני SHORT מהשרת…</p>
+    </section>
+<section id="marketAttentionPanel" class="attention-panel app-view trade-view scans-view" aria-label="איתותי חדשות ותצפיתנים"><h2>איתותים ותצפיתנים</h2><p>ממתין למידע מהשרת. נדרש חיבור המכשיר לצפייה בתצפיות.</p></section>
+<details id="strategyReviewPanel" class="strategy-review"><summary>מעקב שיטת הכניסה · תוצאות והשוואה</summary><div id="strategyReviewBody"></div></details><section id="maDecisionJournal" class="ma-journal app-view trade-view portfolio-view" data-platform="BINANCE" aria-label="יומן השוואת החלטות אוטומטיות לממוצעים"></section>
 
     <div class="workspace-heading"><h2>סביבת העבודה</h2><button id="collapseDashboard" type="button" class="text-action">סגור את כל הפירוט</button></div>
     <details id="scenarioSection" class="panel dashboard-fold app-view trade-view portfolio-view">
@@ -446,9 +468,7 @@
       <div id="paperHistory" class="paper-history" hidden></div>
     </section>
 
-    <section id="futuresPositionsPanel" class="panel app-view trade-view portfolio-view" aria-label="פוזיציות SHORT פעילות">
-      <h2>פוזיציות פעילות · SHORT Futures</h2><p>ממתין לנתוני SHORT מהשרת…</p>
-    </section>
+
 
     <section id="demoRealtimePositionsSection" class="panel app-view portfolio-view" hidden>
       <div class="panel-title-row">
@@ -499,5 +519,5 @@
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261031-channel-tp-v2"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261031-exit-levels"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261101-channel-watch"></script><script type="module" src="/binance-trading-pnl.js?v=20261102-pnl"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261031-channel-tp-v2"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261031-exit-levels"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261026-history"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261101-channel-watch"></script><script type="module" src="/binance-terminal.js?v=20261103-terminal"></script><script type="module" src="/binance-trading-pnl.js?v=20261103-terminal"></script></body>
 </html>
