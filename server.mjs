@@ -865,7 +865,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     if(channelPrimary.requested||meta.wyckoffTrade?.entryMode==='channel_breakout'){
       const actions=liveActionLog.filter(a=>a.symbol===symbol);
       const entryAfter=Math.max(Date.parse(tradeControl.resumedAt)||0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite));
-      assertChannelSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.liveBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);
+      assertChannelSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.channelBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);
     }
     if(meta.wyckoffTrade?.entryMode==='independent_breakout'){
       const actions=liveActionLog.filter(a=>a.symbol===symbol);
@@ -877,7 +877,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
   if(reason==='MANUAL_BUY')requireLivePrice(streams[symbol],Date.now(),15000);
   if(['spring_retest','wyckoff_confirmation','spring_rsi_live','early_wave_live','spring_reclaim_confirmed','early_wave_confirmed','independent_breakout','channel_breakout'].includes(meta.wyckoffTrade?.entryMode)){
     if(tradeControl.paused)throw Error('TRADING_PAUSED');
-    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);
+    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),meta.wyckoffTrade.entryMode==='channel_breakout'?streams[symbol]?.channelBar:streams[symbol]?.liveBar);
   }
 
   // News changes observation attention only; execution uses the existing technical/account checks.
@@ -1193,7 +1193,7 @@ function initUniverse(symbols){
 
 function startMarketStream(){
   if(!SYMBOLS.length)return;
-  const names=SYMBOLS.flatMap(s=>[`${s.toLowerCase()}@trade`,`${s.toLowerCase()}@kline_1m`]).join('/');
+  const names=SYMBOLS.flatMap(s=>[`${s.toLowerCase()}@trade`,`${s.toLowerCase()}@kline_1m`,`${s.toLowerCase()}@kline_5m`]).join('/');
   const url=`wss://stream.binance.com:9443/stream?streams=${names}`;
   // Reuse a healthy subscription; universe refresh must not interrupt every scan.
   if(marketSocket?.url===url&&[WebSocket.OPEN,WebSocket.CONNECTING].includes(marketSocket.readyState))return;
@@ -1233,6 +1233,14 @@ function startMarketStream(){
           volume:+k.v,
           closed:Boolean(k.x)
         };
+        if(k.i==='5m'){
+          const previous=streams[s]?.channelBar,eventAt=Number(m.E);
+          if(streams[s]&&Number.isFinite(eventAt)&&(!previous||candle.openTime>previous.openTime||candle.openTime===previous.openTime&&eventAt>=previous.receivedAt)){
+            streams[s].channelBar={...candle,closeTime:candle.closeTime+1,receivedAt:eventAt};
+          }
+          return;
+        }
+        if(k.i!=='1m')return;
         const state=minuteCandleState.get(s)||{closed:[],current:null};
         if(candle.closed){
           const rows=state.closed.filter(x=>x.openTime!==candle.openTime);
@@ -1546,7 +1554,7 @@ async function evaluateSymbol(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:mode==='live'&&channelPrimary.requested?streams[s]?.channelBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
     if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
@@ -2659,7 +2667,7 @@ const server=http.createServer((req,res)=>{
         entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,
         entryMode:'confirmed_quality',
         entryModes:mode==='live'&&channelPrimary.requested?(channelPrimary.enabled?['channel_breakout']:[]):['spring_reclaim_confirmed','early_wave_confirmed',...(mode==='live'&&independentEntry.enabled?['independent_breakout']:[])],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,
-        entryConfirmation:'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',
+        entryConfirmation:mode==='live'&&channelPrimary.requested?'LIVE_CHANNEL_PRICE_AND_ACCUMULATED_VOLUME':'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',
         readPerformanceVersion:1,
         historyPerformanceVersion:1,
         rsiScreenerVersion:1,

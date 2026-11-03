@@ -6,7 +6,7 @@ const code=fs.readFileSync(new URL('../channel-watch.js',import.meta.url),'utf8'
 const ctx=vm.createContext({});vm.runInContext(code,ctx);const candidate=ctx.LEVI_CHANNEL_WATCH.candidate;
 const now=Date.now(),base={at:now,now,enabled:true};
 test('only advanced channel stages qualify, separately for LONG and SHORT',()=>{
- for(const reason of ['WAIT_CHANNEL_BREAKOUT','CHANNEL_VOLUME_LOW','WAIT_LOWER_CHANNEL_BREAK','SHORT_VOLUME_LOW'])assert.ok(candidate({...base,reason}));
+ for(const reason of ['WAIT_CHANNEL_LIVE_BREAKOUT','WAIT_LOWER_CHANNEL_LIVE_BREAK','WAIT_CHANNEL_BREAKOUT','CHANNEL_VOLUME_LOW','WAIT_LOWER_CHANNEL_BREAK','SHORT_VOLUME_LOW'])assert.ok(candidate({...base,reason}));
  for(const reason of ['WAIT_CHANNEL_PIVOTS','REGRESSION_DIRECTION_BLOCK','SHORT_PRICE_INVALIDATED','CHANNEL_SIGNAL_EXPIRED','WAIT_NEW_SHORT_SIGNAL','CHANNEL_BREAKOUT_READY','SHORT_CHANNEL_READY','CHANNEL_LIQUIDITY_LOW',null])assert.equal(candidate({...base,reason}),null);
 });
 test('held, disabled, stale, missing, future and expired results never highlight',()=>{

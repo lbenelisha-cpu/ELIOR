@@ -4,7 +4,7 @@
  const add=(tag,text,parent,cls='')=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;parent.append(el);return el;};
  const date=v=>Number.isFinite(v)?new Date(v).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'טרם נבדק';
  const num=v=>Number.isFinite(v)?v.toLocaleString('he-IL',{maximumFractionDigits:5}):'—';
- const reasons={NEAR_CHANNEL_BOUNDARY:'קרוב לגבול התעלה',CHANNEL_OBSERVED:'תעלה במעקב',WAIT_CHANNEL_PIVOTS:'ממתין לנקודות קיצון',WAIT_TWO_TOUCHES:'טרם אושרו שתי נגיעות בכל צד',WAIT_HISTORY:'אין 51 נרות סגורים לבדיקה',GAPPED_HISTORY:'חסרים נרות ברצף',INVALID_HISTORY:'נתוני הנרות אינם תקינים',STALE_HISTORY:'נרות לא עדכניים',HISTORY_UNAVAILABLE:'לא התקבלו נרות מהמקור',WAIT_OBSERVATION:'ממתין לסריקת תצפיתן',STALE_OBSERVATION:'התצפית התיישנה',LIVE_OBSERVER_ONLY:'התצפיתן הטכני פועל במצב LIVE',OBSERVER_STORAGE_UNAVAILABLE:'שמירת התצפיות דורשת בדיקה',TWO_TOUCHES_EACH_SIDE:'שתי נגיעות בכל צד',REGRESSION:'נתוני רגרסיה',VOLUME_DATA:'נתוני מחזור',VOLUME_RATIO:'מחזור ×1.5 מהממוצע',LIQUIDITY:'מחזור כספי ממוצע של 10,000 USDT'};
+ const reasons={NEAR_CHANNEL_BOUNDARY:'קרוב לגבול התעלה',CHANNEL_OBSERVED:'תעלה במעקב',WAIT_CHANNEL_PIVOTS:'ממתין לנקודות קיצון',WAIT_TWO_TOUCHES:'טרם אושרו שתי נגיעות בכל צד',WAIT_HISTORY:'אין 50 נרות סגורים לבדיקה',GAPPED_HISTORY:'חסרים נרות ברצף',INVALID_HISTORY:'נתוני הנרות אינם תקינים',STALE_HISTORY:'נרות לא עדכניים',HISTORY_UNAVAILABLE:'לא התקבלו נרות מהמקור',WAIT_OBSERVATION:'ממתין לסריקת תצפיתן',STALE_OBSERVATION:'התצפית התיישנה',LIVE_OBSERVER_ONLY:'התצפיתן הטכני פועל במצב LIVE',OBSERVER_STORAGE_UNAVAILABLE:'שמירת התצפיות דורשת בדיקה',TWO_TOUCHES_EACH_SIDE:'שתי נגיעות בכל צד',REGRESSION:'נתוני רגרסיה',VOLUME_DATA:'נתוני מחזור',VOLUME_RATIO:'מחזור ×1.5 מהממוצע',LIQUIDITY:'מחזור כספי ממוצע של 10,000 USDT'};
  const verification={SINGLE_REPORT:'דיווח יחיד · מקור, זמן ושיוך נבדקו',COMPANY_OR_SYNDICATED:'הודעת חברה / תוכן מיוחס · ללא אימות עצמאי',UNCERTAIN:'ניסוח מסויג / שמועה · לא אומת',REVISED:'כותרת שתוקנה · דורשת בדיקה נוספת'};
  let snapshot=null,receivedAt=0,query='',all=false;
  const head=add('div','',panel,'attention-head');panel.replaceChildren(head);
@@ -34,7 +34,7 @@
    if(t.ready){
     add('p','Spot · 50 נרות לפני נר המדידה · '+date(t.dataAt),card,'attention-note');
     add('p',t.channel?'תעלת קיצון: '+t.channel.highTouches+' נגיעות למעלה / '+t.channel.lowTouches+' למטה · '+(t.channel.confirmed?'מאושרת':'זמנית'):'תעלת קיצון: אין תעלה תקפה',card);
-    add('p','רגרסיה: '+({UP:'עולה',DOWN:'יורדת',FLAT:'ללא כיוון'}[t.regression?.side]||'אין נתון')+' · מחזור ×'+num(t.volume?.ratio)+' לעומת ממוצע 20 נרות',card);
+    add('p','רגרסיה: '+({UP:'עולה',DOWN:'יורדת',FLAT:'ללא כיוון'}[t.regression?.side]||'אין נתון')+' · מחזור הנר הסגור האחרון ×'+num(t.volume?.ratio)+' לעומת ממוצע 20 נרות',card);
    }else add('p',transport?(reasons[t.reason]||'התצפית התיישנה'):'אין תצפית טכנית עדכנית',card,'attention-note');
    const first=r.news.evidence?.[0];if(first){const story=add('div','',card,'attention-story');link(story,first);add('small',first.source+' · '+date(first.publishedAt)+(r.news.active?'':' · אינו איתות עדכני'),story);}
    const details=add('details','',card);details.dataset.symbol=r.symbol;details.open=expanded.has(r.symbol);add('summary','מה נאסף ונבדק',details);

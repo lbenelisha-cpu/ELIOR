@@ -25,10 +25,10 @@ test('corroboration describes narrow matching reports, never converts an outage 
  const duplicate=newsAttention(news([pair[0],{...pair[0],id:'copy'}]),'ETHUSDT',now);assert.equal(duplicate.evidence.length,1);
 });
 test('observers use the entry window and confirmed geometry, exclude open candles and expose volume and missing data',()=>{
- const b=bars();Object.assign(b.at(-1),{open:105,close:106,high:106.2,low:104.9,volume:2000});
+ const b=bars();Object.assign(b.at(-1),{volume:2000});
  const config=channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_CHANNEL_PRIMARY_AFTER:new Date(end-STEP).toISOString()});
- const entry=channelEntry({bars:b,price:106,priceAsOf:now,now,liveBar:{openTime:end,low:105.9}},config);assert.equal(entry.ready,true,entry.reason);
- const o=technicalObservation({symbol:'ETHUSDT',bars:b,at:now});assert.equal(o.period,50);assert.equal(o.dataAt,end);assert.equal(o.channel.upper,entry.setup.level);assert.equal(o.channel.lowTouches,entry.setup.lowTouches);assert.equal(o.channel.highTouches,entry.setup.highTouches);assert.equal(o.volume.ratio,2);assert.equal(o.regression.slope,entry.setup.regressionSlope);
+ const entry=channelEntry({bars:b,price:106,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+STEP,open:105,high:106.1,low:104.9,close:106,volume:2000,closed:false,receivedAt:now}},config);assert.equal(entry.ready,true,entry.reason);
+ const o=technicalObservation({symbol:'ETHUSDT',bars:b,at:now});assert.equal(o.period,50);assert.equal(o.dataAt,end);assert.equal(o.channel.upper,entry.setup.level);assert.equal(o.channel.lowTouches,entry.setup.lowTouches);assert.equal(o.channel.highTouches,entry.setup.highTouches);assert.equal(o.volume.ratio,2);assert.equal(o.volume.basis,'LAST_CLOSED_BAR');assert.equal(o.regression.slope,entry.setup.regressionSlope);
  const live={...b.at(-1),openTime:end,closeTime:end+STEP,closed:false,close:9999,high:10000};assert.deepEqual(technicalObservation({symbol:'ETHUSDT',bars:[...b,live],at:now}),o);
  const missing=structuredClone(b);delete missing.at(-1).volume;const m=technicalObservation({symbol:'ETHUSDT',bars:missing,at:now});assert.equal(m.volume.ratio,null);assert.ok(m.missing.includes('VOLUME_DATA'));
  for(const mutate of [x=>x.splice(-4,1),x=>x.at(-1).high=1,x=>x.push(x.at(-1)),x=>x.splice(0,160)]){const x=structuredClone(b);mutate(x);assert.equal(technicalObservation({symbol:'ETHUSDT',bars:x,at:now}).ready,false);}

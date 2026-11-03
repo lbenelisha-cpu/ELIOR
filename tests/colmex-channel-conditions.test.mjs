@@ -47,3 +47,10 @@ test('panel renders unknown metrics without stale cards and LIVE markup keeps on
  assert.doesNotMatch(html,/id="(?:showWyckoffHistory|wyckoffSearchStatus|wyckoffOccurrenceStatus|closedMarketPreparation|resistancePatternStatus)"|כל שלב וואיקוף/);
  for(const id of ['chart','colmexChannelConditions','showColmexSwing','showColmexRegression','chartMarkLegend','colmexChartRisk','autoLiveChecks'])assert.ok(html.includes('id="'+id+'"'));
 });
+
+test('intrabar and previous-server requirements are described separately using reported policy',()=>{
+ const current=structuredClone(status);current.channelPrimary.waitForBreakoutClose=false;
+ const rules=colmexChannelConditions({status:current,now}).rules.join(' ');
+ assert.match(rules,/ללא המתנה לסגירתו/);assert.match(rules,/הצטבר בנר הפריצה הפתוח/);assert.match(rules,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(rules,/דקות מסגירת/);
+ assert.match(colmexChannelConditions({status,now}).rules.join(' '),/גרסת השרת המדווחת עדיין דורשת נר סגור/);
+});

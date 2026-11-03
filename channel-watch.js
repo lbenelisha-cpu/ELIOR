@@ -1,6 +1,6 @@
 // Read-only display classification. Never participates in order authorization.
 (function(root){
- const messages={WAIT_CHANNEL_BREAKOUT:'LONG · תעלה ורגרסיה אושרו; חסרה פריצה תקפה',CHANNEL_VOLUME_LOW:'LONG · פריצה נבדקה; חסר אישור מחזור',WAIT_LOWER_CHANNEL_BREAK:'SHORT · תעלה ורגרסיה אושרו; חסרה שבירה תקפה',SHORT_VOLUME_LOW:'SHORT · שבירה נבדקה; חסר אישור מחזור'};
+ const messages={WAIT_CHANNEL_LIVE_BREAKOUT:'LONG · תעלה ורגרסיה אושרו; ממתין לפריצה בזמן הנר',WAIT_LOWER_CHANNEL_LIVE_BREAK:'SHORT · תעלה ורגרסיה אושרו; ממתין לשבירה בזמן הנר',WAIT_CHANNEL_BREAKOUT:'LONG · תעלה ורגרסיה אושרו; חסרה פריצה תקפה',CHANNEL_VOLUME_LOW:'LONG · פריצה נבדקה; חסר אישור מחזור',WAIT_LOWER_CHANNEL_BREAK:'SHORT · תעלה ורגרסיה אושרו; חסרה שבירה תקפה',SHORT_VOLUME_LOW:'SHORT · שבירה נבדקה; חסר אישור מחזור'};
  function candidate({reason,at,enabled,held=false,stale=false,now=Date.now()}){
   const t=typeof at==='number'?at:Date.parse(at);
   if(!enabled||held||stale||!Number.isFinite(t)||t>now||now-t>=60000||!messages[reason])return null;
