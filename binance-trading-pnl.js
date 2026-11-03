@@ -27,7 +27,7 @@ export function pnlCsv(rows){
  return '\uFEFF'+[header,...rows.map(r=>[r.symbol,r.direction,r.market,when(r.entryAt),when(r.closedAt),r.qty,r.entryPrice,r.exitPrice,r.costUsdt,feesText(r.fees),r.fundingUsdt,r.netPnlUsdt,r.netPnlPct,r.status==='PARTIAL'?'יציאה חלקית':'סגירה',reasonLabel(r.reason),r.issue?issueLabel(r.issue):'מחושב'])].map(row=>row.map(cell).join(',')).join('\r\n');
 }
 
-export function createTradingPnlPanel(host,{read,download=()=>{},now=Date.now}){
+export function createTradingPnlPanel(host,{read,download=()=>{},now=Date.now,onData=()=>{}}){
  let context={mode:'disconnected',visible:false},data=null,busy=false,request=0,lastAttempt=-Infinity,shown=25;
  const heading=el('div',null,'pnl-heading'),intro=el('div');intro.append(el('span','BINANCE · LONG + SHORT','pnl-eyebrow'),el('h2','רווח והפסד מהמסחר'),el('p','כל יציאה במקום אחד · תוצאות שמומשו, לאחר עמלות ומימון'));
  const refresh=el('button','רענן נתונים','refresh'),exportBtn=el('button','ייצוא CSV לאקסל','refresh');refresh.type=exportBtn.type='button';heading.append(intro,refresh,exportBtn);
@@ -73,16 +73,16 @@ export function createTradingPnlPanel(host,{read,download=()=>{},now=Date.now}){
   more.hidden=rows.length<=shown;exportBtn.disabled=!rows.length;
  }
  async function load(force=false){
-  if(context.mode!=='live'||!context.visible||busy||!force&&now()-lastAttempt<15000)return;
+  if(context.mode!=='live'||!context.visible||busy||!force&&now()-lastAttempt<(context.refreshMs||15000))return;
   lastAttempt=now();const current=++request;busy=true;refresh.disabled=true;status.textContent='טוען רווח והפסד…';
-  try{const next=await read();if(current!==request)return;if(!next?.ok||!Array.isArray(next.rows))throw Error('INVALID_REPORT');data=next;render();}
-  catch(error){if(current!==request)return;data=null;render();status.textContent=error.status===401?'נדרש חיבור מכשיר לצפייה ברווח והפסד.':'לא ניתן לטעון את הדוח כרגע. נסה לרענן.';}
+  try{const next=await read();if(current!==request)return;if(!next?.ok||!Array.isArray(next.rows))throw Error('INVALID_REPORT');data=next;render();onData(data);}
+  catch(error){if(current!==request)return;data=null;render();onData(null);status.textContent=error.status===401?'נדרש חיבור מכשיר לצפייה ברווח והפסד.':'לא ניתן לטעון את הדוח כרגע. נסה לרענן.';}
   finally{if(current===request){busy=false;refresh.disabled=false;}}
  }
  refresh.addEventListener('click',()=>load(true));exportBtn.addEventListener('click',()=>download(pnlCsv(filtered()),'LEVI-PnL-'+dateKey(now())+'.csv'));
  for(const input of [period,direction,sort,from,to])input.addEventListener('change',()=>{shown=25;render();});symbol.addEventListener('input',()=>{shown=25;render();});more.addEventListener('click',()=>{shown+=25;render();});
  function setContext(next){
-  if(context.mode!==next.mode){request++;data=null;busy=false;lastAttempt=-Infinity;refresh.disabled=false;}
+  if(context.mode!==next.mode){request++;data=null;busy=false;lastAttempt=-Infinity;refresh.disabled=false;onData(null);}
   context={...context,...next};render();
   if(context.mode!=='live'){status.textContent=context.mode==='demo'?'הדוח מרכז מסחר LIVE. עבור ל־LIVE לצפייה.':'נדרש חיבור מכשיר לצפייה ברווח והפסד.';refresh.disabled=true;return;}
   if(context.visible)load();
@@ -92,13 +92,15 @@ export function createTradingPnlPanel(host,{read,download=()=>{},now=Date.now}){
 
 const host=document.getElementById('binanceTradingPnl');
 if(host){
- const panel=createTradingPnlPanel(host,{read:async()=>{
+ const panel=createTradingPnlPanel(host,{onData:data=>window.dispatchEvent(new CustomEvent('levi:binance-pnl-data',{detail:data})),read:async()=>{
   const url=window.API_BASE+'/api/binance-trading-pnl',r=await fetch(window.binanceReadUrl(url),{headers:window.binanceReadHeaders(url),cache:'no-store',signal:AbortSignal.timeout(20000)});
   if(!r.ok){const error=Error('PNL_UNAVAILABLE');error.status=r.status;throw error;}return r.json();
  },download:(content,name)=>{const url=URL.createObjectURL(new Blob([content],{type:'text/csv;charset=utf-8'})),link=el('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}});
  let mode=window.LEVI_DASHBOARD_SNAPSHOT?.mode||'disconnected';
- const update=()=>panel.setContext({mode,visible:!host.hidden&&!document.hidden});
+ const overview=document.getElementById('terminalLedgers');
+ const update=()=>panel.setContext({mode,visible:(!host.hidden||(overview&&!overview.hidden))&&!document.hidden,refreshMs:host.hidden?60000:15000});
  window.addEventListener('levi:trading-pnl-view',update);
+ window.addEventListener('trade-device-expired',()=>{mode='disconnected';update();});
  window.addEventListener('levi:binance-dashboard',e=>{if(e.detail?.unauthorized)mode='disconnected';else if(e.detail?.mode)mode=e.detail.mode;update();});
  document.addEventListener('visibilitychange',update);setInterval(update,15000);update();
 }
