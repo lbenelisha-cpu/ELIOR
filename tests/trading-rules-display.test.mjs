@@ -16,3 +16,8 @@ test('fallback preserves reported policy; mode changes clear it and missing valu
  assert.match(ctx.tradingRuleLines({mode:'live'}).join('\n'),/ממתין לאימות/);
  assert.match(ctx.tradingRuleLines({...live,channelPrimary:{requested:true,enabled:false,error:'BLOCKED'}}).join('\n'),/חסום: BLOCKED/);
 });
+
+test('intrabar rules follow verified LONG and SHORT policies without advertising a closing-candle wait',()=>{
+ const x=structuredClone(live);x.channelPrimary.waitForBreakoutClose=false;x.shortTrading.policy.waitForBreakoutClose=false;
+ const text=ctx.tradingRuleLines(x).join('\n');assert.match(text,/ללא המתנה לסגירת נר הפריצה/);assert.match(text,/מחזור מצטבר בנר הפתוח/);assert.match(text,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(text,/נר פריצה נסגר|פריצה מטה בנר סגור|דקות מסגירת/);
+});

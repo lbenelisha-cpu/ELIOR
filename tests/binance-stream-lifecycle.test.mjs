@@ -39,3 +39,15 @@ test('failed evaluation clears old buy eligibility instead of advertising stale 
  context.setAgentFromEval({ok:false,symbol:'ACEUSDT',error:'Fresh connected Binance price required; entry evaluation paused'});
  const a=context.agents.ACEUSDT;assert.equal(a.entryConfirmed,false);assert.equal(a.entryEligible,false);assert.equal(a.buyQualified,false);assert.equal(a.decision,'WAIT_DATA');assert.equal(a.staleData,true);
 });
+
+test('channel stream carries authoritative 5m OHLCV and rejects old kline events without mixing minute volume',()=>{
+ const x=setup();x.context.minuteCandleState=new Map();x.context.startMarketStream();
+ const socket=x.sockets[0],t=Date.parse('2026-11-03T15:00:00Z');
+ assert.match(socket.url,/@kline_5m/);
+ const send=(E,v,i='5m')=>socket.handlers.message(JSON.stringify({e:'kline',s:'ACEUSDT',E,k:{i,t,T:t+(i==='5m'?300000:60000)-1,o:'100',h:'102',l:'99',c:'101',v,x:false}}));
+ send(t+1000,'1500');const b=x.context.streams.ACEUSDT.channelBar;
+ assert.equal(b.volume,1500);assert.equal(b.receivedAt,t+1000);assert.equal(b.closeTime,t+300000);assert.equal(b.closed,false);
+ send(t+500,'500');assert.equal(x.context.streams.ACEUSDT.channelBar.volume,1500);
+ send(t+1500,'20','1m');assert.equal(x.context.streams.ACEUSDT.channelBar.volume,1500);assert.equal(x.context.minuteCandleState.get('ACEUSDT').current.volume,20);
+ send(t+2000,'1700');assert.equal(x.context.streams.ACEUSDT.channelBar.volume,1700);
+});

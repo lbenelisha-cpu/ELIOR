@@ -47,3 +47,8 @@ test('channel search never presents a stale Wyckoff reset as the active entry co
  renderSearchStatus(host,null,{...options,check:{at:end,reason:'SEARCH_PEAK'}});text=host.children.map(n=>n.textContent).join(' ');assert.match(text,/ממתין לבדיקה מתועדת במסלול התעלות/);
  }finally{globalThis.document=prior;}
 });
+
+test('Colmex intrabar policy describes current broker price and keeps confirmed channel pivots',()=>{
+ const view=colmexStrategyView({enabled:true,channelPrimary:{enabled:true,requested:true,enabledAfter:end,waitForBreakoutClose:false}});
+ assert.match(view.entry,/ללא המתנה לסגירת נר הפריצה/);assert.match(view.entry,/50 נרות סגורים/);assert.match(view.entry,/המחזור שהצטבר בנר הפתוח/);assert.doesNotMatch(view.entry,/נדרשת סגירה מעל/);
+});

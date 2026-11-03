@@ -1,0 +1,26 @@
+[
+  {
+    "before": "      const entryAfter=Math.max(Date.parse(tradeControl.resumedAt)||0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite));\n      assertChannelSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.liveBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);\n    }\n",
+    "after": "      const entryAfter=Math.max(Date.parse(tradeControl.resumedAt)||0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite));\n      assertChannelSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.channelBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);\n    }\n"
+  },
+  {
+    "before": "    if(tradeControl.paused)throw Error('TRADING_PAUSED');\n    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),streams[symbol]?.liveBar);\n  }\n",
+    "after": "    if(tradeControl.paused)throw Error('TRADING_PAUSED');\n    assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),meta.wyckoffTrade.entryMode==='channel_breakout'?streams[symbol]?.channelBar:streams[symbol]?.liveBar);\n  }\n"
+  },
+  {
+    "before": "  if(!SYMBOLS.length)return;\n  const names=SYMBOLS.flatMap(s=>[`${s.toLowerCase()}@trade`,`${s.toLowerCase()}@kline_1m`]).join('/');\n  const url=`wss://stream.binance.com:9443/stream?streams=${names}`;\n",
+    "after": "  if(!SYMBOLS.length)return;\n  const names=SYMBOLS.flatMap(s=>[`${s.toLowerCase()}@trade`,`${s.toLowerCase()}@kline_1m`,`${s.toLowerCase()}@kline_5m`]).join('/');\n  const url=`wss://stream.binance.com:9443/stream?streams=${names}`;\n"
+  },
+  {
+    "before": "        };\n        const state=minuteCandleState.get(s)||{closed:[],current:null};\n",
+    "after": "        };\n        if(k.i==='5m'){\n          const previous=streams[s]?.channelBar,eventAt=Number(m.E);\n          if(streams[s]&&Number.isFinite(eventAt)&&(!previous||candle.openTime>previous.openTime||candle.openTime===previous.openTime&&eventAt>=previous.receivedAt)){\n            streams[s].channelBar={...candle,closeTime:candle.closeTime+1,receivedAt:eventAt};\n          }\n          return;\n        }\n        if(k.i!=='1m')return;\n        const state=minuteCandleState.get(s)||{closed:[],current:null};\n"
+  },
+  {
+    "before": "    const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);\n    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});\n\n",
+    "after": "    const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);\n    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:mode==='live'&&channelPrimary.requested?streams[s]?.channelBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});\n\n"
+  },
+  {
+    "before": "        entryModes:mode==='live'&&channelPrimary.requested?(channelPrimary.enabled?['channel_breakout']:[]):['spring_reclaim_confirmed','early_wave_confirmed',...(mode==='live'&&independentEntry.enabled?['independent_breakout']:[])],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,\n        entryConfirmation:'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',\n        readPerformanceVersion:1,\n",
+    "after": "        entryModes:mode==='live'&&channelPrimary.requested?(channelPrimary.enabled?['channel_breakout']:[]):['spring_reclaim_confirmed','early_wave_confirmed',...(mode==='live'&&independentEntry.enabled?['independent_breakout']:[])],earlyWave:EARLY_WAVE_POLICY,shortEnabled:false,\n        entryConfirmation:mode==='live'&&channelPrimary.requested?'LIVE_CHANNEL_PRICE_AND_ACCUMULATED_VOLUME':'CLOSED_5M_RECLAIM_MA_VOLUME_RSI40',\n        readPerformanceVersion:1,\n"
+  }
+]
