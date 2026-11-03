@@ -46,9 +46,9 @@ function render(){
  health('colmexServerHealth',!monitor?'unknown':monitor.health==='recent'&&!blockingPending.length?'good':'warning',!monitor?'מצב המעקב לא אומת':status.halt?'נדרש בירור פקודה':blockingPending.length?'הוראה ממתינה לאישור':monitor.health==='recent'?'שרת המעקב פעיל':monitor.health==='disabled'?'המעקב כבוי':status.lastError?(status.lastError.stage==='ACCOUNT_SNAPSHOT'?'סבב המעקב נכשל · קריאת חשבון':'סבב המעקב נכשל · ניסיון נוסף אוטומטי'):'עדכון השרת מתעכב');
  const marketHealth=marketHealthView(market,now);health('colmexMarketHealth',marketHealth.kind,marketHealth.label);
  txt('colmexPolicy',status?.policy?`${status.policy.symbols.length} מניות במעקב · עד $${status.policy.notionalUsd} למניה · ${status.policy.maxPositions} פוזיציות`:'50 מניות במעקב · עד $800 למניה · 3 פוזיציות');
- const prepared=!statusFailed&&status?.preparation?.rows||{},checked=Object.values(prepared).filter(r=>!r.error&&r.complete!==false).length,total=status?.policy?.symbols?.length||50;
+ const checked=monitor?.checked||0,total=monitor?.total||status?.policy?.symbols?.length||50;
  const pct=Math.min(100,checked/total*100);$('colmexScanRing').style.setProperty('--scan-angle',pct*3.6+'deg');txt('colmexScanCount',(status&&!statusFailed?checked:'—')+' / '+total);
- txt('colmexScanNote',status&&!statusFailed?'הכנה לפי הנרות הסגורים · '+time(status.preparation?.lastCheckedAt):'ממתין לסיכום הסריקה');
+ txt('colmexScanNote',monitor?(status.channelPrimary?.requested?'בדיקות תעלת קיצון ורגרסיה':'בדיקות כניסה מתועדות')+' · סבב שרת אחרון: '+time(monitor.completed):'ממתין לסיכום הסריקה');
  txt('colmexChecksCount',monitor?`${monitor.checked} / ${monitor.total}`:'—');
  txt('colmexProtectionAt',status&&!statusFailed?'בדיקת ברוקר אחרונה: '+time(status.lastBrokerSnapshotAt):'מצב ההגנות טרם אומת');
  const host=$('colmexPositionCards');host.replaceChildren();

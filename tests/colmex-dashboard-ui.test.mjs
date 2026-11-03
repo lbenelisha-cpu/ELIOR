@@ -39,3 +39,11 @@ test('map chart action selects the position in the existing chart without sendin
  const s=status();s.data.positions=[{symbol:'MSFT',qty:1,entryPrice:200}];const u=ui({status:s});u.get('colmexMapChart').onclick();
  assert.equal(u.get('colmexChartPanel').open,true);assert.equal(u.sent.length,1);assert.equal(u.sent[0].type,'levi-rsi-select');assert.equal(u.sent[0].detail,'MSFT');
 });
+
+test('dashboard scan summary counts actual entry checks rather than legacy preparation rows',()=>{
+ const s=status();s.data.policy.symbols=['AAPL','MSFT'];s.data.channelPrimary={requested:true};
+ s.data.preparation={lastCheckedAt:Date.now(),rows:{AAPL:{complete:true},MSFT:{complete:true}}};
+ s.data.checks={AAPL:{at:Date.now()-60000,reason:'WAIT_CHANNEL_BREAKOUT',entryDecisions:{primary:'channel_breakout'}}};
+ const u=ui({status:s});assert.equal(u.text('colmexScanCount'),'1 / 2');assert.match(u.text('colmexScanNote'),/תעלת קיצון ורגרסיה/);assert.doesNotMatch(u.text('colmexScanNote'),/הכנה/);
+ u.emit('levi:colmex-status-error');assert.equal(u.text('colmexScanCount'),'— / 2');assert.match(u.text('colmexScanNote'),/ממתין/);
+});
