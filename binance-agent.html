@@ -7,7 +7,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="/binance-agent.css?v=20261101-channel-touches">
+  <link rel="stylesheet" href="/binance-agent.css?v=20261104-channel-badge">
 <link rel="stylesheet" href="/tradingview-exit-snapshot.css?v=20261031-exit-levels"><link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
   <link rel="stylesheet" href="/binance-dashboard.css?v=20261030-news-nav">
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-entry-alpha">
@@ -307,9 +307,10 @@
         <p id="resistancePatternStatus" class="mini" role="status">טוען אזורי התנגדות ופריצה…</p>
         <section id="chartTerminal" class="chart-terminal" aria-label="גרף אינטראקטיבי"><div id="chartTerminalTools"></div>
         <div id="chartPriceLegend" class="chart-price-legend" aria-label="מקרא מחירי העסקה" hidden></div>
+        <div id="channelTouchBadge" class="channel-touch-badge" role="status" hidden></div>
         <div class="chart-wrap">
           <canvas id="priceChart" width="1200" height="560"></canvas>
-          <div id="channelTouchBadge" class="channel-touch-badge" role="status" hidden></div>
+          
           <div id="wyckoffPivots" class="wyckoff-pivots"></div>
           <div id="wyckoffOccurrences" class="wyckoff-occurrences"></div>
           <div id="chartEmpty" class="chart-empty hidden">אין נתוני גרף</div>
@@ -512,7 +513,7 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
   <script src="/binance-futures-positions.js?v=20261103-intrabar"></script>
-  <script src="/binance-agent.js?poc=1&v=20261103-intrabar"></script>
+  <script src="/binance-agent.js?poc=1&v=20261104-channel-badge"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261103-poc"></script>
   <script src="/market-attention.js?v=20261103-intrabar"></script>
