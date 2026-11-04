@@ -15,7 +15,7 @@ export function colmexPnlRows(trades,now=Date.now()){
   const verified=!t.accountingAdjusted&&t.accountingStatus==='FEES_UNVERIFIED'&&Array.isArray(t.exitOrderIds)&&t.exitOrderIds.length>0&&cost>0&&numeric(t.exitPrice)&&t.exitPrice>0&&numeric(t.grossPnl);
   const gross=verified?t.grossPnl:null;
   // The current LIVE journal does not verify fees. Never promote gross to net.
-  return {symbol:String(t.symbol||'—'),direction:'LONG',qty:numeric(t.qty)?t.qty:null,entryPrice:numeric(t.entryPrice)?t.entryPrice:null,exitPrice:numeric(t.exitPrice)?t.exitPrice:null,entryAt:validTime(t.entryAt)?t.entryAt:null,closedAt,cost,gross,net:null,fees:null,grossPct:gross!==null&&cost>0?gross/cost*100:null,reason:reasonText(t.reason),issue:!closedAt?'INVALID_DATE':t.accountingAdjusted?'QUANTITY_CHANGED':verified?'FEES_UNVERIFIED':'MISSING_EXECUTION'};
+  return {symbol:String(t.symbol||'—'),direction:t.side==='SHORT'?'SHORT':'LONG',qty:numeric(t.qty)?t.qty:null,entryPrice:numeric(t.entryPrice)?t.entryPrice:null,exitPrice:numeric(t.exitPrice)?t.exitPrice:null,entryAt:validTime(t.entryAt)?t.entryAt:null,closedAt,cost,gross,net:null,fees:null,grossPct:gross!==null&&cost>0?gross/cost*100:null,reason:reasonText(t.reason),issue:!closedAt?'INVALID_DATE':t.accountingAdjusted?'QUANTITY_CHANGED':verified?'FEES_UNVERIFIED':'MISSING_EXECUTION'};
  });
 }
 export function filterColmexPnl(rows,{period='30',symbol='',from='',to='',sort='newest'}={},now=Date.now()){
@@ -45,7 +45,7 @@ export function createColmexPnlPanel(host,{refresh=()=>{},download=()=>{},now=Da
  const totals=el('div',null,'pnl-totals'),counts=el('p',null,'pnl-counts'),wrap=el('div',null,'pnl-table-wrap'),table=el('table',null,'pnl-table');table.setAttribute('aria-label','רווח והפסד Colmex');
  const thead=el('thead'),tr=el('tr');for(const text of ['נכס / כיוון','כניסה ← זיהוי סגירה','מחירי ביצוע · USD','כמות / עלות · USD','רווח גולמי · USD','תשואה גולמית','עמלות / נטו · USD','סיבת סגירה / אימות']){const th=el('th',text);th.scope='col';tr.append(th);}thead.append(tr);const tbody=el('tbody');table.append(thead,tbody);wrap.append(table);
  const more=el('button','הצג עוד 25 סגירות','secondary');more.type='button';
- const note=el('p','הדוח כולל עד 100 סגירות אחרונות של פוזיציות שבמעקב הבוט, כולל החזקות ידניות שאומצו לניהול. מסלול קולמקס הנוכחי הוא LONG בלבד. הסינון לפי זמן זיהוי הסגירה בשעון ישראל, שאינו בהכרח זמן הביצוע בברוקר. רווח גולמי ותשואה מחושבים רק כשמחירי הביצוע והכמות מאומתים; העמלות והרווח נטו עדיין אינם מאומתים. שינוי כמות או מכירה חלקית מחוץ לבוט עשויים להשאיר נתונים חסרים. נתון חסר אינו אפס. רווח פתוח, העברות והפקדות אינם נכללים בסיכום.','pnl-note');
+ const note=el('p','הדוח כולל עד 100 סגירות אחרונות של פוזיציות שבמעקב הבוט, כולל החזקות ידניות שאומצו לניהול. הדוח כולל פוזיציות LONG ו־SHORT. הסינון לפי זמן זיהוי הסגירה בשעון ישראל, שאינו בהכרח זמן הביצוע בברוקר. רווח גולמי ותשואה מחושבים רק כשמחירי הביצוע והכמות מאומתים; העמלות והרווח נטו עדיין אינם מאומתים. שינוי כמות או מכירה חלקית מחוץ לבוט עשויים להשאיר נתונים חסרים. נתון חסר אינו אפס. רווח פתוח, העברות והפקדות אינם נכללים בסיכום.','pnl-note');
  host.append(heading,controls,status,totals,counts,wrap,more,note);
  const filtered=()=>filterColmexPnl(data||[],{period:period.value,symbol:symbol.value,from:from.value,to:to.value,sort:sort.value},now());
  function render(){
@@ -63,7 +63,7 @@ export function createColmexPnlPanel(host,{refresh=()=>{},download=()=>{},now=Da
   counts.textContent=rows.length+' סגירות בסינון'+(s.unknown?' · '+s.unknown+' ללא חישוב גולמי; אינן נכללות בסיכום':'');
   if(!rows.length){const row=el('tr'),cell=el('td','אין סגירות שמורות בטווח ובסינון שנבחרו.');cell.colSpan=8;row.append(cell);tbody.append(row);}
   for(const r of rows.slice(0,shown)){const row=el('tr'),cell=(...nodes)=>{const td=el('td');td.append(...nodes);row.append(td);};
-   cell(el('b',r.symbol),el('small','LONG','pnl-side long'));
+   cell(el('b',r.symbol),el('small',r.direction,'pnl-side '+r.direction.toLowerCase()));
    cell(el('span',when(r.entryAt)),el('small',when(r.closedAt)));
    cell(el('span','כניסה '+format(r.entryPrice)),el('small','יציאה '+format(r.exitPrice)));
    cell(el('span',format(r.qty)),el('small',format(r.cost)+' USD'));

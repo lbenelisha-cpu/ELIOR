@@ -5,7 +5,7 @@ import {colmexChannelConditions,colmexLiveTradeMarks,renderColmexChannelConditio
 import {CHANNEL_PRIMARY_POLICY} from '../lib/channel-primary-entry.mjs';
 
 const now=Date.parse('2026-11-03T19:00:00Z');
-const status={enabled:true,channelPrimary:{requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_breakout',channel:{ready:false}}}}};
+const status={enabled:true,channelPrimary:{requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_long_short',channel:{ready:false}}}}};
 const channels={axis:new Map([[now-300000,300000]]),swing:{ready:true,highTouches:2,lowTouches:1,upper:333,lower:330,provisional:true},regression:{ready:true,slope:.1,middle:331.5}};
 test('channel panel separates dynamic touch counts from the timestamped server decision and states actual entry requirements',()=>{
  const view=colmexChannelConditions({channels,status,symbol:'AAPL',now});
@@ -52,5 +52,5 @@ test('intrabar and previous-server requirements are described separately using r
  const current=structuredClone(status);current.channelPrimary.waitForBreakoutClose=false;
  const rules=colmexChannelConditions({status:current,now}).rules.join(' ');
  assert.match(rules,/ללא המתנה לסגירתו/);assert.match(rules,/הצטבר בנר הפריצה הפתוח/);assert.match(rules,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(rules,/דקות מסגירת/);
- assert.match(colmexChannelConditions({status,now}).rules.join(' '),/גרסת השרת המדווחת עדיין דורשת נר סגור/);
+ assert.match(colmexChannelConditions({status,now}).rules.join(' '),/SHORT/);
 });

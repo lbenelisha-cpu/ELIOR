@@ -1,5 +1,5 @@
-import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261104-poc';
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261104-poc';
+import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261104-long-short';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261104-long-short';
 import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
@@ -53,7 +53,7 @@ async function refresh(){if(document.hidden||loading)return;loading=true;refresh
  if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-colmex-rsi',{detail:d}));
  latest=d;received.textContent='מצב השרת נקרא במסך: '+time(Date.now());document.getElementById('autoMonitorHistory').replaceChildren();renderMonitor();
  badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt&&d.halt!==d.lastResult?' · '+reason(d.halt):'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
- positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · כמות ${p.qty} · כניסה $${p.entryPrice} · שיא שנצפה $${p.peakPrice}`);
+ positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · ${p.side||'LONG'} · כמות ${p.qty} · כניסה $${p.entryPrice} · ${p.side==='SHORT'?'שפל שנצפה $'+p.lowPrice:'שיא שנצפה $'+p.peakPrice}`);
  if(!d.positions?.length)line(positions,'אין פוזיציות שמנוהלות בידי המנגנון הזה. פוזיציות ידניות מוצגות בחלונית החשבון.');
  }catch{renderColmexStrategy(document,null);if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:null,error:true};if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-status-error'));latest=null;badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';health.textContent='אין חיבור לתצוגת המעקב · לא ניתן לאמת שהבדיקות ממשיכות';health.dataset.health='error';summary.textContent='זמן הסבב האחרון אינו מאומת כעת.';positions.replaceChildren();checks.replaceChildren();document.getElementById('autoMonitorHistory').replaceChildren();}finally{loading=false;refreshButton.disabled=false;}}
 refreshButton.addEventListener('click',refresh);

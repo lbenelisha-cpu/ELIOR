@@ -1,8 +1,8 @@
 import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-labels-pnl';
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261104-poc';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261104-long-short';
 import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
-import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261104-poc';
+import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261104-long-short';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
@@ -93,7 +93,7 @@ function renderChart(){
  if(PAPER_MODE){
  const resistance=globalThis.LEVI_RESISTANCE?.detect(chartBars().slice(0,visibleWindow.end),{interval});
  const route=liveSearchState.checks?.[selected]?.entryDecisions;
- $('#resistancePatternStatus').textContent=(globalThis.LEVI_RESISTANCE?.describe(resistance,interval)||'')+(route?.primary==='poc_reclaim'?' · מסלול ראשי: מבנה עולה + POC · '+(route.poc.ready?'החזרה מעל POC אושרה, כפוף לבדיקות החשבון':entryReasonLabel(route.poc.reason)):route?' · מסלול פריצה בשרת: '+(route.breakout.reason==='INDEPENDENT_ENTRY_DISABLED'?'לא מופעל':route.breakout.ready?'תנאי הניתוח מתקיימים; הביצוע כפוף לבדיקות החשבון':'ממתין לתנאי כניסה'):'');
+ $('#resistancePatternStatus').textContent=(globalThis.LEVI_RESISTANCE?.describe(resistance,interval)||'')+(route?.primary==='channel_long_short'?' · מסלול ראשי: תעלת קיצון ורגרסיה · LONG / SHORT · '+(route.channel.ready?'איתות '+route.channel.side+' אושר, כפוף לבדיקות החשבון':entryReasonLabel(route.channel.reason)):route?' · מסלול פריצה בשרת: '+(route.breakout.reason==='INDEPENDENT_ENTRY_DISABLED'?'לא מופעל':route.breakout.ready?'תנאי הניתוח מתקיימים; הביצוע כפוף לבדיקות החשבון':'ממתין לתנאי כניסה'):'');
  globalThis.LEVI_RESISTANCE?.drawSvg({svg,zone:resistance,view:bars,x,y,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
  }
  bars.forEach((b,i)=>{const marks=visiblePoints.filter(p=>p.index===i),primary=marks.find(p=>p.kind==='peak')||marks.find(p=>p.kind==='buy'||p.kind==='sell')||marks.at(-1),color=primary?.color||(b.close>=b.open?'#67e0ae':'#ff798b'),w=Math.max(2,Math.min(12,plotWidth/bars.length*.6));const line=add('line',{x1:x(i),x2:x(i),y1:y(b.high),y2:y(b.low),stroke:color,'stroke-width':primary?2:1});const body=add('rect',{x:x(i)-w/2,y:Math.min(y(b.open),y(b.close)),width:w,height:Math.max(primary?3:1,Math.abs(y(b.open)-y(b.close))),fill:color});

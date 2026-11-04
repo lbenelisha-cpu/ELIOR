@@ -10,7 +10,7 @@ function ui({account=null,status=null}={}){
  const element=()=>({children:[],textContent:'',dataset:{},style:{setProperty(){}},append(...n){this.children.push(...n);},replaceChildren(...n){this.children=n;},addEventListener(){},setAttribute(){},scrollIntoView(){}});
  const get=id=>{if(!elements.has(id))elements.set(id,element());return elements.get(id);};
  const window={LEVI_COLMEX_ACCOUNT:account,LEVI_COLMEX_STATUS:status,addEventListener:(name,fn)=>events[name]=fn,dispatchEvent:event=>sent.push(event)};
- vm.runInNewContext(fs.readFileSync(new URL('../colmex-dashboard.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,''),{...math,positionChangeBadge,monitorView,window,document:{getElementById:get,createElement:element,querySelector:()=>element()},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},Date,Intl,setInterval(){}});
+ vm.runInNewContext(fs.readFileSync(new URL('../colmex-dashboard.js',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,''),{...math,positionChangeBadge,monitorView,window,document:{getElementById:get,createElement:element,querySelector:()=>element()},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},Date,Intl,setInterval(){}});
  const text=n=>n.textContent+n.children.map(text).join('|');return {get,sent,text:id=>text(get(id)),emit:(name,detail)=>events[name]({detail})};
 }
 const fixture=()=>({data:{selectedAccount:{id:'1',name:'USD account',currency:'USD'},observedAt:new Date().toISOString(),state:{projectedBalance:1000,cashBalance:0,openNetPnL:-2},positions:[]}});
@@ -38,6 +38,10 @@ test('position map only presents recently confirmed protection and observed pric
 test('map chart action selects the position in the existing chart without sending a trade',()=>{
  const s=status();s.data.positions=[{symbol:'MSFT',qty:1,entryPrice:200}];const u=ui({status:s});u.get('colmexMapChart').onclick();
  assert.equal(u.get('colmexChartPanel').open,true);assert.equal(u.sent.length,1);assert.equal(u.sent[0].type,'levi-rsi-select');assert.equal(u.sent[0].detail,'MSFT');
+});
+test('SHORT map shows a gain when the buyback quote falls and labels its direction',()=>{
+ const s=status(),now=Date.now();s.data.positions=[{symbol:'AAPL',side:'SHORT',qty:2,entryPrice:100,lastBid:94,lastQuoteAt:now,lowPrice:93,brokerProtection:{stopLoss:95,takeProfit:90,verifiedAt:now}}];
+ const u=ui({status:s});assert.match(u.text('colmexMapContent'),/SHORT/);assert.match(u.text('colmexMapContent'),/\+6.00%/);assert.match(u.text('colmexPositionCards'),/SHORT/);
 });
 
 test('dashboard scan summary counts actual entry checks rather than legacy preparation rows',()=>{
