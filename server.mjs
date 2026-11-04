@@ -2450,6 +2450,8 @@ const server=http.createServer((req,res)=>{
     '/binance-control-session.js':['binance-control-session.js','text/javascript'],
     '/binance-device-access.js':['binance-device-access.js','text/javascript'],
     '/binance-manual-trades.js':['binance-manual-trades.js','text/javascript'],
+    '/binance-live-monitor.js':['binance-live-monitor.js','text/javascript'],
+    '/binance-live-monitor.css':['binance-live-monitor.css','text/css'],
     '/binance-poc-paper.js':['binance-poc-paper.js','text/javascript'],
     '/binance-poc-paper.css':['binance-poc-paper.css','text/css'],
     '/binance-poc.js':['binance-poc.js','text/javascript'],
@@ -2605,6 +2607,52 @@ const server=http.createServer((req,res)=>{
     getDisplayAccountSnapshot()
       .then(account=>send(res,{connected:true,account}))
       .catch(e=>send(res,{connected:false,error:e.message},502));
+    return;
+  }
+
+  if(u.pathname==='/api/binance-poc-live-monitor'&&req.method==='GET'){
+    if(mode!=='live')return send(res,{ok:false,error:'LIVE_ACCOUNT_MODE_REQUIRED'},409);
+    getDisplayAccountSnapshot().then(async spot=>{
+      let futures={ok:false,error:'FUTURES_ACCOUNT_UNAVAILABLE',walletUsdt:null,availableUsdt:null,positions:[]};
+      try{
+        const [snapshot,risk]=await Promise.all([
+          futuresShort.snapshot(),
+          pnlReadApi.get('/fapi/v2/positionRisk')
+        ]);
+        if(!Array.isArray(risk))throw Error('FUTURES_POSITION_RESPONSE_INVALID');
+        const managed=futuresShort.state.positions||{};
+        futures={
+          ok:true,walletUsdt:snapshot.walletUsdt,availableUsdt:snapshot.availableUsdt,
+          positions:risk.filter(p=>Number(p.positionAmt)!==0).map(p=>({
+            symbol:p.symbol,quantity:Number(p.positionAmt),entryPrice:Number(p.entryPrice),
+            markPrice:Number(p.markPrice),unrealizedPnlUsdt:Number(p.unRealizedProfit),
+            liquidationPrice:Number(p.liquidationPrice),leverage:Number(p.leverage),
+            managed:!!managed[p.symbol],strategy:managed[p.symbol]?.setup?.strategyId||null
+          }))
+        };
+      }catch(error){futures.error=error.message||futures.error;}
+      const pnl=tradingPnlReader.read(liveActionLog,futuresShort.state.closed,{
+        spotHealthy:liveStateHealth.journalReady===true,
+        shortHealthy:!futuresShort.fatal
+      });
+      const realized=direction=>{
+        const rows=pnl.rows.filter(row=>row.direction===direction);
+        const known=rows.filter(row=>Number.isFinite(row.netPnlUsdt));
+        return {net:known.length?known.reduce((sum,row)=>sum+row.netPnlUsdt,0):null,closed:rows.length,known:known.length,unknown:rows.length-known.length};
+      };
+      const balances=(spot.balances||[]).filter(b=>b.asset&&!['USDT','USDC'].includes(b.asset)&&Number(b.qty)>0)
+        .map(b=>({asset:b.asset,symbol:b.asset+'USDT',quantity:b.qty,valueUsdt:b.valueUsdt,
+          markPrice:b.usdtPrice,entryPrice:b.entryPrice??null,unrealizedPnlUsdt:Number.isFinite(b.pnlIls)?b.pnlIls:null,
+          pnlPct:Number.isFinite(b.pnlPct)?b.pnlPct:null}));
+      const knownSpot=balances.filter(b=>Number.isFinite(b.unrealizedPnlUsdt));
+      const poc=pocLiveRunner.status();
+      return send(res,{ok:true,mode:'live',asOf:Date.now(),spot:{equityUsdt:spot.totalValueUsdt,
+        availableUsdt:spot.usdtFree,lockedUsdt:spot.usdtLocked,openPnlUsdt:balances.length===knownSpot.length?knownSpot.reduce((n,b)=>n+b.unrealizedPnlUsdt,0):null,
+        positions:balances,unpricedAssets:spot.unpricedAssets||[]},futures,
+        realized:{long:realized('LONG'),short:realized('SHORT'),loadingShort:pnl.loadingShort,issues:pnl.issues},
+        poc:{enabled:poc.enabled,executionReady:poc.executionReady,checkedAt:poc.checkedAt,error:poc.error,fatal:poc.fatal,
+          pendingSetups:poc.pendingSetups,executions:poc.executions}});
+    }).catch(error=>send(res,{ok:false,error:error.message||'LIVE_MONITOR_UNAVAILABLE'},503));
     return;
   }
 
@@ -2833,7 +2881,6 @@ server.listen(PORT,'0.0.0.0',async()=>{
   loadTradeControl();
   loadPaperState();
   loadLiveActionLog();
-  if(KEYS_CONFIGURED)pocPaper.start();
   setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
   setInterval(()=>liveExecution.automatic(()=>futuresShort.cycle()).catch(()=>{}),2000).unref();

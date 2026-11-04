@@ -1,6 +1,6 @@
 const UPSTREAM='https://levi-binance.2-29-48-20.sslip.io';
-const READ_PATHS=new Set(['/api/binance-poc-paper','/api/binance-live/poc','/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account']);
-export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account','/api/binance-mode','/api/binance-agent','/api/binance-trade-history'].includes(path)?25000:10000;
+const READ_PATHS=new Set(['/api/binance-poc-paper','/api/binance-poc-live-monitor','/api/binance-live/poc','/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account']);
+export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account','/api/binance-mode','/api/binance-agent','/api/binance-trade-history','/api/binance-poc-live-monitor'].includes(path)?25000:10000;
 const reply=(statusCode,data)=>({statusCode,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
 export function readTarget(path){
  if(typeof path!=='string'||path.length>2048||!path.startsWith('/api/'))throw Error('INVALID_PATH');
