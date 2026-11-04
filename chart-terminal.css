@@ -9,6 +9,7 @@
 .terminal-ohlc[data-pinned=true]{box-shadow:inset -3px 0 #e5be6c}.terminal-help{display:block;color:#8299ae;font:11px Arial,sans-serif;padding:0 14px 10px;line-height:1.6}
 .chart-terminal .chart-wrap,.chart-terminal .chart{border:0;border-radius:0;background:#0c1520;margin:0;padding:0;min-height:0}
 .chart-terminal .chart-wrap{height:clamp(460px,66vh,760px)}
+.frvp-host{position:relative}.frvp-overlay{position:absolute!important;inset:0;width:100%!important;height:100%!important;z-index:8;overflow:hidden;pointer-events:none;direction:ltr}.frvp-overlay[data-mode=select]{pointer-events:auto;touch-action:none;cursor:crosshair}.frvp-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;direction:rtl}.frvp-controls button{border:1px solid #85722e;border-radius:8px;background:#182332;color:#ffe066;padding:8px 12px;min-height:38px;font:600 13px Arial,sans-serif;cursor:pointer}.frvp-controls button[aria-pressed=true]{background:#4b3d16;color:#fff2ad}.frvp-controls button[hidden]{display:none}.frvp-status{color:#a9bfd5;font:12px/1.5 Arial,sans-serif}
 .chart-interactive{position:relative;touch-action:none;cursor:crosshair;direction:ltr;user-select:none;-webkit-user-select:none}
 .terminal-crosshair{position:absolute!important;inset:0;display:block;width:100%!important;height:100%!important;pointer-events:none!important;z-index:7;overflow:hidden;direction:ltr}
 .chart-terminal .chart-price-legend{padding:8px 14px;margin:0;border-bottom:1px solid var(--chart-border)}

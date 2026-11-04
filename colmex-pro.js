@@ -16,8 +16,9 @@ let paperUI=null;
 const simulationMarks=s=>paperUI?.simulationMarks(s)||{points:[],cards:[],lines:[]};
 const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
-import {createWorkbench} from './chart-workbench.js?v=20261022-tools';
+import {createWorkbench} from './chart-workbench.js?v=20261104-frvp';
 import {createChartTimeNavigation} from './chart-time-navigation.js?v=20261101-chart-terminal';
+import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261104-frvp';
 import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261029-higher-recovery';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
@@ -58,12 +59,13 @@ function render(preserveForm=false,preserveChart=false){
 }
 function validBar(b){return b&&typeof b.date==='string'&&Number.isFinite(Date.parse(b.date))&&['open','high','low','close'].every(k=>positive(b[k]))&&b.high>=Math.max(b.open,b.close)&&b.low<=Math.min(b.open,b.close)&&b.high>=b.low;}
 function parseCandles(text){
- const lines=text.replace(/^\uFEFF/,'').trim().split(/\r?\n/);if(lines.length<2||lines.length>20001)throw Error('נדרש קובץ עם כותרת ו־1 עד 20,000 נרות.');
- const split=line=>line.split(',').map(s=>s.trim().replace(/^"|"$/g,'')),header=split(lines.shift()).map(s=>s.toLowerCase());const keys=['date','open','high','low','close'],indices=keys.map(k=>header.indexOf(k));if(indices.some(i=>i<0))throw Error('כותרות נדרשות: Date, Open, High, Low, Close.');
- const bars=lines.filter(s=>s.trim()).map(line=>{const cells=split(line),bar={};keys.forEach((k,i)=>bar[k]=k==='date'?cells[indices[i]]:Number(cells[indices[i]]));if(!/^\d{4}-\d{2}-\d{2}(?:$|T.*(?:Z|[+-]\d{2}:\d{2})$)/.test(bar.date||'')||!validBar(bar))throw Error('נמצאו תאריך או ערכי נר לא תקינים.');if(Date.parse(bar.date)>Date.now())throw Error('הקובץ מכיל תאריך עתידי.');return bar;}).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+ const lines=text.replace(/^\\uFEFF/,'').trim().split(/\\r?\\n/);if(lines.length<2||lines.length>20001)throw Error('נדרש קובץ עם כותרת ו־1 עד 20,000 נרות.');
+ const split=line=>line.split(',').map(s=>s.trim().replace(/^"|"$/g,'')),header=split(lines.shift()).map(s=>s.toLowerCase());const keys=['date','open','high','low','close'],indices=keys.map(k=>header.indexOf(k)),volumeIndex=header.indexOf('volume');if(indices.some(i=>i<0))throw Error('כותרות נדרשות: Date, Open, High, Low, Close. Volume אופציונלי עבור פרופיל נפח.');
+ const bars=lines.filter(s=>s.trim()).map(line=>{const cells=split(line),bar={};keys.forEach((k,i)=>bar[k]=k==='date'?cells[indices[i]]:Number(cells[indices[i]]));if(volumeIndex>=0){const volume=Number(cells[volumeIndex]);if(!Number.isFinite(volume)||volume<0)throw Error('ערך Volume לא תקין.');bar.volume=volume;}if(!/^\\d{4}-\\d{2}-\\d{2}(?:$|T.*(?:Z|[+-]\\d{2}:\\d{2})$)/.test(bar.date||'')||!validBar(bar))throw Error('נמצאו תאריך או ערכי נר לא תקינים.');if(Date.parse(bar.date)>Date.now())throw Error('הקובץ מכיל תאריך עתידי.');return bar;}).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
  if(!bars.length||new Set(bars.map(b=>Date.parse(b.date))).size!==bars.length)throw Error('נדרשים נרות ללא תאריכים כפולים.');return bars.slice(-2000);
 }
 const workbench=createWorkbench({host:$('#chart'),toolbarHost:$('#chartTools'),volumeHost:$('#chartVolume'),getDrawings:()=>state.drawings[selected]||[],saveDrawings:items=>{state.drawings[selected]=items;return save();}});
+const fixedRangeProfile=createFixedRangeVolumeProfile({host:$('#chart'),toolbarHost:$('#chartTools')});
 const chartTimeNavigation=createChartTimeNavigation({host:$('#chartTimeNavigation'),onChange:()=>renderChart()});
 const chartTerminal=createChartTerminal({host:$('#chart'),toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),navigation:()=>chartTimeNavigation,onChange:()=>renderChart()});
 for(const id of ['showColmexSwing','showColmexRegression'])$('#'+id)?.addEventListener('change',()=>renderChart());
@@ -73,7 +75,7 @@ function renderChart(){
  const freshRsiLive=rsiQuote?.priceKind==='BROKER_BID'&&quoteAt>Number(rsiLive?.observedAt||0)?{date:new Date(Math.floor(quoteAt/300000)*300000).toISOString(),close:rsiQuote.price,observedAt:quoteAt}:rsiLive;
  renderRsiChart($('#colmexRsi'),markets[selected]?.rsiAnalysisBars||markets[selected]?.analysisBars||chartBars(),freshRsiLive||null);
  if(workbench.busy&&workbench.currentSymbol===selected)return;
- const root=$('#chart'),visibleWindow=chartTimeNavigation.view(chartBars(),{context:selected+':'+(markets[selected]?.interval||$('#marketInterval').value)+':'+manualCharts.has(selected),width:root.clientWidth||850}),bars=visibleWindow.bars;$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences')?.replaceChildren();if(PAPER_MODE)$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){renderColmexChannelConditions($('#colmexChannelConditions'),{status:liveSearchState,symbol:selected,manual:manualCharts.has(selected)});if($('#colmexChannelStatus'))$('#colmexChannelStatus').textContent='ממתין לנרות לחישוב התעלות…';workbench.clear();chartTerminal.clear();globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),null,'USD');const p=document.createElement('p');p.textContent='טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
+ const root=$('#chart'),visibleWindow=chartTimeNavigation.view(chartBars(),{context:selected+':'+(markets[selected]?.interval||$('#marketInterval').value)+':'+manualCharts.has(selected),width:root.clientWidth||850}),bars=visibleWindow.bars;$('#chartMarkDetails').textContent='לחץ על נר מסומן או על פירוט מתחת לגרף להצגת המחיר והזמן.';$('#chartMarkLegend').replaceChildren();$('#wyckoffOccurrences')?.replaceChildren();if(PAPER_MODE)$('#wyckoffOccurrenceStatus').textContent='ממתין לנרות לניתוח בטווח המוצג';root.replaceChildren();if(!bars.length){renderColmexChannelConditions($('#colmexChannelConditions'),{status:liveSearchState,symbol:selected,manual:manualCharts.has(selected)});if($('#colmexChannelStatus'))$('#colmexChannelStatus').textContent='ממתין לנרות לחישוב התעלות…';workbench.clear();chartTerminal.clear();fixedRangeProfile.clear();globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),null,'USD');const p=document.createElement('p');p.textContent='טען נתוני שוק או ייבא CSV כדי להציג גרף נרות';root.append(p);return;}
  const W=Math.max(320,root.clientWidth||850),plotRight=W-95,plotWidth=plotRight-20;
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+W+' 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
  const chartName=STOCK_NAMES[selected]||markets[selected]?.name||quotes[selected]?.name||selected;
@@ -129,6 +131,7 @@ function renderChart(){
  svg.append(channelLabels);root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
  workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:W,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · '+bars.length+' נרות בחלון הזמן הנבחר.');
  chartTerminal.update({symbol:selected,interval,bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
+ fixedRangeProfile.update({symbol:selected,interval,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom},x,y});
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
 if(PAPER_MODE)$('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};

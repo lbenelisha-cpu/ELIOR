@@ -43,6 +43,11 @@ let moneyUnit='₪';
 let chartCandles=[];
 let chartDecisions=[];
 let chartWorkbench=null;
+let fixedRangeProfile=null;
+import('./fixed-range-volume-profile.js?v=20261104-frvp').then(({createFixedRangeVolumeProfile})=>{
+ fixedRangeProfile=createFixedRangeVolumeProfile({host:$('#priceChart').parentElement,toolbarHost:$('#chartTools')});
+ drawCandles(chartCandles);
+}).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
 let chartTimeNavigation=null;
 let chartTerminal=null;
 import('./chart-terminal.js?v=20261101-chart-terminal').then(({createChartTerminal})=>{
@@ -53,7 +58,7 @@ import('./chart-time-navigation.js?v=20261101-chart-terminal').then(({createChar
  chartTimeNavigation=createChartTimeNavigation({host:$('#chartTimeNavigation'),onChange:()=>drawCandles(chartCandles)});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTimeNavigation','מחוון הזמן לא נטען · רענן את העמוד.'));
-import('./chart-workbench.js?v=20261022-tools').then(({createWorkbench})=>{
+import('./chart-workbench.js?v=20261104-frvp').then(({createWorkbench})=>{
  const saved={};try{Object.assign(saved,JSON.parse(localStorage.getItem('levi-binance-chart-tools-v1')||'{}'));}catch{}
  chartWorkbench=createWorkbench({host:document.querySelector('#priceChart').parentElement,toolbarHost:document.querySelector('#chartTools'),volumeHost:document.querySelector('#chartVolume'),getDrawings:symbol=>saved[symbol]||[],saveDrawings:(items,symbol)=>{saved[symbol]=items;try{localStorage.setItem('levi-binance-chart-tools-v1',JSON.stringify(saved));return true;}catch{return false;}}});
  drawCandles(chartCandles);
@@ -1108,6 +1113,7 @@ function drawCandles(candles){
   }
   chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
   chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
+  fixedRangeProfile?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view.map(b=>({...b,time:Number(b.openTime)})),width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch},x:i=>left+step*(i+.5),y});
 }
 
 let dashboardLoadInFlight=false;
