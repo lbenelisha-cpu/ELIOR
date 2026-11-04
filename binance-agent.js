@@ -1006,8 +1006,6 @@ function drawCandles(candles){
     const title=document.createElement('strong'),counts=document.createElement('span');
     title.textContent=touchBadge.title;counts.textContent=touchBadge.counts;
     channelBadge.append(title,counts);channelBadge.dataset.state=touchBadge.provisional?'provisional':'confirmed';
-    channelBadge.style.right=((right+10)/W*100)+'%';
-    channelBadge.style.top=(Math.max(top+8,Math.min(top+ch-62,y(parallel.lower)+12))/H*100)+'%';
     channelBadge.title='נגיעות בנקודות קיצון מאושרות על התעלה המוצגת · אישור קיצון לאחר שני נרות נוספים · אינו אישור כניסה';
     channelBadge.hidden=false;
   }
