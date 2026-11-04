@@ -27,6 +27,8 @@ import {analyzeCandlePower} from './lib/candle-power.mjs';
 import {DEFAULT_TRADE_SETTINGS,validateTradeSettings,normalizeTradeSettingsRecord,TRADE_SETTINGS_VERSION} from './lib/trade-settings.mjs';
 import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
+import {BinancePocLiveRunner} from './lib/binance-poc-live-runner.mjs';
+import {POC_LIVE_POLICY} from './lib/poc-live-policy.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
 import {createTradeHistoryReader,historySymbol} from './lib/binance-trade-history.mjs';
 import {EquityHistory,createEquitySampler} from './lib/binance-equity-history.mjs';
@@ -112,6 +114,7 @@ const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
 const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
 const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
+const POC_LIVE_REQUESTED=String(process.env.BINANCE_POC_AUTO_LIVE_ENABLED||'false')==='true';
 const independentEntry=independentEntryConfig(process.env);
 const channelPrimary=channelEntryConfig(process.env);
 const marketNewsConfig={...newsConfig(process.env),enabled:false,error:null,policy:'OBSERVATION_ONLY',scope:'ASSET_WATCH'};
@@ -333,9 +336,20 @@ const liveManagedPositions=()=>{
   const positions=trackedLivePositions(liveActionLog);
   for(const [symbol,p] of Object.entries(positions)){const cached=livePeakMemory.get(symbol);if(cached?.entryAt===p.entryAt&&Number(cached.peakPrice)>=Number(p.peakPrice))Object.assign(p,{peakPrice:cached.peakPrice,peakAt:cached.peakAt});}
   for(const p of Object.values(positions))if(['WYCKOFF_D1_V1','WYCKOFF_5M_V1'].includes(p.strategyId))applyTrailingExitPolicy(p,tradeSettings.values);
-  for(const [symbol,p] of Object.entries(positions)){p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,mode:r.mode||'OCO',stopPrice:r.stop,takeProfitPrice:r.mode==='STOP_ONLY'?null:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}}
+  for(const [symbol,p] of Object.entries(positions)){
+   if(p.strategyId==='POC_AUTO_V1')p.effectiveStopPrice=Math.max(Number(p.structuralStop)||0,Number(p.peakPrice||p.entryPrice)*(1-(Number(p.trailingPct)||POC_LIVE_POLICY.trailingPct)/100),Number(p.effectiveStopPrice)||0);
+   p.brokerProtection={status:'MISSING'};const r=nativeProtection.rows[symbol];if(r&&r.entryAt===p.entryAt){p.brokerProtection={status:r.phase,mode:r.mode||'OCO',stopPrice:r.stop,takeProfitPrice:r.mode==='STOP_ONLY'?null:r.target,quantity:Number(r.params.quantity),updatedAt:r.updatedAt,verifiedAt:r.verifiedAt||null,hasUnsettledFill:r.hasUnsettledFill===true,error:r.error||null};if(r.phase==='ACTIVE')p.effectiveStopPrice=Math.max(p.effectiveStopPrice,Number(r.stop)||0);}
+  }
   return positions;
 };
+function exitForLivePosition(position,price){
+ if(position?.strategyId==='POC_AUTO_V1')return {sell:Number(price)<=Number(position.effectiveStopPrice),reason:'POC_TRAILING_STOP'};
+ return wyckoffExit(position,price);
+}
+function refreshPocTrail(position){
+ if(position?.strategyId!=='POC_AUTO_V1')return;
+ position.effectiveStopPrice=Math.max(Number(position.structuralStop)||0,Number(position.peakPrice||position.entryPrice)*(1-(Number(position.trailingPct)||POC_LIVE_POLICY.trailingPct)/100),Number(position.effectiveStopPrice)||0);
+}
 const tradingPositions=()=>{
  if(mode==='live')return liveManagedPositions();
  const positions=DEMO_TRADING?demoTrader.state.positions:paper.positions;
@@ -808,7 +822,8 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
   if(!info||info.status!=='TRADING'||info.quoteAsset!=='USDT'||info.isSpotTradingAllowed===false){
     throw Error('LIVE symbol is not available for Spot trading: '+symbol);
   }
-  if(info.ocoAllowed!==true||!info.orderTypes?.includes('TAKE_PROFIT')||!info.orderTypes?.includes('STOP_LOSS'))throw Error('NATIVE_PROTECTION_NOT_SUPPORTED');
+  const pocEntry=meta.pocLive===true&&meta.wyckoffTrade?.strategyId==='POC_AUTO_V1';
+  if(!info.orderTypes?.includes('STOP_LOSS')||(!pocEntry&&(info.ocoAllowed!==true||!info.orderTypes?.includes('TAKE_PROFIT'))))throw Error('NATIVE_PROTECTION_NOT_SUPPORTED');
   if(info.quoteOrderQtyMarketAllowed===false){
     throw Error('LIVE quoteOrderQty market buy is not supported: '+symbol);
   }
@@ -853,12 +868,14 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     throw e;
   }
 
-  if(quoteUsdt*(1-tradeSettings.values.stopLossPct/100)*.998<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
+  const initialStop=pocEntry?Number(meta.wyckoffTrade.structuralStop):null;
+  if(pocEntry&&(!(initialStop>0)||initialStop>=requireLivePrice(streams[symbol],Date.now(),15000)))throw Error('POC_STRUCTURAL_STOP_INVALID');
+  if(!pocEntry&&quoteUsdt*(1-tradeSettings.values.stopLossPct/100)*.998<minimum)throw Error('NATIVE_PROTECTION_BUDGET_BELOW_MINIMUM');
   const precision=Math.min(8,Number(info.quoteAssetPrecision??8));
   const factor=10**precision;
   const quoteText=(Math.floor(quoteUsdt*factor)/factor).toFixed(precision);
 
-  if(reason!=='MANUAL_BUY'){
+  if(reason!=='MANUAL_BUY'&&!pocEntry){
     const executionBars=await candles(symbol);
     const hourlyTrend=assessQualityEntry(symbol,executionBars);
     if(!hourlyTrend.ok)throw Error(hourlyTrend.code);
@@ -880,9 +897,18 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     assertSpringEntryReady(meta.wyckoffTrade,requireLivePrice(streams[symbol],Date.now(),15000),Date.now(),meta.wyckoffTrade.entryMode==='channel_breakout'?streams[symbol]?.channelBar:streams[symbol]?.liveBar);
   }
 
-  // News changes observation attention only; execution uses the existing technical/account checks.
-  if(reason!=='MANUAL_BUY'&&pocEntries.reserved(symbol,'LONG'))throw Error('POC_PENDING_FOR_SYMBOL');
-  if(pocGuard)await pocGuard();
+  if(pocEntry){
+    if(pocEntries.reserved(symbol,'LONG'))throw Error('POC_PENDING_FOR_SYMBOL');
+    const fresh=await j('/api/v3/ticker/bookTicker?symbol='+encodeURIComponent(symbol));
+    const bid=Number(fresh.bidPrice),ask=Number(fresh.askPrice),observed=bid,setup=meta.pocSetup;
+    if(tradeControl.paused||mode!=='live'||!LIVE||!AUTO_EXECUTION)throw Error('POC_ENTRIES_PAUSED');
+    if(!(Date.now()<Number(setup?.expiresAt)&&Date.now()-Number(setup?.armedAt)>=0&&Date.now()-Number(setup?.armedAt)<=POC_LIVE_POLICY.gapMs&&bid>0&&ask>=bid&&observed>Number(setup?.poc)&&observed>initialStop))throw Error('POC_PRICE_RECLAIM_NOT_CURRENT');
+    meta={...meta,pocLive:true,armedAt:meta.armedAt,wyckoffTrade:{...meta.wyckoffTrade,entryMode:'POC_RECLAIM',poc:Number(setup.poc),structuralStop:initialStop,trailingPct:POC_LIVE_POLICY.trailingPct,peakPrice:observed,effectiveStopPrice:null,exitPolicy:'POC_TRAILING_1PCT'}};
+  }else{
+    // The existing manual POC wait keeps its symbol reservation and final guard.
+    if(reason!=='MANUAL_BUY'&&pocEntries.reserved(symbol,'LONG'))throw Error('POC_PENDING_FOR_SYMBOL');
+    if(pocGuard)await pocGuard();
+  }
   const order=await liveOrders.submit({symbol,side:'BUY',type:'MARKET',quoteOrderQty:quoteText,newOrderRespType:'FULL'},{reason,meta},params=>{observeMaDecision({symbol,stage:'ORDER_ATTEMPT',origin:reason.startsWith('MANUAL')?'MANUAL':'AUTOMATIC',action:params.side==='BUY'?'ENTER':'EXIT',reason,reference:params.newClientOrderId});return signedBinancePost('/api/v3/order',params);},recordLiveFill);
   try{await nativeProtection.sync(symbol,liveManagedPositions()[symbol],requireLivePrice(streams[symbol],Date.now(),15000));}
   catch(error){recordLiveError(symbol,error);order.protectionWarning=error.message;}
@@ -988,8 +1014,9 @@ async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
       let price;
       try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
       observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
+      refreshPocTrail(saved);
       persistLivePeak(ev.symbol,saved);
-      if(wyckoffExit(saved,price).sell)needsExecution=true;
+      if(exitForLivePosition(saved,price).sell)needsExecution=true;
     }
     if(allowEntries&&!tradeControl.paused&&ev.entryConfirmed&&ev.wyckoffTrade&&!saved&&
       !liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))needsExecution=true;
@@ -1009,14 +1036,15 @@ async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
     saved.marketRank=marketRanks.get(ev.symbol)??null;
     let price;try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
     observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
-    const exit=wyckoffExit(saved,price);
+    refreshPocTrail(saved);
+    const exit=exitForLivePosition(saved,price);
     persistLivePeak(ev.symbol,saved);
     if(exit.sell){
       try{await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
       catch(error){recordLiveError(ev.symbol,error);if(liveOrders.pending||nativeProtection.uncertain()||!liveStateHealth.journalReady)throw error;}
     }
   }
-  if(!allowEntries||tradeControl.paused)return;
+  if(!allowEntries||tradeControl.paused||POC_LIVE_REQUESTED)return;
   account=await reconcileLiveHoldings();
   if(!liveReadiness().ready)return;
   if(Object.entries(liveManagedPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
@@ -2234,7 +2262,7 @@ const displayChartReader=createChartReader(j);
 const futuresShort=new FuturesShortRunner({
  api:new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET}),
  file:process.env.BINANCE_FUTURES_SHORT_FILE||LIVE_LOG_FILE+'.futures-short',
- config:shortConfig(process.env),settings:()=>tradeSettings.values,
+ config:shortConfig(POC_LIVE_REQUESTED?{...process.env,BINANCE_FUTURES_SHORT_STRATEGY:'POC'}:process.env),settings:()=>tradeSettings.values,
  control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
  permission:getApiRestrictions
 });
@@ -2271,6 +2299,57 @@ const pocEntries=new BinancePoc({
  reconcile:async row=>row.side==='LONG'
   ?executeManualTrade({...pocManualInput(row),statusOnly:true})
   :futuresShort.state.pocResults?.[row.requestId]||null
+});
+const pocLiveRunner=new BinancePocLiveRunner({
+ file:process.env.BINANCE_POC_LIVE_FILE||LIVE_LOG_FILE+'.poc-live',
+ symbols:side=>side==='LONG'?SYMBOLS:side==='SHORT'?futuresShort.universe:[],
+ fetchMinutes:async(side,symbol)=>side==='SHORT'?futuresShort.api.get('/fapi/v1/klines',{symbol,interval:'1m',limit:260}):j('/api/v3/klines?symbol='+encodeURIComponent(symbol)+'&interval=1m&limit=260'),
+ quote:async(side,symbol)=>{if(side==='SHORT'){const q=await futuresShort.quote(symbol);return {bid:q.bidPrice,ask:q.askPrice,at:Number(q.time)};}const q=await j('/api/v3/ticker/bookTicker?symbol='+encodeURIComponent(symbol));return {bid:q.bidPrice,ask:q.askPrice,at:Date.now()};},
+ control:()=>({enabled:POC_LIVE_REQUESTED,allowEntries:POC_LIVE_REQUESTED&&mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused&&liveStateHealth.journalReady&&liveReadiness().ready}),
+ execute:async(run,setup,finalCheck)=>{
+  return liveExecution.automatic(async()=>{
+   const resumedAt=Date.parse(tradeControl.resumedAt)||0;
+   if(Number(setup.confirmedAt)<=resumedAt||Number(setup.armedAt)<=resumedAt)return {deferred:true,error:'POC_SETUP_PRECEDES_LIVE_RESUME'};
+   try{await finalCheck();}catch(error){return {deferred:true,error:error.message};}
+   if(run.side==='SHORT'){
+    try{return await futuresShort.enterAutoPoc(run.symbol,{...setup,executionId:run.id,armedAt:setup.armedAt},finalCheck);}
+    catch(error){if(futuresShort.state.pending?.setup?.executionId===run.id)throw error;return {deferred:true,error:error.message};}
+   }
+   const trade={strategyId:'POC_AUTO_V1',entryMode:'POC_RECLAIM',patternId:setup.id,poc:setup.poc,structuralStop:setup.structuralStop,setupAt:setup.confirmedAt,expiresAt:setup.expiresAt,pocPolicyVersion:POC_LIVE_POLICY.version};
+   try{
+    const order=await placeLiveMarketBuy(run.symbol,0,'POC_AUTO_LONG',{pocLive:true,pocSetup:setup,pocExecutionId:run.id,armedAt:setup.armedAt,wyckoffTrade:trade});
+    return {ok:true,order};
+   }catch(error){if(liveOrders.pending?.meta?.pocExecutionId===run.id)throw error;return {deferred:true,error:error.message};}
+  });
+ },
+ reconcile:async run=>{
+  return liveExecution.automatic(async()=>{
+   if(run.side==='SHORT'&&futuresShort.state.pending?.setup?.executionId===run.id){
+    await futuresShort.recover();
+    const position=futuresShort.state.positions[run.symbol];
+    if(futuresShort.state.pending)return null;
+    const closed=futuresShort.state.closed.findLast(p=>p.symbol===run.symbol&&p.setup?.executionId===run.id);
+    return {ok:true,order:{status:position||closed?'FILLED':'EXPIRED',executedQty:position?.qty||closed?.qty||0}};
+   }
+   if(liveOrders.pending?.meta?.pocExecutionId===run.id){
+    const order=await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+    if(order)return {ok:true,order};
+   }
+   const fill=liveActionLog.find(a=>a.type==='BUY'&&a.pocExecutionId===run.id);
+   return fill?{ok:true,order:{executedQty:fill.executedQty||fill.qty,status:fill.status}}:null;
+  });
+ },
+ manage:async(run)=>{
+  if(run.side==='SHORT'){
+   if(futuresShort.state.positions[run.symbol])return;
+   const closed=futuresShort.state.closed.some(p=>p.symbol===run.symbol&&p.setup?.executionId===run.id);
+   return closed?'CLOSED':undefined;
+  }
+  const position=liveManagedPositions()[run.symbol];
+  if(position)return 'OPEN';
+  return liveActionLog.some(a=>a.type==='BUY'&&a.pocExecutionId===run.id)?'CLOSED':undefined;
+ },
+ now:Date.now
 });
 const pnlReadApi=new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET});
 const tradingPnlReader=createTradingPnlReader({get:(route,params)=>pnlReadApi.get(route,params),file:process.env.BINANCE_TRADING_PNL_FILE||LIVE_LOG_FILE+'.trading-pnl'});
@@ -2467,6 +2546,7 @@ const server=http.createServer((req,res)=>{
       entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,marketAttention:ATTENTION_POLICY,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
+      pocAutoTrading:authorized?pocLiveRunner.status():{version:POC_LIVE_POLICY.version,enabled:POC_LIVE_REQUESTED,executionReady:false},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
@@ -2756,7 +2836,8 @@ server.listen(PORT,'0.0.0.0',async()=>{
   if(KEYS_CONFIGURED)pocPaper.start();
   setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
-  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
+  setInterval(()=>liveExecution.automatic(()=>futuresShort.cycle()).catch(()=>{}),2000).unref();
+  if(POC_LIVE_REQUESTED)setInterval(()=>pocLiveRunner.cycle().catch(error=>recordLiveError(null,error)),2000).unref();
   /* Wyckoff upgrade preserves existing holdings and journals. */
   await refreshUniverse();
 });
