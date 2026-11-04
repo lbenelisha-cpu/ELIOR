@@ -28,6 +28,7 @@ function harness(options={}){
   if(p==='/fapi/v1/openAlgoOrders')return [...algos.values()].filter(o=>o.algoStatus==='NEW');
   if(p==='/fapi/v1/income')return options.income||[];
   if(p==='/fapi/v1/ticker/bookTicker')return {...quote,symbol:q.symbol};
+  if(p==='/fapi/v1/ticker/price')return {symbol:q.symbol,price:quote.bidPrice};
   if(p==='/fapi/v1/exchangeInfo')return {symbols:[info]};
   if(p==='/fapi/v1/ticker/24hr')return [{symbol:'ABCUSDT',quoteVolume:'10000000'}];
   if(p==='/fapi/v1/klines')return [...input().bars,input().liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);
@@ -45,7 +46,7 @@ function harness(options={}){
    return o;
   }
   if(p==='/fapi/v1/algoOrder'){
-   if(options.rejectProtection){const e=Error('PROTECTION_REJECTED');e.status=400;e.code=-2021;throw e;}
+   if(typeof options.rejectProtection==='function'?options.rejectProtection(q):options.rejectProtection){const e=Error('PROTECTION_REJECTED');e.status=400;e.code=-2021;throw e;}
    const o={...q,algoId:algos.size+1000,orderType:q.type,algoStatus:'NEW',closePosition:true};algos.set(q.clientAlgoId,o);return o;
   }
   if(p==='/fapi/v1/marginType'){symbolConfig.marginType=q.marginType;return {};}
@@ -99,6 +100,21 @@ test('partial IOC fill gets protection for the actual position and can close wit
 });
 test('failed protection closes only the owned short and blocks further entries',async()=>{
  const h=harness({rejectProtection:true});await h.runner.enter('ABCUSDT',shortSignal(input(),config));assert.ok(h.runner.state.halt);assert.ok(h.writes.some(x=>x.q.side==='BUY'&&x.q.reduceOnly==='true'));await assert.rejects(h.runner.entryGate());
+});
+test('a crossed channel target rejected as immediate trigger closes at market without halting future entries',async()=>{
+ let h;
+ h=harness({
+  beforePost(p,q){if(p==='/fapi/v1/algoOrder'&&q.type==='TAKE_PROFIT_MARKET')h.setQuote({bidPrice:q.triggerPrice,askPrice:q.triggerPrice});},
+  rejectProtection:q=>q.type==='TAKE_PROFIT_MARKET'
+ });
+ await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ const position=h.runner.state.positions.ABCUSDT;
+ assert.equal(position.closeReason,'CHANNEL_TAKE_PROFIT');
+ assert.equal(h.runner.state.halt,null);
+ assert.ok(h.writes.some(x=>x.q.type==='MARKET'&&x.q.side==='BUY'&&x.q.reduceOnly==='true'));
+ await h.runner.manage(await h.runner.snapshot());
+ assert.equal(Object.keys(h.runner.state.positions).length,0);
+ assert.equal([...h.algos.values()].filter(a=>a.algoStatus==='NEW').length,0);
 });
 test('newly filled short is closed if the first protection quote fails',async()=>{
  let filled=false;const h=harness({beforePost(p,q){if(p.endsWith('/order')&&q.side==='SELL')filled=true;},onGet(p){if(filled&&p.endsWith('bookTicker'))throw Error('QUOTE_FAILURE');}});

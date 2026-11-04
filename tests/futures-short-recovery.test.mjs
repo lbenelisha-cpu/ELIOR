@@ -20,6 +20,13 @@ test('release refuses different halts, pending orders, open or malformed positio
   const s=sample();change(s);await assert.rejects(prepareShortHaltRelease(s,exchange(),300),/SHORT_RELEASE/);
  }
 });
+test('verified flat recovery accepts the immediate-trigger halt and terminal rejected protective orders',async()=>{
+ const s=sample();s.halt='FUTURES_API_-2021';
+ s.closed[0].algos=[{clientAlgoId:'owned-stop',kind:'STOP_MARKET',status:'REJECTED'}];
+ const api=exchange();
+ const next=await prepareShortHaltRelease(s,api,300);
+ assert.equal(next.halt,null);assert.equal(next.haltReleases[0].previousHalt,'FUTURES_API_-2021');
+});
 test('release refuses live exchange positions, open orders, unsafe modes and unverified protection identities',async()=>{
  const account={canTrade:true,multiAssetsMargin:false,positions:[],assets:[{asset:'USDT',availableBalance:'69.96'}]};
  const variants=[

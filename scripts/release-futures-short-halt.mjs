@@ -9,7 +9,7 @@ import {prepareShortHaltRelease} from '../lib/futures-short-recovery.mjs';
 if(process.argv[2]!=='--release')throw Error('Explicit --release required');
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
 const installed=fs.readFileSync(path.join(root,'lib/futures-short-runner.mjs'),'utf8');
-if(!installed.includes('visibilityDelays=[150,300,600,950]')||!installed.includes('this.state.resumedAt||0'))throw Error('SHORT_VISIBILITY_FIX_NOT_INSTALLED');
+if(!installed.includes('visibilityDelays=[150,300,600,950]')||!installed.includes('this.state.resumedAt||0')||!installed.includes('FUTURES_EXIT_TRIGGER_ALREADY_REACHED'))throw Error('SHORT_VISIBILITY_FIX_NOT_INSTALLED');
 const service='levi-binance';
 const ctl=(...args)=>execFileSync('systemctl',args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:30000});
 const pid=ctl('show',service,'-p','MainPID','--value').trim();
@@ -29,7 +29,7 @@ try{
  const backup=file+'.before-halt-release-'+Date.now();
  fs.writeFileSync(backup,current,{flag:'wx',mode:0o600});
  atomicFuturesSave(file,next);saved=true;
- console.log(JSON.stringify({released:true,previousHalt:'FUTURES_API_-2013',resumedAt:next.resumedAt,backup,exchangeOrdersSubmitted:0,budgetUnchanged:true}));
+ console.log(JSON.stringify({released:true,previousHalt:JSON.parse(current).halt,resumedAt:next.resumedAt,backup,exchangeOrdersSubmitted:0,budgetUnchanged:true}));
 }finally{
  // Restart even when validation fails; the pre-existing halt then remains intact.
  try{ctl('start',service);}catch{
