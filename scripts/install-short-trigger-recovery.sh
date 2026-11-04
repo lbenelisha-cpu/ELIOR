@@ -16,7 +16,8 @@ for file in "${files[@]}" "${support[@]}"; do
 done
 cp -a lib "$stage/runtime/"
 cp regression-trend.js parallel-channel.js "$stage/runtime/"
-cp server.mjs binance-agent.js "$stage/runtime/"
+git show "$revision:server.mjs" > "$stage/runtime/server.mjs"
+git show "$revision:binance-agent.js" > "$stage/runtime/binance-agent.js"
 for file in "${files[@]}"; do git show "$revision:$file" > "$stage/runtime/$file"; done
 node --check "$stage/runtime/lib/futures-short-api.mjs"
 node --check "$stage/runtime/lib/futures-short-runner.mjs"
