@@ -50,5 +50,5 @@ test('channel search never presents a stale Wyckoff reset as the active entry co
 
 test('Colmex intrabar policy describes current broker price and keeps confirmed channel pivots',()=>{
  const view=colmexStrategyView({enabled:true,channelPrimary:{enabled:true,requested:true,enabledAfter:end,waitForBreakoutClose:false}});
- assert.match(view.entry,/ללא המתנה לסגירת נר הפריצה/);assert.match(view.entry,/50 נרות סגורים/);assert.match(view.entry,/המחזור שהצטבר בנר הפתוח/);assert.doesNotMatch(view.entry,/נדרשת סגירה מעל/);
+ assert.match(view.entry,/ללא המתנה לסגירה/);assert.match(view.entry,/50 נרות סגורים/);assert.match(view.entry,/המחזור המצטבר בנר הפתוח/);assert.match(view.entry,/SHORT: מחיר Ask מתחת/);assert.match(view.entry,/LONG: מחיר Bid מעל/);assert.doesNotMatch(view.entry,/נדרשת סגירה מעל/);
 });

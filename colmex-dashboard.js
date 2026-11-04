@@ -22,7 +22,7 @@ function renderMap(now){
  txt('colmexMapTitle',p?.symbol||'מפת פוזיציה');
  if(!p){const empty=el('div',null,'map-empty');empty.append(el('div',null,'empty-rail'),el('p',!status||statusFailed?'ממתין לנתוני הפוזיציות.':account?.data?.positions?.length?'ההחזקות מופיעות בפרטי החשבון. המפה תוצג לפוזיציה שבמעקב האוטומטי.':'אין כרגע פוזיציה במעקב האוטומטי.\nכשתיפתח פוזיציה, רמות המחיר יוצגו כאן.'));host.append(empty);return;}
  const protection=protectionView(p,status.pendingActions,now),entry=Number(p.entryPrice)>0?Number(p.entryPrice):null,current=freshAt(p.lastQuoteAt,now,120000)&&Number(p.lastBid)>0?Number(p.lastBid):null;
- host.append(positionChangeBadge(el,entry,current));
+ host.append(positionChangeBadge(el,entry,current,p.side));
  const stop=protection.stop>0?protection.stop:null,target=protection.target>0?protection.target:null;
  const grid=el('div',null,'position-prices');
  for(const [label,value,cls] of [['כניסה',entry,''],['מחיר שנצפה',current,''],['סטופ מאושר',stop,'negative'],['יעד מאושר',target,'positive']]){const item=el('div');item.append(el('span',label),el('b',value===null?'—':'$'+price(value),cls));grid.append(item);}host.append(grid);
@@ -59,9 +59,9 @@ function render(){
  else if(!positions.length)host.append(el('p','אין פוזיציות מנוהלות בדיווח השרת. כלל ההחזקות מופיעות בפירוט החשבון.','quiet-empty'));
  else for(const p of positions){
   const protection=protectionView(p,status.pendingActions,now),card=el('article',null,'colmex-position');
-  card.append(el('h3',p.symbol),el('span',protection.label,'protection-state '+protection.kind));
+  card.append(el('h3',p.symbol+' · '+(p.side||'LONG')),el('span',protection.label,'protection-state '+protection.kind));
   const grid=el('div',null,'position-prices');
-  for(const [label,value] of [['כמות',n(p.qty)],['כניסה','$'+price(p.entryPrice)],['מחיר שנצפה',freshAt(p.lastQuoteAt,now,120000)&&p.lastBid>0?'$'+price(p.lastBid):'—'],['סטופ מאושר',protection.stop>0?'$'+price(protection.stop):'—'],['יעד מאושר',protection.target>0?'$'+price(protection.target):'—'],['שיא שנצפה','$'+price(p.peakPrice)]]){const item=el('div');item.append(el('span',label),el('b',value));grid.append(item);}card.append(grid);
+  for(const [label,value] of [['כמות',n(p.qty)],['כניסה','$'+price(p.entryPrice)],['מחיר שנצפה',freshAt(p.lastQuoteAt,now,120000)&&p.lastBid>0?'$'+price(p.lastBid):'—'],['סטופ מאושר',protection.stop>0?'$'+price(protection.stop):'—'],['יעד מאושר',protection.target>0?'$'+price(protection.target):'—'],[p.side==='SHORT'?'שפל שנצפה':'שיא שנצפה','$'+price(p.side==='SHORT'?p.lowPrice:p.peakPrice)]]){const item=el('div');item.append(el('span',label),el('b',value));grid.append(item);}card.append(grid);
   card.append(el('p','נבדק: '+time(p.brokerProtection?.verifiedAt)+' · מחיר הביצוע עשוי להיות שונה.','small muted'));host.append(card);
  }
 }

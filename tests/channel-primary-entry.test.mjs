@@ -81,7 +81,7 @@ function colmexFixture(){
  return {state,b,snapshot,history,args:{state,broker:b,env,now:()=>now,deadline:now+27000,save:async()=>{}}};
 }
 test('Colmex submits exactly one protected channel intent and rechecks history and account',async()=>{
- const f=colmexFixture();await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.reads,2);const i=f.b.writes[0];assert.equal(i.setup.entryMode,'channel_breakout');assert.ok(i.order.stopLoss>0&&i.order.takeProfit>0);assert.equal(f.state.checks.AAPL.entryDecisions.primary,'channel_breakout');
+ const f=colmexFixture();await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.reads,2);const i=f.b.writes[0];assert.equal(i.setup.entryMode,'channel_breakout');assert.ok(i.order.stopLoss>0&&i.order.takeProfit>0);assert.equal(f.state.checks.AAPL.entryDecisions.primary,'channel_long_short');
  await runCycle({...f.args,now:()=>now+60000,deadline:now+87000});assert.equal(f.b.writes.length,1);
  for(const kind of ['activation','cash','permission','halt','changed-signal','changed-price','save']){
   const f=colmexFixture();
