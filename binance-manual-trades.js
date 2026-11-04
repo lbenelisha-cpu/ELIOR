@@ -5,7 +5,7 @@
  const context=()=>window.LEVI_MANUAL_TRADES?.context()||{};
  function refresh(){
   const c=context(),ready=c.mode==='live'&&c.capabilities?.version===1,held=c.account?.balances?.find(b=>b.asset+'USDT'===c.symbol);
-  get('manualForgetBtn').disabled=busy||uncertain;get('manualBuyBtn').disabled=busy||!ready;get('manualSellBtn').disabled=busy||!ready||!(Number(held?.qty??(Number(held?.free||0)+Number(held?.locked||0)))>0);
+  get('manualForgetBtn').disabled=busy||uncertain;get('manualBuyBtn').disabled=busy||!ready;const sellable=Number(held?.qty??(Number(held?.free||0)+Number(held?.locked||0)))>0;get('manualSellBtn').disabled=busy||!ready||!sellable;get('manualSellBtn').title=!ready?'נדרש מצב LIVE וחיבור מכשיר מאושר':sellable?'מכור מיד את כל הכמות הזמינה של '+c.symbol:'אין יתרה זמינה למכירה בנכס '+c.symbol;
   get('manualTradeHint').textContent=!ready?(c.mode!=='live'?'קנייה ומכירה ידניות זמינות ב־LIVE בלבד':'נדרש עדכון שרת להפעלת קנייה ומכירה ידניות'):'מסחר באישור שלך · '+c.symbol+' · בדיקת פרטים ואישור לפני כל פעולה';
  }
  function close(){if(!busy&&!uncertain){dialog.close();intent=null;}}
