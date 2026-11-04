@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 26522)
-Total output lines: 1354
-
 const B=['localhost','127.0.0.1'].includes(window.location.hostname)?window.location.origin:'https://levi-binance.2-29-48-20.sslip.io';
 window.API_BASE=B;
 window.binanceReadUrl=url=>{
@@ -354,14 +351,594 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   put('#wyckoffClosed',wx.closed??'—');
   const fees=wx.fees;
   put('#tradeFeesTotal',fees?fmt(fees.totalUsdt,4)+' USDT'+(fees.complete?'':' · חלקי'):'—');
-  put('#tradeFeesDetails',fees?'קנייה: '+fmt(fees.buyUsdt,4)+' · מכירה:…11522 tokens truncated…length)return;
+  put('#tradeFeesDetails',fees?'קנייה: '+fmt(fees.buyUsdt,4)+' · מכירה: '+fmt(fees.sellUsdt,4)+' USDT · לפי היומן הזמין'+(fees.missingRecords?' · '+fees.missingRecords+' רשומות ללא נתוני עמלה':'')+Object.entries(fees.unvalued||{}).map(([asset,amount])=>' · טרם הומר: '+fmt(amount,8)+' '+asset).join(''):'ממתין לנתוני עמלות מהשרת');
+  if(currentMode==='live')put('#paperTradesCount',wx.closed??'—');
+  if(d.paper?.currency)moneyUnit=d.paper.currency;
+  if(d.paper?.source==='BINANCE_DEMO_SPOT'){demoTradingEnabled=true;$('#resetPaperBtn')?.classList.add('hidden');if(!d.paper.error)put('#status','דמו Binance · מסחר אוטומטי');}
+  if(d.paper?.source==='BINANCE_DEMO_SPOT'){
+    put('#portfolioTitle','חשבון Binance Demo · USDT');
+    if(d.paper.error)put('#status','מסחר דמו מושהה · '+d.paper.error);
+    else if(!d.paper.connected)put('#status','ממתין לחיבור לחשבון הדמו');
+  }
+  currentLiveAccount=liveAccount;
+  const {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
+  const paperPos=p.positions||{};
+  const rotationGap=Number(d.config?.rotationScoreGap||20);
+  const maxPositions=Number(currentMode==='live'?(d.config?.maxPositions||5):(p.maxPositions||10));
+
+  const warning=$('#unmanagedHoldingWarning');
+  if(warning){
+    const unverified=isLive&&liveAccount?.connected?liveBalances.filter(b=>{
+      const a=agents.find(a=>a.symbol===b.asset+'USDT');
+      return !['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(a?.strategy?.exitPolicy);
+    }):[];
+    warning.hidden=!unverified.length;
+    warning.textContent=unverified.length?'נדרש טיפול · ניהול והגנות לא אומתו: '+unverified.map(b=>b.asset).join(', ')+' · קיימת יתרה בחשבון ללא פוזיציה מנוהלת מתועדת. אין להסתמך על מכירה אוטומטית. יש לבדוק פקודות הגנה בבייננס.':'';
+  }
+  renderMarketStrip(agents);
+
+  const sd=d.config?.strategyDiagnostics||{};
+  const nearest=(sd.nearestToTarget||[])[0];
+  put('#strategyDiagnostics',currentMode==='live'&&d.config?.channelPrimary?.requested?'מסלול תעלות · נסרקו '+agents.length+' נכסים · איתותים מאושרים '+agents.filter(a=>a.entryConfirmed===true&&a.entryEligible!==false).length+' · סיבת ההמתנה מוצגת לכל נכס':'5M מוכנים '+(sd.dailyReady??0)+'/'+(sd.evaluated??0)+' · דשדוש '+(sd.consolidation??0)+' · Spring '+(sd.spring??0)+' · מועמדים '+(sd.executionCandidates??0)+' · בוצעו '+(sd.demoFilled??0)+' · נדחו '+(sd.demoRejected??0));
+
+  if(!activeAgents.length){
+    put('#scanStatusMessage','נסרקו '+agents.length+' · מוצגים '+agents.length+' · אין כרגע פוזיציה פעילה — ממתין ב־USDT להזדמנות איכותית');
+  }else{
+    const weakText=weakestActive?(' · החלשה ביותר: '+weakestActive.symbol+' · ציון '+fmt(weakestActive.score,1)):'';
+    const interval=Number(d.config?.decisionIntervalMs||60000)/1000;
+    const rotationState=activeAgents.length<maxPositions
+      ? ' · בדיקה כל '+fmt(interval,0)+' שניות · '+activeAgents.length+'/'+maxPositions+' מקומות תפוסים'
+      : ' · בדיקה כל '+fmt(interval,0)+' שניות · '+(d.config?.rotationEnabled?'רוטציה פעילה — נדרש יתרון +'+fmt(rotationGap,0):'רוטציה כבויה');
+    const diag=d.config?.buyCandidateCount!=null
+      ? ' · עברו תנאי כניסה: '+d.config.buyCandidateCount+' · מתאימים למגמה: '+(d.config.trendCandidateCount??'—')+(d.config.demoExecutionBusy?' · מנוע ביצוע עסוק':'')
+      : '';
+    put('#scanStatusMessage',
+      'נסרקו '+agents.length+' · מוצגים '+currentVisibleAgents.length+
+      ' · '+activeAgents.length+'/'+maxPositions+' פוזיציות פעילות'+weakText+rotationState+diag
+    );
+  }
+
+  if(!isLive){
+    put('#accountPnlLabel','רווח / הפסד');
+    put('#accountPnlNote','');
+    put('#holdingsNote','');
+    const pnlEl=$('#paperPnl');
+    if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,false);
+    put('#paperValue',fmt(p.valueIls)+' '+moneyUnit);
+    put('#paperCash',fmt(p.cashIls)+' '+moneyUnit);
+    put('#paperPnl',`${+p.profitIls>=0?'+':''}${fmt(p.profitIls)} ${moneyUnit} (${+p.profitPct>=0?'+':''}${fmt(p.profitPct)}%)`);
+    put('#slots',`${p.activePositions||0}/${maxPositions}`);
+    put('#slotValue',fmt(p.slotIls)+' '+moneyUnit+(p.allocationMode==='FIXED_10_PERCENT'?' · קבוע':''));
+    put('#paperTradesCount',(p.trades||[]).length);
+  }
+
+  const displayScoreMin=Number(d.config?.rotationMinScore||65);
+  currentVisibleAgents=[...agents].sort((a,b)=>{
+    const aHeld=isHeld(a)?1:0,bHeld=isHeld(b)?1:0;
+    if(aHeld!==bHeld)return bHeld-aHeld;
+
+    const aBuy=(a.decision==='BUY'||a.decision==='BUY_READY'||a.decision==='BUY READY'||a.buyQualified)?1:0;
+    const bBuy=(b.decision==='BUY'||b.decision==='BUY_READY'||b.decision==='BUY READY'||b.buyQualified)?1:0;
+    if(aBuy!==bBuy)return bBuy-aBuy;
+
+    return Number(b.score||0)-Number(a.score||0);
+  });
+  if(!currentVisibleAgents.some(a=>a.symbol===selectedSymbol)){
+    selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
+  }
+
+  if(!preserveScanner)window.LEVI_SCANNER_VIEW.update($('#assetsBody'),currentVisibleAgents.map(a=>{
+    const s=a.strategy||{};
+    const held=isHeld(a);
+    const score=Number(a.score||0);
+    const pnl=positionPnlDisplay(isLive?liveBalances.find(x=>x.asset+'USDT'===a.symbol):paperPos[a.symbol],isLive?'USDT':moneyUnit);
+    const trendLabel=({UP:'עולה',DOWN:'יורדת'}[s.direction]||'לא ידועה');
+    const dec=decisionFor(a,held,activeAgents.length,maxPositions,weakestActive,rotationGap,isLive,liveAccount);
+    const displayBlocker=isLive&&!held?liveEntryStatus(a,liveAccount,maxPositions).blocker:a.blocker;
+    const watch=window.LEVI_CHANNEL_WATCH?.candidate({reason:a.entryDecisions?.primary==='channel_breakout'?a.entryDecisions.channel?.reason:null,at:a.lastDecisionAt,enabled:isLive&&d.config?.channelPrimary?.enabled===true,held,stale:a.staleData||!!a.lastError});
+    const rowClasses=[
+      a.symbol===selectedSymbol?'selected':'',
+      held?'active-position':'',
+      watch?'channel-watch':'',
+      held?pnl.className:'',
+      (dec==='BUY'||dec==='BUY READY'||dec==='BUY_READY')?'buy-alert':'',
+      dec==='ROTATE READY'?'rotate-alert':''
+    ].filter(Boolean).join(' ');
+    return {symbol:a.symbol,className:rowClasses,cells:[
+      {html:`<b>${a.symbol.replace('USDT','')}</b>${watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+watch.text+' · לא אישור קנייה</div>':''}<div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
+      {html:fmt(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice,Math.abs(Number(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice))<10?8:4)},
+      {className:held?pnl.className:'',html:held?pnl.text:'—'},
+      {className:'decision '+String(dec).toLowerCase().replaceAll(' ','-'),html:decisionLabel(dec)}
+    ]};
+  }),selectScannerAsset);
+
+  if(isLive){
+    $('#positions').innerHTML=liveBalances.length
+      ? liveBalances.map(x=>{const pnl=positionPnlDisplay(x,'USDT');return `<div><b>${x.asset}USDT</b> · כמות ${fmt(x.qty,8)} · שווי ${fmt(x.valueUsdt)} USDT<div class="${pnl.className}">${pnl.text}</div><div class="mini">לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר</div></div>`;}).join('')
+      : liveAccount?'<div class="mini">אין פוזיציות LIVE פעילות.</div>':'<div class="mini">לא ניתן לאמת כעת את הפוזיציות בחשבון LIVE.</div>';
+  }else{
+    const ps=Object.values(paperPos);
+    $('#positions').innerHTML=ps.length
+      ? ps.map(x=>{const pnl=positionPnlDisplay(x);return `<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה ${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}<div class="${pnl.className}">${pnl.text}</div></div>`;}).join('')
+      : '<div class="mini">אין פוזיציות פעילות.</div>';
+    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
+  }
+
+  if(activeView==='portfolio')renderPortfolioView();
+  if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
+  updateSelectedAsset(d,currentMode,liveAccount);
+  if(typeof CustomEvent==='function'){
+    const detail={agent:d,account:liveAccount,mode:currentMode,receivedAt:Date.now()};
+    window.LEVI_DASHBOARD_SNAPSHOT=detail;
+    window.dispatchEvent(new CustomEvent('levi:binance-dashboard',{detail}));
+  }
+}
+
+function rotationGapText(a,d,currentMode,liveAccount){
+  const {isHeld,activeAgents,weakestActive}=activeContext(d,currentMode,liveAccount);
+  if(isHeld(a)) return 'פעיל';
+  if(!a.buyQualified) return 'לא כשיר לרוטציה';
+  if(!weakestActive) return 'מתאים לקנייה';
+  const gap=Number(a.score||0)-weakestActive.score;
+  return (gap>=0?'+':'')+fmt(gap,1)+' / נדרש +'+fmt(Number(d.config?.rotationScoreGap||20),0);
+}
+
+async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode,liveAccount=currentLiveAccount){
+  if(!d) return;
+  const a=(d.agents||[]).find(x=>x.symbol===selectedSymbol)||(d.agents||[])[0];
+  if(!a) return;
+  selectedSymbol=a.symbol;
+  const {isHeld,activeAgents,weakestActive,p}=activeContext(d,currentModeArg,liveAccount);
+  const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(currentModeArg==='live'?(d.config?.maxPositions||5):(p.maxPositions||6)),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live',liveAccount);
+  const s=a.strategy||{};
+
+  put('#chartSymbol',a.symbol);
+  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),{agent:d,account:liveAccount,mode:currentModeArg,receivedAt:Date.now()},a.symbol);
+  put('#chartSectionLabel',a.symbol+' · נרות, RSI ותעלות');
+  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol);
+  put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
+  put('#chartScore','ציון '+fmt(a.score,1));
+  put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');
+  put('#chartWave',s.currentWave==null?'לא זמין':fmt(s.currentWave,2)+'%');
+  put('#chartPrevDown',s.previousDownWave==null?'לא זמין':fmt(s.previousDownWave,2)+'%');
+  put('#chartQualification',buyReasonLabel(a.buyReason));
+  put('#entryRouteDecision',a.entryDecisions?.primary==='channel_breakout'?'תעלת קיצון ראשית + רגרסיה: '+buyReasonLabel(a.entryDecisions.channel.reason):a.entryDecisions?'מסלול קיים: '+buyReasonLabel(a.entryDecisions.current.reason)+' · פריצה עצמאית: '+buyReasonLabel(a.entryDecisions.breakout.reason):'');
+  const hourly=a.entryFilters;
+  put('#hourlyTrendStatus',currentModeArg==='live'&&d.config?.channelPrimary?.requested?'כניסה: תעלת קיצון + רגרסיה · '+(d.config.channelPrimary.period??'—')+' נרות 5 דקות · שתי נגיעות בכל גבול · מחזור פי 1.5 מממוצע 20':d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' או גל 1% ופריצת 3 נרות · ללא מסנן שעה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
+    'מגמת שעה: '+(hourly.ok?'מאושרת':'ממתינה')+' · סגירה '+fmt(hourly.close,8)+' · ממוצע 20 '+fmt(hourly.sma20,8)+' · ממוצע 50 '+fmt(hourly.sma50,8)+' · '+new Date(hourly.asOf).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'מגמת שעה: ממתין ל־50 שעות מלאות ועדכניות');
+
+  const selectedPnl=positionPnlDisplay(currentModeArg==='live'?liveAccount?.balances?.find(x=>x.asset+'USDT'===a.symbol):p.positions?.[a.symbol],currentModeArg==='live'?'USDT':moneyUnit);
+  const badge=$('#chartDecisionBadge');
+  put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
+  if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':(a.strategy?.entryMode==='channel_breakout'||a.entryDecisions?.primary==='channel_breakout')?'תעלת קיצון ראשית · רגרסיה עזר · '+buyReasonLabel(a.buyReason):a.strategy?.entryMode==='independent_breakout'?'פריצה עצמאית · נר 5 דקות סגור, מחזור ומגמה · '+buyReasonLabel(a.buyReason):(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
+
+  put('#actionSelectedSymbol',a.symbol);
+  put('#actionSelectedDecision',decisionLabel(dec));
+  put('#actionSelectedPnl',isHeld(a)?selectedPnl.text:'אין פוזיציה פעילה');
+  const selectedPnlEl=$('#actionSelectedPnl');
+  if(selectedPnlEl)for(const kind of ['profit','loss','flat','unknown'])selectedPnlEl.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
+  put('#actionSelectedPnlNote',isHeld(a)?(currentModeArg==='live'?'לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר':'רווח / הפסד לא ממומש'):'P&L יוצג לאחר קנייה');
+  put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
+  put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
+
+  await Promise.all([...((activeView==='trade'||activeView==='scans')&&$('#chartSection')?.open!==false?[loadChart(a.symbol)]:[]),...(activeView==='journal'?[loadDecisionHistory(a.symbol)]:[])]);
+}
+
+function blockerLabel(b){
+  if(!b)return '—';
+  if(typeof b==='string')return buyReasonLabel(b);
+  const reason=String(b.text||'').match(/(?:וויקוף|וואיקוף) 5 דקות:\s*([A-Z0-9_]+)/)?.[1]||b.code;
+  const translated=buyReasonLabel(reason);if(translated&&translated!==reason&&translated!=='—')return translated;
+  if(['WAIT_STABLECOIN','WAIT_MOVEMENT','WAIT_VOLUME','WAIT_HOURLY_TREND','WAIT_HOURLY_TREND_DATA','WAIT_QUALITY_DATA'].includes(b.code))return decisionReasonLabel(b.code);
+  return b.text||b.code||'—';
+}
+
+function decisionReasonLabel(r){
+  const quality={WAIT_SECOND_RECOVERY_CONFIRMATION:'ממתין לאישור שיא ההתאוששות השנייה בנר סגור',SECOND_RECOVERY_NOT_HIGHER:'קנייה חסומה: ההתאוששות השנייה אינה גבוהה מהראשונה',WAIT_CLOSED_CONFIRMATION:'ממתין לנר סגור המאשר התאוששות / פריצה',WAIT_MA_HISTORY:'ממתין להיסטוריה עבור MA100/200',MA_DOWNTREND_BLOCK:'מגמת MA100/200 יורדת והמחיר מתחת לשניהם',WAIT_VOLUME_HISTORY:'נתוני מחזור חסרים',CONFIRMATION_VOLUME_LOW:'מחזור נר האישור נמוך מהממוצע',WAIT_ATR_HISTORY:'ממתין לנתוני תנודתיות',VOLATILITY_RISK_TOO_HIGH:'מרחק ההגנה הנדרש גדול מ־3%',QUALITY_SIGNAL_INVALIDATED:'אישור הכניסה בוטל במחיר הנוכחי'};if(quality[r])return quality[r];
+  return ({
+    BUY_EXECUTED:'BUY בוצע',
+    SELL_EXECUTED:'SELL בוצע',
+    ROTATE_IN:'רוטציה פנימה',
+    ROTATE_OUT:'רוטציה החוצה',
+    NO_SLOT:'אין Slot פנוי',
+    ROTATION_NOT_STRONG_ENOUGH:'לא חזק מספיק לרוטציה',
+    BUY_READY:'מתאים לקנייה',
+    QUALIFIED_BUT_HOLD:'מתאים לקנייה אך ממתין',
+    ACTIVE_LONG:'פוזיציה פעילה · ממשיך להחזיק',
+    HOLD_NOT_QUALIFIED:'HOLD · לא כשיר לכניסה',
+    WAVE_BELOW_3:'לוגיקה ישנה',
+    WAVE_ABOVE_8:'לוגיקה ישנה',
+    NOT_STRONGER_THAN_PREVIOUS_DOWN:'הגל חלש מהירידה הקודמת',
+    BELOW_MA200:'מתחת ל־MA200',
+    NOT_UP:'לא בגל עולה',
+    NO_PREVIOUS_DOWN:'אין גל ירידה קודם',
+    STALE_5M_SIGNAL:'נר 5 הדקות האחרון אינו עדכני',
+    WAIT_CURRENT_5M_HISTORY:'ממתין להיסטוריית 5 דקות עדכנית',
+    FIVE_MINUTE_TIMEFRAME_REQUIRED:'חסרים נרות רציפים של 5 דקות',
+    TRADING_PAUSED:'מסחר עצור · אין קניות חדשות',
+    WAIT_STABLECOIN:'מטבע יציב — אינו מועמד למסחר',
+    WAIT_MOVEMENT:'תנועה חלשה ביחס לעלויות',
+    WAIT_VOLUME:'ממתין לאישור מחזור מסחר',
+    WAIT_HOURLY_TREND:'וויקוף אושר · ממתין לסגירת שעה מעל ממוצע 20, וממוצע 20 מעל 50',
+    WAIT_HOURLY_TREND_DATA:'ממתין ל־50 שעות מלאות ועדכניות לאישור מגמה',
+    HOURLY_TREND_CONFIRMED:'מגמת שעה מאושרת: סגירה מעל ממוצע 20, וממוצע 20 מעל 50',
+    HOURLY_TREND_DISABLED:'מגמת שעה אינה תנאי כניסה',
+    WAIT_QUALITY_DATA:'ממתין לנתונים לאישור איכות',
+    WAIT_NEW_WYCKOFF_SIGNAL:'ממתין לאישור וויקוף חדש לאחר מכירה או חידוש מסחר',
+    WYCKOFF_SPRING_RSI_LIVE:'Spring ותנאי RSI אושרו · ללא המתנה לסגירת נר',
+    SPRING_REJECTED_RSI_HIGH:'התבנית נפסלה: RSI מעל סף הכניסה ב־Spring · מחפש שיא חדש',
+    WAIT_RSI_0_30:'ממתין ל־RSI חי בין 0 ל־30 בנקודת Spring',
+    WAIT_RSI_0_40:'ממתין ל־RSI חי בין 0 ל־40 בנקודת Spring',
+    WAIT_RSI_DATA:'אין מספיק נרות לחישוב RSI (14)',
+    WYCKOFF_LIVE_RECLAIM:'וויקוף אושר במחיר החי מעל השפל הראשון · ללא המתנה לסגירת נר',
+    WAIT_SPRING_RETEST:'וויקוף אושר · ממתין לחזרת המחיר לנקודת Spring',
+    EARLY_WAVE_BREAKOUT:'כניסה נוספת · גל של 1% ופריצת 3 נרות',
+    TRAILING_PROFIT_HOLD:'הגנת רווח פעילה · הסטופ עולה עם השיא',
+    TRAILING_PROFIT_EXIT:'מכירה · סף הגנת הרווח נחצה',
+    WAIT_PROFIT_ACTIVATION_5_PERCENT:'סטופ התחלתי · ממתין לרווח 5% להפעלת הגנה',
+    WAIT_PROFIT_ACTIVATION_4_PERCENT:'סטופ 1% · ממתין לרווח 4% להפעלת נגרר',
+    PROFIT_FLOOR4_TRAIL1PP_HOLD:'רצפת רווח 4% · נגרר נקודת אחוז מהשיא',
+    PROFIT_FLOOR4_TRAIL1PP_EXIT:'מכירה · הגנת רווח נגררת',
+    TRAIL_STOP_LOSS_1_PERCENT:'מכירה · סטופ הפסד 1%',
+    BROKER_TAKE_PROFIT_50_PERCENT:'מכירה · יעד רווח 50%',
+    BROKER_STOP_LOSS:'מכירה · סטופ אצל הברוקר',
+    FIXED_TP4_SL1_HOLD:'יעד רווח 4% · סטופ 1% ממחיר הקנייה',
+    FIXED_TAKE_PROFIT_4_PERCENT:'מכירה · יעד רווח 4%',
+    FIXED_STOP_LOSS_1_PERCENT:'מכירה · סטופ 1%',
+    WYCKOFF_MINIMUM_PROFIT_HOLD:'היסטוריה · המתנה להגנת רווח לפי הכלל הקודם',
+    WAIT_WYCKOFF_ENTRY_PRICE:'ממתין למחיר חי מעל השפל הראשון ומתחת ליעד התבנית',
+    WYCKOFF_SPRING_RETEST:'קנייה בחזרה ל־Spring לאחר אישור וויקוף',
+    WYCKOFF_SPRING_STOP_LOSS_10_PERCENT:'מכירה · ירידה של 10% ממחיר הקנייה',
+    WYCKOFF_GAIN_GIVEBACK_20_PERCENT:'מכירה · החזרה של 20% מהעלייה שנצברה',
+    HOLD:'HOLD',
+    ERROR:'שגיאה'
+  })[r]||r||'—';
+}
+
+function actionLabel(x){
+  return ({BUY:'קנייה',SELL:'מכירה',ROTATE_IN:'רוטציה פנימה',ROTATE_OUT:'רוטציה החוצה'})[x]||x||'פעולה';
+}
+
+$('#strategyReviewPanel')?.addEventListener('toggle',()=>{if($('#strategyReviewPanel').open)loadActionJournal(currentMode);});
+async function loadActionJournal(currentModeArg){
+  try{
+    const d=await J(ACTIONLOG);
+    window.LEVI_STRATEGY_REVIEW_DATA=currentModeArg==='live'?d.strategyReview:null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:window.LEVI_STRATEGY_REVIEW_DATA}));
+    const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
+    window.dispatchEvent(new CustomEvent('levi:binance-history',{detail:{mode:currentModeArg,visible:activeView==='journal',symbols:[...new Set([...list.map(a=>a.symbol),...(currentLiveAccount?.balances||[]).filter(b=>b.asset!=='USDT'&&b.valueUsdt>=5).map(b=>b.asset+'USDT')])].filter(s=>/^[A-Z0-9]+USDT$/.test(s)),selectedSymbol}}));
+    const journal=d.netJournal?.[currentModeArg]||[];
+    const netPanel=$('#netTradeJournal');if(netPanel)netPanel.innerHTML=journal.length?journal.slice(0,30).map(t=>'<div><b>'+t.symbol+' · '+(t.closed?'נסגרה':'מכירה חלקית')+'</b><div>'+tradeExecutionTime(t.at)+' · קנייה '+fmt(t.entryPrice,12)+' → מכירה '+fmt(t.sellPrice,12)+'</div><div class="'+(t.netPnlUsdt===null?'pnl-unknown':t.netPnlUsdt>=0?'pnl-profit':'pnl-loss')+'">רווח נטו: '+(t.netPnlUsdt===null?'חסרים נתוני עלות / עמלות':fmt(t.netPnlUsdt,4)+' USDT ('+fmt(t.netPnlPct)+'%)')+'</div><div>שיא רווח לפני עמלות: '+fmt(t.maxGrossPnlUsdt,4)+' USDT · שיא מחיר '+fmt(t.peakPrice,12)+'</div><div>עמלת קנייה: '+commissionsText(t.buyCommissions)+' · עמלת מכירה: '+commissionsText(t.sellCommissions)+'</div><div>סיבה: '+decisionReasonLabel(t.reason)+'</div></div>').join(''):'אין עסקאות עם עלות כניסה מתועדת';
+    put('#actionJournalTitle','יומן פעולות · '+(currentModeArg==='live'?'LIVE':'DEMO'));
+    $('#actionJournal').innerHTML=list.length?list.slice(0,30).map(x=>{
+      const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
+      const amount=Number.isFinite(+x.amountIls)?' · סכום '+fmt(x.amountIls)+' '+moneyUnit:Number.isFinite(+x.amountUsdt)?' · סכום '+fmt(x.amountUsdt)+' USDT':'';
+      const pnl=Number.isFinite(+x.pnlIls)?' · P/L '+(+x.pnlIls>=0?'+':'')+fmt(x.pnlIls)+' '+moneyUnit:'';
+      const fees=' · עמלה: '+commissionsText(x.commissions);
+      const reason=x.reason?' · '+x.reason:'';
+      return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${fees}${reason} · ${when}</div>`;
+    }).join(''):'<div class="mini">'+(currentModeArg==='live'?'עדיין אין פעולות LIVE.':'עדיין אין פעולות DEMO.')+'</div>';
+  }catch(e){
+    window.LEVI_STRATEGY_REVIEW_DATA=null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:null}));
+    $('#actionJournal').innerHTML='<div class="mini">שגיאה בטעינת יומן הפעולות</div>';
+  }
+}
+
+async function loadLiveAccount(prefetched=null){
+  try{
+    const d=prefetched||await J(LIVEACC),a=d.account||{};
+    if(!d.connected||!d.account)throw Error(d.error||'נתוני החשבון אינם זמינים');
+    put('#liveConnected',d.connected?'מחובר ✅':'לא מחובר');
+    put('#liveTotalValue',fmt(a.totalValueUsdt)+' USDT');
+    put('#liveUsdt',fmt(a.usdtFree)+' USDT');
+    put('#liveCanTrade',a.tradingGate?.spotPermission?'Spot API פעיל':'קריאה בלבד');
+    put('#liveAccountType',a.accountType||'—');
+    put('#paperValue',fmt(a.totalValueUsdt)+' USDT');
+    put('#paperCash',fmt(a.usdtFree)+' USDT');
+    const pnl=liveAccountPnlDisplay(a);
+    put('#paperPnl',pnl.text);
+    put('#accountPnlLabel','רווח / הפסד לא ממומש');
+    const pnlEl=$('#paperPnl');
+    if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,pnl.className==='pnl-'+kind);
+    put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות'+(a.profitReinvestmentPaused?' · ההקצאה הקיימת נשמרת; עדכון מרווחים ממתין להמרת עמלה':''));
+    put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
+    put('#slots',((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
+    put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
+    put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');
+    const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
+    $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';
+    return a;
+  }catch(e){
+    put('#paperPnl','אין נתוני חשבון');put('#slots','—');
+    const pnlEl=$('#paperPnl');if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,kind==='unknown');
+    put('#liveConnected','שגיאה');put('#liveTotalValue','—');put('#liveUsdt','—');put('#liveCanTrade','—');put('#liveAccountType','—');
+    $('#liveBalances').innerHTML='<div class="mini">'+e.message+'</div>';
+    return null;
+  }
+}
+
+async function loadDecisionHistory(symbol){
+  try{
+    put('#decisionHistorySymbol',symbol);
+    const d=await J(DECISION_HISTORY+'?symbol='+encodeURIComponent(symbol)+'&limit=20');
+    const recorded=d.recorded||[];
+    const technical=d.technicalDaily||[];
+    const technicalWarning=d.technicalError?'<div class="mini">ההיסטוריה הטכנית אינה זמינה כרגע; מוצגות הבדיקות שנרשמו.</div>':'';
+
+    const header='<div class="decision-row header"><div>זמן</div><div>החלטה</div><div>גל</div><div>ירידה קודמת</div><div>ציון</div><div>מקור</div><div>סיבה</div></div>';
+
+    const renderRecorded=recorded.map(x=>{
+      const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';
+      const cls=x.decision==='BUY'||x.decision==='ROTATE_IN'?'good':x.decision==='SELL'||x.decision==='ROTATE_OUT'?'bad':'warn';
+      return `<div class="decision-row">
+        <div>${when}</div>
+        <div class="${cls}">${decisionLabel(x.decision||'HOLD')}</div>
+        <div>${fmt(x.currentWave,2)}%</div>
+        <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
+        <div>${fmt(x.score,1)}</div>
+        <div title="Slots: ${x.activeSlots}/${x.maxSlots}">${x.decisionPriceSource==='LIVE_PRICE'?'LIVE':x.decisionPriceSource?.startsWith('5M')?'5M':'D1'}</div>
+        <div>${decisionReasonLabel(x.reason||x.buyReason)}</div>
+      </div>`;
+    }).join('');
+
+    const renderTechnical=technical.map(x=>{
+      const when=x.at?new Date(x.at).toLocaleDateString('he-IL'):'—';
+      const cls=x.buyQualified?'good':'warn';
+      return `<div class="decision-row">
+        <div>${when}</div>
+        <div class="${cls}">${x.technicalDecision||'HOLD'}</div>
+        <div>${fmt(x.currentWave,2)}%</div>
+        <div>${x.previousDownWave==null?'—':fmt(x.previousDownWave,2)+'%'}</div>
+        <div>—</div>
+        <div>5M</div>
+        <div>${decisionReasonLabel(x.buyReason)}</div>
+      </div>`;
+    }).join('');
+
+    let out='';
+    if(recorded.length){
+      out+='<div class="decision-history-section-title">בדיקות אמיתיות שנרשמו במערכת</div>'+header+renderRecorded;
+    }
+    if(technical.length){
+      out+='<div class="decision-history-section-title">היסטוריה טכנית · 5 דקות</div>'+header+renderTechnical;
+    }
+    $('#decisionHistory').innerHTML=technicalWarning+(out||'<div class="mini">אין עדיין היסטוריית החלטות.</div>');
+  }catch(e){
+    $('#decisionHistory').innerHTML='<div class="mini">שגיאה בטעינת היסטוריית החלטות</div>';
+  }
+}
+
+
+function renderCandlePower(a){
+  if(!a)return;
+  const trendLabel=({UP:'מגמת עלייה',DOWN:'מגמת ירידה',SIDEWAYS:'דשדוש / לא ברור'})[a.trend]||'—';
+  const controlLabel=({BUYERS:'קונים חזקים יותר',SELLERS:'מוכרים חזקים יותר',BALANCED:'כוחות מאוזנים'})[a.control]||'—';
+  put('#candleTrend',trendLabel);
+  put('#candleControl',controlLabel);
+  put('#buyerPower',fmt(a.buyerScore,1));
+  put('#sellerPower',fmt(a.sellerScore,1));
+  put('#candleStructure',
+    (a.explanation||'')+
+    ' · HH '+(a.higherHighs??0)+
+    ' · HL '+(a.higherLows??0)+
+    ' · LH '+(a.lowerHighs??0)+
+    ' · LL '+(a.lowerLows??0)
+  );
+  put('#candleCount',
+    'קונים '+(a.buyerCandles??0)+
+    ' | מוכרים '+(a.sellerCandles??0)+
+    ' | מאוזנים '+(a.neutralCandles??0)+
+    ' · כלל שליטה: 7 מול 3'
+  );
+
+  const stateLabel={
+    BUYERS_STRONG:'קונים שולטים',
+    SELLERS_STRONG:'מוכרים שולטים',
+    BUYERS_REJECTION:'קונים דחו ירידה',
+    SELLERS_REJECTION:'מוכרים דחו עלייה',
+    BUYERS_EDGE:'יתרון לקונים',
+    SELLERS_EDGE:'יתרון למוכרים',
+    NEUTRAL:'מאוזן'
+  };
+
+  const rows=(a.candles||[]).slice().reverse();
+  const el=$('#candlePowerRows');
+  if(!el)return;
+  el.innerHTML=rows.map((x,i)=>{
+    const cls=x.state.startsWith('BUYERS')?'buyers':x.state.startsWith('SELLERS')?'sellers':'neutral';
+    const when=x.closeTime?new Date(x.closeTime).toLocaleString('he-IL'):'—';
+    return '<div class="candle-power-row '+cls+'">'+
+      '<div><b>#'+(rows.length-i)+'</b><small>'+when+'</small></div>'+
+      '<div><span>O</span><b>'+fmt(x.open,x.open<1?5:2)+'</b></div>'+
+      '<div><span>H</span><b>'+fmt(x.high,x.high<1?5:2)+'</b></div>'+
+      '<div><span>L</span><b>'+fmt(x.low,x.low<1?5:2)+'</b></div>'+
+      '<div><span>C</span><b>'+fmt(x.close,x.close<1?5:2)+'</b></div>'+
+      '<div><span>גוף</span><b>'+fmt(x.bodyPct,0)+'%</b></div>'+
+      '<div class="candle-state"><b>'+stateLabel[x.state]+'</b><small>'+x.reason+'</small></div>'+
+    '</div>';
+  }).join('');
+}
+
+async function runBinanceWyckoffScan(candles,rows,position){
+ if(typeof Worker==='undefined')return wyckoffHistoryEngine.binanceWyckoffHistory(candles,rows,position);
+ return new Promise((resolve,reject)=>{
+  const worker=new Worker('/binance-wyckoff-worker.js?v=20261017-history',{type:'module'});
+  const timer=setTimeout(()=>{worker.terminate();reject(Error('WYCKOFF_SCAN_TIMEOUT'));},15000);
+  worker.onmessage=event=>{clearTimeout(timer);worker.terminate();resolve(event.data);};
+  worker.onerror=()=>{clearTimeout(timer);worker.terminate();reject(Error('WYCKOFF_SCAN_UNAVAILABLE'));};
+  worker.postMessage({candles,rows,position});
+ });
+}
+function publishSlopeData(symbol,bars){
+ if(typeof window==='undefined')return;
+ const agent=currentAgentData?.agents?.find(a=>a.symbol===symbol),position=agent?.position==='LONG'?agent.strategy:null;
+ window.LEVI_MA_SLOPE_DATA={symbol,bars,position,price:position?.price,priceAt:position?.positionQuoteAt};globalThis.LEVI_MA_SLOPE?.renderBinance(window.LEVI_MA_SLOPE_DATA);
+}
+let chartLoadInFlight=null;
+let chartLastReadKey=null,chartLastReadAt=0;
+function loadChart(symbol){
+ const key=[symbol,selectedInterval,selectedRange,currentMode].join(':');
+ if(chartLoadInFlight?.key===key)return chartLoadInFlight.promise;
+ if(chartLastReadKey===key&&Date.now()-chartLastReadAt<15000&&chartCandles.length)return Promise.resolve();
+ const promise=loadChartRequest(symbol);chartLoadInFlight={key,promise};
+ const clear=()=>{if(chartLoadInFlight?.promise===promise)chartLoadInFlight=null;};
+ promise.then(clear,clear);return promise;
+}
+async function loadChartRequest(symbol){
+  globalThis.LEVI_RSI_BADGE?.setBinance(symbol);
+  const requestId=++chartRequestId;
+  const interval=selectedInterval,range=selectedRange;
+  const modeAtRequest=currentMode;
+  const contextKey=[symbol,interval,range,modeAtRequest].join(':');
+  try{
+    if(chartAnalysisContext!==contextKey){
+      chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
+      $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');
+      const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
+      put('#chartEmpty','טוען נתוני גרף…');$('#chartEmpty')?.classList.remove('hidden');
+    }else $('#chartEmpty')?.classList.add('hidden');
+    const cached=typeof window!=='undefined'?window.LEVI_CHART_CACHE?.read(contextKey):null;
+    if(chartAnalysisContext!==contextKey&&cached){
+      chartCandles=cached.candles;chartDecisions=[];chartVisibleStartTime=cached.visibleStartTime;
+      chartAnalysisContext=contextKey;chartWyckoffHistory=[];chartWyckoffError=null;selectedWyckoffId=null;
+      drawCandles(chartCandles);$('#chartEmpty')?.classList.add('hidden');
+      put('#chartLegend','עותק גרף קודם מ־'+new Date(cached.savedAt).toLocaleString('he-IL')+' · ממתין לנתונים עדכניים');
+    }
+    const d=await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval)+'&range='+encodeURIComponent(range),{timeoutMs:35000});
+    if(!Array.isArray(d.candles)||!d.candles.length)throw Error('לא התקבלו נרות למטבע ולטווח שנבחרו.');
+    put('#chartLegend','נר '+selectedInterval.toUpperCase()+' · '+('טווח '+({'1D':'יום','2D':'יומיים','3D':'3 ימים','4D':'4 ימים','5D':'5 ימים','1W':'שבוע'}[selectedRange]||selectedRange))+' · MA200');
+    if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode||(d.decisionMode&&d.decisionMode!==modeAtRequest))return;
+    $('#chartEmpty')?.classList.add('hidden');
+    if(chartAnalysisContext!==contextKey){
+      put('#chartDecisionDetails','בחר סימון כדי לראות את תנאי הבדיקה והתוצאה.');
+      chartAnalysisContext=contextKey;selectedWyckoffId=null;chartWyckoffHistory=[];chartWyckoffError=null;
+    }
+    chartVisibleStartTime=Number(d.visibleStartTime)||0;
+    chartCandles=d.candles||[];if(interval==='5m')publishSlopeData(symbol,chartCandles);
+    chartLastReadKey=contextKey;chartLastReadAt=Date.now();
+    if(typeof window!=='undefined')window.LEVI_CHART_CACHE?.write(contextKey,d);
+    chartDecisions=[...(d.decisions||[]),...(d.actions||[])];
+    // Price data is visible immediately; historical annotations may finish later.
+    drawCandles(chartCandles);globalThis.LEVI_MARKET_POWER?.load(selectedSymbol);
+    try{
+    const historyEngine=wyckoffHistoryEngine||await import('/lib/binance-wyckoff-history.mjs?v=20261017-history');
+    wyckoffHistoryEngine=historyEngine;
+    const source=interval==='5m'?d:await J(CHART+'?symbol='+encodeURIComponent(symbol)+'&interval=5m&range='+encodeURIComponent(range),{timeoutMs:35000});
+    if(requestId!==chartRequestId||symbol!==selectedSymbol||interval!==selectedInterval||modeAtRequest!==currentMode)return;
+    const sourceCandles=source.candles||[];publishSlopeData(symbol,sourceCandles);
+    if(typeof window!=='undefined')window.LEVI_RSI_BADGE_SOURCE={symbol,bars:sourceCandles};
+    globalThis.LEVI_RSI_BADGE?.setBinance(symbol,sourceCandles);
+    const closedAt=sourceCandles.filter(b=>b.closed!==false).at(-1)?.closeTime;
+    const cacheKey=[symbol,range,modeAtRequest,closedAt].join(':');
+    let analysis=wyckoffHistoryCache.get(cacheKey);
+    const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};
+    if(!analysis){analysis=await runBinanceWyckoffScan(sourceCandles,[...(source.decisions||[]),...(source.actions||[])],position);wyckoffHistoryCache.clear();wyckoffHistoryCache.set(cacheKey,analysis);}
+    if(requestId!==chartRequestId)return;
+    chartWyckoffHistory=historyEngine.mergeBinanceRecorded(analysis.history,[...(source.decisions||[]),...(source.actions||[])],position);chartWyckoffError=analysis.error;
+    }catch(historyError){if(requestId!==chartRequestId)return;const position=(currentAgentData?.agents||[]).find(a=>a.symbol===symbol)?.strategy||{};chartWyckoffHistory=wyckoffHistoryEngine?wyckoffHistoryEngine.mergeBinanceRecorded([],chartDecisions,position):[];chartWyckoffError=historyError.message;}
+    if(requestId!==chartRequestId)return;
+    drawCandles(chartCandles);
+    globalThis.LEVI_MARKET_POWER?.load(selectedSymbol);
+  }catch(e){
+    if(requestId!==chartRequestId)return;
+    if(chartAnalysisContext===contextKey&&chartCandles.length){
+      put('#chartLegend','לא ניתן לרענן כעת · מוצגים הנרות מהטעינה האחרונה · '+e.message);
+    }else{
+      chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
+      $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נתוני עליות');put('#chartRiseDetails','');
+      $('#chartDecisionMarkers')?.replaceChildren();
+      const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
+      put('#chartEmpty','לא ניתן לטעון את הגרף · '+e.message);
+      $('#chartEmpty')?.classList.remove('hidden');
+    }
+  }
+}
+
+function drawIndicators(candles,window=null){
+  const engine=globalThis.BinanceIndicators;if(!engine)return;
+  const values=engine.calculateIndicators(candles);
+  for(const [key,name,color,bounds,levels] of [['rsi','RSI (14)','#bb90ff',[0,100],[currentAgentData?.config?.entryRsi?.max??40,70]],['roc','ROC (12)','#40d5de',null,[0]]]){
+    const show=$('#show'+key.toUpperCase())?.checked;
+    const panel=$('#'+key+'Panel');if(panel)panel.hidden=!show;
+    if(show){
+      const separateRsi=key==='rsi'&&selectedInterval!=='5m';
+      const series=separateRsi?(globalThis.LEVI_RSI_BADGE?.series()||[]).slice(-120):window?values[key].slice(window.start,window.end):values[key].slice(-120);
+      engine.drawIndicator($('#'+key+'Chart'),series,{name:key==='rsi'?name+' · 5 דקות'+(separateRsi?' · נתונים אחרונים, טווח נפרד':' · חלון הגרף'):name,color,bounds,levels});
+    }
+  }
+}
+function chartSellLevel(data,liveAccount,mode,symbol){
+ const agent=(data?.agents||[]).find(a=>a.symbol===symbol);
+ const held=mode==='live'?(liveAccount?.balances||[]).some(b=>b.asset+'USDT'===symbol&&Number(b.valueUsdt)>=5):!!data?.paper?.positions?.[symbol];
+ if(!held||!agent||agent.staleData)return null;
+ const strategy=agent.strategy||{},position=mode==='live'?strategy:data.paper.positions[symbol];
+ const stop=Number(strategy.effectiveStopPrice??position.effectiveStopPrice??strategy.stopPrice??position.stopPrice);
+ if(!(stop>0)||!Number.isFinite(stop))return null;
+ return {price:stop,reason:strategy.profitProtectionPending?'עצירת הפסד · הגנת רווח תופעל ב־'+tradeExecutionTime(strategy.profitProtectionStartsAt):strategy.trailingActive?'הגנה מהשיא':'עצירת הפסד',rsiSell:strategy.rsiExit?.sell===true};
+}
+
+function renderPositionPoints(view,step,left,y,digits,plotBounds=null){
+ const root=$('#wyckoffPivots');if(!root)return;
+ const level=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);if(!level)return;
+ const strategy=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
+ for(const [kind,label,at,price] of [['buy','קנייה בפועל',strategy.entryAt,strategy.entryPrice],['peak','השיא מאז הקנייה',strategy.peakAt,strategy.peakPrice]]){
+  const time=Date.parse(at);if(!Number.isFinite(time)||!(Number(price)>0))continue;
+  const index=view.findIndex(c=>time>=Number(c.openTime)&&time<=Number(c.closeTime));if(index<0)continue;
+  const yy=y(Number(price));if(yy<(plotBounds?.top??94)||yy>(plotBounds?.bottom??root.clientHeight-112))continue;
+  const dot=document.createElement('button');dot.type='button';dot.className='position-candle-hit';
+  dot.style.left=(left+step*(index+.5))+'px';dot.style.top=Math.min(y(Number(view[index].high)),y(Number(view[index].low)))-5+'px';dot.style.width=Math.max(12,step*.7)+'px';dot.style.height=Math.max(16,Math.abs(y(Number(view[index].high))-y(Number(view[index].low)))+10)+'px';
+  dot.title=label+' · '+fmt(price,digits)+' USDT · '+tradeExecutionTime(at);dot.setAttribute('aria-label',dot.title);
+  dot.onclick=()=>put('#chartDecisionDetails',dot.title);root.append(dot);
+ }
+}
+
+let selectedChartMove=null;
+function renderChartRises(ctx,view,{left,right,top,bottom,step,y,digits}){
+ const root=$('#chartRises'),down=$('#chartFalls'),list=$('#chartRiseList');if(!root||!down||!list)return;
+ const enabled=$('#showRises')?.checked!==false,indicators=globalThis.BinanceIndicators;
+ root.hidden=down.hidden=!enabled;
+ const upMoves=(indicators?.risingMoves(view)||[]).map(m=>({...m,direction:'up'})),downMoves=(indicators?.fallingMoves(view)||[]).map(m=>({...m,direction:'down'})),moves=[...upMoves,...downMoves];
+ const key=m=>selectedSymbol+':'+selectedInterval+':'+m.direction+':'+m.startTime+':'+m.endTime;
+ const detail=m=>(m.pct>0?'+':'')+m.pct.toFixed(2)+'% · מ־'+fmt(m.startPrice,digits)+' ל־'+fmt(m.endPrice,digits)+' USDT · '+tradeExecutionTime(m.startTime)+' עד '+tradeExecutionTime(m.endTime)+' · '+(m.status==='completed'?'מהלך שהסתיים':m.status==='interrupted'?'נתונים נקטעו — הסיום לא אומת':'מהלך מתהווה — עשוי להתעדכן');
+ const highlight=m=>{selectedChartMove=key(m);put('#chartRiseDetails',detail(m));drawCandles(chartCandles);};
+ const renderKey=JSON.stringify([selectedSymbol,selectedInterval,left,right,step,enabled,moves]);
+ if(root._renderKey!==renderKey){
+  root._renderKey=renderKey;root.replaceChildren();down.replaceChildren();list.replaceChildren();
+  put('#chartRiseSummary','פירוט תנועות של 1% ומעלה · '+upMoves.length+' עליות · '+downMoves.length+' ירידות');
+  for(const m of moves.slice().sort((a,b)=>b.endTime-a.endTime)){
+   const item=document.createElement('button');item.type='button';item.className='chart-rise-item '+m.direction;item.textContent=detail(m);item.onclick=()=>highlight(m);list.append(item);
+  }
+  for(const [host,direction,group]of [[root,'up',upMoves],[down,'down',downMoves]]){
+   const caption=document.createElement('span');caption.className='chart-move-caption';caption.textContent=direction==='up'?'עליות ↑':'ירידות ↓';host.append(caption);
+   for(const placed of indicators.moveLabelLayout(group,{left,right,step})){
+    const m=placed.moves[0],tag=document.createElement('button');tag.type='button';
+    tag.className='chart-rise-label '+direction+(placed.overflow?' is-group':m.status==='completed'?'':' is-developing');
+    tag.textContent=placed.overflow?'עוד '+placed.moves.length:(m.pct>0?'+':'')+m.pct.toFixed(2)+'%';tag.dir='ltr';
+    tag.title=placed.moves.map(detail).join('\n');tag.setAttribute('aria-label',tag.title);
+    tag.style.left=placed.x+'px';tag.style.top=(placed.row*25+3)+'px';tag.style.width=placed.width+'px';
+    tag.onclick=()=>{if(!placed.overflow){highlight(m);return;}put('#chartRiseDetails',placed.moves.map(detail).join(' | '));$('#chartMoveBreakdown').open=true;};host.append(tag);
+   }
+  }
+ }
+ const selected=enabled?moves.find(m=>key(m)===selectedChartMove):null;
+ if(selected){
+  ctx.save();ctx.beginPath();ctx.rect(left,top,right-left,bottom-top);ctx.clip();ctx.strokeStyle=selected.direction==='up'?'#72e4b3':'#ff8597';ctx.lineWidth=2;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(left+step*(selected.startIndex+.5),y(selected.startPrice));ctx.lineTo(left+step*(selected.endIndex+.5),y(selected.endPrice));ctx.stroke();ctx.restore();
+ }
+}
+
+let candleFlashOn=true;
+setInterval(()=>{
+ if(document.hidden||globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;
+ const agent=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol);
+ const held=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
+ if(!held||!chartCandles.length)return;
  candleFlashOn=!candleFlashOn;drawCandles(chartCandles);
 },650);
 function drawCandles(candles){
   const canvas=$('#priceChart');
   const channelBadge=$('#channelTouchBadge');
   if(channelBadge){channelBadge.hidden=true;channelBadge.replaceChildren();}
-  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
+  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
