@@ -1,4 +1,4 @@
-# Primary swing-channel entries (Binance and Colmex)
+# Primary swing-channel entries (Binance) and POC reclaim entries (Colmex)
 
 This opt-in route replaces all other automatic entry routes while requested. Wyckoff and independent breakout remain observable but cannot authorize a buy. Manual confirmations are separate. Existing positions continue their existing exit/protection path, even if channel history or activation is unavailable.
 
@@ -20,4 +20,6 @@ Code defaults OFF. For each platform independently, set `<PLATFORM>_CHANNEL_PRIM
 
 Binance owner runs `scripts/install-channel-primary.sh <full SHA> --enable-live`. It stages offline tests and narrowly patches recognized installed server contexts; backs up selected files and its own service override. It never writes trade settings or other service overrides. `--install-only` preserves activation; `--disable-channel-primary` restores old configured routes. Startup rollback cannot reverse any exchange execution.
 
-Colmex owner sets `COLMEX_CHANNEL_PRIMARY_ENABLED=true` and `COLMEX_CHANNEL_PRIMARY_AFTER` in Netlify production function environment and deploys. Final activation changes live automated trading and must be performed by the account owner. Verify `/.netlify/functions/colmex-auto-status` channelPrimary state and app status after deployment. Market-closed time is not an entry failure. Do not create another broker session.
+For Colmex, the same opt-in flag now selects `COLMEX_POC_RECLAIM_V1` instead of the channel-breakout logic described above. Its LONG entry requires 50 closed 5-minute bars, two confirmed higher lows and two confirmed higher highs (each pivot needs two following bars), then estimates a 32-bin volume profile from the later higher low through the following higher high. An intrabar entry requires the open 5-minute candle to trade at/below that POC and the fresh broker bid to reclaim above it; a break beneath the later higher low invalidates the setup. The runner recomputes the structure and POC before the broker order. Volume is estimated by distributing each OHLCV bar's volume across its High–Low range; it is not exchange trade-level Fixed Range Volume Profile data. Existing cash sizing, position limits, broker checks, stops, take-profit and trailing protection remain unchanged.
+
+Colmex owner sets `COLMEX_CHANNEL_PRIMARY_ENABLED=true` and `COLMEX_CHANNEL_PRIMARY_AFTER` in Netlify production function environment and deploys. Final activation changes live automated trading and must be performed by the account owner. Verify `/.netlify/functions/colmex-auto-status` reports strategy `COLMEX_POC_RECLAIM_V1`, and check the latest POC diagnostic in app status. Market-closed time is not an entry failure. Do not create another broker session.

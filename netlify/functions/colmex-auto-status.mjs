@@ -10,7 +10,7 @@ import {autoStore,stateKey} from '../../lib/colmex-auto-store.mjs';
 export function makeHandler({env=process.env,storeFactory=autoStore}={}){return async event=>{
  const response=(code,data)=>({statusCode:code,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'},body:JSON.stringify(data)});
  if(event.httpMethod!=='GET')return response(405,{error:'READ_ONLY'});
- const channelPrimary={...channelEntryConfig(env,'COLMEX'),executionEnabled:configuredLive(env)};
+ const channelPrimary={...channelEntryConfig(env,'COLMEX'),strategy:'COLMEX_POC_RECLAIM_V1',entryMode:'poc_reclaim',lookback:50,pocBins:32,executionEnabled:configuredLive(env)};
  const enabled=configuredLive(env),independentEntry={...colmexBreakoutConfig(env),executionEnabled:configuredLive(env)},base={policy:AUTO_POLICY,channelPrimary,independentEntry,enabled,activation:'SERVER_CONFIGURATION_ONLY',live:true,configuration:{accountPinned:/^\d+$/.test(env.COLMEX_AUTO_ACCOUNT_ID||''),liveAckMatches:env.COLMEX_AUTO_LIVE_ACK===LIVE_ACK,enabledFlag:env.COLMEX_AUTO_LIVE_ENABLED==='true',productionEnvironment:env.CONTEXT==='production'}};
  try{
   const id=env.COLMEX_AUTO_ACCOUNT_ID;

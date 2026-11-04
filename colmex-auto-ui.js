@@ -1,5 +1,5 @@
-import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261103-intrabar';
-import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261103-intrabar';
+import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261104-poc';
+import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261104-poc';
 import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
 const health=document.getElementById('autoMonitorHealth'),summary=document.getElementById('autoMonitorSummary'),received=document.getElementById('autoMonitorReceived'),refreshButton=document.getElementById('autoMonitorRefresh');
