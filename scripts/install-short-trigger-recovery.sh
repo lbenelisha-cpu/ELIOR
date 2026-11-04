@@ -26,18 +26,21 @@ for file in lib/futures-short-runner.mjs lib/futures-short-api.mjs lib/futures-s
     lib/futures-short-runner.mjs) grep -q 'async ensureAlgo(p,kind,price)' "$file" && grep -q 'visibilityDelays=\[150,300,600,950\]' "$file" ;;
     lib/futures-short-api.mjs) grep -q "'/fapi/v1/ticker/bookTicker'" "$file" ;;
     lib/futures-short-recovery.mjs) grep -q "FUTURES_API_-2013" "$file" ;;
-    scripts/release-futures-short-halt.mjs) grep -q 'SHORT_VISIBILITY_FIX_NOT_INSTALLED' "$file" ;;
+    scripts/release-futures-short-halt.mjs) [[ ! -f "$file" ]] || grep -q 'SHORT_VISIBILITY_FIX_NOT_INSTALLED' "$file" ;;
   esac || { echo "Unexpected installed context in $file; no files changed." >&2; exit 1; }
 done
 
 backup="/root/levi-before-short-trigger-fix-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -m 700 "$backup"
-tar -czf "$backup/code.tgz" lib/futures-short-api.mjs lib/futures-short-runner.mjs lib/futures-short-recovery.mjs scripts/release-futures-short-halt.mjs
+existing=(); missing=()
+for file in "${files[@]}"; do if [[ -f "$file" ]]; then existing+=("$file"); else missing+=("$file"); fi; done
+tar -czf "$backup/code.tgz" "${existing[@]}"
 rollback(){
   trap - ERR
   set +e
   systemctl stop levi-binance
   tar -xzf "$backup/code.tgz" -C /opt/levi-binance
+  for file in "${missing[@]}"; do rm -f -- "$file"; done
   systemctl start levi-binance
   echo "Code restored from $backup; SHORT halt retained." >&2
   exit 1
