@@ -10,7 +10,8 @@ stage=$(mktemp -d /tmp/levi-short-trigger.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/runtime/lib" "$stage/runtime/scripts" "$stage/runtime/tests"
 files=(lib/futures-short-api.mjs lib/futures-short-runner.mjs lib/futures-short-recovery.mjs scripts/release-futures-short-halt.mjs)
-for file in "${files[@]}" tests/futures-short.test.mjs tests/futures-short-recovery.test.mjs; do
+support=(tests/futures-short.test.mjs tests/futures-short-recovery.test.mjs scripts/patch-futures-short.mjs scripts/futures-short-patches.json)
+for file in "${files[@]}" "${support[@]}"; do
   git show "$revision:$file" > "$stage/runtime/$file"
 done
 cp -a lib "$stage/runtime/"
