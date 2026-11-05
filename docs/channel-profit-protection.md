@@ -1,5 +1,42 @@
 # Channel Take Profit (V2)
 
+## Binance settings override (2026-11-05)
+
+Binance managed LONG exits now use `SETTINGS_V1`: all four menu settings
+apply to existing positions (including BNB) and new fills. The TP is
+`actual entry * (1 + takeProfitPct / 100)`. Activation and initial SL also
+use actual entry; the trailing gap is percentage points of entry below the
+high-water mark. Already-earned stronger stops are retained.
+
+The live server reapplies current menu settings when reconstructing managed
+positions; LIVE fill reconstruction and DEMO fills persist this source.
+Frozen channel geometry remains a reference for analysis and entry checks,
+and cannot override Binance TP or activation. Colmex and historical unmarked
+policy calculations below retain their existing channel behavior.
+
+The frontend alone does not activate this change. Owner-run deployment of the
+reviewed server commit is required (the existing
+`scripts/install-binance-settings.sh <reviewed-full-commit-sha>` stages the
+affected runtime files). The running server may then replace existing owned
+Binance protection orders, including BNB's TP. Verify the new broker target
+and stop after reconciliation; do not treat a settings save as broker approval.
+
+The sections below describe the retained channel policy and Colmex behavior.
+
+Binance Futures SHORT now mirrors these settings: TP = entry times
+`(1 - takeProfitPct / 100)`, activation = entry times
+`(1 - profitActivationPct / 100)`, initial stop = entry times
+`(1 + stopLossPct / 100)`, and an armed stop follows the lowest observed Ask
+plus `entry * trailingGapPp / 100`. Saved and verified tighter stops are
+retained. New fills use actual execution and existing owned positions use
+current settings on management. A channel target remains signal geometry,
+not the exit override. POC uses the same settings calculation. SHORT TP must
+be below 100%; entry and settings updates enforce this where applicable.
+The SHORT runtime files must also be installed by the owner; the LONG settings
+installer alone does not deploy `lib/futures-short-policy.mjs` and
+`lib/futures-short-runner.mjs`. Deployment can replace live SHORT protection
+orders and is not performed by this change.
+
 New `channel_breakout` entries automatically freeze a `CHANNEL_TAKE_PROFIT_V2`
 plan from the confirmed pre-breakout channel. The absolute Take Profit is:
 

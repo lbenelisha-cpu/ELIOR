@@ -207,13 +207,13 @@ function tradingRuleLines(s){
   lines.push('קנייה: '+(n(p.period)??'מספר לא ידוע של')+' נרות סגורים של 5 דקות לפני נר הפריצה · לפחות שתי נגיעות בכל גבול · רגרסיה עולה · '+(p.waitForBreakoutClose===false?'מחיר חי מעל הגבול העליון ומרכז הרגרסיה, ללא המתנה לסגירת נר הפריצה':'נר פריצה נסגר מעל הגבול העליון ומרכז הרגרסיה')+'.');
   lines.push((p.waitForBreakoutClose===false?'מחזור מצטבר בנר הפתוח: לפחות פי ':'מחזור: לפחות פי ')+(n(p.minVolumeRatio)??'—')+' מממוצע 20 הנרות הקודמים · ממוצע שווי מחזור מינימלי '+(n(p.minMeanDollarVolume)??'—')+' USDT לנר.');
   lines.push('לפני שליחה: מחיר עדכני מעל רמות הפריצה ומרכז הרגרסיה, איתות שלא נוצל, יתרה, מקום והגנות. '+(p.livePriceRule==='CURRENT_PRICE'?'נגיעה קודמת במהלך הנר אינה פוסלת לאחר התאוששות.':'השרת לא אישר את כלל ההתאוששות החדש.')+(p.waitForBreakoutClose===false?' תוקף האיתות עד סוף נר הפריצה הנוכחי; כל התנאים נבדקים שוב לפני השליחה.':' תוקף האיתות: '+(n(p.signalValidityMs)!==null?p.signalValidityMs/60000:'—')+' דקות מסגירת נר הפריצה; אין המתנה חובה נוספת.'));
-  lines.push('יעד LONG חדש: הגבול העליון שנפרץ + רוחב התעלה שנקבע לפני הפריצה. וויקוף וגל מוקדם אינם מסלולי כניסה חלופיים כשהמסלול הראשי מופעל.');
+  lines.push('יעד LONG: לפי מדיניות היציאה וההגדרות שבשרת; היעד המתועד מוצג בפוזיציה. וויקוף וגל מוקדם אינם מסלולי כניסה חלופיים כשהמסלול הראשי מופעל.');
  }else if(s?.mode==='demo')lines.push('מצב DEMO: כללי מסלול LIVE אינם אישור לתנאי הדמו. תנאי הנכס וסיבת ההמתנה מוצגים ליד הגרף.');
  else if(p)lines.push('מסלול התעלות אינו נבחר בשרת. יש לבדוק את מסלול הכניסה וסיבת ההמתנה של הנכס; אין להסיק שכללי התעלות פעילים.');
  else lines.push('ממתין לאימות כללי הכניסה מהשרת.');
  lines.push('הגדרות יציאה לכניסות חדשות: סטופ '+(n(e.stopLossPct)??'—')+'% · הפעלת הגנה '+(n(e.profitActivationPct)??'—')+'% · מרחק נגרר '+(n(e.trailingGapPp)??'—')+' נקודות אחוז ממחיר הכניסה. לפוזיציה קיימת יש לבדוק את הסטופ והיעד המתועדים שלה. המחירים לפני עמלות.');
  const f=s?.shortTrading?.policy;
- if(f)lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · '+(n(f.period)??'לא נמסר מספר')+' נרות 5 דקות · שתי נגיעות בכל גבול · רגרסיה יורדת · '+(f.waitForBreakoutClose===false?'פריצה מטה במחיר חי, ללא המתנה לסגירת הנר · מחזור מצטבר בנר הפתוח פי 1.5 מממוצע 20':'פריצה מטה בנר סגור · מחזור פי 1.5 מממוצע 20')+'. יעד: הגבול התחתון פחות רוחב התעלה. '+(f.livePriceRule==='CURRENT_PRICE'?'חזרה זמנית מעלה אינה פוסלת אם המחיר העדכני שוב מתחת לרמות.':'')+' תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(f)lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · '+(n(f.period)??'לא נמסר מספר')+' נרות 5 דקות · שתי נגיעות בכל גבול · רגרסיה יורדת · '+(f.waitForBreakoutClose===false?'פריצה מטה במחיר חי, ללא המתנה לסגירת הנר · מחזור מצטבר בנר הפתוח פי 1.5 מממוצע 20':'פריצה מטה בנר סגור · מחזור פי 1.5 מממוצע 20')+'. יעד SHORT: לפי מדיניות היציאה וההגדרות שבשרת; היעד המתועד מוצג בפוזיציה. '+(f.livePriceRule==='CURRENT_PRICE'?'חזרה זמנית מעלה אינה פוסלת אם המחיר העדכני שוב מתחת לרמות.':'')+' תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
  return lines;
 }
 function renderTradingRules(s){
@@ -464,6 +464,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
+  renderActivePositionProtection(d,liveAccount,isLive);
   if(activeView==='portfolio')renderPortfolioView();
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   updateSelectedAsset(d,currentMode,liveAccount);
@@ -472,6 +473,24 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     window.LEVI_DASHBOARD_SNAPSHOT=detail;
     window.dispatchEvent(new CustomEvent('levi:binance-dashboard',{detail}));
   }
+}
+
+function renderActivePositionProtection(data,account,isLive){
+  const rows=[...($('#positions')?.children||[])];
+  const holdings=isLive?(account?.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>=5):Object.values(data.paper?.positions||{});
+  holdings.forEach((holding,index)=>{
+    const row=rows[index];if(!row)return;
+    const symbol=isLive?holding.asset+'USDT':holding.symbol;
+    const agent=(data.agents||[]).find(a=>a.symbol===symbol);
+    const position=isLive?agent?.strategy:{...holding,...agent?.strategy};
+    const host=document.createElement('div');row.append(host);
+    const risk=position?{...position,qty:holding.qty,currentPrice:isLive?holding.usdtPrice:holding.currentPrice,pnlIls:holding.pnlIls}:null;
+    if(!globalThis.LEVI_TRADE_RISK?.levels(risk)){
+      host.className='mini';host.textContent='אין נתוני הגנה מנוהלת מתועדים לפוזיציה זו';return;
+    }
+    globalThis.LEVI_TRADE_RISK.render(host,risk,'USDT');
+    if(agent?.staleData){const note=document.createElement('small');note.textContent='נתוני ההגנה אינם עדכניים · מוצג המידע האחרון שהתקבל';host.prepend(note);}
+  });
 }
 
 function rotationGapText(a,d,currentMode,liveAccount){
@@ -975,7 +994,7 @@ function drawCandles(candles){
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
   const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=!tradeRisk;
-  if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop);
+  if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop,...(tradeRisk.trailing?[tradeRisk.brokerTarget]:[]));
   const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
   put('#positionEntryPrice',heldNow?priceText(riskPosition?.entryPrice??selectedPosition.entryPrice):'—');
   put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
@@ -1065,6 +1084,7 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
+    {price:tradeRisk?.trailing?tradeRisk.brokerTarget:NaN,label:riskPosition?.channelProfitProtection?.mode==='TAKE_PROFIT'?'יעד מכירה לפי התעלה':'יעד מכירה',color:'#ffce73'},
     {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},

@@ -55,7 +55,7 @@ import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} f
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from './lib/wyckoff-evaluation.mjs';
 import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
-import {TRAILING_EXIT_POLICY,applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
+import {TRAILING_EXIT_POLICY,applySettingsExitPolicy as applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {protectionPrice} from './lib/binance-protection-price.mjs';
@@ -2312,7 +2312,7 @@ const server=http.createServer((req,res)=>{
    req.on('end',async()=>{try{const input=JSON.parse(text);await liveExecution.manual(async()=>{
     if(input.revision!==tradeSettings.revision)throw Error('SETTINGS_CHANGED_RELOAD');
     const next={policyVersion:TRADE_SETTINGS_VERSION,revision:tradeSettings.revision+1,values:validateTradeSettings(input.values),updatedAt:new Date().toISOString()};
-    if(next.values.takeProfitPct>=100&&(Object.values(futuresShort.state.positions).some(p=>p.setup?.entryMode==='POC')||pocEntries.state.rows.some(r=>r.side==='SHORT'&&['WAITING','EXECUTING','UNKNOWN'].includes(r.status))))throw Error('POC_SHORT_TP_BELOW_100_REQUIRED');
+    if(next.values.takeProfitPct>=100&&(futuresShort.config.requested||Object.keys(futuresShort.state.positions).length||pocEntries.state.rows.some(r=>r.side==='SHORT'&&['WAITING','EXECUTING','UNKNOWN'].includes(r.status))))throw Error('SHORT_TP_BELOW_100_REQUIRED');
     fs.mkdirSync(path.dirname(SETTINGS_FILE),{recursive:true});fs.writeFileSync(SETTINGS_FILE+'.tmp',JSON.stringify(next),{mode:0o600});fs.renameSync(SETTINGS_FILE+'.tmp',SETTINGS_FILE);tradeSettings=next;
    });send(res,{ok:true,...tradeSettings});}catch(e){send(res,{ok:false,error:e.message},400);}});return;
   }
