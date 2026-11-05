@@ -28,6 +28,9 @@ function harness(options={}){
   if(p==='/fapi/v1/openAlgoOrders')return [...algos.values()].filter(o=>o.algoStatus==='NEW');
   if(p==='/fapi/v1/income')return options.income||[];
   if(p==='/fapi/v1/ticker/bookTicker')return {...quote,symbol:q.symbol};
+  // Deployed runners also check CONTRACT_PRICE before installing native protection.
+  // Use the current synthetic bid as the last trade, including low-price/stale fixtures.
+  if(p==='/fapi/v1/ticker/price')return {symbol:q.symbol,price:quote.bidPrice,time:quote.time};
   if(p==='/fapi/v1/exchangeInfo')return {symbols:[info]};
   if(p==='/fapi/v1/ticker/24hr')return [{symbol:'ABCUSDT',quoteVolume:'10000000'}];
   if(p==='/fapi/v1/klines')return [...input().bars,input().liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);
@@ -56,6 +59,15 @@ function harness(options={}){
  runner.infos.ABCUSDT=info;runner.marketAt=now;
  return {runner,api,writes,algos,orders,a,symbolConfig,control,ownerSettings,setQuote:q=>quote={...quote,...q},setPositions:p=>positions=p,get saved(){return saved;}};
 }
+test('contract-price test replies follow quote changes and retain strict endpoint failures',async()=>{
+ const h=harness(),read=()=>h.api.get('/fapi/v1/ticker/price',{symbol:'ABCUSDT'});
+ assert.deepEqual(await read(),{symbol:'ABCUSDT',price:'104',time:now});
+ h.setQuote({bidPrice:'.02349',askPrice:'.023491',time:now-11000});
+ assert.deepEqual(await read(),{symbol:'ABCUSDT',price:'.02349',time:now-11000});
+ await assert.rejects(h.api.get('/fapi/v1/unexpected'),/Unexpected read/);
+ const failing=harness({onGet(p){if(p==='/fapi/v1/ticker/price')throw Error('CONTRACT_PRICE_FAILURE');}});
+ await assert.rejects(failing.api.get('/fapi/v1/ticker/price',{symbol:'ABCUSDT'}),/CONTRACT_PRICE_FAILURE/);
+});
 test('SHORT requires a fresh intrabar lower break, falling regression and volume; replay and invalidation are rejected',()=>{
  const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.ok(good.setup.regressionSlope<0);
  for(const mutate of [i=>i.priceAsOf=now-11000,i=>i.bars.splice(150,1),i=>i.bars.at(-1).high=1,i=>i.liveBar.volume=1000,i=>i.liveBar.high=NaN,i=>i.price=110,i=>i.price=1,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
