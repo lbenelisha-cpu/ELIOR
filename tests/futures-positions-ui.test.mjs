@@ -30,3 +30,10 @@ test('SHORT exposes scan reasons and recorded closures without fabricating reali
  x.shortTrading.closed=[{symbol:'ABCUSDT',entryAt:now-600000,closedAt:now,entryPrice:100,reason:'BROKER_OR_EXTERNAL_CLOSE'}];
  const html=view(x,now);assert.match(html,/נתון קודם/);assert.match(html,/ממתין לתעלה עם שתי נגיעות/);assert.match(html,/&lt;bad&gt;/);assert.doesNotMatch(html,/<bad>/);assert.match(html,/סגירות SHORT אחרונות · 1/);assert.match(html,/רווח ממומש אינם כלולים/);assert.match(html,/סגירה בבורסה או ממקור חיצוני/);
 });
+
+test('SHORT displays the settings policy only after the server reports it',()=>{
+ const x=structuredClone(snapshot);assert.match(view(x,now),/יעד הרווח לפי התעלה/);
+ x.shortTrading.policy={exitPolicy:'FUTURES_SHORT_SETTINGS_V2'};
+ x.shortTrading.closed=[{symbol:'ABCUSDT',entryAt:now-1000,closedAt:now,entryPrice:100,reason:'SETTINGS_TAKE_PROFIT'}];
+ const html=view(x,now);assert.match(html,/יעד התעלה אינו סוגר SHORT/);assert.match(html,/יעד רווח לפי הגדרות האפליקציה/);
+});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {shortConfig,shortSignal,shortExit,shortOrderPlan} from '../lib/futures-short-policy.mjs';
+import {shortConfig,shortSignal,shortExit,validateShortSettings,FUTURES_SHORT_EXIT_POLICY,shortOrderPlan} from '../lib/futures-short-policy.mjs';
 import {FuturesShortAPI} from '../lib/futures-short-api.mjs';
 import {FuturesShortRunner,atomicFuturesSave} from '../lib/futures-short-runner.mjs';
 import {validateTradeSettings} from '../lib/trade-settings.mjs';
@@ -69,6 +69,73 @@ test('SHORT uses owner stop/activation/gap with frozen channel target and never 
  assert.equal(shortExit(e,95,settings).exit,'TRAILING_STOP');assert.equal(shortExit(p,90,settings).exit,'CHANNEL_TAKE_PROFIT');
  assert.equal(shortExit({...p,targetPrice:99.5},99.5,settings).exit,'CHANNEL_TAKE_PROFIT');
 });
+
+test('Binance settings exit ignores the channel target and arms at the configured 8 percent',()=>{
+ const s={takeProfitPct:50,stopLossPct:2,profitActivationPct:8,trailingGapPp:2};
+ let p={entryPrice:100,targetPrice:99,setup:{entryMode:'CHANNEL',targetPrice:99}};
+ p=shortExit(p,98,s,{targetMode:'SETTINGS'});
+ assert.equal(p.exit,null);assert.equal(p.targetPrice,50);assert.equal(p.stopPrice,102);assert.equal(p.armed,false);
+ p=shortExit(p,92,s,{targetMode:'SETTINGS'});
+ assert.equal(p.armed,true);assert.equal(p.stopPrice,94);assert.equal(p.exit,null);
+ p=shortExit(p,90,s,{targetMode:'SETTINGS'});assert.equal(p.stopPrice,92);
+ assert.equal(shortExit(p,92,s,{targetMode:'SETTINGS'}).exit,'TRAILING_STOP');
+ assert.equal(shortExit(p,50,s,{targetMode:'SETTINGS'}).exit,'SETTINGS_TAKE_PROFIT');
+ // The Colmex caller does not opt in to the Binance policy.
+ assert.equal(shortExit({entryPrice:100,targetPrice:99},99,s).exit,'CHANNEL_TAKE_PROFIT');
+});
+
+test('Binance entry uses the actual fill and settings for native TP, including partial fills',async()=>{
+ for(const fillFraction of [1,.5]){
+  const h=harness({fillFraction});Object.assign(h.ownerSettings,{takeProfitPct:50,stopLossPct:2,profitActivationPct:8,trailingGapPp:2});
+  await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+  const p=h.runner.state.positions.ABCUSDT;
+  assert.equal(p.targetPrice,p.entryPrice*.5);assert.equal(p.exitPolicy,FUTURES_SHORT_EXIT_POLICY);
+  assert.equal(h.runner.status().policy.exitPolicy,FUTURES_SHORT_EXIT_POLICY);
+  assert.equal(p.algos.find(a=>a.kind==='TAKE_PROFIT_MARKET').price,52);
+  h.setQuote({bidPrice:'102',askPrice:'102.01'});await h.runner.manage(await h.runner.snapshot());
+  assert.ok(h.runner.state.positions.ABCUSDT);assert.equal(h.writes.filter(x=>x.q.side==='BUY'&&x.p==='/fapi/v1/order').length,0);
+ }
+});
+
+test('an existing channel SHORT replaces its native target after verification while retaining its earned stop',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ const p=h.runner.state.positions.ABCUSDT,old=p.algos.find(a=>a.kind==='TAKE_PROFIT_MARKET');
+ p.targetPrice=103.5;p.setup.targetPrice=103.5;delete p.exitPolicy;
+ old.price=103.5;h.algos.get(old.clientAlgoId).triggerPrice='103.5';
+ p.lowPrice=90;p.armed=true;p.stopPrice=91;
+ const before=h.writes.length;
+ Object.assign(h.ownerSettings,{takeProfitPct:50,stopLossPct:2,profitActivationPct:8,trailingGapPp:2});
+ h.setQuote({bidPrice:'90',askPrice:'90.01'});
+ const restored=new FuturesShortRunner({api:h.api,file:'/unused',config,settings:()=>h.ownerSettings,control:()=>h.control,permission:async()=>({}),now:()=>now,save:()=>{},initialState:h.runner.state});
+ await restored.manage(await restored.snapshot());
+ const next=restored.state.positions.ABCUSDT;
+ assert.equal(next.targetPrice,52);assert.equal(next.stopPrice,91);assert.equal(next.armed,true);
+ assert.equal(next.setup.targetPrice,103.5,'preserve entry evidence');
+ assert.equal(next.exitPolicy,FUTURES_SHORT_EXIT_POLICY);
+ const changes=h.writes.slice(before),created=changes.findIndex(w=>w.q.type==='TAKE_PROFIT_MARKET'),canceled=changes.findIndex(w=>w.q.clientAlgoId===old.clientAlgoId&&!w.q.type);
+ assert.ok(created>=0&&canceled>created);assert.equal(h.algos.get(old.clientAlgoId).algoStatus,'CANCELED');
+ assert.equal(changes.filter(w=>w.p==='/fapi/v1/order').length,0);
+});
+
+test('changing settings updates an existing native TP and records the settings reason on exit',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ h.ownerSettings.takeProfitPct=10;
+ await h.runner.manage(await h.runner.snapshot());
+ const p=h.runner.state.positions.ABCUSDT;assert.equal(p.targetPrice,93.60000000000001);
+ assert.equal(p.algos.find(a=>a.kind==='TAKE_PROFIT_MARKET').price,93.6);
+ h.setQuote({bidPrice:'92.99',askPrice:'93'});await h.runner.manage(await h.runner.snapshot());await h.runner.manage(await h.runner.snapshot());
+ assert.equal(h.runner.state.closed.at(-1).reason,'SETTINGS_TAKE_PROFIT');
+});
+
+test('impossible SHORT take profit is rejected before changing margin or sending an entry',async()=>{
+ for(const takeProfitPct of [100,500]){
+  assert.throws(()=>validateShortSettings({...settings,takeProfitPct}),/SHORT_TP_BELOW_100_REQUIRED/);
+  const h=harness();h.ownerSettings.takeProfitPct=takeProfitPct;
+  await assert.rejects(()=>h.runner.enter('ABCUSDT',shortSignal(input(),config)),/SHORT_TP_BELOW_100_REQUIRED/);
+  assert.equal(h.writes.length,0);
+ }
+ assert.equal(validateShortSettings({...settings,takeProfitPct:99.9}).takeProfitPct,99.9);
+});
 test('sizing reserves fees within a 35 USDT slot and never raises leverage or buys an unsupported contract',()=>{
  const plan=shortOrderPlan(info,input().quote,shortSignal(input(),config).setup);assert.ok(Number(plan.quantity)*104.01<=34);assert.equal(plan.side,'SELL');assert.equal(plan.timeInForce,'IOC');
  assert.throws(()=>shortOrderPlan({...info,contractType:'CURRENT_QUARTER'},input().quote,{}));
@@ -85,7 +152,7 @@ test('full entry installs verified close-only stop and TP; native protection is 
  h.ownerSettings.stopLossPct=.5;await h.runner.manage(await h.runner.snapshot());
  const stopCreates=h.writes.filter(x=>x.q.type==='STOP_MARKET');assert.equal(stopCreates.length,2);assert.equal(h.algos.get(stopCreates[0].q.clientAlgoId).algoStatus,'CANCELED');
  const newer=h.writes.indexOf(stopCreates[1]),cancel=h.writes.findIndex(x=>!x.q.type&&x.q.clientAlgoId===stopCreates[0].q.clientAlgoId);assert.ok(newer<cancel);
- h.setQuote({bidPrice:'102',askPrice:'102.01'});await h.runner.manage(await h.runner.snapshot());await h.runner.manage(await h.runner.snapshot());
+ h.setQuote({bidPrice:'105',askPrice:'105.01'});await h.runner.manage(await h.runner.snapshot());await h.runner.manage(await h.runner.snapshot());
  assert.equal(Object.keys(h.runner.state.positions).length,0);assert.equal(h.writes.at(-3)?.q.side==='SELL',false);assert.ok(h.writes.some(x=>x.q.side==='BUY'&&x.q.reduceOnly==='true'));
 });
 test('ambiguous entry survives restart, reconciles its original ID and never submits a second SELL',async()=>{

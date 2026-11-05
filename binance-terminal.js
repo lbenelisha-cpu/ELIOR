@@ -4,7 +4,7 @@ const num=(n,d=2)=>n==null||!Number.isFinite(n)?'—':n.toLocaleString('en-US',{
 const signed=n=>n==null?'—':(n>0?'+':'')+num(n);
 const tone=n=>n==null?'unknown':n>0?'positive':n<0?'negative':'neutral';
 const when=at=>new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(at);
-const reasons={CHANNEL_TAKE_PROFIT:'יעד התעלה',CHANNEL_STOP_LOSS:'סטופ הפסד',STOP_LOSS:'סטופ הפסד',TRAILING_STOP:'הגנה נגררת',TRAILING_PROFIT_EXIT:'הגנת רווח',BROKER_STOP_LOSS:'סטופ בבורסה',BROKER_OR_EXTERNAL_CLOSE:'סגירה בבורסה',MANUAL_SELL:'מכירה ידנית',MANUAL_STOP_ALL:'עצירה ידנית',FUTURES_PROTECTION_FAILED:'כשל בהגנה'};
+const reasons={SETTINGS_TAKE_PROFIT:'יעד רווח לפי ההגדרות',CHANNEL_TAKE_PROFIT:'יעד התעלה',CHANNEL_STOP_LOSS:'סטופ הפסד',STOP_LOSS:'סטופ הפסד',TRAILING_STOP:'הגנה נגררת',TRAILING_PROFIT_EXIT:'הגנת רווח',BROKER_STOP_LOSS:'סטופ בבורסה',BROKER_OR_EXTERNAL_CLOSE:'סגירה בבורסה',MANUAL_SELL:'מכירה ידנית',MANUAL_STOP_ALL:'עצירה ידנית',FUTURES_PROTECTION_FAILED:'כשל בהגנה'};
 export function createTerminalDashboard(doc=document,{now=Date.now}={}) {
   const get=id=>doc.getElementById(id);
   let snapshot=null,report=null;
