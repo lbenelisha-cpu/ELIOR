@@ -464,6 +464,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
+  renderActivePositionProtection(d,liveAccount,isLive);
   if(activeView==='portfolio')renderPortfolioView();
   if(activeView==='trade'||activeView==='scans')requestAnimationFrame(()=>drawCandles(chartCandles));
   updateSelectedAsset(d,currentMode,liveAccount);
@@ -472,6 +473,24 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     window.LEVI_DASHBOARD_SNAPSHOT=detail;
     window.dispatchEvent(new CustomEvent('levi:binance-dashboard',{detail}));
   }
+}
+
+function renderActivePositionProtection(data,account,isLive){
+  const rows=[...($('#positions')?.children||[])];
+  const holdings=isLive?(account?.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>=5):Object.values(data.paper?.positions||{});
+  holdings.forEach((holding,index)=>{
+    const row=rows[index];if(!row)return;
+    const symbol=isLive?holding.asset+'USDT':holding.symbol;
+    const agent=(data.agents||[]).find(a=>a.symbol===symbol);
+    const position=isLive?agent?.strategy:{...holding,...agent?.strategy};
+    const host=document.createElement('div');row.append(host);
+    const risk=position?{...position,qty:holding.qty,currentPrice:isLive?holding.usdtPrice:holding.currentPrice,pnlIls:holding.pnlIls}:null;
+    if(!globalThis.LEVI_TRADE_RISK?.levels(risk)){
+      host.className='mini';host.textContent='אין נתוני הגנה מנוהלת מתועדים לפוזיציה זו';return;
+    }
+    globalThis.LEVI_TRADE_RISK.render(host,risk,'USDT');
+    if(agent?.staleData){const note=document.createElement('small');note.textContent='נתוני ההגנה אינם עדכניים · מוצג המידע האחרון שהתקבל';host.prepend(note);}
+  });
 }
 
 function rotationGapText(a,d,currentMode,liveAccount){
@@ -975,7 +994,7 @@ function drawCandles(candles){
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
   const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=!tradeRisk;
-  if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop);
+  if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop,...(tradeRisk.trailing?[tradeRisk.brokerTarget]:[]));
   const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
   put('#positionEntryPrice',heldNow?priceText(riskPosition?.entryPrice??selectedPosition.entryPrice):'—');
   put('#positionPeakPrice',heldNow?priceText(selectedPosition.peakPrice):'—');
@@ -1065,6 +1084,7 @@ function drawCandles(candles){
   ctx.stroke();
 
   const priceLevels=[
+    {price:tradeRisk?.trailing?tradeRisk.brokerTarget:NaN,label:riskPosition?.channelProfitProtection?.mode==='TAKE_PROFIT'?'יעד מכירה לפי התעלה':'יעד מכירה',color:'#ffce73'},
     {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
