@@ -15,7 +15,10 @@ cp server.mjs binance-agent.js regression-trend.js parallel-channel.js "$stage/r
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
 node "$stage/release/scripts/patch-short-settings-exit.mjs" "$stage/runtime"
 for file in server.mjs lib/futures-short-policy.mjs lib/futures-short-runner.mjs; do node --check "$stage/runtime/$file"; done
-node --test "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs"
+if ! node --test "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs"; then
+ echo 'Staged SHORT tests failed. Installed code and service were not changed.' >&2
+ exit 1
+fi
 # Read only the running service's path configuration. Do not print its environment.
 SHORT_SETTINGS_STAGE="$stage" node --input-type=module - <<'JS'
 import fs from 'node:fs';
