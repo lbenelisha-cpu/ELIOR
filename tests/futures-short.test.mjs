@@ -3,13 +3,24 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {shortConfig,shortSignal,shortExit,shortOrderPlan} from '../lib/futures-short-policy.mjs';
+import {shortConfig,shortSignal,shortExit,settingsShortExit,shortOrderPlan} from '../lib/futures-short-policy.mjs';
 import {FuturesShortAPI} from '../lib/futures-short-api.mjs';
 import {FuturesShortRunner,atomicFuturesSave} from '../lib/futures-short-runner.mjs';
 import {validateTradeSettings} from '../lib/trade-settings.mjs';
 const D=300000,end=Date.parse('2026-11-01T10:00Z'),now=end+1000;
 const config=shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true',BINANCE_FUTURES_SHORT_AFTER:new Date(end-D).toISOString()});
 const settings=validateTradeSettings({});
+test('settings SHORT mirrors LONG: fixed TP, activation, trailing gap and one-way ratchet',()=>{
+ const menu={takeProfitPct:8,stopLossPct:2,profitActivationPct:5,trailingGapPp:2};
+ let p=settingsShortExit({entryPrice:100,targetPrice:99.5},99.5,menu);
+ assert.equal(p.targetPrice,92);assert.equal(p.activationPrice,95);assert.equal(p.stopPrice,102);assert.equal(p.exit,null);
+ p=settingsShortExit(p,95,menu);assert.equal(p.armed,true);assert.equal(p.stopPrice,97);assert.equal(p.exit,null);
+ p=settingsShortExit(p,94,menu);assert.equal(p.stopPrice,96);
+ p=settingsShortExit(p,94.5,{...menu,stopLossPct:3,trailingGapPp:4});assert.equal(p.stopPrice,96);
+ assert.equal(settingsShortExit(p,96,menu).exit,'TRAILING_STOP');
+ assert.equal(settingsShortExit({entryPrice:100,targetPrice:99.5},92,menu).exit,'SETTINGS_TAKE_PROFIT');
+ assert.throws(()=>settingsShortExit({entryPrice:100,targetPrice:90},100,{...menu,takeProfitPct:100}),/TP_BELOW_100/);
+});
 function input(){
  const bars=Array.from({length:205},(_,i)=>{const t=end-(205-i)*D,p=210-(100+i*.02+Math.cos(i*Math.PI/5));return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
 
@@ -85,7 +96,7 @@ test('full entry installs verified close-only stop and TP; native protection is 
  h.ownerSettings.stopLossPct=.5;await h.runner.manage(await h.runner.snapshot());
  const stopCreates=h.writes.filter(x=>x.q.type==='STOP_MARKET');assert.equal(stopCreates.length,2);assert.equal(h.algos.get(stopCreates[0].q.clientAlgoId).algoStatus,'CANCELED');
  const newer=h.writes.indexOf(stopCreates[1]),cancel=h.writes.findIndex(x=>!x.q.type&&x.q.clientAlgoId===stopCreates[0].q.clientAlgoId);assert.ok(newer<cancel);
- h.setQuote({bidPrice:'102',askPrice:'102.01'});await h.runner.manage(await h.runner.snapshot());await h.runner.manage(await h.runner.snapshot());
+ h.setQuote({bidPrice:'51.99',askPrice:'52'});await h.runner.manage(await h.runner.snapshot());await h.runner.manage(await h.runner.snapshot());
  assert.equal(Object.keys(h.runner.state.positions).length,0);assert.equal(h.writes.at(-3)?.q.side==='SELL',false);assert.ok(h.writes.some(x=>x.q.side==='BUY'&&x.q.reduceOnly==='true'));
 });
 test('ambiguous entry survives restart, reconciles its original ID and never submits a second SELL',async()=>{
@@ -228,6 +239,15 @@ test('a low-priced weighted fill installs both protections despite rounded order
  h.setPositions([{symbol:'ABCUSDT',positionSide:'BOTH',positionAmt:String(-qty),entryPrice:'.02355'}]);
  await h.runner.manage(await h.runner.snapshot());
  assert.equal(h.runner.state.halt,'FUTURES_POSITION_OWNERSHIP_CHANGED');assert.equal(h.writes.length,count);
+});
+
+test('channel SHORT migrates existing targets to current settings and replaces broker TP',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ const p=h.runner.state.positions.ABCUSDT;assert.equal(p.targetPrice,52);assert.equal(p.exitCalculationSource,'SETTINGS_V1');
+ p.targetPrice=p.setup.targetPrice;delete p.exitCalculationSource;
+ h.ownerSettings.takeProfitPct=8;await h.runner.manage(await h.runner.snapshot());
+ assert.ok(Math.abs(p.targetPrice-95.68)<1e-9);
+ assert.ok(p.algos.some(a=>a.kind==='TAKE_PROFIT_MARKET'&&a.status==='NEW'&&Math.abs(a.price-95.68)<1e-9));
 });
 
 test('manual POC SHORT bypasses channel signals but uses actual fill settings, reserve, native protection and durable receipt',async()=>{

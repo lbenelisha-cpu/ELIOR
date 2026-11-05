@@ -23,6 +23,20 @@ and stop after reconciliation; do not treat a settings save as broker approval.
 
 The sections below describe the retained channel policy and Colmex behavior.
 
+Binance Futures SHORT now mirrors these settings: TP = entry times
+`(1 - takeProfitPct / 100)`, activation = entry times
+`(1 - profitActivationPct / 100)`, initial stop = entry times
+`(1 + stopLossPct / 100)`, and an armed stop follows the lowest observed Ask
+plus `entry * trailingGapPp / 100`. Saved and verified tighter stops are
+retained. New fills use actual execution and existing owned positions use
+current settings on management. A channel target remains signal geometry,
+not the exit override. POC uses the same settings calculation. SHORT TP must
+be below 100%; entry and settings updates enforce this where applicable.
+The SHORT runtime files must also be installed by the owner; the LONG settings
+installer alone does not deploy `lib/futures-short-policy.mjs` and
+`lib/futures-short-runner.mjs`. Deployment can replace live SHORT protection
+orders and is not performed by this change.
+
 New `channel_breakout` entries automatically freeze a `CHANNEL_TAKE_PROFIT_V2`
 plan from the confirmed pre-breakout channel. The absolute Take Profit is:
 
