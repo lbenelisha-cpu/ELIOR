@@ -55,7 +55,7 @@ import {trackedLivePositions,livePositionLedger,liveFillAction,liveBalancePnl} f
 import {backtestWyckoff} from './lib/wyckoff-backtest.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from './lib/wyckoff-evaluation.mjs';
 import {binancePositionExit as wyckoffExit, BINANCE_EXIT_TIERS} from './lib/binance-position-exit.mjs';
-import {TRAILING_EXIT_POLICY,applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
+import {TRAILING_EXIT_POLICY,applySettingsExitPolicy as applyTrailingExitPolicy} from './lib/trailing-profit-exit.mjs';
 import {DemoTrader} from './lib/binance-demo-trader.mjs';
 import {requireLivePrice} from './lib/binance-live-price.mjs';
 import {protectionPrice} from './lib/binance-protection-price.mjs';

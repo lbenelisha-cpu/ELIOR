@@ -25,11 +25,11 @@ test('sub-0.1 percent activation stays valid without corrupting base settings on
  const p=applyTrailingExitPolicy({entryPrice:103.99,setup:setup()},settings);assert.ok(p.profitActivationPct<.1);assert.equal(p.exitSettings.profitActivationPct,5);
  const restored=JSON.parse(JSON.stringify(p));applyTrailingExitPolicy(restored,settings);assert.equal(restored.activationPrice,p.activationPrice);
 });
-test('Binance actual fill rebuilds protection and slippage past target is explicit, preserving stop',()=>{
+test('Binance actual fill uses configured activation even for a recorded legacy channel plan',()=>{
  const trade=applyTrailingExitPolicy({entryPrice:101,setup:setup()},settings);
  const intent={params:{symbol:'ABCUSDT',side:'BUY'},meta:{wyckoffTrade:trade},at:new Date().toISOString()};
  const order={executedQty:'1',cummulativeQuoteQty:'102',transactTime:Date.now()};
- const a=liveFillAction(order,intent,[]);assert.equal(a.wyckoffTrade.activationPrice,103);assert.equal(a.wyckoffTrade.stopPrice,99.96);
+ const a=liveFillAction(order,intent,[]);assert.ok(Math.abs(a.wyckoffTrade.activationPrice-107.1)<1e-10);assert.equal(a.wyckoffTrade.stopPrice,99.96);
  const b=liveFillAction({...order,cummulativeQuoteQty:'105'},intent,[]);assert.equal(b.wyckoffTrade.channelProfitProtection.status,'TARGET_PASSED_AT_FILL');assert.ok(Math.abs(b.wyckoffTrade.stopPrice-102.9)<1e-10);assert.equal(b.wyckoffTrade.activationPrice,110.25);
  assert.equal(channelProfitLevels({entryPrice:101,setup:{channelProtection:{...setup().channelProtection,width:5}}}).status,'INVALID_PLAN');
 });
@@ -51,14 +51,14 @@ test('a close channel TP may exit before activation, without moving activation o
  assert.equal(binancePositionExit(r,104).sell,true);assert.equal(r.profitFloorArmed,false);
  assert.throws(()=>validateChannelProfitEntry(p.setup,104,settings),/TARGET_ALREADY/);
 });
-test('V2 actual Binance fills keep the absolute target, including slippage past it',()=>{
+test('Binance fills anchor configured TP to actual execution and retain channel target only for reference',()=>{
  const trade=applyTrailingExitPolicy({strategyId:'WYCKOFF_5M_V1',entryPrice:101,setup:targetSetup(4)},settings);
  const intent={params:{symbol:'ABCUSDT',side:'BUY'},meta:{wyckoffTrade:trade},at:new Date().toISOString()};
  for(const price of [102,105]){
   const fill=liveFillAction({executedQty:'1',cummulativeQuoteQty:String(price),transactTime:Date.now()},intent,[]).wyckoffTrade;
-  assert.equal(fill.targetPrice,104);assert.equal(fill.profitActivationPct,5);assert.ok(Math.abs(fill.stopPrice-price*.98)<1e-10);
+  assert.equal(fill.targetPrice,price*1.5);assert.equal(fill.channelProfitProtection.mode,'REFERENCE_ONLY');assert.equal(fill.profitActivationPct,5);assert.ok(Math.abs(fill.stopPrice-price*.98)<1e-10);
   assert.equal(fill.exitSettings.takeProfitPct,50);
-  if(price===105){assert.equal(fill.channelProfitProtection.status,'TARGET_PASSED_AT_FILL');assert.equal(binancePositionExit(fill,price).sell,true);}
+  if(price===105){assert.equal(fill.channelProfitProtection.status,'TARGET_PASSED_AT_FILL');assert.equal(binancePositionExit(fill,price).sell,false);}
  }
 });
 test('new channel target is automatic regardless of the legacy half-way opt-in and malformed geometry cannot enter',()=>{
