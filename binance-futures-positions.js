@@ -7,6 +7,22 @@
  const fresh=(t,now,age)=>number(t)&&Number(t)<=now+1000&&now-Number(t)<=age;
  const reasons={WAIT_NEW_SHORT_SIGNAL:'ממתין לאיתות SHORT חדש',WAIT_TWO_TOUCHES_PER_SIDE:'ממתין לתעלה עם שתי נגיעות בכל גבול',SHORT_REGRESSION_DIRECTION_BLOCK:'הרגרסיה אינה יורדת',SHORT_REGRESSION_CENTER_BLOCK:'המחיר אינו מתחת למרכז הרגרסיה',WAIT_FUTURES_LIVE_BAR:'ממתין לנתוני מחזור עדכניים של הנר הפתוח',WAIT_LOWER_CHANNEL_LIVE_BREAK:'ממתין לשבירת הגבול התחתון בזמן הנר',WAIT_LOWER_CHANNEL_BREAK:'ממתין לפריצה מטה בנר סגור',SHORT_VOLUME_LOW:'מחזור הפריצה קטן מפי 1.5 מממוצע 20',SHORT_LIQUIDITY_LOW:'שווי המחזור נמוך מהמינימום',SHORT_PRICE_INVALIDATED:'המחיר או נתוני הנר אינם מאפשרים כניסה כעת',SHORT_SIGNAL_EXPIRED:'תוקף האיתות פג',SHORT_CHANNEL_READY:'תנאי האיתות מתקיימים; נדרשת בדיקה לפני שליחה',WAIT_FRESH_FUTURES_PRICE:'ממתין למחיר Futures עדכני',WAIT_FUTURES_HISTORY:'חסרה היסטוריית נרות',FUTURES_SHORT_DISABLED:'כניסות SHORT כבויות',SHORT_TARGET_ALREADY_REACHED:'המחיר כבר הגיע ליעד',SHORT_PATTERN_ALREADY_USED:'התעלה כבר נוצלה',STOP_LOSS:'סטופ הפסד',TRAILING_STOP:'הגנה נגררת',SETTINGS_TAKE_PROFIT:'יעד רווח לפי ההגדרות',CHANNEL_TAKE_PROFIT:'יעד התעלה',BROKER_OR_EXTERNAL_CLOSE:'סגירה בבורסה או ממקור חיצוני'};
  const reason=v=>reasons[v]||v||'לא נמסרה סיבה';
+ function rules(snapshot,f,rows){
+  const settings=snapshot.exitSettings||{},pct=v=>number(v)?format(v)+'%':'לא התקבל מהשרת';
+  const source=f.exitCalculationSource==='SETTINGS_V1';
+  let html='<details data-short-detail="rules"><summary>כללי כניסה ויציאה · SHORT</summary><h3>פתיחת SHORT — מכירה תחילה</h3><ul>';
+  html+='<li>תעלת קיצון מאושרת על '+format(f.policy?.period??50,0)+' נרות של 5 דקות, עם שתי נגיעות לפחות בכל גבול.</li><li>רגרסיה יורדת והמחיר מתחת למרכז הרגרסיה ולגבול התחתון של התעלה.</li><li>פריצה במחיר חי בזמן הנר; אין המתנה לסגירתו. המחזור המצטבר בנר לפחות פי 1.5 מממוצע 20 הנרות הקודמים.</li><li>שווי מחזור ממוצע של 10,000 USDT לפחות; נתוני מחיר ומחזור עדכניים, איתות בתוקף שלא נוצל.</li><li>עד שתי פוזיציות, עד 35 USDT למקום כולל רזרבה לעמלות, Isolated במינוף 1x. החשבון, היתרה, הרשאות המסחר וההגנות נבדקים לפני ביצוע.</li></ul>';
+  html+='<p class="mini">כניסת POC ידנית היא מסלול נפרד לפי המחיר שנבחר; תנאי איתות התעלה אינם חלים עליה.</p><h3>סגירת SHORT — קנייה חוזרת</h3>';
+  html+='<p>'+(source?'השרת מדווח שהיציאות מחושבות לפי ההגדרות, גם בפוזיציות מנוהלות קיימות.':'מדיניות היציאה לפי ההגדרות טרם אומתה בשרת. יש לבדוק את היעד והסטופ המתועדים בכל פוזיציה.')+'</p>';
+  html+='<ul><li>יעד רווח בהגדרות: <strong>'+pct(settings.takeProfitPct)+'</strong>. בחישוב לפי ההגדרות: מחיר כניסה × (1 − אחוז היעד ÷ 100). הגעה ליעד מפעילה סגירה.</li><li>סטופ הפסד: <strong>'+pct(settings.stopLossPct)+'</strong>. סף התחלתי: מחיר כניסה × (1 + אחוז הסטופ ÷ 100).</li><li>הפעלת הגנת רווח: <strong>'+pct(settings.profitActivationPct)+'</strong>. מופעלת כאשר המחיר יורד לסף; ההפעלה עצמה אינה מכירה.</li><li>מרווח נגרר: <strong>'+(number(settings.trailingGapPp)?format(settings.trailingGapPp)+' נקודות אחוז':'לא התקבל מהשרת')+'</strong> ממחיר הכניסה. לאחר ההפעלה: השפל שנקלט מאז הכניסה ועוד המרווח. הסטופ יורד עם שפל חדש ואינו עולה חזרה.</li></ul><p class="mini">סגירה נבדקת לפי מחיר הקנייה החוזרת (Ask). הספים לפני עמלות ומימון; מחיר הביצוע אינו מובטח. הגדרות כלליות אינן אישור לפקודות שהתקבלו בבורסה.</p>';
+  for(const p of rows){
+   const s=p.settings||{},state=p.armed===true?'הגנה נגררת פעילה':p.armed===false?'ממתינה להפעלת ההגנה':'מצב הפעלה לא נמסר';
+   html+='<h3>'+esc(p.symbol)+' · '+state+'</h3><p>מדיניות מתועדת: '+(p.exitCalculationSource==='SETTINGS_V1'||p.setup?.entryMode==='POC'?'יעד לפי ההגדרות':'יש לבדוק את היעד השמור')+' · מחיר עודכן '+esc(time(p.priceAt))+'</p><dl>';
+   for(const [label,value] of [['מחיר כניסה',format(p.entryPrice,8)],['יעד מכירה מתועד',format(p.targetPrice,8)],['סטופ נוכחי מתועד',format(p.stopPrice,8)],['סף הפעלת הגנה מתועד',format(p.activationPrice,8)],['שפל מאז הכניסה',format(p.lowPrice,8)],['סטופ הפסד בהגדרות הפוזיציה',pct(s.stopLossPct)],['הפעלת הגנה בהגדרות הפוזיציה',pct(s.profitActivationPct)],['מרווח נגרר בנקודות אחוז',format(s.trailingGapPp)]])html+='<dt>'+label+'</dt><dd>'+value+'</dd>';
+   html+='</dl>';
+  }
+  return html+'</details>';
+ }
  function view(snapshot,now=Date.now()){
   const f=snapshot?.shortTrading;
   const title='<div class="panel-title-row"><h2>פוזיציות פעילות · SHORT Futures</h2></div>';
@@ -28,7 +44,7 @@
   html+=card('רווח / הפסד לא ממומש · USDT',signedTotal,number(totalPnl)?'לפני עמלות ומימון · לפי מחיר Ask':'ממתין למחירים עדכניים','',totalPnl>0?'positive':totalPnl<0?'negative':'');
   const dots='<div class="slot-dots" aria-hidden="true">'+[0,1].map(i=>'<i'+(i<rows.length?' class="used"':'')+'></i>').join('')+'</div>';
   html+=card('פוזיציות SHORT פעילות',rows.length+'/2',dots+'עד 35 USDT לכל מקום · כולל רזרבה לעמלות');
-  html+='</div><div class="workspace-heading"><h2>הפוזיציות שלך · SHORT</h2><span class="mode-tag">USDⓈ-M · Isolated · 1x</span></div>';
+  html+='</div>'+rules(snapshot,f,rows)+'<div class="workspace-heading"><h2>הפוזיציות שלך · SHORT</h2><span class="mode-tag">USDⓈ-M · Isolated · 1x</span></div>';
   html+='<details class="mini"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>תקציב 70 USDT · ארנק Futures נפרד מ־Spot</p><p dir="ltr">'+esc(reason(f.halt||f.reason))+'</p></details>';
   html+='<div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table wide-table"><thead><tr><th>נכס / כיוון</th><th>מועד כניסה</th><th>כמות</th><th>מחיר כניסה</th><th>מחיר נוכחי (Ask)</th><th>סכום כניסה USDT</th><th>רווח / הפסד USDT</th><th>רווח / הפסד %</th><th>יעד רווח TP</th><th>סטופ נוכחי</th><th>הגנות</th></tr></thead><tbody>';
   for(const p of rows){

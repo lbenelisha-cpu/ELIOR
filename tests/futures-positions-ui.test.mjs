@@ -10,6 +10,17 @@ test('SHORT table calculates profit when price falls and shows independent walle
  const html=view(snapshot,now);assert.match(html,/1\/2/);assert.match(html,/>70</);assert.match(html,/>36</);assert.match(html,/\+10/);assert.match(html,/\+5%/);assert.match(html,/אומתו בבורסה/);
  const loss=structuredClone(snapshot);loss.shortTrading.positions[0].currentPrice=105;assert.match(view(loss,now),/-10/);assert.match(view(loss,now),/-5%/);
 });
+
+test('SHORT displays entry rules and actual menu exit values without inventing missing settings',()=>{
+ const x=structuredClone(snapshot);x.exitSettings={takeProfitPct:8,stopLossPct:2,profitActivationPct:5,trailingGapPp:2};
+ x.shortTrading.exitCalculationSource='SETTINGS_V1';
+ Object.assign(x.shortTrading.positions[0],{exitCalculationSource:'SETTINGS_V1',settings:x.exitSettings,targetPrice:92,stopPrice:97,activationPrice:95,lowPrice:95,armed:true});
+ const html=view(x,now);
+ for(const text of ['כללי כניסה ויציאה','מכירה תחילה','שתי נגיעות','פי 1.5','10,000','קנייה חוזרת','8%','2%','5%','2 נקודות אחוז','ההפעלה עצמה אינה מכירה','הגנה נגררת פעילה','שפל מאז הכניסה','סף הפעלת הגנה מתועד'])assert.ok(html.includes(text),text);
+ assert.match(html,/סף הפעלת הגנה מתועד<\/dt><dd>95/);
+ const unknown=view(snapshot,now);assert.match(unknown,/לא התקבל מהשרת/);assert.match(unknown,/טרם אומתה בשרת/);
+ const empty=structuredClone(x);empty.shortTrading.positions=[];assert.match(view(empty,now),/כללי כניסה ויציאה/);
+});
 test('missing and stale prices are unknown instead of zero PnL; stale protection is not verified',()=>{
  const stale=view(snapshot,now+120000);assert.match(stale,/מחיר לא עדכני/);assert.doesNotMatch(stale,/\+10|\+5%|אומתו בבורסה/);assert.match(stale,/לא אומתו לאחרונה/);
  const missing=structuredClone(snapshot);missing.shortTrading.positions[0].currentPrice=null;assert.doesNotMatch(view(missing,now),/\+10|\+5%/);
