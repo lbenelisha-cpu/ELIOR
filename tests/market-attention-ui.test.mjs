@@ -13,8 +13,9 @@ class Element{
 function ui(){
  const panel=new Element('section'),listeners={},timers=[],h={now:1793707201000};
  const context={document:{getElementById:id=>id==='marketAttentionPanel'?panel:null,createElement:tag=>new Element(tag),hidden:false,addEventListener:(name,fn)=>listeners[name]=fn},window:{addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent:e=>{h.lastEvent=e;listeners[e.type]?.(e);}},CustomEvent:class{constructor(type,args){this.type=type;this.detail=args?.detail;}},Date:class extends Date{static now(){return h.now;}},URL,setInterval:fn=>timers.push(fn)};
+ vm.runInNewContext(fs.readFileSync(new URL('../channel-entry-checklist.js',import.meta.url),'utf8'),context);
  vm.runInNewContext(fs.readFileSync(new URL('../market-attention.js',import.meta.url),'utf8'),context);
- return {...h,panel,timers,clock:h,send:s=>listeners['levi:binance-agent']({detail:{marketAttention:s}}),expire:()=>listeners['trade-device-expired'](),find:fn=>panel.findAll(fn),context};
+ return {...h,panel,timers,clock:h,send:(s,config)=>listeners['levi:binance-agent']({detail:{marketAttention:s,config}}),expire:()=>listeners['trade-device-expired'](),find:fn=>panel.findAll(fn),context};
 }
 const snapshot=now=>({policy:{version:'MARKET_ATTENTION_V1'},checkedAt:now,rows:[{symbol:'ETHUSDT',news:{active:true,covered:true,expiresAt:now+600000,evidence:[{title:'<img src=x onerror=alert(1)>',url:'https://www.coindesk.com/news/example',source:'CoinDesk',publishedAt:now-60000,firstSeenAt:now-30000,checkedAt:now,verification:'SINGLE_REPORT'}]},technical:{ready:true,watch:true,reason:'NEAR_CHANNEL_BOUNDARY',checkedAt:now,dataAt:now-1000,expiresAt:now+180000,channel:{highTouches:2,lowTouches:2,confirmed:true},regression:{side:'UP'},volume:{ratio:1.4},missing:['VOLUME_RATIO']}}],sourceStatus:[],events:[]});
 test('attention display uses text nodes, validates links, expires highlights and clears on auth loss',()=>{
@@ -60,4 +61,28 @@ test('shared cards show both directions, mapped contract and separate execution 
  const row=s.rows[0];row.symbol='GOOGLBUSDT';row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BREAKOUT'};row.entryBlockers={long:'NO_FREE_SLOT',short:'FUTURES_ENTRIES_PAUSED'};row.shortObservation={available:true,futuresSymbol:'GOOGLUSDT',at:h.clock.now,expiresAt:h.clock.now+60000,reason:'SHORT_VOLUME_LOW'};
  h.send(s);assert.match(h.panel.textContent,/LONG · GOOGLBUSDT/);assert.match(h.panel.textContent,/SHORT · GOOGLUSDT/);assert.match(h.panel.textContent,/NO_FREE_SLOT/);assert.match(h.panel.textContent,/SHORT_VOLUME_LOW/);assert.match(h.panel.textContent,/FUTURES_ENTRIES_PAUSED/);
  row.shortObservation={available:false,mappingReason:'FUTURES_SYMBOL_UNAVAILABLE',at:null};h.send(s);assert.match(h.panel.textContent,/FUTURES_SYMBOL_UNAVAILABLE/);assert.doesNotMatch(h.panel.textContent,/SHORT · GOOGLUSDT/);
+});
+
+test('entry checklists show recorded passes per market, never closed-bar volume or final execution approval',()=>{
+ const h=ui(),s=snapshot(h.clock.now),row=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const config={channelPrimary:{requested:true,version:'CHANNEL_PRIMARY_INTRABAR_V2',period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}}};
+ row.longDecision={at:h.clock.now,reason:'CHANNEL_VOLUME_LOW'};
+ row.shortObservation={available:true,observationOnly:true,spotSymbol:row.symbol,futuresSymbol:'ETHUSDT',at:h.clock.now,expiresAt:h.clock.now+60000,reason:'WAIT_TWO_TOUCHES_PER_SIDE'};
+ row.technical.volume={ratio:9,ratioPassed:true};row.entryBlockers={long:'NO_FREE_SLOT'};
+ const original=JSON.stringify(s),checks=()=>h.find(e=>e.className==='attention-checklist');
+ const condition=(index,id)=>checks()[index].findAll(e=>e.dataset.condition===id)[0];
+ h.send(s,config);assert.equal(checks().length,2);
+ assert.equal(condition(0,'channel').dataset.state,'passed');assert.match(condition(0,'channel').textContent,/✓/);
+ assert.equal(condition(0,'volume').dataset.state,'waiting');assert.equal(condition(0,'range').dataset.state,'unknown');
+ assert.equal(condition(0,'execution').dataset.state,'blocked');assert.equal(condition(1,'channel').dataset.state,'waiting');
+ assert.equal(condition(1,'slope').dataset.state,'unknown');assert.equal(JSON.stringify(s),original);
+ assert.match(h.panel.textContent,/הבדיקה נעצרת בתנאי הראשון/);
+ // A fresh envelope cannot revive the previous candle's successful evidence.
+ h.clock.now=Math.ceil(h.clock.now/300000)*300000;s.checkedAt=h.clock.now;
+ h.send(s,config);assert.equal(h.find(e=>e.dataset.state==='passed').length,0);
+ // Unknown policy and unmapped Futures must not inherit favorable Spot observations.
+ row.longDecision.at=h.clock.now;row.shortObservation.available=false;row.shortObservation.mappingReason='FUTURES_SYMBOL_UNAVAILABLE';
+ h.send(s,{channelPrimary:{...config.channelPrimary,version:'OTHER'}});assert.equal(h.find(e=>e.dataset.state==='passed').length,0);
+ h.clock.now+=90001;h.timers[0]();assert.equal(h.find(e=>e.dataset.state==='blocked').length,0);
+ h.expire();assert.equal(checks().length,0);
 });

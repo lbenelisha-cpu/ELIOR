@@ -6,7 +6,7 @@
  const num=v=>Number.isFinite(v)?v.toLocaleString('he-IL',{maximumFractionDigits:5}):'—';
  const reasons={NEAR_CHANNEL_BOUNDARY:'קרוב לגבול התעלה',CHANNEL_OBSERVED:'תעלה במעקב',WAIT_CHANNEL_PIVOTS:'ממתין לנקודות קיצון',WAIT_TWO_TOUCHES:'טרם אושרו שתי נגיעות בכל צד',WAIT_HISTORY:'אין 50 נרות סגורים לבדיקה',GAPPED_HISTORY:'חסרים נרות ברצף',INVALID_HISTORY:'נתוני הנרות אינם תקינים',STALE_HISTORY:'נרות לא עדכניים',HISTORY_UNAVAILABLE:'לא התקבלו נרות מהמקור',WAIT_OBSERVATION:'ממתין לסריקת תצפיתן',STALE_OBSERVATION:'התצפית התיישנה',LIVE_OBSERVER_ONLY:'התצפיתן הטכני פועל במצב LIVE',OBSERVER_STORAGE_UNAVAILABLE:'שמירת התצפיות דורשת בדיקה',TWO_TOUCHES_EACH_SIDE:'שתי נגיעות בכל צד',REGRESSION:'נתוני רגרסיה',VOLUME_DATA:'נתוני מחזור',VOLUME_RATIO:'מחזור ×1.5 מהממוצע',LIQUIDITY:'מחזור כספי ממוצע של 10,000 USDT'};
  const verification={SINGLE_REPORT:'דיווח יחיד · מקור, זמן ושיוך נבדקו',COMPANY_OR_SYNDICATED:'הודעת חברה / תוכן מיוחס · ללא אימות עצמאי',UNCERTAIN:'ניסוח מסויג / שמועה · לא אומת',REVISED:'כותרת שתוקנה · דורשת בדיקה נוספת'};
- let snapshot=null,receivedAt=0,query='',all=false;
+ let snapshot=null,longPolicy=null,receivedAt=0,query='',all=false;
  const head=add('div','',panel,'attention-head');panel.replaceChildren(head);
  const heading=add('div','',head);add('span','חדשות + תצפית טכנית',heading,'attention-kicker');add('h2','איתותים ותצפיתנים',heading);
  const newsLink=add('a','ערוץ החדשות ↗',head);newsLink.href='/market-news.html';
@@ -17,6 +17,19 @@
  const cards=add('div','',panel,'attention-cards'),sources=add('details','',panel,'attention-sources');add('summary','מקורות, כיסוי ויומן תצפיות',sources);const sourceBody=add('div','',sources);
  const link=(parent,row)=>{try{const u=new URL(row.url);if(u.protocol!=='https:'||u.username||u.password||u.port||!['www.coindesk.com','cointelegraph.com','www.prnewswire.com'].includes(u.hostname))return;const a=add('a',row.title,parent);a.dir='auto';a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}catch{}};
  const entryReason=value=>window.LEVI_FUTURES_TABLE?.reason(value)||reasons[value]||value||'ממתין לבדיקה';
+ function checklist(host,input){
+  const view=window.LEVI_ENTRY_CHECKLIST?.project(input);if(!view)return;
+  add('p','תנאי כניסה בתעלה · '+view.count+'/'+view.total+' אושרו בבדיקה',host,'attention-check-summary');
+  const list=add('ul','',host,'attention-checklist');list.setAttribute('aria-label','תנאי כניסה '+input.side);
+  for(const row of view.rows){
+   const item=add('li','',list,'attention-check '+row.state);item.dataset.condition=row.id;item.dataset.state=row.state;
+   const marker={passed:'✓',waiting:'○',unknown:'—',blocked:'!'}[row.state];
+   const label={passed:'התקיים בבדיקה',waiting:'טרם התקיים',unknown:row.id==='execution'?'ממתין לבדיקה סופית':'טרם אומת',blocked:'הביצוע חסום'}[row.state];
+   const icon=add('span',marker,item,'attention-check-icon');icon.setAttribute('aria-hidden','true');
+   const body=add('span','',item);add('span',row.label,body);add('small',label,body);
+  }
+  if(view.status!=='recorded')add('small',view.status==='unsupported'?'ממתין לאימות מסלול הכניסה מהשרת':view.status==='stale'?'אין בדיקת כניסה עדכנית · הסימונים נוקו':'תוצאת השרת אינה מפרטת אילו תנאים עברו',host,'attention-check-note');
+ }
  function render(){
   const now=Date.now(),transport=snapshot&&now-receivedAt<90000&&now>=receivedAt&&now-snapshot.checkedAt<90000&&now>=snapshot.checkedAt;
   const expanded=new Set(Array.from(cards.querySelectorAll('details[open]')).map(x=>x.dataset.symbol));cards.replaceChildren();sourceBody.replaceChildren();
@@ -36,12 +49,19 @@
     const checks=add('div','',card,'attention-entry-checks'),long=add('div','',checks),short=add('div','',checks),o=r.shortObservation;
     add('strong','LONG · '+r.symbol,long);const ld=r.longDecision,lf=transport&&ld&&now>=ld.at&&now-ld.at<90000;
     add('p','בדיקה: '+(lf?entryReason(ld.reason):'ממתין לבדיקה עדכנית'),long);
-    add('small','ביצוע: '+(r.entryBlockers?.long?entryReason(r.entryBlockers.long):lf&&ld.blocker?entryReason(ld.blocker):'כפוף לבדיקה סופית'),long);
+    const longBlocker=transport?(r.entryBlockers?.long||(lf?ld.blocker:null)):null;
+    add('small','ביצוע: '+(longBlocker?entryReason(longBlocker):'כפוף לבדיקה סופית'),long);
+    const longSupported=snapshot.mode==='live'&&longPolicy?.requested===true&&longPolicy.version==='CHANNEL_PRIMARY_INTRABAR_V2'&&longPolicy.period===50&&longPolicy.minVolumeRatio===1.5&&longPolicy.minMeanDollarVolume===10000&&longPolicy.consolidationPolicy?.version==='CHANNEL_CONSOLIDATION_V1';
+    checklist(long,{side:'LONG',reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
+    add('small','בדיקה אחרונה: '+date(ld?.at),long);
     add('strong','SHORT · '+(o?.futuresSymbol||'חוזה לא מאומת'),short);
     const sf=transport&&o&&o.at<=now&&now-o.at<180000&&o.expiresAt>now;
     add('p','בדיקה: '+(!transport?'העדכון התיישן':!o?'ממתין למיפוי חוזה':!o.available?entryReason(o.mappingReason):sf?entryReason(o.reason):entryReason(o.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION')),short);
-    add('small','ביצוע: '+(r.entryBlockers?.short?entryReason(r.entryBlockers.short):'כפוף לבדיקה סופית'),short);
+    const shortBlocker=transport?r.entryBlockers?.short:null;
+    add('small','ביצוע: '+(shortBlocker?entryReason(shortBlocker):'כפוף לבדיקה סופית'),short);
+    checklist(short,{side:'SHORT',reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
     add('small','בדיקה אחרונה: '+date(o?.at),short);
+    add('small','✓ התקיים בבדיקה · ○ ממתין · — טרם אומת. הבדיקה נעצרת בתנאי הראשון שלא עבר; לפני ביצוע כל התנאים נבדקים מחדש.',card,'attention-check-legend');
    }
    if(t.ready){
     add('p','Spot · 50 נרות לפני נר המדידה · '+date(t.dataAt),card,'attention-note');
@@ -63,9 +83,9 @@
   for(const e of snapshot.events||[])add('p',date(e.at)+' · '+e.symbol+' · '+(reasons[e.reason]||e.reason),sourceBody,'attention-note');
  }
  search.oninput=()=>{query=search.value.trim().toUpperCase();render();};toggle.onclick=()=>{all=!all;render();};
- window.addEventListener('levi:binance-agent',e=>{snapshot=e.detail?.marketAttention?.policy?.version==='MARKET_ATTENTION_V1'?e.detail.marketAttention:null;receivedAt=Date.now();render();});
- window.addEventListener('trade-device-expired',()=>{snapshot=null;render();});
+ window.addEventListener('levi:binance-agent',e=>{snapshot=e.detail?.marketAttention?.policy?.version==='MARKET_ATTENTION_V1'?e.detail.marketAttention:null;longPolicy=e.detail?.config?.channelPrimary||null;receivedAt=Date.now();render();});
+ window.addEventListener('trade-device-expired',()=>{snapshot=null;longPolicy=null;render();});
  setInterval(()=>{if(snapshot&&!document.hidden)render();},10000);
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)render();});
- if(window.LEVI_AGENT_SNAPSHOT?.marketAttention){snapshot=window.LEVI_AGENT_SNAPSHOT.marketAttention;receivedAt=Date.now();render();}
+ if(window.LEVI_AGENT_SNAPSHOT?.marketAttention){snapshot=window.LEVI_AGENT_SNAPSHOT.marketAttention;longPolicy=window.LEVI_AGENT_SNAPSHOT.config?.channelPrimary||null;receivedAt=Date.now();render();}
 })();

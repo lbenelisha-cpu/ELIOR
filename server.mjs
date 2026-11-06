@@ -2342,6 +2342,7 @@ const server=http.createServer((req,res)=>{
     controlDevices.revoke(req.headers.authorization);return send(res,{ok:true});
   }
   const sf={
+    '/channel-entry-checklist.js':['channel-entry-checklist.js','text/javascript'],
     '/parallel-channel.js':['parallel-channel.js','text/javascript'],
     '/regression-trend.js':['regression-trend.js','text/javascript'],
     '/resistance-patterns.js':['resistance-patterns.js','text/javascript'],
