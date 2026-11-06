@@ -64,17 +64,26 @@ test('published Binance-only intrabar plus settings/consolidation installs indep
   assert.equal(shortBody(previous),binanceOnlyShort(patch.before),'historical published code matches the reviewed alternate input');
   const file=path.join(root,'lib/futures-short-policy.mjs');
   fs.writeFileSync(file,previous+'\n// Preserve deployed exit integration\n');
+  const server=path.join(root,'server.mjs'),serverBefore=fs.readFileSync(server,'utf8');
+  const hookAnchor='      persistLivePeak(ev.symbol,saved);';
+  assert.equal(serverBefore.split(hookAnchor).length,2);
+  fs.writeFileSync(server,serverBefore.replace(hookAnchor,'      refreshPocTrail(saved);\n'+hookAnchor));
   patchParallelChecks(root,patches);const next=fs.readFileSync(file,'utf8');
+  assert.match(fs.readFileSync(server,'utf8'),/refreshPocTrail\(saved\)/);
   assert.equal(shortBody(next),binanceOnlyShort(patch.after));
   assert.equal(next.slice(next.indexOf('// Cumulative live volume')),previous.slice(previous.indexOf('// Cumulative live volume'))+'\n// Preserve deployed exit integration\n');
   assert.match(next,/conditionReportVersion:CHANNEL_CONDITIONS_VERSION/);assert.doesNotMatch(next,/colmex-market-hours|stockSessionGap|regularSession/);
   patchParallelChecks(root,patches);assert.equal(fs.readFileSync(file,'utf8'),next);
   // Supply the unchanged dependencies, and exercise the resulting installed files.
   for(const name of ['lib','tests','scripts'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(root,name),{recursive:true,force:false});
-  for(const name of ['regression-trend.js','parallel-channel.js','binance-agent.js','channel-entry-checklist.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(root,name));
+  for(const entry of fs.readdirSync(new URL('../',import.meta.url),{withFileTypes:true})){
+   if(entry.isFile()&&!entry.name.startsWith('.')&&!fs.existsSync(path.join(root,entry.name)))
+    fs.copyFileSync(new URL('../'+entry.name,import.meta.url),path.join(root,entry.name));
+  }
   const {spawnSync}=await import('node:child_process'),env={...process.env};delete env.NODE_TEST_CONTEXT;
-  const names=['channel-entry-checklist','futures-short','futures-short-recovery','futures-short-fill','channel-consolidation-entry'];
-  const run=spawnSync(process.execPath,['--test',...names.map(n=>path.join(root,'tests',n+'.test.mjs'))],{env,encoding:'utf8',timeout:30000,maxBuffer:2000000});
+  // Run exactly the same complete suite as the VPS installer. A smaller subset
+  // previously missed local hook and historical-installer fixture mismatches.
+  const run=spawnSync(process.execPath,[path.join(root,'scripts/test-parallel-entry-runtime.mjs'),root],{env,encoding:'utf8',timeout:120000,maxBuffer:2000000});
   assert.ifError(run.error);assert.equal(run.status,0,run.stdout+run.stderr);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

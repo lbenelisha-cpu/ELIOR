@@ -41,6 +41,14 @@ code. Shared and Binance-only layouts are matched exactly; modified guards, mixe
 or duplicated evaluators and unknown imports still abort before any writes.
 The historical fixture is the original published module, not a generated approximation.
 
+Historical installer reconstruction (including the earlier attention installer)
+runs against the pristine release. Behavior tests run against the staged installed
+modules, with the same complete suite also exercised by the Binance-only layout
+fixture. The source-isolated exit-monitor test supplies the optional deployed
+`refreshPocTrail` dependency; it still verifies idle cycles make no exchange
+request and a triggered stop executes. This does not replace or validate the
+local hook's implementation; the installer preserves it unchanged.
+
 
 Data availability (the rolling 50 closed bars, fresh quote and current open bar)
 is not a checklist row and does not count toward the ten technical conditions.

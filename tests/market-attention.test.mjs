@@ -1,12 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import {NEWS_SOURCES,parseNewsFeed} from '../lib/market-news.mjs';
 import {newsAttention,technicalObservation,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from '../lib/market-attention.mjs';
 import {channelEntry,channelEntryConfig} from '../lib/channel-primary-entry.mjs';
-import {patchAttention} from '../scripts/patch-market-attention.mjs';
 const STEP=300000,end=Date.parse('2026-11-03T12:00:00Z'),now=end+1000;
 function bars(){return Array.from({length:205},(_,i)=>{const p=100+i*.02+Math.cos(i*Math.PI/5);return {openTime:end-(205-i)*STEP,closeTime:end-(204-i)*STEP,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});}
 const row=(title='Ethereum network suffers an outage',source=NEWS_SOURCES[0],at=now-60000)=>({...parseNewsFeed(`<rss><channel><item><title>${title}</title><link>https://${source.host}/news/test</link><pubDate>${new Date(at).toUTCString()}</pubDate></item></channel></rss>`,source,now).rows[0],firstSeenAt:now-1000});
@@ -47,20 +43,4 @@ test('read-only priority keeps the same universe and stable order; observations 
  recordAttention(state,{symbol:'ETHUSDT',at:now+2,error:'HISTORY_UNAVAILABLE'});assert.equal(attentionSnapshot({...args,now:now+2}).rows[0].technical.ready,false);
  for(let i=0;i<400;i++)recordAttention(state,{symbol:'ASSET'+i,at:now+3+i,error:'HISTORY_UNAVAILABLE'});assert.equal(Object.keys(state.marketAttention.observations).length,150);assert.equal(state.marketAttention.events.length,300);
  const restored=JSON.parse(JSON.stringify(state));assert.deepEqual(attentionSnapshot({...args,state:restored}),attentionSnapshot(args));
-});
-test('installer is atomic and idempotent while preserving unrelated production edits',()=>{
- const root=fs.mkdtempSync(path.join(os.tmpdir(),'attention-patch-'));
- try{
-  const patches=JSON.parse(fs.readFileSync(new URL('../scripts/market-attention-patches.json',import.meta.url)));
-  for(const file of ['server.mjs','binance-agent.html']){
-   let s=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
-   // Reconstruct the original installer's source context before the later shared-watch integration.
-   const later=JSON.parse(fs.readFileSync(new URL('../scripts/shared-market-watch-patches.json',import.meta.url),'utf8'));
-   for(const p of later.filter(p=>p.file===file).reverse())s=s.replace(p.after,p.before);
-   for(const p of patches.filter(p=>p.file===file).reverse())s=s.replace(p.after,p.before);
-   fs.writeFileSync(path.join(root,file),s+'\n// unrelated production edit\n');
-  }
-  patchAttention(root,patches);const first=fs.readFileSync(path.join(root,'server.mjs'),'utf8');patchAttention(root,patches);assert.equal(fs.readFileSync(path.join(root,'server.mjs'),'utf8'),first);assert.match(first,/unrelated production edit/);
-  assert.throws(()=>patchAttention(root,[{file:'server.mjs',before:'// unrelated production edit',after:'// changed'},{file:'binance-agent.html',before:'nonexistent',after:'nonexistent replacement sentinel'}]),/no files changed/);assert.equal(fs.readFileSync(path.join(root,'server.mjs'),'utf8'),first);
- }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

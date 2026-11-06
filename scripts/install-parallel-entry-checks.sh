@@ -10,7 +10,8 @@ stage=$(mktemp -d /tmp/levi-parallel-checks.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/release" "$stage/runtime"
 git archive "$revision" | tar -x -C "$stage/release"
-node --test "$stage/release/tests/parallel-entry-installer.test.mjs"
+echo 'Checking installer reconstruction against the reviewed release.'
+node --test "$stage/release/tests/parallel-entry-installer.test.mjs" "$stage/release/tests/market-attention-installer.test.mjs"
 cp -a "$stage/release/." "$stage/runtime/"
 cp -a lib/. "$stage/runtime/lib/"
 cp server.mjs binance-agent.js regression-trend.js parallel-channel.js "$stage/runtime/"
@@ -24,10 +25,8 @@ fi
 ln -s /opt/levi-binance/node_modules "$stage/runtime/node_modules"
 files=(server.mjs lib/channel-condition-report.mjs lib/channel-primary-entry.mjs lib/futures-short-policy.mjs lib/wyckoff-evaluation.mjs lib/entry-method-comparison.mjs lib/market-attention.mjs lib/shared-market-watch.mjs)
 for file in "${files[@]}"; do node --check "$stage/runtime/$file"; done
-tests=(channel-entry-checklist market-attention-ui shared-market-watch market-attention channel-primary-entry futures-short futures-short-recovery futures-short-fill channel-consolidation channel-consolidation-entry live-execution-lock)
-args=()
-for name in "${tests[@]}"; do args+=("$stage/runtime/tests/$name.test.mjs"); done
-if ! node --test --test-skip-pattern='^Colmex' "${args[@]}"; then
+echo 'Checking behavior against the staged installed runtime, including local server integrations.'
+if ! node "$stage/release/scripts/test-parallel-entry-runtime.mjs" "$stage/runtime"; then
  echo 'Staged parallel-check tests failed. Installed code and service were not changed.' >&2
  exit 1
 fi
