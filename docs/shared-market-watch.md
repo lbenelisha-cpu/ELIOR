@@ -51,3 +51,10 @@ code, and verifies policy markers, unchanged activation flags and exit settings.
 Rollback restores code only; execution journals are retained. A successful install
 does not itself confirm every contract's market-data availability or execute a
 trade. Colmex trading code is not modified by this Binance-specific update.
+
+The installer supports the existing SHORT runner with or without the optional
+server-side POC reservation hook. When that hook is absent, an exact reviewed
+runner-constructor anchor installs only the shared observer; it does not install
+POC, alter execution controls or replace the server file wholesale. Both layouts
+are checked before staging. Unknown or duplicate anchors still abort before any
+installed file or service change, and report a named patch ID for diagnosis.
