@@ -68,3 +68,45 @@ test('signal and data failures do not skip ahead to authorize later conditions',
   const missing=view(side,evaluate(side,i).reason);assert.equal(missing.dataPending,true);assert.equal(state(missing,'channel'),'unknown');
  }
 });
+
+test('candle rollover and transient quote/bar waits retain a labelled previous scan without extending its lifetime',()=>{
+ for(const side of ['LONG','SHORT']){
+  const tracker=globalThis.LEVI_ENTRY_CHECKLIST.createTracker(),at=end+D-1000;
+  const seed={side,symbol:'ABCUSDT',marketSymbol:'ABCUSDT',reason:side==='SHORT'?'SHORT_VOLUME_LOW':'CHANNEL_VOLUME_LOW',at,now:at,expiresAt:end+D,transport:true,supported:true};
+  const first=tracker.update(seed);assert.equal(state(first,'channel'),'passed');
+  const expired=tracker.update({...seed,now:end+D});
+  assert.equal(expired.status,'refreshing');assert.equal(expired.current,false);assert.equal(expired.count,0);assert.equal(expired.previousCount,first.count);
+  assert.equal(state(expired,'channel'),'previous_passed');assert.equal(state(expired,'volume'),'previous_waiting');
+  const pending={...seed,reason:side==='SHORT'?'WAIT_FUTURES_LIVE_BAR':'WAIT_CHANNEL_LIVE_BAR',at:end+D+1000,now:end+D+1000,expiresAt:end+2*D,blocker:'NO_FREE_SLOT'};
+  const refresh=tracker.update(pending);assert.equal(refresh.previousAt,at);assert.equal(state(refresh,'execution'),'blocked');assert.equal(refresh.previousCount,first.count);
+  const lagging=tracker.update({...pending,reason:side==='SHORT'?'GAPPED_FUTURES_HISTORY':'GAPPED_CHANNEL_HISTORY',at:end+D+2000,now:end+D+2000});
+  assert.equal(lagging.status,'refreshing');assert.equal(lagging.previousAt,at);assert.equal(state(lagging,'channel'),'previous_passed');
+  if(side==='SHORT')assert.equal(tracker.update({...seed,reason:'STALE_SHORT_OBSERVATION',expiresAt:null,now:end+D+2000}).status,'refreshing');
+  const elapsed=at+(side==='SHORT'?180000:90000);
+  const old=tracker.update({...pending,at:elapsed,now:elapsed});assert.notEqual(old.status,'refreshing');assert.equal(old.rows.some(r=>r.state.startsWith('previous_')),false);
+ }
+});
+test('new channel rejection replaces prior confirmation; data corruption, disconnect and policy changes clear history',()=>{
+ for(const side of ['LONG','SHORT']){
+  const tracker=globalThis.LEVI_ENTRY_CHECKLIST.createTracker(),at=end+D-1000;
+  const seed={side,symbol:'ABCUSDT',marketSymbol:'ABCUSDT',reason:side==='SHORT'?'SHORT_VOLUME_LOW':'CHANNEL_VOLUME_LOW',at,now:at,expiresAt:end+D,transport:true,supported:true};
+  tracker.update(seed);
+  const reject={...seed,reason:side==='SHORT'?'WAIT_TWO_TOUCHES_PER_SIDE':'WAIT_CHANNEL_TWO_TOUCHES',at:end+D+1000,now:end+D+1000,expiresAt:end+2*D};
+  const fresh=tracker.update(reject);assert.equal(state(fresh,'channel'),'waiting');assert.equal(fresh.count,0);assert.notEqual(fresh.status,'refreshing');
+  // An out-of-order reply cannot resurrect the previous successful channel.
+  assert.equal(tracker.update({...seed,now:reject.now}).count,0);
+  for(const patch of [{transport:false},{supported:false},{marketSymbol:'XYZUSDT'},{reason:'UNKNOWN_REASON'},{reason:side==='SHORT'?'INVALID_FUTURES_HISTORY':'INVALID_CHANNEL_HISTORY'}]){
+   const t=globalThis.LEVI_ENTRY_CHECKLIST.createTracker();t.update(seed);const stopped=t.update({...seed,...patch,at:end+D+1000,now:end+D+1000,expiresAt:end+2*D});
+   assert.equal(stopped.rows.some(r=>r.state.startsWith('previous_')),false);
+   const next=t.update({...seed,now:end+D+2000});assert.notEqual(next.status,'refreshing');
+  }
+ }
+});
+test('previous checks never cross asset, market or side and are cleared on removal and auth loss',()=>{
+ const tracker=globalThis.LEVI_ENTRY_CHECKLIST.createTracker(),at=end+D-1000;
+ const seed={side:'LONG',symbol:'ABCUSDT',marketSymbol:'ABCUSDT',reason:'CHANNEL_VOLUME_LOW',at,now:at,transport:true,supported:true};
+ tracker.update(seed);
+ for(const patch of [{symbol:'OTHERUSDT',marketSymbol:'OTHERUSDT'},{side:'SHORT',expiresAt:end+D,reason:'SHORT_VOLUME_LOW'}])assert.notEqual(tracker.update({...seed,...patch,now:end+D}).status,'refreshing');
+ tracker.retain([]);assert.notEqual(tracker.update({...seed,now:end+D}).status,'refreshing');
+ tracker.update(seed);tracker.clear();assert.notEqual(tracker.update({...seed,now:end+D}).status,'refreshing');
+});

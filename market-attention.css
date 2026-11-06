@@ -8,5 +8,7 @@
 .attention-check.passed{background:#143b35}.attention-check.passed .attention-check-icon{color:#80e5b6}
 .attention-check.waiting{background:#3d3320}.attention-check.waiting .attention-check-icon{color:#ffda80}
 .attention-check.blocked{background:#422b33}.attention-check.blocked .attention-check-icon{color:#ff9eae}
+.attention-check.previous_passed,.attention-check.previous_waiting,.attention-check.previous_unknown{background:#1c3042;border-inline-start:2px dashed #7396b6}
+.attention-check.previous_passed .attention-check-icon,.attention-check.previous_waiting .attention-check-icon{color:#9ac9f1}
 .attention-check-legend,.attention-check-note{display:block;color:#aac0cc;font-size:.76rem;line-height:1.6;margin:10px 0}
 @media(max-width:600px){.attention-entry-checks{grid-template-columns:1fr}}
