@@ -17,6 +17,7 @@ function renderFeed(){
   if(r.group==='prnewswire')add('span','הודעת חברה',tags,'tag');
   if(r.uncertain)add('span','ניסוח מסויג · למעקב בלבד',tags,'tag');
   if(r.revised)add('span','דיווח שעודכן · ללא השפעה',tags,'tag');
+  window.LEVI_NEWS_SUMMARY?.append(article,r);
   const heading=add('h3','',article);heading.dir='auto';link(heading,r.title,r.url);
   if(r.assets.length)add('div',r.assets.map(a=>a.id.replace('crypto:','').replace('stock:','מניית ')).join(' · ')+' — זיהוי לפי אזכור מפורש בכותרת',article,'asset');
   else add('div','ללא שיוך ברור לנכס במיפוי הנוכחי',article,'hint');
@@ -37,7 +38,7 @@ function render(){
  $('source').value=selected;$('decisions').replaceChildren();
  const observations=readOK&&fresh&&!data.storageError?(data.attention||[]).filter(d=>d.active&&d.expiresAt>Date.now()):[];
  if(!observations.length)add('p','אין כרגע איתות חדשות עדכני במיפוי הקיים. היעדר איתות אינו אישור שאין חדשות.',$('decisions'),'hint');
- for(const d of observations){const box=add('div','',$('decisions'),'decision');add('strong',d.symbol+' · תשומת לב למעקב',box);add('p','נבדקו מקור, זמן ואזכור מפורש בכותרת. המידע לא מהווה אישור לעסקה.',box,'hint');if(d.matchingReports?.length>=2)add('p','נמצאה התאמה בפרטי אירוע בכותרות של שני מפרסמים; אינה אימות עצמאי של האירוע.',box,'hint');for(const e of d.evidence.filter(e=>e.active&&e.expiresAt>Date.now())){link(box,e.source+' · '+e.title,e.url);add('p',({UNCERTAIN:'ניסוח מסויג / שמועה · לא אומת',REVISED:'דיווח שעודכן · דורש בדיקה',COMPANY_OR_SYNDICATED:'הודעת חברה / תוכן מיוחס',SINGLE_REPORT:'דיווח יחיד'}[e.verification]||'דיווח למעקב')+' · פורסם '+date(e.publishedAt),box,'hint');}}
+ for(const d of observations){const box=add('div','',$('decisions'),'decision');add('strong',d.symbol+' · תשומת לב למעקב',box);add('p','נבדקו מקור, זמן ואזכור מפורש בכותרת. המידע לא מהווה אישור לעסקה.',box,'hint');if(d.matchingReports?.length>=2)add('p','נמצאה התאמה בפרטי אירוע בכותרות של שני מפרסמים; אינה אימות עצמאי של האירוע.',box,'hint');for(const e of d.evidence.filter(e=>e.active&&e.expiresAt>Date.now())){window.LEVI_NEWS_SUMMARY?.append(box,e);link(box,e.source+' · '+e.title,e.url);add('p',({UNCERTAIN:'ניסוח מסויג / שמועה · לא אומת',REVISED:'דיווח שעודכן · דורש בדיקה',COMPANY_OR_SYNDICATED:'הודעת חברה / תוכן מיוחס',SINGLE_REPORT:'דיווח יחיד'}[e.verification]||'דיווח למעקב')+' · פורסם '+date(e.publishedAt),box,'hint');}}
 
  renderFeed();
 }

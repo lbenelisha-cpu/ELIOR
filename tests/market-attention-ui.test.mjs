@@ -33,3 +33,8 @@ test('observer TTL is independent of live transport and selection/filter control
  assert.doesNotMatch(fs.readFileSync(new URL('../market-attention.js',import.meta.url),'utf8'),/\bfetch\s*\(|XMLHttpRequest|\.write\(|innerHTML\s*=/);
  assert.match(fs.readFileSync(new URL('../market-attention.css',import.meta.url),'utf8'),/prefers-reduced-motion:reduce/);
 });
+test('news brief receives the source report while trading observations stay unchanged',()=>{
+ const h=ui(),seen=[],s=snapshot(h.clock.now),original=JSON.stringify(s);
+ h.context.window.LEVI_NEWS_SUMMARY={append:(parent,row)=>{seen.push(row);const text=new Element('p');text.textContent='תקציר בעברית';parent.append(text);}};
+ h.send(s);assert.equal(seen.length,2);assert.equal(seen[0],s.rows[0].news.evidence[0]);assert.match(h.panel.textContent,/תקציר בעברית/);assert.equal(JSON.stringify(s),original);
+});

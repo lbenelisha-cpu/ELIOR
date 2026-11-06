@@ -1,4 +1,4 @@
-/* Display and chart selection only. No requests and no trading controls. */
+/* Display and chart selection only. Optional headline translation is isolated in news-summary.js. */
 (()=>{
  const panel=document.getElementById('marketAttentionPanel');if(!panel)return;
  const add=(tag,text,parent,cls='')=>{const el=document.createElement(tag);el.textContent=text;if(cls)el.className=cls;parent.append(el);return el;};
@@ -36,11 +36,11 @@
     add('p',t.channel?'תעלת קיצון: '+t.channel.highTouches+' נגיעות למעלה / '+t.channel.lowTouches+' למטה · '+(t.channel.confirmed?'מאושרת':'זמנית'):'תעלת קיצון: אין תעלה תקפה',card);
     add('p','רגרסיה: '+({UP:'עולה',DOWN:'יורדת',FLAT:'ללא כיוון'}[t.regression?.side]||'אין נתון')+' · מחזור הנר הסגור האחרון ×'+num(t.volume?.ratio)+' לעומת ממוצע 20 נרות',card);
    }else add('p',transport?(reasons[t.reason]||'התצפית התיישנה'):'אין תצפית טכנית עדכנית',card,'attention-note');
-   const first=r.news.evidence?.[0];if(first){const story=add('div','',card,'attention-story');link(story,first);add('small',first.source+' · '+date(first.publishedAt)+(r.news.active?'':' · אינו איתות עדכני'),story);}
+   const first=r.news.evidence?.[0];if(first){const story=add('div','',card,'attention-story');window.LEVI_NEWS_SUMMARY?.append(story,first);link(story,first);add('small',first.source+' · '+date(first.publishedAt)+(r.news.active?'':' · אינו איתות עדכני'),story);}
    const details=add('details','',card);details.dataset.symbol=r.symbol;details.open=expanded.has(r.symbol);add('summary','מה נאסף ונבדק',details);
    if(t.ready){add('p','נר המדידה נסגר במחיר '+num(t.price)+'. גבול עליון '+num(t.channel?.upper)+'; תחתון '+num(t.channel?.lower)+'; מרכז רגרסיה '+num(t.regression?.center)+'.',details);add('p','מחזור כספי ממוצע ל־20 נרות: '+num(t.volume?.meanDollarVolume)+' USDT. חסר בבדיקה: '+(t.missing?.length?t.missing.map(x=>reasons[x]||x).join(' · '):'אין חוסר במדדים המוצגים; אין בכך אישור עסקה')+'.',details);}
    add('p','בדיקת תצפיתן אחרונה: '+date(t.checkedAt),details,'attention-note');
-   for(const e of r.news.evidence||[]){const story=add('div','',details,'attention-story');link(story,e);add('small',verification[e.verification]||'דיווח למעקב',story);add('small','פורסם '+date(e.publishedAt)+' · נקלט '+date(e.firstSeenAt)+' · המקור נבדק '+date(e.checkedAt),story);}
+   for(const e of r.news.evidence||[]){const story=add('div','',details,'attention-story');window.LEVI_NEWS_SUMMARY?.append(story,e);link(story,e);add('small',verification[e.verification]||'דיווח למעקב',story);add('small','פורסם '+date(e.publishedAt)+' · נקלט '+date(e.firstSeenAt)+' · המקור נבדק '+date(e.checkedAt),story);}
    if(r.news.matchingReports?.length>=2)add('p','נמצאו פרטי אירוע תואמים בכותרות של שני מפרסמים. זו הצלבה של כותרות, לא אימות עצמאי של האירוע.',details);
    if(!r.news.covered)add('p','אין מיפוי חדשות מפורש לנכס זה בגרסה הנוכחית.',details);
    for(const [name,d,age] of [['LONG Spot',r.longDecision,90000],['SHORT Futures',r.shortDecision,120000]])add('p',name+': '+(transport&&d&&now-d.at>=0&&now-d.at<age?(d.blocker||d.reason)+' · '+date(d.at):'אין החלטת מסחר עדכנית להצגה'),details,'attention-note');
