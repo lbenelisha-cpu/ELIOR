@@ -79,6 +79,8 @@ test('candle rollover and transient quote/bar waits retain a labelled previous s
   assert.equal(state(expired,'channel'),'previous_passed');assert.equal(state(expired,'volume'),'previous_waiting');
   const pending={...seed,reason:side==='SHORT'?'WAIT_FUTURES_LIVE_BAR':'WAIT_CHANNEL_LIVE_BAR',at:end+D+1000,now:end+D+1000,expiresAt:end+2*D,blocker:'NO_FREE_SLOT'};
   const refresh=tracker.update(pending);assert.equal(refresh.previousAt,at);assert.equal(state(refresh,'execution'),'blocked');assert.equal(refresh.previousCount,first.count);
+  const lagging=tracker.update({...pending,reason:side==='SHORT'?'GAPPED_FUTURES_HISTORY':'GAPPED_CHANNEL_HISTORY',at:end+D+2000,now:end+D+2000});
+  assert.equal(lagging.status,'refreshing');assert.equal(lagging.previousAt,at);assert.equal(state(lagging,'channel'),'previous_passed');
   if(side==='SHORT')assert.equal(tracker.update({...seed,reason:'STALE_SHORT_OBSERVATION',expiresAt:null,now:end+D+2000}).status,'refreshing');
   const elapsed=at+(side==='SHORT'?180000:90000);
   const old=tracker.update({...pending,at:elapsed,now:elapsed});assert.notEqual(old.status,'refreshing');assert.equal(old.rows.some(r=>r.state.startsWith('previous_')),false);

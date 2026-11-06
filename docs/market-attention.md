@@ -31,7 +31,7 @@ summary says it is waiting for updated data instead of dropping to a misleading
 zero score. All server data validation and expiry checks remain in effect;
 the UI does not treat an expired candle's checkmarks as current approvals.
 
-During a short candle transition or quote/open-bar refresh, the display can retain
+During a short candle transition or quote/open-bar/history refresh, the display can retain
 the last recorded checklist as **previous**, with a blue checkmark, its original
 timestamp and “אושר בבדיקה הקודמת · מתעדכן”. The summary retains the prior count
 labelled as such instead of implying that confirmed channel touches have failed.

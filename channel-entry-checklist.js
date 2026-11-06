@@ -58,7 +58,7 @@
   return {rows,count,total:definitions.length,current,dataPending,status:!supported?'unsupported':!timely?'stale':!known?'unknown':'recorded'};
  }
  function createTracker(){
-  const records=new Map(),transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR']);
+  const records=new Map(),transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR','WAIT_CHANNEL_HISTORY','WAIT_FUTURES_HISTORY','GAPPED_CHANNEL_HISTORY','GAPPED_FUTURES_HISTORY']);
   const symbolOK=s=>typeof s==='string'&&/^[A-Z0-9]{2,24}USDT$/.test(s);
   function update(input){
    const now=input.now??Date.now(),view=project({...input,now}),key=input.side+':'+input.symbol;
