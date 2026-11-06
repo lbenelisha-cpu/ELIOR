@@ -59,3 +59,11 @@ test('attention board joins stock-token and Futures checks only through verified
  const row=snapshot.rows.find(r=>r.symbol==='GOOGLBUSDT');assert.equal(row.shortDecision.reason,'SHORT_VOLUME_LOW');assert.equal(row.shortObservation.futuresSymbol,'GOOGLUSDT');assert.equal(row.entryBlockers.long,'NO_FREE_SLOT');assert.equal(row.entryBlockers.short,'FUTURES_TWO_SLOTS_FULL');assert.equal(snapshot.sharedWatchPolicy.version,SHARED_WATCH_POLICY.version);
  const unmapped=snapshot.rows.find(r=>r.symbol==='NVDABUSDT');assert.equal(unmapped.shortObservation.available,false);assert.equal(unmapped.shortDecision,null);
 });
+
+test('parallel reports survive the public SHORT snapshot and expire with their original scan',async()=>{
+ const h=harness();await h.watch.tick();const row=h.watch.snapshot().rows[0];
+ assert.equal(row.conditions.version,'CHANNEL_CONDITIONS_PARALLEL_V1');assert.equal(row.conditions.side,'SHORT');assert.equal(row.conditions.rows.filter(r=>r.state==='passed').length,10);
+ const board=attentionSnapshot({state:{},news:{},symbols:h.source,now:h.clock,sharedWatch:h.watch.snapshot()});
+ assert.deepEqual(board.rows.find(r=>r.symbol===row.spotSymbol).shortObservation.conditions,row.conditions);
+ h.clock=end+D;assert.equal(h.watch.snapshot().rows[0].conditions,null);
+});

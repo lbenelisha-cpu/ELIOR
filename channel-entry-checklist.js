@@ -1,4 +1,4 @@
-/* Read-only projection of the server's ordered channel checks. Never authorizes a trade. */
+/* Read-only display of independent server checks; legacy ordered results remain labelled. Never authorizes a trade. */
 (function(root){
  const STEP=300000;
  // A recorded rejection proves only the gates reached before it. Later gates
@@ -28,7 +28,7 @@
   ['range',['WAIT_CHANNEL_CONSOLIDATION','INVALID_CHANNEL_CONSOLIDATION','CHANNEL_CONSOLIDATION_SIDE_BLOCK']],
   ['rangeBreak',['WAIT_CHANNEL_CONSOLIDATION_BREAK']]
  ];
- function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null}={}){
+ function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null,conditions=null}={}){
   const sell=side==='SHORT',stages=sell?short:long;
   const definitions=[
    ['channel','תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
@@ -46,16 +46,18 @@
   const timely=transport&&Number.isFinite(at)&&at>0&&Number.isFinite(now)&&at<=now&&now-at<(sell?180000:90000)&&now<(Math.floor(at/STEP)+1)*STEP&&(!sell||Number.isFinite(expiresAt)&&expiresAt>now);
   const success=reason===(sell?'SHORT_CHANNEL_READY':'CHANNEL_BREAKOUT_READY');
   const stop=stages.findIndex(([,reasons])=>reasons.includes(reason));
-  const known=success||stop>=0,current=validSide&&supported&&timely&&known;
+  const parallel=conditions!=null;
+  const validReport=parallel&&conditions.version==='CHANNEL_CONDITIONS_PARALLEL_V1'&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  const known=parallel?validReport:success||stop>=0,current=validSide&&supported&&timely&&known;
   const passed=new Set(current?stages.slice(0,success?stages.length:stop).map(([key])=>key):[]);
-  const failed=current&&!success?stages[stop][0]:null;
-  const rows=definitions.map(([id,label,gates])=>({id,label,state:gates.includes(failed)?'waiting':gates.every(g=>passed.has(g))?'passed':'unknown'}));
+  const failed=current&&!success&&stop>=0?stages[stop][0]:null;
+  const rows=definitions.map(([id,label,gates])=>({id,label,state:parallel?(current?conditions.rows.find(r=>r.id===id).state:'unknown'):gates.includes(failed)?'waiting':gates.every(g=>passed.has(g))?'passed':'unknown'}));
   const count=rows.filter(r=>r.state==='passed').length;
   // Null blocker is absence of a reported block, never proof of account approval.
   rows.push({id:'execution',label:'אישור ביצוע · הרשאות, יתרה, מקום והגנות',state:transport&&blocker?'blocked':'unknown'});
   // Data availability is a background prerequisite, not a counted signal.
   const dataPending=current&&['quote','bar','history'].includes(failed);
-  return {rows,count,total:definitions.length,current,dataPending,status:!supported?'unsupported':!timely?'stale':!known?'unknown':'recorded'};
+  return {rows,count,total:definitions.length,current,dataPending,parallel:!!validReport,status:!supported?'unsupported':parallel&&!validReport?'invalid-report':!timely?'stale':!known?'unknown':'recorded'};
  }
  function createTracker(){
   const records=new Map(),transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR','WAIT_CHANNEL_HISTORY','WAIT_FUTURES_HISTORY','GAPPED_CHANNEL_HISTORY','GAPPED_FUTURES_HISTORY']);

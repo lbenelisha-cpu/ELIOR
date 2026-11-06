@@ -110,3 +110,60 @@ test('previous checks never cross asset, market or side and are cleared on remov
  tracker.retain([]);assert.notEqual(tracker.update({...seed,now:end+D}).status,'refreshing');
  tracker.update(seed);tracker.clear();assert.notEqual(tracker.update({...seed,now:end+D}).status,'refreshing');
 });
+
+test('independent server checks evaluate volume, liquidity and consolidation after an earlier rejection on both sides',()=>{
+ for(const side of ['LONG','SHORT']){
+  const i=input(side);i.price=side==='SHORT'?106:104;
+  const result=evaluate(side,i);assert.equal(result.ready,false);assert.match(result.reason,/BREAK/);
+  const v=view(side,result.reason,{conditions:result.conditions});assert.equal(v.parallel,true);
+  assert.equal(state(v,'break'),'waiting');assert.equal(state(v,'volume'),'passed');assert.equal(state(v,'liquidity'),'passed');
+  assert.equal(state(v,'range'),'passed');assert.equal(state(v,'signal'),'passed');assert.equal(state(v,'rangeBreak'),'waiting');
+  assert.equal(state(v,'execution'),'unknown');
+  i.liveBar.volume=1499;
+  const two=evaluate(side,i),vv=view(side,two.reason,{conditions:two.conditions});
+  assert.equal(two.reason,result.reason);assert.equal(state(vv,'break'),'waiting');assert.equal(state(vv,'volume'),'waiting');assert.equal(state(vv,'liquidity'),'passed');
+ }
+});
+test('missing channel geometry leaves only dependent checks unknown; independent measurements still run',()=>{
+ for(const side of ['LONG','SHORT']){
+  const i=input(side);i.bars=i.bars.map((b,k)=>{const p=100+(side==='LONG'?k:-k)*.01;return {...b,open:p,high:p+.001,low:p-.001,close:p};});
+  const result=evaluate(side,i);assert.equal(result.ready,false);assert.match(result.reason,/PIVOTS|TOUCHES/);
+  const v=view(side,result.reason,{conditions:result.conditions});
+  assert.equal(state(v,'channel'),'waiting');assert.equal(state(v,'break'),'unknown');assert.equal(state(v,'range'),'unknown');
+  for(const id of ['slope','volume','liquidity'])assert.equal(state(v,id),'passed',side+' '+id);
+ }
+});
+test('a new-signal wait or wrong regression cannot suppress independent volume results',()=>{
+ for(const side of ['LONG','SHORT']){
+  const i=input(side);i.entryAfter=end;
+  let r=evaluate(side,i),v=view(side,r.reason,{conditions:r.conditions});
+  assert.equal(r.ready,false);assert.equal(state(v,'signal'),'waiting');assert.equal(state(v,'channel'),'passed');assert.equal(state(v,'volume'),'passed');
+  const wrong=input(side==='LONG'?'SHORT':'LONG');r=evaluate(side,wrong);v=view(side,r.reason,{conditions:r.conditions});
+  assert.match(r.reason,/DIRECTION_BLOCK/);assert.equal(state(v,'slope'),'waiting');assert.equal(state(v,'volume'),'passed');assert.equal(state(v,'liquidity'),'passed');
+ }
+});
+test('only complete current reports count; invalid reports cannot fall back to inferred approval',()=>{
+ for(const side of ['LONG','SHORT']){
+  const good=evaluate(side,input(side));assert.equal(good.ready,true);assert.equal(good.conditions.rows.every(r=>r.state==='passed'),true);
+  assert.equal(view(side,good.reason,{conditions:good.conditions}).count,10);
+  for(const mutate of [c=>c.version='OTHER',c=>c.side=side==='LONG'?'SHORT':'LONG',c=>c.at=now+1,c=>c.at-=300000,c=>c.expiresAt++,c=>c.rows.pop(),c=>c.rows.push(c.rows[0]),c=>c.rows[0].state='approved',c=>c.rows[0]=c.rows[1]]){
+   const c=structuredClone(good.conditions);mutate(c);const v=view(side,good.reason,{conditions:c});assert.equal(v.count,0);assert.equal(v.current,false);
+  }
+  const stale=view(side,good.reason,{conditions:good.conditions,now:end+D});assert.equal(stale.count,0);
+  const noQuote=input(side);noQuote.priceAsOf=now-20000;const r=evaluate(side,noQuote);assert.equal(r.ready,false);assert.equal(r.conditions.rows.every(x=>x.state==='unknown'),true);
+ }
+});
+
+test('LONG report is persisted with its scan and reaches attention without inventing account approval',async()=>{
+ const {evaluateDailyTrade}=await import('../lib/wyckoff-evaluation.mjs');
+ const {recordEntryBlocker}=await import('../lib/entry-method-comparison.mjs');
+ const {attentionSnapshot}=await import('../lib/market-attention.mjs');
+ const i=input('LONG');i.liveBar.volume=1000;
+ const ev=evaluateDailyTrade({...i,symbol:'ABCUSDT',priceAsOf:new Date(now).toISOString(),timeframe:'5m',entryMode:'confirmed_quality',channelPrimary:configs.LONG});
+ const conditions=ev.entryDecisions.channel.conditions;assert.equal(conditions.rows.find(r=>r.id==='liquidity').state,'passed');
+ const state={};recordEntryBlocker(state,{symbol:'ABCUSDT',at:now+10,reason:ev.buyReason,conditions});
+ const row=attentionSnapshot({state,news:{},symbols:['ABCUSDT'],now:now+10,diagnostics:state.entryComparison.diagnostics}).rows[0];
+ assert.deepEqual(row.longDecision.conditions,conditions);
+ const v=view('LONG',row.longDecision.reason,{conditions:row.longDecision.conditions,at:row.longDecision.at,now:now+10});assert.equal(v.count,9);
+ recordEntryBlocker(state,{symbol:'ABCUSDT',at:now+20,reason:'EVALUATION_DATA_UNAVAILABLE'});assert.equal(state.entryComparison.diagnostics.ABCUSDT.conditions,null);
+});
