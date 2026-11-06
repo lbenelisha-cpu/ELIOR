@@ -12,8 +12,8 @@ mkdir "$stage/release" "$stage/runtime"
 git archive "$revision" | tar -x -C "$stage/release"
 # The original SHORT installer has its own source-integration test. It belongs
 # to the immutable release; deployed server integrations may legitimately differ.
-echo 'Checking original SHORT installer against reviewed release sources.'
-if ! node --test "$stage/release/tests/futures-short-installer.test.mjs"; then
+echo 'Checking SHORT and shared-watch installers against reviewed release sources.'
+if ! node --test "$stage/release/tests/futures-short-installer.test.mjs" "$stage/release/tests/shared-watch-installer.test.mjs"; then
  echo 'Release installer tests failed. Installed code and service were not changed.' >&2
  exit 1
 fi
@@ -27,7 +27,10 @@ const root=process.argv[2];
 if(!fs.readFileSync(root+'/lib/futures-short-policy.mjs','utf8').includes('FUTURES_SHORT_SETTINGS_V2')||!fs.existsSync(root+'/lib/channel-consolidation.mjs'))throw Error('INSTALL_CONFIRMED_CONSOLIDATION_UPDATE_FIRST');
 JS
 cp "$stage/release/lib/shared-market-watch.mjs" "$stage/runtime/lib/"
-node "$stage/release/scripts/patch-shared-market-watch.mjs" "$stage/runtime"
+if ! node "$stage/release/scripts/patch-shared-market-watch.mjs" "$stage/runtime"; then
+ echo 'Shared-watch staging could not identify an integration. See the patch ID above. Installed code and service were not changed.' >&2
+ exit 1
+fi
 for file in server.mjs lib/shared-market-watch.mjs lib/market-attention.mjs lib/futures-short-runner.mjs; do node --check "$stage/runtime/$file"; done
 echo 'Checking shared watch and trading protections against staged installed runtime.'
 if ! node --test "$stage/runtime/tests/shared-market-watch.test.mjs" "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs" "$stage/runtime/tests/channel-consolidation.test.mjs" "$stage/runtime/tests/channel-consolidation-entry.test.mjs"; then
