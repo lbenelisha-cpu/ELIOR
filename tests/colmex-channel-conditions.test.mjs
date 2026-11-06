@@ -7,6 +7,15 @@ import {CHANNEL_PRIMARY_POLICY} from '../lib/channel-primary-entry.mjs';
 const now=Date.parse('2026-11-03T19:00:00Z');
 const status={enabled:true,channelPrimary:{requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_long_short',channel:{ready:false}}}}};
 const channels={axis:new Map([[now-300000,300000]]),swing:{ready:true,highTouches:2,lowTouches:1,upper:333,lower:330,provisional:true},regression:{ready:true,slope:.1,middle:331.5}};
+test('consolidation rule is advertised only by the updated server and recorded blockers identify its zone',()=>{
+ const current=structuredClone(status);current.channelPrimary.consolidationPolicy=CHANNEL_PRIMARY_POLICY.consolidationPolicy;
+ current.checks.AAPL.reason='CHANNEL_CONSOLIDATION_SIDE_BLOCK';
+ current.checks.AAPL.entryDecisions.channel.consolidation={zone:'UPPER',bars:3,endAt:now-300000};
+ const view=colmexChannelConditions({channels,status:current,symbol:'AAPL',now});
+ assert.match(view.server,/מיקום הדשדוש אינו מתאים/);assert.match(view.server,/דשדוש עליון · 3 נרות/);
+ assert.match(view.rules.join(' '),/אמצעי מאפשר את שני הכיוונים/);
+ assert.doesNotMatch(colmexChannelConditions({channels,status,symbol:'AAPL',now}).rules.join(' '),/דשדוש לפני הכניסה/);
+});
 test('channel panel separates dynamic touch counts from the timestamped server decision and states actual entry requirements',()=>{
  const view=colmexChannelConditions({channels,status,symbol:'AAPL',now});
  assert.deepEqual(view.metrics.map(m=>m[1]),['2','1','עולה']);

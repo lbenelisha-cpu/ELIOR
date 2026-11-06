@@ -14,6 +14,8 @@ const config=channelEntryConfig(env,'COLMEX');
 function input(short=true){
  let times=[];for(let t=end-8*86400000;t<end;t+=D)if(regularSession(t))times.push(t);
  const bars=times.slice(-205).map((t,i)=>{const rising=100+i*.02+Math.cos(i*Math.PI/5),p=short?210-rising:rising;return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
+ // A completed central consolidation precedes the live breakout.
+ for(const [j,bar] of bars.slice(-3).entries()){const p=(short?105.95:104.05)+(j===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
  const price=short?104:106;
  return {symbol:'AAPL',bars,price,ask:price+.01,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+D,open:105,close:price,high:short?105.1:106.1,low:short?103.9:104.9,volume:2000,closed:false,receivedAt:now}};
 }
@@ -47,6 +49,16 @@ test('protected SHORT is rechecked, durably reserved once and not duplicated aft
  const order=f.broker.writes[0];assert.equal(order.order.side,'sell');assert.equal(order.setup.entryMode,'channel_short');assert.equal(order.order.takeProfitType,'absolute');assert.ok(order.order.takeProfit<order.order.price);assert.equal(order.order.stopLossType,'offset%');
  assert.equal(f.reads().historyReads,2);assert.equal(f.reads().quoteReads,2);
  await runCycle({...f.args,state:structuredClone(f.state),now:()=>now+60000,deadline:now+87000});assert.equal(f.broker.writes.length,1);
+});
+test('Colmex blocks a stale candidate when consolidation changes before the broker write',async()=>{
+ const f=fixture(),history=f.broker.history;let calls=0;
+ f.broker.history=async()=>{
+  const h=await history();
+  if(++calls===2)for(let k=202;k<205;k++){const p=210-(100+k*.02+Math.cos(k*Math.PI/5));Object.assign(h.barDetails[k],{o:p,c:p,h:p+.1,l:p-.1});}
+  return h;
+ };
+ await runCycle(f.args);assert.equal(f.broker.writes.length,0);
+ assert.ok(JSON.stringify(f.state).includes('CHANNEL_CONSOLIDATION_SIDE_BLOCK'),JSON.stringify(f.state));
 });
 test('SHORT final recheck blocks changed geometry, price, low volume, expired data, lack of cash and slots',async()=>{
  for(const kind of ['price','volume','expiry','cash','slots','permission','save']){
