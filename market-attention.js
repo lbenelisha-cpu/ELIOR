@@ -17,24 +17,27 @@
  const cards=add('div','',panel,'attention-cards'),sources=add('details','',panel,'attention-sources');add('summary','מקורות, כיסוי ויומן תצפיות',sources);const sourceBody=add('div','',sources);
  const link=(parent,row)=>{try{const u=new URL(row.url);if(u.protocol!=='https:'||u.username||u.password||u.port||!['www.coindesk.com','cointelegraph.com','www.prnewswire.com'].includes(u.hostname))return;const a=add('a',row.title,parent);a.dir='auto';a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}catch{}};
  const entryReason=value=>window.LEVI_FUTURES_TABLE?.reason(value)||reasons[value]||value||'ממתין לבדיקה';
+ const entryTracker=window.LEVI_ENTRY_CHECKLIST?.createTracker();
  function checklist(host,input){
-  const view=window.LEVI_ENTRY_CHECKLIST?.project(input);if(!view)return;
-  const progress=view.status==='recorded'&&!view.dataPending?view.count+'/'+view.total+' אושרו בבדיקה':'ממתין לעדכון נתונים';
+  const view=entryTracker?.update(input)||window.LEVI_ENTRY_CHECKLIST?.project(input);if(!view)return;
+  const progress=view.status==='refreshing'?view.previousCount+'/'+view.total+' בבדיקה האחרונה · ממתין לעדכון':view.status==='recorded'&&!view.dataPending?view.count+'/'+view.total+' אושרו בבדיקה':'ממתין לעדכון נתונים';
   add('p','תנאי כניסה בתעלה · '+progress,host,'attention-check-summary');
   const list=add('ul','',host,'attention-checklist');list.setAttribute('aria-label','תנאי כניסה '+input.side);
   for(const row of view.rows){
    const item=add('li','',list,'attention-check '+row.state);item.dataset.condition=row.id;item.dataset.state=row.state;
-   const marker={passed:'✓',waiting:'○',unknown:'—',blocked:'!'}[row.state];
-   const label={passed:'התקיים בבדיקה',waiting:'טרם התקיים',unknown:row.id==='execution'?'ממתין לבדיקה סופית':'טרם אומת',blocked:'הביצוע חסום'}[row.state];
+   const marker={passed:'✓',waiting:'○',unknown:'—',blocked:'!',previous_passed:'✓',previous_waiting:'○',previous_unknown:'—'}[row.state];
+   const label={passed:'התקיים בבדיקה',waiting:'טרם התקיים',unknown:row.id==='execution'?'ממתין לבדיקה סופית':'טרם אומת',blocked:'הביצוע חסום',previous_passed:'אושר בבדיקה הקודמת · מתעדכן',previous_waiting:'המתין בבדיקה הקודמת · מתעדכן',previous_unknown:'טרם אומת · מתעדכן'}[row.state];
    const icon=add('span',marker,item,'attention-check-icon');icon.setAttribute('aria-hidden','true');
    const body=add('span','',item);add('span',row.label,body);add('small',label,body);
   }
-  if(view.status!=='recorded')add('small',view.status==='unsupported'?'ממתין לאימות מסלול הכניסה מהשרת':view.status==='stale'?'אין בדיקת כניסה עדכנית · הסימונים נוקו':'תוצאת השרת אינה מפרטת אילו תנאים עברו',host,'attention-check-note');
+  if(view.status!=='recorded')add('small',view.status==='refreshing'?'מוצגת הבדיקה מ־'+date(view.previousAt)+' בזמן הרענון. הסימונים הקודמים אינם אישור כניסה כעת.':view.status==='unsupported'?'ממתין לאימות מסלול הכניסה מהשרת':view.status==='stale'?'אין בדיקת כניסה עדכנית · הסימונים נוקו':'תוצאת השרת אינה מפרטת אילו תנאים עברו',host,'attention-check-note');
  }
  function render(){
   const now=Date.now(),transport=snapshot&&now-receivedAt<90000&&now>=receivedAt&&now-snapshot.checkedAt<90000&&now>=snapshot.checkedAt;
   const expanded=new Set(Array.from(cards.querySelectorAll('details[open]')).map(x=>x.dataset.symbol));cards.replaceChildren();sourceBody.replaceChildren();
-  if(!snapshot){status.textContent='אין תצפית עדכנית להצגה. חבר את המכשיר; אם הוא מחובר, יש לוודא שהשרת מעודכן.';return;}
+  if(!snapshot){entryTracker?.clear();status.textContent='אין תצפית עדכנית להצגה. חבר את המכשיר; אם הוא מחובר, יש לוודא שהשרת מעודכן.';return;}
+  if(!transport||snapshot.mode!=='live')entryTracker?.clear();
+  entryTracker?.retain(snapshot.rows.map(r=>r.symbol));
   const rows=snapshot.rows.map(r=>{const news={...r.news,active:transport&&r.news.active&&r.news.expiresAt>now};const technical={...r.technical,ready:transport&&r.technical.ready&&r.technical.expiresAt>now};technical.watch=technical.ready&&r.technical.watch;if(r.technical.ready&&!technical.ready)technical.reason='STALE_OBSERVATION';return {...r,news,technical,active:news.active||technical.watch};});
   const active=rows.filter(r=>r.active).length,scanned=rows.filter(r=>r.technical.ready).length;
   status.textContent=(transport?'עדכון שרת: '+date(snapshot.checkedAt):'העדכון התיישן · האיתותים הפעילים הוסרו')+' · '+active+' נכסים לתשומת לב · '+scanned+'/'+rows.length+' תצפיות טכניות עדכניות'+(snapshot.storageError?' · שגיאת שמירת תצפיות':'');
@@ -53,14 +56,14 @@
     const longBlocker=transport?(r.entryBlockers?.long||(lf?ld.blocker:null)):null;
     add('small','ביצוע: '+(longBlocker?entryReason(longBlocker):'כפוף לבדיקה סופית'),long);
     const longSupported=snapshot.mode==='live'&&longPolicy?.requested===true&&longPolicy.version==='CHANNEL_PRIMARY_INTRABAR_V2'&&longPolicy.period===50&&longPolicy.minVolumeRatio===1.5&&longPolicy.minMeanDollarVolume===10000&&longPolicy.consolidationPolicy?.version==='CHANNEL_CONSOLIDATION_V1';
-    checklist(long,{side:'LONG',reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
+    checklist(long,{symbol:r.symbol,marketSymbol:r.symbol,side:'LONG',reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
     add('small','בדיקה אחרונה: '+date(ld?.at),long);
     add('strong','SHORT · '+(o?.futuresSymbol||'חוזה לא מאומת'),short);
     const sf=transport&&o&&o.at<=now&&now-o.at<180000&&o.expiresAt>now;
     add('p','בדיקה: '+(!transport?'העדכון התיישן':!o?'ממתין למיפוי חוזה':!o.available?entryReason(o.mappingReason):sf?entryReason(o.reason):entryReason(o.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION')),short);
     const shortBlocker=transport?r.entryBlockers?.short:null;
     add('small','ביצוע: '+(shortBlocker?entryReason(shortBlocker):'כפוף לבדיקה סופית'),short);
-    checklist(short,{side:'SHORT',reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
+    checklist(short,{symbol:r.symbol,marketSymbol:o?.futuresSymbol,side:'SHORT',reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
     add('small','בדיקה אחרונה: '+date(o?.at),short);
     add('small','✓ התקיים בבדיקה · ○ ממתין · — טרם אומת. הבדיקה נעצרת בתנאי הראשון שלא עבר; לפני ביצוע כל התנאים נבדקים מחדש.',card,'attention-check-legend');
    }

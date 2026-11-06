@@ -13,10 +13,10 @@ observer to approve live-price or accumulated-open-bar-volume requirements.
 LONG requires the advertised current channel/consolidation policy; SHORT uses
 only the verified contract's read-only shared observation. Unknown reasons,
 unverified mappings and policies, future dates, transport/auth loss, expired
-observations and the next five-minute candle clear checkmarks. The 90-second LONG
+observations and the next five-minute candle clear current approvals. The 90-second LONG
 and 180-second shared SHORT observation lifetimes are upper bounds. These are
-timestamped scan results, not live quotes. Checkmarks can disappear on the next
-scan; they are never latched across candles.
+timestamped scan results, not live quotes. New scans replace previous conditions;
+an expired scan cannot approve a current entry.
 
 Account permission, cash, capacity and protection approval remain a separate row:
 a reported blocker is shown explicitly; no reported blocker remains unverified.
@@ -29,7 +29,18 @@ is not a checklist row and does not count toward the ten technical conditions.
 While the server awaits those inputs, or the recorded scan has expired, the
 summary says it is waiting for updated data instead of dropping to a misleading
 zero score. All server data validation and expiry checks remain in effect;
-the UI does not retain checkmarks from an expired candle.
+the UI does not treat an expired candle's checkmarks as current approvals.
+
+During a short candle transition or quote/open-bar refresh, the display can retain
+the last recorded checklist as **previous**, with a blue checkmark, its original
+timestamp and “אושר בבדיקה הקודמת · מתעדכן”. The summary retains the prior count
+labelled as such instead of implying that confirmed channel touches have failed.
+A fresh failed touch check replaces that history immediately. Malformed or unknown
+results, unavailable policies/mappings, transport/auth loss and asset removal clear
+the history. It is isolated by asset, market and direction, bounded to 300 entries,
+and never persisted. Repeated pending updates do not extend the original 90-second
+LONG / 180-second SHORT lifetime. Current execution blockers are never inherited
+from a previous scan. This presentation history is not consulted by any executor.
 
 Binance Overview and Scans include an authenticated “איתותים ותצפיתנים” board. The existing agent response supplies it; the widget makes no requests or order submissions. A news report creates a watch highlight, never a buy/sell decision. The server ignores the legacy MARKET_NEWS_ENTRY_OVERLAY activation for execution. Automatic candidate ordering, final submission, POC, quantities and exits do not consult news.
 

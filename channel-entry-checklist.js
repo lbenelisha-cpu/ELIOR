@@ -57,5 +57,33 @@
   const dataPending=current&&['quote','bar','history'].includes(failed);
   return {rows,count,total:definitions.length,current,dataPending,status:!supported?'unsupported':!timely?'stale':!known?'unknown':'recorded'};
  }
- root.LEVI_ENTRY_CHECKLIST={project};
+ function createTracker(){
+  const records=new Map(),transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR']);
+  const symbolOK=s=>typeof s==='string'&&/^[A-Z0-9]{2,24}USDT$/.test(s);
+  function update(input){
+   const now=input.now??Date.now(),view=project({...input,now}),key=input.side+':'+input.symbol;
+   const identity=input.marketSymbol,age=input.side==='SHORT'?180000:90000;
+   // History is presentation-only, per asset/market/side, and keeps the original
+   // observation time. Refresh attempts cannot extend its lifetime.
+   for(const [k,r] of records)if(!Number.isFinite(now)||now<r.at||now-r.at>=r.age)records.delete(k);
+   if(!input.transport||!input.supported||!symbolOK(input.symbol)||!symbolOK(identity)||!['LONG','SHORT'].includes(input.side)){
+    records.delete(key);return view;
+   }
+   let previous=records.get(key);
+   if(previous&&previous.identity!==identity){records.delete(key);previous=null;}
+   if(previous&&Number.isFinite(input.at)&&input.at<previous.at)return project({...input,now,transport:false});
+   if(view.current&&!view.dataPending){
+    records.set(key,{identity,at:input.at,reason:input.reason,age,view});
+    if(records.size>300)records.delete(records.keys().next().value);
+    return view;
+   }
+   const sameExpiredScan=view.status==='stale'&&input.at===previous?.at&&(input.reason===previous?.reason||input.side==='SHORT'&&input.reason==='STALE_SHORT_OBSERVATION');
+   const awaitingBar=view.dataPending&&transient.has(input.reason)&&input.at>=previous?.at;
+   if(previous&&(sameExpiredScan||awaitingBar))return {...view,current:false,count:0,status:'refreshing',previousCount:previous.view.count,previousAt:previous.at,
+    rows:view.rows.map(row=>row.id==='execution'?row:{...row,state:'previous_'+previous.view.rows.find(r=>r.id===row.id).state})};
+   records.delete(key);return view;
+  }
+  return {update,clear:()=>records.clear(),retain:symbols=>{const keep=new Set(symbols);for(const key of records.keys())if(!keep.has(key.slice(key.indexOf(':')+1)))records.delete(key);}};
+ }
+ root.LEVI_ENTRY_CHECKLIST={project,createTracker};
 })(typeof window==='undefined'?globalThis:window);

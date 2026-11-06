@@ -92,3 +92,26 @@ test('entry checklists show recorded passes per market, never closed-bar volume 
  h.clock.now+=90001;h.timers[0]();assert.equal(h.find(e=>e.dataset.state==='blocked').length,0);
  h.expire();assert.equal(checks().length,0);
 });
+
+test('a pending candle update preserves the previous touch check and count with explicit historical labels',()=>{
+ const h=ui();h.clock.now=Math.ceil(h.clock.now/300000)*300000-1000;
+ const s=snapshot(h.clock.now),row=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const config={channelPrimary:{requested:true,version:'CHANNEL_PRIMARY_INTRABAR_V2',period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}}};
+ row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BREAKOUT'};
+ row.shortObservation={available:true,observationOnly:true,spotSymbol:row.symbol,futuresSymbol:row.symbol,at:h.clock.now,expiresAt:h.clock.now+1000,reason:'SHORT_VOLUME_LOW'};
+ h.send(s,config);assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='passed').length,2);
+ h.clock.now+=1000;s.checkedAt=h.clock.now;row.shortObservation.reason='STALE_SHORT_OBSERVATION';row.shortObservation.expiresAt=null;
+ h.send(s,config);
+ assert.equal(h.find(e=>e.dataset.state==='passed').length,0);
+ const prior=h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='previous_passed');assert.equal(prior.length,2);
+ for(const p of prior){assert.match(p.textContent,/✓/);assert.match(p.textContent,/אושר בבדיקה הקודמת · מתעדכן/);}
+ assert.match(h.panel.textContent,/2\/10 בבדיקה האחרונה · ממתין לעדכון/);
+ assert.match(h.panel.textContent,/4\/10 בבדיקה האחרונה · ממתין לעדכון/);
+ assert.match(h.panel.textContent,/הסימונים הקודמים אינם אישור כניסה כעת/);
+ row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BAR'};h.send(s,config);
+ assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='previous_passed').length,2);
+ row.longDecision={at:h.clock.now+1,reason:'WAIT_CHANNEL_TWO_TOUCHES'};h.clock.now++;s.checkedAt=h.clock.now;h.send(s,config);
+ assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='waiting').length,1);
+ assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='previous_passed').length,1);
+ h.expire();h.send(s,config);assert.equal(h.find(e=>e.dataset.state?.startsWith('previous_')).length,0);
+});
