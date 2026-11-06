@@ -65,15 +65,19 @@ test('published Binance-only intrabar plus settings/consolidation installs indep
   const file=path.join(root,'lib/futures-short-policy.mjs');
   fs.writeFileSync(file,previous+'\n// Preserve deployed exit integration\n');
   const server=path.join(root,'server.mjs'),serverBefore=fs.readFileSync(server,'utf8');
-  const hookAnchor='      persistLivePeak(ev.symbol,saved);';
-  assert.equal(serverBefore.split(hookAnchor).length,2);
-  fs.writeFileSync(server,serverBefore.replace(hookAnchor,'      refreshPocTrail(saved);\n'+hookAnchor));
+  // Exact source provided from the VPS, including both exit-wrapper calls and
+  // the POC entry guard. Do not synthesize just one of its local dependencies.
+  const deployedCycle=fs.readFileSync(new URL('./fixtures/binance-live-cycle-deployed-20261106.txt',import.meta.url),'utf8');
+  const start=serverBefore.indexOf('async function executeLiveCycle('),end=serverBefore.indexOf('async function getLiveAccountSnapshot(',start);
+  assert.ok(start>=0&&end>start);
+  fs.writeFileSync(server,serverBefore.slice(0,start)+deployedCycle+serverBefore.slice(end));
   patchParallelChecks(root,patches);const next=fs.readFileSync(file,'utf8');
-  assert.match(fs.readFileSync(server,'utf8'),/refreshPocTrail\(saved\)/);
+  const serverAfter=fs.readFileSync(server,'utf8'),cycleStart=serverAfter.indexOf('async function executeLiveCycle(');
+  assert.equal(serverAfter.slice(cycleStart,serverAfter.indexOf('async function getLiveAccountSnapshot(',cycleStart)),deployedCycle);
   assert.equal(shortBody(next),binanceOnlyShort(patch.after));
   assert.equal(next.slice(next.indexOf('// Cumulative live volume')),previous.slice(previous.indexOf('// Cumulative live volume'))+'\n// Preserve deployed exit integration\n');
   assert.match(next,/conditionReportVersion:CHANNEL_CONDITIONS_VERSION/);assert.doesNotMatch(next,/colmex-market-hours|stockSessionGap|regularSession/);
-  patchParallelChecks(root,patches);assert.equal(fs.readFileSync(file,'utf8'),next);
+  patchParallelChecks(root,patches);assert.equal(fs.readFileSync(file,'utf8'),next);assert.equal(fs.readFileSync(server,'utf8'),serverAfter);
   // Supply the unchanged dependencies, and exercise the resulting installed files.
   for(const name of ['lib','tests','scripts'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(root,name),{recursive:true,force:false});
   for(const entry of fs.readdirSync(new URL('../',import.meta.url),{withFileTypes:true})){
