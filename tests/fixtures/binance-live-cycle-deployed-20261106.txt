@@ -1,0 +1,68 @@
+async function executeLiveCycle(evals,{allowEntries=mode==='live'}={}){
+  if(!LIVE||!AUTO_EXECUTION||!liveStateHealth.journalReady)return;
+  // Most one-second cycles only observe peaks. Do not reserve network work
+  // (and block manual execution) unless a sale, entry, or recovery is needed.
+  let needsExecution=Boolean(liveOrders.pending);
+  for(const ev of evals){
+    if(!ev.ok)continue;
+    const saved=liveManagedPositions()[ev.symbol];
+    if(saved){
+      let price;
+      try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
+      observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
+      refreshPocTrail(saved);
+      persistLivePeak(ev.symbol,saved);
+      if(exitForLivePosition(saved,price).sell)needsExecution=true;
+    }
+    if(allowEntries&&!tradeControl.paused&&ev.entryConfirmed&&ev.wyckoffTrade&&!saved&&
+      !liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))needsExecution=true;
+  }
+  if(!needsExecution)return;
+  const gate=liveTradingGate(await getApiRestrictions());
+  if(!gate.ready)return;
+  if(gate.withdrawalsEnabled)throw Error('Withdrawals must remain disabled for LIVE auto execution');
+  await liveOrders.recover(p=>signedBinanceGet('/api/v3/order',{symbol:p.params.symbol,origClientOrderId:p.params.newClientOrderId}),recordLiveFill);
+  let account=await getLiveAccountSnapshot();
+  const owned=symbol=>account.balances.find(b=>b.asset===symbol.slice(0,-4)&&b.qty>0&&Number(b.valueUsdt||0)>=5);
+  const sold=new Set();
+  for(const ev of evals){
+    if(!ev.ok||!owned(ev.symbol))continue;
+    const saved=liveManagedPositions()[ev.symbol];
+    if(!saved)continue;
+    saved.marketRank=marketRanks.get(ev.symbol)??null;
+    let price;try{price=requireLivePrice(streams[ev.symbol],Date.now(),15000);}catch{continue;}
+    observePositionPeak(saved,price,streams[ev.symbol].lastEventAt);
+    refreshPocTrail(saved);
+    const exit=exitForLivePosition(saved,price);
+    persistLivePeak(ev.symbol,saved);
+    if(exit.sell){
+      try{await placeLiveMarketSell(ev.symbol,exit.reason);sold.add(ev.symbol);account=await getLiveAccountSnapshot();}
+      catch(error){recordLiveError(ev.symbol,error);if(liveOrders.pending||nativeProtection.uncertain()||!liveStateHealth.journalReady)throw error;}
+    }
+  }
+  if(!allowEntries||tradeControl.paused||POC_LIVE_REQUESTED)return;
+  account=await reconcileLiveHoldings();
+  if(!liveReadiness().ready)return;
+  if(Object.entries(liveManagedPositions()).some(([s,p])=>nativeProtection.rows[s]?.phase!=='ACTIVE'||nativeProtection.rows[s]?.entryAt!==p.entryAt))return;
+  for(const ev of newsEntryCandidates(evals)){
+    if(owned(ev.symbol)||sold.has(ev.symbol))continue;
+    if(liveActionLog.some(a=>a.type==='BUY'&&a.symbol===ev.symbol&&a.wyckoffTrade?.patternId===ev.wyckoffTrade.patternId))continue;
+    const held=account.balances.filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;
+    if(held>=LIVE_MAX_POSITIONS){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:'NO_FREE_SLOT'});break;}
+    const allocation=liveNextBuyAllocation(account,{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT});
+    if(!allocation.ok){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:allocation.code||'INSUFFICIENT_BALANCE'});break;}
+    const spend=allocation.amountUsdt;
+    if(spend<5||spend>LIVE_MAX_USDT||Number(account.usdtFree||0)<spend*1.002){recordEntryBlocker(strategyReviewState,{symbol:ev.symbol,reason:'READY',technicalReady:true,entryBlockReason:'INSUFFICIENT_UNLEVERAGED_CASH'});break;}
+    await placeLiveMarketBuy(ev.symbol,spend,ev.buyReason||'WYCKOFF_RECLAIM',{score:ev.score,wyckoffTrade:ev.wyckoffTrade,kellyPolicyVersion:KELLY_RULESET});
+    account=await getLiveAccountSnapshot();
+  }
+}
+
+let lastDisplayAccount=null,displayAccountPending=null;
+async function getDisplayAccountSnapshot(){
+  if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)>=0&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<10000)return externalCostReader.decorate(lastDisplayAccount);
+  if(displayAccountPending)return externalCostReader.decorate(await displayAccountPending);
+  const pending=getLiveAccountSnapshot();displayAccountPending=pending;
+  try{return externalCostReader.decorate(await pending);}finally{if(displayAccountPending===pending)displayAccountPending=null;}
+}
+
