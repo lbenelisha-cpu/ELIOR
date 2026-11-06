@@ -33,6 +33,15 @@ up the changed files, preserves local integrations, activation flags and exit
 settings, and verifies both report capabilities after restart. No trading rule,
 allocation, order route or exit protection is relaxed.
 
+The installer also recognizes the exact Binance-only intrabar evaluator published
+at `5381d2cc0db960c8faedef38eb9fb55e8c95b501`, followed by the targeted settings and
+consolidation patches. It installs the independent report using the same strict
+Binance candle-gap rules and original import layout, retaining the existing exit
+code. Shared and Binance-only layouts are matched exactly; modified guards, mixed
+or duplicated evaluators and unknown imports still abort before any writes.
+The historical fixture is the original published module, not a generated approximation.
+
+
 Data availability (the rolling 50 closed bars, fresh quote and current open bar)
 is not a checklist row and does not count toward the ten technical conditions.
 While the server awaits those inputs, or the recorded scan has expired, the
