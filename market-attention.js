@@ -16,6 +16,7 @@
  const toggle=add('button','הצג את כל הנכסים',controls);toggle.type='button';
  const cards=add('div','',panel,'attention-cards'),sources=add('details','',panel,'attention-sources');add('summary','מקורות, כיסוי ויומן תצפיות',sources);const sourceBody=add('div','',sources);
  const link=(parent,row)=>{try{const u=new URL(row.url);if(u.protocol!=='https:'||u.username||u.password||u.port||!['www.coindesk.com','cointelegraph.com','www.prnewswire.com'].includes(u.hostname))return;const a=add('a',row.title,parent);a.dir='auto';a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}catch{}};
+ const entryReason=value=>window.LEVI_FUTURES_TABLE?.reason(value)||reasons[value]||value||'ממתין לבדיקה';
  function render(){
   const now=Date.now(),transport=snapshot&&now-receivedAt<90000&&now>=receivedAt&&now-snapshot.checkedAt<90000&&now>=snapshot.checkedAt;
   const expanded=new Set(Array.from(cards.querySelectorAll('details[open]')).map(x=>x.dataset.symbol));cards.replaceChildren();sourceBody.replaceChildren();
@@ -31,6 +32,17 @@
    add('strong',r.symbol,top);const button=add('button','פתח גרף',top);button.type='button';button.onclick=()=>window.dispatchEvent(new CustomEvent('levi-rsi-select',{detail:r.symbol}));
    const title=r.news.active?'איתות חדשות · תשומת לב מוגברת':r.technical.watch?'תצפיתן: '+reasons.NEAR_CHANNEL_BOUNDARY:reasons[r.technical.reason]||'מעקב';
    add('p',title,card,'attention-label');const t=r.technical;
+   if(snapshot.sharedWatchPolicy?.version==='SHARED_LONG_SHORT_WATCH_V1'){
+    const checks=add('div','',card,'attention-entry-checks'),long=add('div','',checks),short=add('div','',checks),o=r.shortObservation;
+    add('strong','LONG · '+r.symbol,long);const ld=r.longDecision,lf=transport&&ld&&now>=ld.at&&now-ld.at<90000;
+    add('p','בדיקה: '+(lf?entryReason(ld.reason):'ממתין לבדיקה עדכנית'),long);
+    add('small','ביצוע: '+(r.entryBlockers?.long?entryReason(r.entryBlockers.long):lf&&ld.blocker?entryReason(ld.blocker):'כפוף לבדיקה סופית'),long);
+    add('strong','SHORT · '+(o?.futuresSymbol||'חוזה לא מאומת'),short);
+    const sf=transport&&o&&o.at<=now&&now-o.at<180000&&o.expiresAt>now;
+    add('p','בדיקה: '+(!transport?'העדכון התיישן':!o?'ממתין למיפוי חוזה':!o.available?entryReason(o.mappingReason):sf?entryReason(o.reason):entryReason(o.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION')),short);
+    add('small','ביצוע: '+(r.entryBlockers?.short?entryReason(r.entryBlockers.short):'כפוף לבדיקה סופית'),short);
+    add('small','בדיקה אחרונה: '+date(o?.at),short);
+   }
    if(t.ready){
     add('p','Spot · 50 נרות לפני נר המדידה · '+date(t.dataAt),card,'attention-note');
     add('p',t.channel?'תעלת קיצון: '+t.channel.highTouches+' נגיעות למעלה / '+t.channel.lowTouches+' למטה · '+(t.channel.confirmed?'מאושרת':'זמנית'):'תעלת קיצון: אין תעלה תקפה',card);

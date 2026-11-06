@@ -6,6 +6,11 @@ const code=fs.readFileSync(new URL('../binance-futures-positions.js',import.meta
 const ctx=vm.createContext({});vm.runInContext(code,ctx);const view=ctx.LEVI_FUTURES_TABLE.view;
 const now=Date.now();
 const snapshot={mode:'live',shortTrading:{enabled:true,checkedAt:now,account:{walletUsdt:70,availableUsdt:36},positions:[{symbol:'ABCUSDT',qty:2,entryPrice:100,currentPrice:95,entryAt:now-600000,priceAt:now,targetPrice:90,stopPrice:99,protectedAt:now,algos:[{kind:'STOP_MARKET',status:'NEW'},{kind:'TAKE_PROFIT_MARKET',status:'NEW'}]}]}};
+test('shared watch shows missing contracts and paused execution without hiding technical checks',()=>{
+ const data=structuredClone(snapshot);data.shortTrading.watch={policy:{version:'SHARED_LONG_SHORT_WATCH_V1'},checkedAt:now,entryBlocker:'FUTURES_TWO_SLOTS_FULL',rows:[{spotSymbol:'GOOGLBUSDT',futuresSymbol:'GOOGLUSDT',available:true,at:now,expiresAt:now+60000,reason:'SHORT_VOLUME_LOW'},{spotSymbol:'NVDABUSDT',available:false,at:null,mappingReason:'FUTURES_SYMBOL_UNAVAILABLE'}]};
+ const html=view(data,now);assert.match(html,/GOOGLBUSDT/);assert.match(html,/GOOGLUSDT/);assert.match(html,/שני מקומות השורט תפוסים/);assert.match(html,/מחזור הפריצה קטן/);assert.match(html,/אין חוזה USDT תואם/);
+ assert.match(view(data,now+100000),/סריקת SHORT התיישנה/);
+});
 test('SHORT consolidation rules wait for the runtime marker and scan reasons show recorded evidence',()=>{
  assert.doesNotMatch(view(snapshot,now),/דשדוש לפני הכניסה/);
  const data=structuredClone(snapshot);data.shortTrading.policy={consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}};

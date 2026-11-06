@@ -61,6 +61,20 @@ function harness(options={}){
  runner.infos.ABCUSDT=info;runner.marketAt=now;
  return {runner,api,writes,algos,orders,a,symbolConfig,control,ownerSettings,setQuote:q=>quote={...quote,...q},setPositions:p=>positions=p,get saved(){return saved;}};
 }
+test('shared SHORT execution universe includes verified stock contracts independently of top-volume rankings',async()=>{
+ const h=harness(),get=h.api.get;h.runner.watchSymbols=()=>['GOOGLBUSDT','ABCUSDT','NVDABUSDT'];
+ h.api.get=async(route,p)=>{
+  if(route==='/fapi/v1/exchangeInfo')return {symbols:[info,{...info,symbol:'GOOGLUSDT',baseAsset:'GOOGL'}]};
+  if(route==='/fapi/v1/ticker/24hr')throw Error('Volume cutoff must not select the shared universe');
+  return get(route,p);
+ };
+ await h.runner.markets();assert.deepEqual(h.runner.universe,['GOOGLUSDT','ABCUSDT']);assert.equal(h.writes.length,0);
+});
+test('removing a shared-watch symbol rejects automatic entry and final dispatch without a SELL',async()=>{
+ const h=harness();h.runner.watchSymbols=()=>['GOOGLBUSDT'];await assert.rejects(h.runner.enter('ABCUSDT',shortSignal(input(),config)),/NOT_IN_SHARED_WATCH/);assert.equal(h.writes.length,0);
+ let symbols=['ABCUSDT'];const k=harness({onSave(){symbols=[];}});k.runner.watchSymbols=()=>symbols;
+ await assert.rejects(k.runner.enter('ABCUSDT',shortSignal(input(),config)),/NOT_IN_SHARED_WATCH/);assert.equal(k.writes.some(w=>w.q.side==='SELL'),false);
+});
 test('contract-price test replies follow quote changes and retain strict endpoint failures',async()=>{
  const h=harness(),read=()=>h.api.get('/fapi/v1/ticker/price',{symbol:'ABCUSDT'});
  assert.deepEqual(await read(),{symbol:'ABCUSDT',price:'104',time:now});
