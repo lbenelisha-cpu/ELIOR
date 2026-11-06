@@ -11,6 +11,14 @@ export function patchSharedWatch(root,patches){
   const count=fragment=>typeof fragment==='string'&&fragment.length?text.split(fragment).length-1:0;
   const fail=reason=>{throw Error('Unrecognized '+file+' context ['+(patch.id||'patch-'+(index+1))+'; '+reason+']; no files changed');};
   if(variants.some(v=>!v.before||!v.after))fail('empty anchor');
+  if(patch.installedMarker){
+   if(file!=='server.mjs'||patch.id!=='server-watch-timer'||!after.includes(patch.installedMarker))fail('invalid installed marker');
+   const installed=count(patch.installedMarker);
+   if(installed>1)fail('duplicate observer timer');
+   // Earlier releases installed this same read-only timer inside server.listen.
+   // Retain its location and never create a second observer interval.
+   if(installed===1)continue;
+  }
   const installed=variants.map(v=>count(v.after));
   if(installed.some(n=>n>1)||installed.filter(n=>n===1).length>1)fail('duplicate installed integration');
   if(installed.some(n=>n===1))continue;

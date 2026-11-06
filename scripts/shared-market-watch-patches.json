@@ -67,9 +67,10 @@
   },
   {
     "file": "server.mjs",
-    "before": "  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();",
-    "after": "  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();\n  setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();",
-    "id": "server-watch-timer"
+    "before": "futuresShort.watchSnapshot=()=>futuresWatch.snapshot();",
+    "after": "futuresShort.watchSnapshot=()=>futuresWatch.snapshot();\nsetInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();",
+    "id": "server-watch-timer",
+    "installedMarker": "setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();"
   },
   {
     "file": "lib/market-attention.mjs",

@@ -54,7 +54,7 @@ test('shared watch initializes without the optional server POC hook and is idemp
   const constructor=original.find(p=>p.after.startsWith('const futuresShort=new FuturesShortRunner')).after.split('\nconst server=')[0];
   const source=[patches.find(p=>p.id==='server-watch-import').before,
    'function marketAttentionSnapshot(){return attentionSnapshot({'+patches.find(p=>p.id==='server-attention-snapshot').before+'});}',
-   constructor,patches.find(p=>p.id==='server-watch-timer').before].join('\n');
+   constructor,'  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();'].join('\n');
   assert.ok(!source.includes(init.before));
   const file=path.join(root,'server.mjs');fs.writeFileSync(file,source);
   patchSharedWatch(root,patches);const once=fs.readFileSync(file,'utf8');
@@ -98,4 +98,55 @@ test('unknown or ambiguous server layouts report a patch ID and preserve every s
    for(const [name,text]of before)assert.equal(fs.readFileSync(path.join(root,name),'utf8'),text);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
  }
+});
+
+test('observer scheduling does not depend on the installed SHORT timer layout or cadence',async()=>{
+ const executionTimer='  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();';
+ const timer=patches.find(p=>p.id==='server-watch-timer');
+ const layouts=[
+  'setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();',
+  '  setInterval(() => futuresShort.cycle().catch(() => {}), 5000).unref();',
+  '  setInterval(async () => { await futuresShort.cycle(); }, 3000).unref();',
+  '  async function shortLoop(){ await futuresShort.cycle(); setTimeout(shortLoop,4000); }\n  shortLoop();'
+ ];
+ for(const scheduler of layouts){
+  const root=oldRuntime();
+  try{
+   const file=path.join(root,'server.mjs');
+   const source=fs.readFileSync(file,'utf8').replace(executionTimer,scheduler);
+   assert.ok(!source.includes(executionTimer),'The previous installer would fail on this layout');
+   fs.writeFileSync(file,source);patchSharedWatch(root,patches);
+   const once=fs.readFileSync(file,'utf8');patchSharedWatch(root,patches);
+   assert.equal(fs.readFileSync(file,'utf8'),once);
+   assert.ok(once.includes(scheduler),'Keep the installed execution scheduler verbatim');
+   assert.equal(once.split(timer.installedMarker).length-1,1);
+   assert.ok(once.includes(timer.after),'Schedule beside the observer initialization');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+ }
+ // Run the inserted fragment. Its callback must touch only the public observer.
+ const scheduled=[];let observations=0,unrefs=0;
+ const context=vm.createContext({
+  futuresShort:{cycle:()=>{throw Error('Observer timer invoked trading');}},
+  futuresWatch:{snapshot:()=>({}),tick:async()=>{observations++;throw Error('Public feed temporarily unavailable');}},
+  setInterval:(callback,ms)=>{scheduled.push({callback,ms});return {unref(){unrefs++;}};}
+ });
+ vm.runInContext(timer.after,context);
+ assert.equal(scheduled.length,1);assert.equal(scheduled[0].ms,2000);assert.equal(unrefs,1);
+ await scheduled[0].callback();await scheduled[0].callback();
+ assert.equal(observations,2,'A failed public read does not disable subsequent observation');
+});
+
+test('an existing observer timer in the earlier server.listen location is retained without duplication',()=>{
+ const root=oldRuntime();
+ try{
+  patchSharedWatch(root,patches);
+  const timer=patches.find(p=>p.id==='server-watch-timer'),file=path.join(root,'server.mjs');
+  const executionTimer='  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();';
+  const source=fs.readFileSync(file,'utf8').replace(timer.after,timer.before).replace(executionTimer,executionTimer+'\n  '+timer.installedMarker);
+  fs.writeFileSync(file,source);patchSharedWatch(root,patches);
+  assert.equal(fs.readFileSync(file,'utf8'),source);
+  const duplicate=source+'\n'+timer.installedMarker;fs.writeFileSync(file,duplicate);
+  assert.throws(()=>patchSharedWatch(root,patches),/server-watch-timer; duplicate observer timer.*no files changed/);
+  assert.equal(fs.readFileSync(file,'utf8'),duplicate);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
