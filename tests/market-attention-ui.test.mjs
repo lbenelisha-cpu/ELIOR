@@ -38,3 +38,9 @@ test('news brief receives the source report while trading observations stay unch
  h.context.window.LEVI_NEWS_SUMMARY={append:(parent,row)=>{seen.push(row);const text=new Element('p');text.textContent='תקציר בעברית';parent.append(text);}};
  h.send(s);assert.equal(seen.length,2);assert.equal(seen[0],s.rows[0].news.evidence[0]);assert.match(h.panel.textContent,/תקציר בעברית/);assert.equal(JSON.stringify(s),original);
 });
+test('shared cards show both directions, mapped contract and separate execution blockers',()=>{
+ const h=ui(),s=snapshot(h.clock.now);s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const row=s.rows[0];row.symbol='GOOGLBUSDT';row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BREAKOUT'};row.entryBlockers={long:'NO_FREE_SLOT',short:'FUTURES_ENTRIES_PAUSED'};row.shortObservation={available:true,futuresSymbol:'GOOGLUSDT',at:h.clock.now,expiresAt:h.clock.now+60000,reason:'SHORT_VOLUME_LOW'};
+ h.send(s);assert.match(h.panel.textContent,/LONG · GOOGLBUSDT/);assert.match(h.panel.textContent,/SHORT · GOOGLUSDT/);assert.match(h.panel.textContent,/NO_FREE_SLOT/);assert.match(h.panel.textContent,/SHORT_VOLUME_LOW/);assert.match(h.panel.textContent,/FUTURES_ENTRIES_PAUSED/);
+ row.shortObservation={available:false,mappingReason:'FUTURES_SYMBOL_UNAVAILABLE',at:null};h.send(s);assert.match(h.panel.textContent,/FUTURES_SYMBOL_UNAVAILABLE/);assert.doesNotMatch(h.panel.textContent,/SHORT · GOOGLUSDT/);
+});

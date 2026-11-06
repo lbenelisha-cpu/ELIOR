@@ -8,6 +8,7 @@ import {channelEntryConfig,assertChannelSubmission} from './lib/channel-primary-
 import {observeChannels} from './lib/channel-comparison.mjs';
 import {newsConfig} from './lib/market-news.mjs';
 import {ATTENTION_POLICY,newsAttention,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from './lib/market-attention.mjs';
+import {SharedMarketWatch,SHARED_WATCH_POLICY} from './lib/shared-market-watch.mjs';
 import {fileNewsCollector} from './lib/market-news-file.mjs';
 import {ENTRY_COMPARISON_POLICY,observeEntryComparison,recordEntryBlocker} from './lib/entry-method-comparison.mjs';
 import {BINANCE_CONFIRMED_POLICY} from './lib/confirmed-entry-quality.mjs';
@@ -119,7 +120,7 @@ const marketNews=fileNewsCollector(process.env.MARKET_NEWS_FILE||'/var/data/mark
 function newsEntryAssessment(symbol){return {action:'NONE',priority:0,reason:'OBSERVATION_ONLY',symbol};}
 function newsEntryCandidates(evals){return evals.filter(e=>e.ok&&e.entryConfirmed&&e.wyckoffTrade);}
 function newsChannelSnapshot(){const data=marketNews.snapshot(),now=Date.now();const assets=[...new Set(data.items.flatMap(r=>r.assets.map(a=>a.id.split(':')[1]+(a.id.startsWith('crypto:')?'USDT':''))))];return {...data,config:marketNewsConfig,executionEnabled:false,decisions:[],attention:assets.map(symbol=>({symbol,...newsAttention(data,symbol,now)}))};}
-function marketAttentionSnapshot(){return attentionSnapshot({state:strategyReviewState,news:marketNews.snapshot(),symbols:SYMBOLS,mode,storageError:strategyReviewError,diagnostics:strategyReviewState.entryComparison?.diagnostics,shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason});}
+function marketAttentionSnapshot(){return attentionSnapshot({state:strategyReviewState,news:marketNews.snapshot(),symbols:SYMBOLS,mode,storageError:strategyReviewError,diagnostics:strategyReviewState.entryComparison?.diagnostics,shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason,sharedWatch:futuresWatch.snapshot(),longEntryBlocker:tradeControl.paused?'TRADING_PAUSED':!channelPrimary.enabled?'CHANNEL_PRIMARY_DISABLED':Object.keys(liveManagedPositions()).length>=LIVE_MAX_POSITIONS?'NO_FREE_SLOT':null});}
 const LIVE_MAX_USDT=Math.max(0,Number(process.env.BINANCE_LIVE_MAX_USDT||400));
 const MANUAL_SYMBOLS=String(process.env.BINANCE_SYMBOLS||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
 
@@ -2239,6 +2240,15 @@ const futuresShort=new FuturesShortRunner({
  permission:getApiRestrictions
 });
 futuresShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');
+// The two directions share asset identities; each reads its own market prices.
+futuresShort.watchSymbols=()=>SYMBOLS;
+futuresShort.config.sharedWatchPolicy=SHARED_WATCH_POLICY;
+const futuresWatch=new SharedMarketWatch({
+ read:(route,params)=>futuresShort.api.get(route,params),symbols:()=>SYMBOLS,
+ config:()=>futuresShort.config,entryBlocker:()=>futuresShort.watchEntryBlocker(),
+ boundary:symbol=>({entryAfter:Math.max(Date.parse(tradeControl.resumedAt)||0,futuresShort.state.resumedAt||0,futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0),used:futuresShort.state.used.filter(p=>p.symbol===symbol).map(p=>p.patternId)})
+});
+futuresShort.watchSnapshot=()=>futuresWatch.snapshot();
 // POC waits are server-owned; the browser can close after explicit creation.
 const pocControl=()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,paused:tradeControl.paused,mode});
 const pocManualInput=row=>({requestId:row.requestId,mode:'live',side:'BUY',symbol:row.symbol,quoteUsdt:row.quoteUsdt});
@@ -2757,6 +2767,7 @@ server.listen(PORT,'0.0.0.0',async()=>{
   setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
   setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
+  setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();
   /* Wyckoff upgrade preserves existing holdings and journals. */
   await refreshUniverse();
 });

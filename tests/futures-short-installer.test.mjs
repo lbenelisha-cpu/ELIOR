@@ -12,6 +12,9 @@ test('targeted installer patches are idempotent and reject an unknown context wi
  try{
   for(const file of ['server.mjs','binance-agent.js']){
    let source=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
+   // Test the original installer before the later shared-watch source integration.
+   const later=JSON.parse(fs.readFileSync(new URL('../scripts/shared-market-watch-patches.json',import.meta.url),'utf8'));
+   for(const p of later.filter(x=>x.file===file).reverse())source=source.replace(p.after,p.before);
    for(const p of patches.filter(x=>x.file===file).reverse())source=source.replace(p.after,p.before);
    fs.writeFileSync(path.join(dir,file),source);
   }

@@ -1,0 +1,77 @@
+[
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "import {futuresFillPrice} from './futures-short-fill.mjs';",
+    "after": "import {futuresFillPrice} from './futures-short-fill.mjs';\nimport {sharedWatchRows,SHARED_WATCH_POLICY} from './shared-market-watch.mjs';"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "status(){return {policy:this.config,enabled:",
+    "after": "status(){return {watch:this.watchSnapshot?.()??null,entryBlocker:this.watchEntryBlocker(),policy:this.config,enabled:"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": " async snapshot(){",
+    "after": " watchEntryBlocker(){\n  if(this.fatal||this.state.halt)return this.fatal||this.state.halt;\n  if(this.forceClose)return 'FUTURES_STOP_ALL';\n  if(this.state.pending)return 'FUTURES_ORDER_PENDING';\n  if(!this.config.enabled)return 'FUTURES_SHORT_DISABLED';\n  if(!this.control().allowEntries)return 'FUTURES_ENTRIES_PAUSED';\n  if(Object.keys(this.state.positions).length>=2)return 'FUTURES_TWO_SLOTS_FULL';\n  if(this.error)return this.error;\n  if(!this.accountSummary||!this.checkedAt||this.now()-this.checkedAt>30000)return 'FUTURES_ACCOUNT_UNVERIFIED';\n  if(this.accountSummary.availableUsdt<35)return 'FUTURES_NEED_35_USDT_FREE_PER_SLOT';\n  return null; // Final entryGate still checks permissions, orders, budget and protection.\n }\n sharedUniverse(){return sharedWatchRows(this.watchSymbols(),Object.values(this.infos)).filter(r=>r.available).map(r=>r.futuresSymbol);}\n assertWatchedSymbol(symbol){\n  if(this.watchSymbols&&(!this.marketAt||this.now()<this.marketAt||this.now()-this.marketAt>=SHARED_WATCH_POLICY.marketAgeMs||!this.sharedUniverse().includes(symbol)))throw Error('FUTURES_NOT_IN_SHARED_WATCH');\n }\n async snapshot(){"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "  const tickers=await this.api.get('/fapi/v1/ticker/24hr');\n  if(!Array.isArray(tickers))throw Error('FUTURES_UNIVERSE_UNVERIFIED');\n  this.universe=tickers.filter(t=>this.infos[t.symbol]&&Number(t.quoteVolume)>0).sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,50).map(t=>t.symbol);",
+    "after": "  if(this.watchSymbols)this.universe=this.sharedUniverse();\n  else{\n   const tickers=await this.api.get('/fapi/v1/ticker/24hr');\n   if(!Array.isArray(tickers))throw Error('FUTURES_UNIVERSE_UNVERIFIED');\n   this.universe=tickers.filter(t=>this.infos[t.symbol]&&Number(t.quoteVolume)>0).sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,50).map(t=>t.symbol);\n  }"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": " async enter(symbol,first){\n  if(this.reserved(symbol))",
+    "after": " async enter(symbol,first){\n  this.assertWatchedSymbol(symbol);\n  if(this.reserved(symbol))"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "  await this.submit('ENTRY',plan,{setup:check.setup,settings},()=>{\n   const last=",
+    "after": "  await this.submit('ENTRY',plan,{setup:check.setup,settings},()=>{\n   this.assertWatchedSymbol(symbol);\n   const last="
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "   const symbol=this.universe[this.cursor++%this.universe.length];if(!symbol)return;",
+    "after": "   if(this.watchSymbols)this.universe=this.sharedUniverse();\n   const symbol=this.universe[this.cursor++%this.universe.length];if(!symbol)return;"
+  },
+  {
+    "file": "server.mjs",
+    "before": "import {ATTENTION_POLICY,newsAttention,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from './lib/market-attention.mjs';",
+    "after": "import {ATTENTION_POLICY,newsAttention,recordAttention,prioritizeObservationSymbols,attentionSnapshot} from './lib/market-attention.mjs';\nimport {SharedMarketWatch,SHARED_WATCH_POLICY} from './lib/shared-market-watch.mjs';"
+  },
+  {
+    "file": "server.mjs",
+    "before": "shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason",
+    "after": "shortChecks:futuresShort.checks,shortReason:futuresShort.status().reason,sharedWatch:futuresWatch.snapshot(),longEntryBlocker:tradeControl.paused?'TRADING_PAUSED':!channelPrimary.enabled?'CHANNEL_PRIMARY_DISABLED':Object.keys(liveManagedPositions()).length>=LIVE_MAX_POSITIONS?'NO_FREE_SLOT':null"
+  },
+  {
+    "file": "server.mjs",
+    "before": "futuresShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');",
+    "after": "futuresShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');\n// The two directions share asset identities; each reads its own market prices.\nfuturesShort.watchSymbols=()=>SYMBOLS;\nfuturesShort.config.sharedWatchPolicy=SHARED_WATCH_POLICY;\nconst futuresWatch=new SharedMarketWatch({\n read:(route,params)=>futuresShort.api.get(route,params),symbols:()=>SYMBOLS,\n config:()=>futuresShort.config,entryBlocker:()=>futuresShort.watchEntryBlocker(),\n boundary:symbol=>({entryAfter:Math.max(Date.parse(tradeControl.resumedAt)||0,futuresShort.state.resumedAt||0,futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0),used:futuresShort.state.used.filter(p=>p.symbol===symbol).map(p=>p.patternId)})\n});\nfuturesShort.watchSnapshot=()=>futuresWatch.snapshot();"
+  },
+  {
+    "file": "server.mjs",
+    "before": "  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();",
+    "after": "  setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();\n  setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();"
+  },
+  {
+    "file": "lib/market-attention.mjs",
+    "before": "export function attentionSnapshot({state,news,symbols=[],now=Date.now(),mode='live',storageError=null,diagnostics={},shortChecks={},shortReason=null}){\n",
+    "after": "export function attentionSnapshot({state,news,symbols=[],now=Date.now(),mode='live',storageError=null,diagnostics={},shortChecks={},shortReason=null,sharedWatch=null,longEntryBlocker=null}){\n"
+  },
+  {
+    "file": "lib/market-attention.mjs",
+    "before": " const live=mode==='live',p=ATTENTION_POLICY;\n",
+    "after": " const live=mode==='live',p=ATTENTION_POLICY;\n const shared=sharedWatch?.policy?.version==='SHARED_LONG_SHORT_WATCH_V1'?sharedWatch:null;\n const mapped=new Map((shared?.rows||[]).map(r=>[r.spotSymbol,r]));\n"
+  },
+  {
+    "file": "lib/market-attention.mjs",
+    "before": "  const diagnostic=diagnostics[symbol],short=shortChecks[symbol];\n  return {symbol,news:n,technical,attention:n.active||technical.watch,\n",
+    "after": "  const diagnostic=diagnostics[symbol],mapping=mapped.get(symbol),short=shortChecks[mapping?mapping.futuresSymbol:symbol];\n  return {symbol,news:n,technical,attention:n.active||technical.watch,shortObservation:live?mapping||null:null,entryBlockers:{long:longEntryBlocker,short:shared?.entryBlocker??null},\n"
+  },
+  {
+    "file": "lib/market-attention.mjs",
+    "before": " return {policy:p,checkedAt:now,mode,storageError,shortReason,rows,\n",
+    "after": " return {policy:p,checkedAt:now,mode,storageError,shortReason,sharedWatchPolicy:shared?.policy||null,rows,\n"
+  }
+]
