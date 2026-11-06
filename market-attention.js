@@ -29,7 +29,7 @@
   if(!shown.length)add('p',query?'אין נכס תואם ביקום המעקב.':'אין כרגע איתות טרי ברשימת המעקב. אפשר לפתוח את כל הנכסים ולראות מה נבדק ומה חסר.',cards,'attention-note');
   for(const r of shown){
    const card=add('article','',cards,'attention-card'+(r.active?' attention-active':'')),top=add('div','',card,'attention-card-head');
-   add('strong',r.symbol,top);const button=add('button','פתח גרף',top);button.type='button';button.onclick=()=>window.dispatchEvent(new CustomEvent('levi-rsi-select',{detail:r.symbol}));
+   add('strong',r.symbol,top);const button=add('button','פתח גרף Spot',top);button.type='button';button.onclick=()=>window.dispatchEvent(new CustomEvent('levi-dashboard-select',{detail:r.symbol}));
    const title=r.news.active?'איתות חדשות · תשומת לב מוגברת':r.technical.watch?'תצפיתן: '+reasons.NEAR_CHANNEL_BOUNDARY:reasons[r.technical.reason]||'מעקב';
    add('p',title,card,'attention-label');const t=r.technical;
    if(snapshot.sharedWatchPolicy?.version==='SHARED_LONG_SHORT_WATCH_V1'){
