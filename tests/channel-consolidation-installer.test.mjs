@@ -1,3 +1,4 @@
+import {restorePreParallelLayout} from './helpers/pre-parallel-entry-layout.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,6 +21,7 @@ test('consolidation installer is repeatable, rejects unknown context atomically 
  try{
   for(const name of ['lib','tests','scripts'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(dir,name),{recursive:true});
   for(const name of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(dir,name));
+  restorePreParallelLayout(dir);
   // A harmless local server edit breaks the original installer's old anchor,
   // while leaving the settings and consolidation patches applicable.
   const serverPath=path.join(dir,'server.mjs'),server=fs.readFileSync(serverPath,'utf8');

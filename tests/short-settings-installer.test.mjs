@@ -1,3 +1,4 @@
+import {beforeParallelChecks,restorePreParallelLayout} from './helpers/pre-parallel-entry-layout.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +19,7 @@ test('SHORT installer applies only recognized changes, preserves unrelated code,
  try{
   const expected=new Map();
   for(const file of new Set(patches.map(p=>p.file))){
-   const next=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8')+'\n// Preserve local deployment integration\n';
+   const next=beforeParallelChecks(file,fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'))+'\n// Preserve local deployment integration\n';
    expected.set(file,next);let old=beforeConsolidation(file,next);
    for(const p of patches.filter(p=>p.file===file).reverse()){
     assert.equal(old.split(p.after).length,2);old=old.replace(p.after,p.before);
@@ -52,6 +53,7 @@ test('staged tests support and preserve an installed runner with additional cont
   // Match the installer's staging boundary: installed runtime, reviewed tests/scripts.
   for(const name of ['lib','tests','scripts'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(dir,name),{recursive:true});
   for(const name of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(dir,name));
+  restorePreParallelLayout(dir);
   for(const file of new Set(patches.map(p=>p.file))){
    const target=path.join(dir,file);let source=beforeConsolidation(file,fs.readFileSync(target,'utf8'));
    for(const p of patches.filter(p=>p.file===file).reverse()){
