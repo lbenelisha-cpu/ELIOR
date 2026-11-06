@@ -1,5 +1,29 @@
 # News and observers: attention only
 
+### Entry checklists (2026-11-06)
+
+Each shared watch card lists the LONG Spot and mapped SHORT Futures entry
+requirements. A checkmark means the condition passed in the displayed server
+check; a circle identifies the unmet gate; a dash means it has not been verified.
+`channel-entry-checklist.js` projects the known, ordered rejection reasons from
+the channel entry evaluators. It marks only gates proven by that result and leaves
+later gates unknown. It does not recompute a signal or use the closed-bar technical
+observer to approve live-price or accumulated-open-bar-volume requirements.
+
+LONG requires the advertised current channel/consolidation policy; SHORT uses
+only the verified contract's read-only shared observation. Unknown reasons,
+unverified mappings and policies, future dates, transport/auth loss, expired
+observations and the next five-minute candle clear checkmarks. The 90-second LONG
+and 180-second shared SHORT observation lifetimes are upper bounds. These are
+timestamped scan results, not live quotes. Checkmarks can disappear on the next
+scan; they are never latched across candles.
+
+Account permission, cash, capacity and protection approval remain a separate row:
+a reported blocker is shown explicitly; no reported blocker remains unverified.
+Even a complete technical checklist does not authorize an order. The UI uses the
+existing response and adds no API requests. This is a static Netlify update with
+no VPS installation or changes to entry rules, settings, allocation or exits.
+
 Binance Overview and Scans include an authenticated “איתותים ותצפיתנים” board. The existing agent response supplies it; the widget makes no requests or order submissions. A news report creates a watch highlight, never a buy/sell decision. The server ignores the legacy MARKET_NEWS_ENTRY_OVERLAY activation for execution. Automatic candidate ordering, final submission, POC, quantities and exits do not consult news.
 
 ### Hebrew headline briefs (2026-11-06)
