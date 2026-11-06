@@ -20,7 +20,24 @@ const snapshot=now=>({policy:{version:'MARKET_ATTENTION_V1'},checkedAt:now,rows:
 test('attention display uses text nodes, validates links, expires highlights and clears on auth loss',()=>{
  const h=ui(),s=snapshot(h.clock.now);h.send(s);
  assert.equal(h.find(e=>e.className.includes('attention-active')).length,1);assert.match(h.panel.textContent,/2 נגיעות למעלה/);assert.match(h.panel.textContent,/<img src=x/);assert.equal(h.find(e=>e.tag==='img').length,0);
- h.find(e=>e.tag==='button'&&e.text==='פתח גרף')[0].onclick();assert.equal(h.clock.lastEvent.detail,'ETHUSDT');assert.equal(h.clock.lastEvent.type,'levi-rsi-select');
+ h.find(e=>e.tag==='button'&&e.text==='פתח גרף Spot')[0].onclick();assert.equal(h.clock.lastEvent.detail,'ETHUSDT');assert.equal(h.clock.lastEvent.type,'levi-dashboard-select');
+ // Exercise the real dashboard navigation from a hidden, collapsed chart.
+ const agent=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
+ const chart={hidden:true,open:false,classList:{contains:name=>name==='trade-view'},scrollIntoView:options=>{h.clock.scroll=options;}};
+ const portfolio={hidden:false,classList:{contains:name=>name==='portfolio-view'}};
+ Object.assign(h.context,{activeView:'portfolio',selectedSymbol:'BTCUSDT',currentAgentData:{agents:[{symbol:'ETHUSDT'}]},currentMode:'live',currentLiveAccount:{},chartCandles:[],
+  $:selector=>selector==='#chartSection'?chart:null,requestAnimationFrame:fn=>fn(),drawCandles:()=>{},
+  updateSelectedAsset:()=>{h.clock.chartSymbol=h.context.selectedSymbol;}});
+ const get=h.context.document.getElementById;
+ h.context.document.getElementById=id=>id==='chartSection'?chart:get(id);
+ h.context.document.querySelectorAll=selector=>selector==='.app-view'?[chart,portfolio]:[];
+ const view=agent.slice(agent.indexOf('function setDashboardView('),agent.indexOf('\nasync function J('));
+ const select=agent.slice(agent.indexOf('function selectScannerAsset('),agent.indexOf('\nfunction render(d,'));
+ const listener=agent.match(/window\.addEventListener\('levi-dashboard-select',event=>\{[\s\S]*?\n\}\);/)[0];
+ vm.runInNewContext(view+'\n'+select+'\n'+listener,h.context);
+ h.find(e=>e.tag==='button'&&e.text==='פתח גרף Spot')[0].onclick();
+ assert.equal(h.context.activeView,'trade');assert.equal(chart.hidden,false);assert.equal(chart.open,true);assert.equal(portfolio.hidden,true);
+ assert.equal(h.clock.chartSymbol,'ETHUSDT');assert.equal(h.clock.scroll.block,'start');assert.equal(h.clock.scroll.behavior,'smooth');
  s.rows[0].news.evidence[0].url='javascript:alert(1)';h.send(s);assert.equal(h.find(e=>e.href?.startsWith('javascript:')).length,0);
  h.clock.now+=90001;h.timers[0]();assert.equal(h.find(e=>e.className.includes('attention-active')).length,0);assert.match(h.panel.textContent,/התיישן/);
  h.expire();assert.equal(h.find(e=>e.className==='attention-card').length,0);assert.match(h.panel.textContent,/חבר את המכשיר/);
