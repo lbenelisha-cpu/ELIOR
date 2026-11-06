@@ -27,7 +27,8 @@
     "id": "report-import",
     "file": "lib/futures-short-policy.mjs",
     "before": "import {regularSession,stockSessionGap} from './colmex-market-hours.mjs';\n",
-    "after": "import {conditionCollector,CHANNEL_CONDITIONS_VERSION} from './channel-condition-report.mjs';\nimport {regularSession,stockSessionGap} from './colmex-market-hours.mjs';\n"
+    "after": "import {conditionCollector,CHANNEL_CONDITIONS_VERSION} from './channel-condition-report.mjs';\nimport {regularSession,stockSessionGap} from './colmex-market-hours.mjs';\n",
+    "atStart": true
   },
   {
     "id": "report-capability",
