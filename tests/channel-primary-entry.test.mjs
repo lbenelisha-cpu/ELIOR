@@ -15,9 +15,22 @@ const config=(platform='BINANCE')=>channelEntryConfig({[platform+'_CHANNEL_PRIMA
 function bars(platform='BINANCE'){
  let times=[];for(let t=end-8*86400000;t<end;t+=D)if(platform==='BINANCE'||regularSession(t))times.push(t);times=times.slice(-205);
  const b=times.map((t,i)=>{const p=100+i*.02+Math.cos(i*Math.PI/5);return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
+ // A completed central consolidation precedes the live breakout.
+ for(const [j,bar] of b.slice(-3).entries()){const p=(104.05)+(j===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
  return b;
 }
 const input=(platform='BINANCE')=>({symbol:'ABCUSDT',bars:bars(platform),price:106,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+D,open:105,close:106,low:104.9,high:106.1,volume:2000,closed:false,receivedAt:now},entryMode:'confirmed_quality',timeframe:'5m',allowEarlyWave:true});
+test('LONG records central consolidation and blocks a latest upper consolidation on both platforms',()=>{
+ for(const platform of ['BINANCE','COLMEX']){
+  const i=input(platform),c=config(platform),good=channelEntry(i,c);
+  assert.equal(good.setup.consolidation.zone,'MIDDLE');
+  const trade={entryMode:'channel_breakout',patternId:good.setup.patternId,setup:good.setup};
+  assert.throws(()=>assertChannelSubmission(i,c,{...trade,setup:{...good.setup,consolidation:null}}),/CONSOLIDATION_CHANGED/);
+  for(let k=202;k<205;k++){const p=100+k*.02+Math.cos(k*Math.PI/5);Object.assign(i.bars[k],{open:p,close:p,high:p+.1,low:p-.1});}
+  const blocked=channelEntry(i,c);assert.equal(blocked.reason,'CHANNEL_CONSOLIDATION_SIDE_BLOCK');assert.equal(blocked.consolidation.zone,'UPPER');
+  assert.throws(()=>assertChannelSubmission(i,c,trade),/CONSOLIDATION_SIDE_BLOCK/);
+ }
+});
 test('channel primary uses frozen pre-breakout pivots, regression and settings on both platforms',()=>{
  for(const platform of ['BINANCE','COLMEX']){
   const r=channelEntry(input(platform),config(platform));assert.equal(r.ready,true,r.reason);assert.ok(r.setup.lowTouches>=2&&r.setup.highTouches>=2);assert.ok(r.setup.regressionSlope>0);assert.ok(r.setup.level<106);assert.equal(r.setup.entryMode,'channel_breakout');

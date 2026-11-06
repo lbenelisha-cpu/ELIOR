@@ -6,6 +6,12 @@ const code=fs.readFileSync(new URL('../binance-futures-positions.js',import.meta
 const ctx=vm.createContext({});vm.runInContext(code,ctx);const view=ctx.LEVI_FUTURES_TABLE.view;
 const now=Date.now();
 const snapshot={mode:'live',shortTrading:{enabled:true,checkedAt:now,account:{walletUsdt:70,availableUsdt:36},positions:[{symbol:'ABCUSDT',qty:2,entryPrice:100,currentPrice:95,entryAt:now-600000,priceAt:now,targetPrice:90,stopPrice:99,protectedAt:now,algos:[{kind:'STOP_MARKET',status:'NEW'},{kind:'TAKE_PROFIT_MARKET',status:'NEW'}]}]}};
+test('SHORT consolidation rules wait for the runtime marker and scan reasons show recorded evidence',()=>{
+ assert.doesNotMatch(view(snapshot,now),/דשדוש לפני הכניסה/);
+ const data=structuredClone(snapshot);data.shortTrading.policy={consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}};
+ data.shortTrading.checks={XYZUSDT:{at:now,reason:'CHANNEL_CONSOLIDATION_SIDE_BLOCK',consolidation:{zone:'LOWER',bars:4,endAt:now-300000}}};
+ const html=view(data,now);assert.match(html,/אמצעי מאפשר את שני הכיוונים/);assert.match(html,/מיקום הדשדוש אינו מתאים/);assert.match(html,/דשדוש תחתון · 4 נרות/);
+});
 test('SHORT table calculates profit when price falls and shows independent wallet and count',()=>{
  const html=view(snapshot,now);assert.match(html,/1\/2/);assert.match(html,/>70</);assert.match(html,/>36</);assert.match(html,/\+10/);assert.match(html,/\+5%/);assert.match(html,/אומתו בבורסה/);
  const loss=structuredClone(snapshot);loss.shortTrading.positions[0].currentPrice=105;assert.match(view(loss,now),/-10/);assert.match(view(loss,now),/-5%/);

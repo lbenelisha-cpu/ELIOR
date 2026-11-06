@@ -6,6 +6,12 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {spawnSync} from 'node:child_process';
 import {patchShortSettings} from '../scripts/patch-short-settings-exit.mjs';
+import {patchChannelConsolidation} from '../scripts/patch-channel-consolidation.mjs';
+const consolidationPatches=JSON.parse(fs.readFileSync(new URL('../scripts/channel-consolidation-patches.json',import.meta.url),'utf8'));
+function beforeConsolidation(file,source){
+ for(const p of consolidationPatches.filter(p=>p.file===file).reverse()){assert.equal(source.split(p.after).length,2);source=source.replace(p.after,p.before);}
+ return source;
+}
 const patches=JSON.parse(fs.readFileSync(new URL('../scripts/short-settings-exit-patches.json',import.meta.url),'utf8'));
 test('SHORT installer applies only recognized changes, preserves unrelated code, and is repeatable',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'short-settings-test-'));
@@ -13,13 +19,14 @@ test('SHORT installer applies only recognized changes, preserves unrelated code,
   const expected=new Map();
   for(const file of new Set(patches.map(p=>p.file))){
    const next=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8')+'\n// Preserve local deployment integration\n';
-   expected.set(file,next);let old=next;
+   expected.set(file,next);let old=beforeConsolidation(file,next);
    for(const p of patches.filter(p=>p.file===file).reverse()){
     assert.equal(old.split(p.after).length,2);old=old.replace(p.after,p.before);
    }
    fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});fs.writeFileSync(path.join(dir,file),old);
   }
   patchShortSettings(dir,patches);patchShortSettings(dir,patches);
+  patchChannelConsolidation(dir,consolidationPatches.filter(p=>fs.existsSync(path.join(dir,p.file))));
   for(const [file,next] of expected)assert.equal(fs.readFileSync(path.join(dir,file),'utf8'),next);
   const before=fs.readFileSync(path.join(dir,'server.mjs'),'utf8');
   assert.throws(()=>patchShortSettings(dir,[{file:'server.mjs',before:'// Preserve local deployment integration',after:'// staged'}, {file:'server.mjs',before:'missing anchor',after:'unknown replacement'}]),/Unrecognized/);
@@ -46,7 +53,7 @@ test('staged tests support and preserve an installed runner with additional cont
   for(const name of ['lib','tests','scripts'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(dir,name),{recursive:true});
   for(const name of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(dir,name));
   for(const file of new Set(patches.map(p=>p.file))){
-   const target=path.join(dir,file);let source=fs.readFileSync(target,'utf8');
+   const target=path.join(dir,file);let source=beforeConsolidation(file,fs.readFileSync(target,'utf8'));
    for(const p of patches.filter(p=>p.file===file).reverse()){
     assert.equal(source.split(p.after).length,2);source=source.replace(p.after,p.before);
    }
@@ -54,6 +61,10 @@ test('staged tests support and preserve an installed runner with additional cont
   }
   // Compatibility fixture for the additional read seen in the VPS test failure;
   // it does not claim to reproduce every local change in the deployed runner.
+  for(const file of new Set(consolidationPatches.map(p=>p.file))){
+   if(patches.some(p=>p.file===file))continue;
+   const target=path.join(dir,file);fs.writeFileSync(target,beforeConsolidation(file,fs.readFileSync(target,'utf8')));
+  }
   const runnerPath=path.join(dir,'lib/futures-short-runner.mjs');
   const anchor=' async ensureAlgo(p,kind,price){';
   const contractCheck=`${anchor}
@@ -63,6 +74,7 @@ test('staged tests support and preserve an installed runner with additional cont
   const installed=fs.readFileSync(runnerPath,'utf8');assert.equal(installed.split(anchor).length,2);
   fs.writeFileSync(runnerPath,installed.replace(anchor,contractCheck));
   patchShortSettings(dir,patches);patchShortSettings(dir,patches);
+  patchChannelConsolidation(dir,consolidationPatches.filter(p=>fs.existsSync(path.join(dir,p.file))));
   assert.ok(fs.readFileSync(runnerPath,'utf8').includes(contractCheck),'retain deployed contract-price checks');
   const files=['futures-short.test.mjs','futures-short-recovery.test.mjs','futures-short-fill.test.mjs'].map(f=>path.join(dir,'tests',f));
   const env={...process.env};delete env.NODE_TEST_CONTEXT;

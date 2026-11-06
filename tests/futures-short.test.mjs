@@ -13,6 +13,8 @@ const settings=validateTradeSettings({});
 function input(){
  const bars=Array.from({length:205},(_,i)=>{const t=end-(205-i)*D,p=210-(100+i*.02+Math.cos(i*Math.PI/5));return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
 
+ // A completed central consolidation precedes the live breakout.
+ for(const [j,bar] of bars.slice(-3).entries()){const p=(105.95)+(j===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
  return {bars,price:104,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+D,open:105,close:104,high:105.1,low:103.9,volume:2000,closed:false,receivedAt:now},quote:{symbol:'ABCUSDT',bidPrice:'104',askPrice:'104.01',time:now}};
 }
 const info={symbol:'ABCUSDT',baseAsset:'ABC',status:'TRADING',contractType:'PERPETUAL',marginAsset:'USDT',quoteAsset:'USDT',filters:[{filterType:'LOT_SIZE',minQty:'.001',maxQty:'10000',stepSize:'.001'},{filterType:'PRICE_FILTER',tickSize:'.01'},{filterType:'MIN_NOTIONAL',notional:'5'}]};
@@ -67,6 +69,17 @@ test('contract-price test replies follow quote changes and retain strict endpoin
  await assert.rejects(h.api.get('/fapi/v1/unexpected'),/Unexpected read/);
  const failing=harness({onGet(p){if(p==='/fapi/v1/ticker/price')throw Error('CONTRACT_PRICE_FAILURE');}});
  await assert.rejects(failing.api.get('/fapi/v1/ticker/price',{symbol:'ABCUSDT'}),/CONTRACT_PRICE_FAILURE/);
+});
+test('SHORT records central consolidation and a changed lower consolidation blocks SELL at final recheck',async()=>{
+ const first=shortSignal(input(),config);assert.equal(first.setup.consolidation.zone,'MIDDLE');
+ const h=harness(),get=h.api.get;
+ h.api.get=async(p,q)=>{
+  const rows=await get(p,q);
+  if(p==='/fapi/v1/klines')for(let k=202;k<205;k++){const v=210-(100+k*.02+Math.cos(k*Math.PI/5));rows[k].splice(1,4,v,v+.1,v-.1,v);}
+  return rows;
+ };
+ await assert.rejects(h.runner.enter('ABCUSDT',first),/CONSOLIDATION_SIDE_BLOCK/);
+ assert.equal(h.writes.some(w=>w.q.side==='SELL'),false);
 });
 test('SHORT requires a fresh intrabar lower break, falling regression and volume; replay and invalidation are rejected',()=>{
  const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.ok(good.setup.regressionSlope<0);
