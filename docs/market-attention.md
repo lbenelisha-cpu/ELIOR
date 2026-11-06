@@ -2,6 +2,32 @@
 
 Binance Overview and Scans include an authenticated “איתותים ותצפיתנים” board. The existing agent response supplies it; the widget makes no requests or order submissions. A news report creates a watch highlight, never a buy/sell decision. The server ignores the legacy MARKET_NEWS_ENTRY_OVERLAY activation for execution. Automatic candidate ordering, final submission, POC, quantities and exits do not consult news.
 
+### Hebrew headline briefs (2026-11-06)
+
+The board and the shared news page display a short Hebrew translation of the
+complete source headline, labeled as an automatic headline translation. This is
+not a summary of an unread full article. The original headline and source link
+remain visible. Longer translations have a three-line preview and an expand button.
+
+The isolated browser helper `news-summary.js` sends only public headlines from
+the existing three allowed publisher hosts to MyMemory's GET translation API
+(`autodetect|he`, verified with the provider). It does not send symbols, account
+state, credentials, source URLs or trading decisions. Requests omit credentials
+and referrers. Nothing is added to the server's trading or news polling paths.
+
+Translation starts when a story becomes visible, runs at most two requests at a
+time, deduplicates the same headline and caches successful text for seven days
+(at most 300 headlines). A changed headline is translated separately. The helper
+caps input at the provider's 500 UTF-8 byte limit without truncating it, and
+records a rolling 5,000-character budget per browser. Provider quotas can also be
+shared by IP; a quota response pauses new translations for 24 hours. Storage
+failure leaves the in-memory limits in effect for the current page. Unavailable
+translation is explicitly labeled and never affects signals or execution.
+
+Provider references: https://mymemory.translated.net/doc/spec.php and
+https://mymemory.translated.net/doc/usagelimits.php . The HTML, scripts and styles
+deploy through the existing Netlify site; no Binance service restart is needed.
+
 The public news page supplies source links, headline metadata and watch signals for mapped companies and crypto. Explicit headline aliases/catalogued stock tokens are used; ambiguous or unmapped stories remain in the news feed. Sources are limited to the four configured RSS feeds. A blocked source remains unavailable (this update does not fix CoinDesk's HTTP 403 or grant API access). The system does not read or verify full articles. It checks feed structure, exact allowed HTTPS source, publication/first-seen times, explicit asset references, duplicates, revisions, uncertainty and attributed material. The historical narrow event matcher is used solely to label matching purchase/outage headlines from two distinct publishers; it cannot influence execution. Identical or syndicated/uncertain/revised reports do not corroborate an event.
 
 Fresh reports (up to six hours old, source successful within 15 minutes) move an existing symbol earlier in the separate read-only observation scan. They never add broker calls, new symbols, execution candidates, or change execution order. All existing observation symbols still get one pass. Per-symbol calculations use the same candle reads already used by the paced research scan, even for held assets. The scanner runs while the server is LIVE; it is independent of new-entry pause. Source outages and persistence errors remove active news highlights; prior headlines can remain visibly historical.
