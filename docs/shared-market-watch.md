@@ -58,3 +58,10 @@ runner-constructor anchor installs only the shared observer; it does not install
 POC, alter execution controls or replace the server file wholesale. Both layouts
 are checked before staging. Unknown or duplicate anchors still abort before any
 installed file or service change, and report a named patch ID for diagnosis.
+
+New installations schedule the read-only observer immediately after its own
+initialization. They do not search for, rewrite or duplicate the installed SHORT
+execution scheduler: its callback style, indentation and cadence are retained.
+The first observer callback runs after two seconds and its single-in-flight
+guard remains active. An existing observer interval from an earlier successful
+installation is retained in place; more than one is rejected before any write.

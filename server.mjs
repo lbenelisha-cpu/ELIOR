@@ -2249,6 +2249,7 @@ const futuresWatch=new SharedMarketWatch({
  boundary:symbol=>({entryAfter:Math.max(Date.parse(tradeControl.resumedAt)||0,futuresShort.state.resumedAt||0,futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0),used:futuresShort.state.used.filter(p=>p.symbol===symbol).map(p=>p.patternId)})
 });
 futuresShort.watchSnapshot=()=>futuresWatch.snapshot();
+setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();
 // POC waits are server-owned; the browser can close after explicit creation.
 const pocControl=()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,paused:tradeControl.paused,mode});
 const pocManualInput=row=>({requestId:row.requestId,mode:'live',side:'BUY',symbol:row.symbol,quoteUsdt:row.quoteUsdt});
@@ -2767,7 +2768,6 @@ server.listen(PORT,'0.0.0.0',async()=>{
   setInterval(()=>pocEntries.tick().catch(()=>{}),3000).unref();
   loadDecisionHistory();
   setInterval(()=>futuresShort.cycle().catch(()=>{}),2000).unref();
-  setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();
   /* Wyckoff upgrade preserves existing holdings and journals. */
   await refreshUniverse();
 });
