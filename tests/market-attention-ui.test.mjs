@@ -72,6 +72,8 @@ test('entry checklists show recorded passes per market, never closed-bar volume 
  const original=JSON.stringify(s),checks=()=>h.find(e=>e.className==='attention-checklist');
  const condition=(index,id)=>checks()[index].findAll(e=>e.dataset.condition===id)[0];
  h.send(s,config);assert.equal(checks().length,2);
+ assert.equal(h.find(e=>e.dataset.condition==='data').length,0);
+ assert.doesNotMatch(h.panel.textContent,/50 נרות סגורים ורציפים \+ מחיר ונר פתוח עדכניים/);
  assert.equal(condition(0,'channel').dataset.state,'passed');assert.match(condition(0,'channel').textContent,/✓/);
  assert.equal(condition(0,'volume').dataset.state,'waiting');assert.equal(condition(0,'range').dataset.state,'unknown');
  assert.equal(condition(0,'execution').dataset.state,'blocked');assert.equal(condition(1,'channel').dataset.state,'waiting');
@@ -80,6 +82,10 @@ test('entry checklists show recorded passes per market, never closed-bar volume 
  // A fresh envelope cannot revive the previous candle's successful evidence.
  h.clock.now=Math.ceil(h.clock.now/300000)*300000;s.checkedAt=h.clock.now;
  h.send(s,config);assert.equal(h.find(e=>e.dataset.state==='passed').length,0);
+ assert.match(h.panel.textContent,/תנאי כניסה בתעלה · ממתין לעדכון נתונים/);
+ assert.doesNotMatch(h.panel.textContent,/0\/10 אושרו בבדיקה/);
+ row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BAR'};
+ h.send(s,config);assert.match(h.panel.textContent,/ממתין לעדכון נתונים/);assert.doesNotMatch(h.panel.textContent,/0\/10 אושרו בבדיקה/);
  // Unknown policy and unmapped Futures must not inherit favorable Spot observations.
  row.longDecision.at=h.clock.now;row.shortObservation.available=false;row.shortObservation.mappingReason='FUTURES_SYMBOL_UNAVAILABLE';
  h.send(s,{channelPrimary:{...config.channelPrimary,version:'OTHER'}});assert.equal(h.find(e=>e.dataset.state==='passed').length,0);

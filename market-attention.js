@@ -19,7 +19,8 @@
  const entryReason=value=>window.LEVI_FUTURES_TABLE?.reason(value)||reasons[value]||value||'ממתין לבדיקה';
  function checklist(host,input){
   const view=window.LEVI_ENTRY_CHECKLIST?.project(input);if(!view)return;
-  add('p','תנאי כניסה בתעלה · '+view.count+'/'+view.total+' אושרו בבדיקה',host,'attention-check-summary');
+  const progress=view.status==='recorded'&&!view.dataPending?view.count+'/'+view.total+' אושרו בבדיקה':'ממתין לעדכון נתונים';
+  add('p','תנאי כניסה בתעלה · '+progress,host,'attention-check-summary');
   const list=add('ul','',host,'attention-checklist');list.setAttribute('aria-label','תנאי כניסה '+input.side);
   for(const row of view.rows){
    const item=add('li','',list,'attention-check '+row.state);item.dataset.condition=row.id;item.dataset.state=row.state;
