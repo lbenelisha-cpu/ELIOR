@@ -236,21 +236,6 @@ test('unknown protection reply is not retried as another algo, and stop-all repo
  ref.status='PENDING';await h.runner.ensureAlgo(p,ref.kind,ref.price);assert.equal(h.writes.length,before);
  const result=await h.runner.closeAll();assert.deepEqual(result,{sold:['FUTURES:ABCUSDT'],failed:[]});assert.equal(h.runner.forceClose,false);
 });
-test('targeted installer patches are idempotent and reject an unknown context without partial writes',async()=>{
- const {patchFutures}=await import('../scripts/patch-futures-short.mjs');
- const patches=JSON.parse(fs.readFileSync(new URL('../scripts/futures-short-patches.json',import.meta.url),'utf8'));
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'short-patch-'));
- try{
-  for(const file of ['server.mjs','binance-agent.js']){
-   let source=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
-   for(const p of patches.filter(x=>x.file===file).reverse())source=source.replace(p.after,p.before);
-   fs.writeFileSync(path.join(dir,file),source);
-  }
-  patchFutures(dir,patches);const once=fs.readFileSync(path.join(dir,'server.mjs'),'utf8');patchFutures(dir,patches);assert.equal(fs.readFileSync(path.join(dir,'server.mjs'),'utf8'),once);
-  const bad=patches.map(p=>({...p}));bad.push({file:'server.mjs',before:'nonexistent context',after:'unrecognized result'});assert.throws(()=>patchFutures(dir,bad),/Unrecognized/);assert.equal(fs.readFileSync(path.join(dir,'server.mjs'),'utf8'),once);
- }finally{fs.rmSync(dir,{recursive:true,force:true});}
-});
-
 test('50 pre-breakout SHORT bars suffice; recovered upper wick passes but current ceiling and expiry block',()=>{
  const i=input();i.bars=i.bars.slice(-50);i.liveBar.high=110;
  const r=shortSignal(i,config);assert.equal(config.period,50);assert.equal(r.ready,true,r.reason);

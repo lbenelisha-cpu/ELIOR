@@ -10,6 +10,13 @@ stage=$(mktemp -d /tmp/levi-consolidation.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/release" "$stage/runtime"
 git archive "$revision" | tar -x -C "$stage/release"
+# The original SHORT installer has its own source-integration test. It belongs
+# to the immutable release; deployed server integrations may legitimately differ.
+echo 'Checking original SHORT installer against reviewed release sources.'
+if ! node --test "$stage/release/tests/futures-short-installer.test.mjs"; then
+ echo 'Release installer tests failed. Installed code and service were not changed.' >&2
+ exit 1
+fi
 cp -a lib "$stage/runtime/lib"
 cp server.mjs binance-agent.js regression-trend.js parallel-channel.js "$stage/runtime/"
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
@@ -29,6 +36,7 @@ JS
 cp "$stage/release/lib/channel-consolidation.mjs" "$stage/runtime/lib/"
 node "$stage/release/scripts/patch-channel-consolidation.mjs" "$stage/runtime"
 for file in server.mjs lib/channel-consolidation.mjs lib/channel-primary-entry.mjs lib/wyckoff-evaluation.mjs lib/futures-short-policy.mjs lib/futures-short-runner.mjs; do node --check "$stage/runtime/$file"; done
+echo 'Checking trading behavior against the staged installed runtime.'
 if ! node --test "$stage/runtime/tests/channel-consolidation.test.mjs" "$stage/runtime/tests/channel-consolidation-entry.test.mjs" "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs"; then
  echo 'Staged consolidation tests failed. Installed code and service were not changed.' >&2
  exit 1

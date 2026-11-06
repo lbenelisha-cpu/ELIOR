@@ -10,11 +10,19 @@ stage=$(mktemp -d /tmp/levi-short-settings.XXXXXX)
 trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/release" "$stage/runtime"
 git archive "$revision" | tar -x -C "$stage/release"
+# The original SHORT installer has its own source-integration test. It belongs
+# to the immutable release; deployed server integrations may legitimately differ.
+echo 'Checking original SHORT installer against reviewed release sources.'
+if ! node --test "$stage/release/tests/futures-short-installer.test.mjs"; then
+ echo 'Release installer tests failed. Installed code and service were not changed.' >&2
+ exit 1
+fi
 cp -a lib "$stage/runtime/lib"
 cp server.mjs binance-agent.js regression-trend.js parallel-channel.js "$stage/runtime/"
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
 node "$stage/release/scripts/patch-short-settings-exit.mjs" "$stage/runtime"
 for file in server.mjs lib/futures-short-policy.mjs lib/futures-short-runner.mjs; do node --check "$stage/runtime/$file"; done
+echo 'Checking trading behavior against the staged installed runtime.'
 if ! node --test "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs"; then
  echo 'Staged SHORT tests failed. Installed code and service were not changed.' >&2
  exit 1
