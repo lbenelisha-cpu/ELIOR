@@ -49,6 +49,12 @@ stopping the service. If the previously authorized SHORT settings exit update
 is still absent, it stages that update first, with its existing settings checks.
 Thus the owner does not have to guess which previous installation completed.
 
+The original SHORT installer's source-integration test runs separately against
+the reviewed release files. Trading tests run against the staged installed
+runtime. This prevents a legitimate local `server.mjs` integration from failing
+an unrelated historical installer test. Both test phases must pass before the
+service is stopped; no tests are skipped and installed server edits are retained.
+
 Unknown source context or failed tests leave deployed files and the service
 untouched. Pending SHORT intents block installation. The installer backs up code,
 checks for pending intents again after stopping, retains journals, and verifies
