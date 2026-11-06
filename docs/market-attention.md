@@ -5,13 +5,18 @@
 Each shared watch card lists the LONG Spot and mapped SHORT Futures entry
 requirements. A checkmark means the condition passed in the displayed server
 check; a circle identifies the unmet gate; a dash means it has not been verified.
-`channel-entry-checklist.js` projects the known, ordered rejection reasons from
-the channel entry evaluators. It marks only gates proven by that result and leaves
-later gates unknown. It does not recompute a signal or use the closed-bar technical
-observer to approve live-price or accumulated-open-bar-volume requirements.
+`channel-entry-checklist.js` displays `CHANNEL_CONDITIONS_PARALLEL_V1` reports
+from the actual entry evaluators. Every computable condition is evaluated against
+the same input snapshot, including conditions after the first rejection. Missing
+prerequisites leave only dependent conditions unknown; malformed or stale input
+cannot produce current approvals. The single `reason` retains its original
+first-blocker meaning for existing logs, while `conditions.rows` contains the
+independent results. Old servers retain the explicitly labelled legacy ordered
+projection until the server update is installed. The UI never substitutes Spot
+closed-bar observations for Futures quotes or accumulated open-candle volume.
 
 LONG requires the advertised current channel/consolidation policy; SHORT uses
-only the verified contract's read-only shared observation. Unknown reasons,
+only the verified contract's read-only shared observation. Malformed reports, unknown legacy reasons,
 unverified mappings and policies, future dates, transport/auth loss, expired
 observations and the next five-minute candle clear current approvals. The 90-second LONG
 and 180-second shared SHORT observation lifetimes are upper bounds. These are
@@ -21,8 +26,12 @@ an expired scan cannot approve a current entry.
 Account permission, cash, capacity and protection approval remain a separate row:
 a reported blocker is shown explicitly; no reported blocker remains unverified.
 Even a complete technical checklist does not authorize an order. The UI uses the
-existing response and adds no API requests. This is a static Netlify update with
-no VPS installation or changes to entry rules, settings, allocation or exits.
+existing response and adds no API requests. The frontend and Colmex functions deploy
+through Netlify. Binance additionally requires `scripts/install-parallel-entry-checks.sh
+<full SHA>` on the VPS. It stages an atomic targeted patch and runtime tests, backs
+up the changed files, preserves local integrations, activation flags and exit
+settings, and verifies both report capabilities after restart. No trading rule,
+allocation, order route or exit protection is relaxed.
 
 Data availability (the rolling 50 closed bars, fresh quote and current open bar)
 is not a checklist row and does not count toward the ten technical conditions.

@@ -99,3 +99,11 @@ test('existing SHORT is managed at Ask even when entry route is disabled',async(
  f.broker.quote=async()=>({bp:100.9,ap:101.1});await runCycle(f.args);
  assert.equal(f.broker.writes.length,1);assert.equal(f.broker.writes[0].kind,'CLOSE');assert.equal(f.broker.writes[0].positionId,'pos');
 });
+
+test('Colmex evaluates and records both directions even when the first direction is ready',async()=>{
+ const result=colmexChannelSignal(input(false),config);
+ assert.equal(result.side,'LONG');assert.equal(result.conditionReports.LONG.rows.every(r=>r.state==='passed'),true);
+ assert.equal(result.conditionReports.SHORT.rows.find(r=>r.id==='slope').state,'waiting');assert.equal(result.conditionReports.SHORT.rows.find(r=>r.id==='volume').state,'passed');
+ const f=fixture();await runCycle(f.args);
+ assert.equal(f.state.checks.AAPL.entryDecisions.channel.conditionReports.SHORT.rows.every(r=>r.state==='passed'),true);
+});

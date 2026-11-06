@@ -78,7 +78,7 @@ test('entry checklists show recorded passes per market, never closed-bar volume 
  assert.equal(condition(0,'volume').dataset.state,'waiting');assert.equal(condition(0,'range').dataset.state,'unknown');
  assert.equal(condition(0,'execution').dataset.state,'blocked');assert.equal(condition(1,'channel').dataset.state,'waiting');
  assert.equal(condition(1,'slope').dataset.state,'unknown');assert.equal(JSON.stringify(s),original);
- assert.match(h.panel.textContent,/הבדיקה נעצרת בתנאי הראשון/);
+ assert.match(h.panel.textContent,/השרת עדיין מחזיר בדיקה בטור/);
  // A fresh envelope cannot revive the previous candle's successful evidence.
  h.clock.now=Math.ceil(h.clock.now/300000)*300000;s.checkedAt=h.clock.now;
  h.send(s,config);assert.equal(h.find(e=>e.dataset.state==='passed').length,0);
@@ -114,4 +114,19 @@ test('a pending candle update preserves the previous touch check and count with 
  assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='waiting').length,1);
  assert.equal(h.find(e=>e.dataset.condition==='channel'&&e.dataset.state==='previous_passed').length,1);
  h.expire();h.send(s,config);assert.equal(h.find(e=>e.dataset.state?.startsWith('previous_')).length,0);
+});
+
+test('parallel reports render later passes and multiple failures from the same scan and clear malformed reports',()=>{
+ const h=ui(),s=snapshot(h.clock.now),at=h.clock.now;s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const ids=['channel','slope','break','center','volume','liquidity','signal','range','rangeBreak','plan'];
+ const report=side=>({version:'CHANNEL_CONDITIONS_PARALLEL_V1',side,at,expiresAt:(Math.floor(at/300000)+1)*300000,rows:ids.map(id=>({id,state:['slope','break'].includes(id)?'waiting':'passed'}))});
+ const row=s.rows[0];row.longDecision={at,reason:'REGRESSION_DIRECTION_BLOCK',conditions:report('LONG')};
+ row.shortObservation={available:true,spotSymbol:'ETHUSDT',futuresSymbol:'ETHUSDT',observationOnly:true,at,expiresAt:report('SHORT').expiresAt,reason:'SHORT_REGRESSION_DIRECTION_BLOCK',conditions:report('SHORT')};
+ const config={channelPrimary:{requested:true,version:'CHANNEL_PRIMARY_INTRABAR_V2',period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}}};
+ h.send(s,config);assert.match(h.panel.textContent,/8\/10 אושרו/);assert.doesNotMatch(h.panel.textContent,/עדיין מחזיר בדיקה בטור/);
+ assert.equal(h.find(e=>e.dataset.condition==='volume'&&e.dataset.state==='passed').length,2);
+ assert.equal(h.find(e=>e.dataset.condition==='slope'&&e.dataset.state==='waiting').length,2);
+ assert.equal(h.find(e=>e.dataset.condition==='execution'&&e.dataset.state==='passed').length,0);
+ row.longDecision.conditions.rows=[];row.shortObservation.conditions.side='LONG';h.send(s,config);
+ assert.equal(h.find(e=>e.dataset.state==='passed').length,0);assert.match(h.panel.textContent,/דוח התנאים אינו תקין/);
 });

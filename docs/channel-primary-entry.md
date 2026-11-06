@@ -2,6 +2,24 @@
 
 This opt-in route replaces all other automatic entry routes while requested. Wyckoff and independent breakout remain observable but cannot authorize a buy. Manual confirmations are separate. Existing positions continue their existing exit/protection path, even if channel history or activation is unavailable.
 
+## Independent condition evaluation (2026-11-06)
+
+Both active intrabar evaluators emit a `CHANNEL_CONDITIONS_PARALLEL_V1` report.
+After input validation, channel confirmation, regression, live breakout, volume,
+liquidity, signal reuse, consolidation and target checks run whenever their own
+inputs are available. An unmet strategy condition does not stop independent checks.
+The original first rejection remains the diagnostic reason; a ready signal now
+explicitly requires every report gate to pass, followed by the existing final
+submission guards. No asynchronous requests or orders were added. “Parallel” means
+independent evaluation within one scan, not multiple competing execution workers.
+Colmex always evaluates both directions and records their reports, retaining LONG
+priority when applicable. Reports do not approve account permissions or protection.
+
+Validation includes 1,200 offline comparisons against the previous evaluators:
+identical readiness/rejection reasons, and identical setup/risk output for all eight
+approved cases, plus regression tests covering final guards and protected orders.
+This verifies implementation equivalence; it is not a profitability backtest.
+
 Rules, version CHANNEL_PRIMARY_BREAKOUT_V1:
 - 50 closed five-minute candles immediately BEFORE the signal candle; no future data or fitting through the breakout.
 - Same confirmed-pivot geometry as parallel-channel.js, with a new optional requireConfirmed selector: only candidates with at least two touches on each boundary qualify, then newest second anchor. Default chart/observation selection remains unchanged.

@@ -63,3 +63,14 @@ test('intrabar and previous-server requirements are described separately using r
  assert.match(rules,/ללא המתנה לסגירתו/);assert.match(rules,/הצטבר בנר הפריצה הפתוח/);assert.match(rules,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(rules,/דקות מסגירת/);
  assert.match(colmexChannelConditions({status,now}).rules.join(' '),/SHORT/);
 });
+
+test('Colmex displays both independent server reports and cannot mix them with chart or historical data',()=>{
+ const s=structuredClone(status),at=now;s.checks.AAPL.at=at;
+ const ids=['channel','slope','break','center','volume','liquidity','signal','range','rangeBreak','plan'];
+ s.checks.AAPL.entryDecisions.channel.conditionReports=Object.fromEntries(['LONG','SHORT'].map(side=>[side,{version:'CHANNEL_CONDITIONS_PARALLEL_V1',side,at,expiresAt:(Math.floor(at/300000)+1)*300000,rows:ids.map(id=>({id,state:id==='slope'?'waiting':'passed'}))}]));
+ const v=colmexChannelConditions({channels,status:s,symbol:'AAPL',now});
+ for(const c of v.conditionViews){assert.equal(c.count,9);assert.equal(c.rows.find(r=>r.id==='slope').state,'waiting');assert.equal(c.rows.find(r=>r.id==='volume').state,'passed');assert.equal(c.rows.find(r=>r.id==='execution').state,'unknown');}
+ for(const patch of [{manual:true},{historical:true},{now:now+300000},{symbol:'MSFT'},{status:{...s,unavailable:true}}]){
+  const view=colmexChannelConditions({channels,status:s,symbol:'AAPL',now,...patch});assert.equal(view.conditionViews.every(c=>c.count===0),true);
+ }
+});

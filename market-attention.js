@@ -22,6 +22,7 @@
   const view=entryTracker?.update(input)||window.LEVI_ENTRY_CHECKLIST?.project(input);if(!view)return;
   const progress=view.status==='refreshing'?view.previousCount+'/'+view.total+' בבדיקה האחרונה · ממתין לעדכון':view.status==='recorded'&&!view.dataPending?view.count+'/'+view.total+' אושרו בבדיקה':'ממתין לעדכון נתונים';
   add('p','תנאי כניסה בתעלה · '+progress,host,'attention-check-summary');
+  if(view.status==='recorded'&&!view.parallel)add('small','השרת עדיין מחזיר בדיקה בטור · נדרש עדכון שרת לבדיקה מלאה',host,'attention-check-note');
   const list=add('ul','',host,'attention-checklist');list.setAttribute('aria-label','תנאי כניסה '+input.side);
   for(const row of view.rows){
    const item=add('li','',list,'attention-check '+row.state);item.dataset.condition=row.id;item.dataset.state=row.state;
@@ -30,7 +31,7 @@
    const icon=add('span',marker,item,'attention-check-icon');icon.setAttribute('aria-hidden','true');
    const body=add('span','',item);add('span',row.label,body);add('small',label,body);
   }
-  if(view.status!=='recorded')add('small',view.status==='refreshing'?'מוצגת הבדיקה מ־'+date(view.previousAt)+' בזמן הרענון. הסימונים הקודמים אינם אישור כניסה כעת.':view.status==='unsupported'?'ממתין לאימות מסלול הכניסה מהשרת':view.status==='stale'?'אין בדיקת כניסה עדכנית · הסימונים נוקו':'תוצאת השרת אינה מפרטת אילו תנאים עברו',host,'attention-check-note');
+  if(view.status!=='recorded')add('small',view.status==='refreshing'?'מוצגת הבדיקה מ־'+date(view.previousAt)+' בזמן הרענון. הסימונים הקודמים אינם אישור כניסה כעת.':view.status==='invalid-report'?'דוח התנאים אינו תקין · ממתין לבדיקה חדשה':view.status==='unsupported'?'ממתין לאימות מסלול הכניסה מהשרת':view.status==='stale'?'אין בדיקת כניסה עדכנית · הסימונים נוקו':'תוצאת השרת אינה מפרטת אילו תנאים עברו',host,'attention-check-note');
  }
  function render(){
   const now=Date.now(),transport=snapshot&&now-receivedAt<90000&&now>=receivedAt&&now-snapshot.checkedAt<90000&&now>=snapshot.checkedAt;
@@ -56,16 +57,16 @@
     const longBlocker=transport?(r.entryBlockers?.long||(lf?ld.blocker:null)):null;
     add('small','ביצוע: '+(longBlocker?entryReason(longBlocker):'כפוף לבדיקה סופית'),long);
     const longSupported=snapshot.mode==='live'&&longPolicy?.requested===true&&longPolicy.version==='CHANNEL_PRIMARY_INTRABAR_V2'&&longPolicy.period===50&&longPolicy.minVolumeRatio===1.5&&longPolicy.minMeanDollarVolume===10000&&longPolicy.consolidationPolicy?.version==='CHANNEL_CONSOLIDATION_V1';
-    checklist(long,{symbol:r.symbol,marketSymbol:r.symbol,side:'LONG',reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
+    checklist(long,{symbol:r.symbol,marketSymbol:r.symbol,side:'LONG',conditions:ld?.conditions,reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
     add('small','בדיקה אחרונה: '+date(ld?.at),long);
     add('strong','SHORT · '+(o?.futuresSymbol||'חוזה לא מאומת'),short);
     const sf=transport&&o&&o.at<=now&&now-o.at<180000&&o.expiresAt>now;
     add('p','בדיקה: '+(!transport?'העדכון התיישן':!o?'ממתין למיפוי חוזה':!o.available?entryReason(o.mappingReason):sf?entryReason(o.reason):entryReason(o.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION')),short);
     const shortBlocker=transport?r.entryBlockers?.short:null;
     add('small','ביצוע: '+(shortBlocker?entryReason(shortBlocker):'כפוף לבדיקה סופית'),short);
-    checklist(short,{symbol:r.symbol,marketSymbol:o?.futuresSymbol,side:'SHORT',reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
+    checklist(short,{symbol:r.symbol,marketSymbol:o?.futuresSymbol,side:'SHORT',conditions:o?.conditions,reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
     add('small','בדיקה אחרונה: '+date(o?.at),short);
-    add('small','✓ התקיים בבדיקה · ○ ממתין · — טרם אומת. הבדיקה נעצרת בתנאי הראשון שלא עבר; לפני ביצוע כל התנאים נבדקים מחדש.',card,'attention-check-legend');
+    add('small','✓ התקיים בבדיקה · ○ ממתין · — טרם אומת. כל תנאי שניתן לחשב נבדק באותה סריקה; כניסה דורשת את כל התנאים ובדיקה סופית.',card,'attention-check-legend');
    }
    if(t.ready){
     add('p','Spot · 50 נרות לפני נר המדידה · '+date(t.dataAt),card,'attention-note');
