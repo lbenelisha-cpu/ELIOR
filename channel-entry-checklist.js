@@ -31,7 +31,6 @@
  function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null}={}){
   const sell=side==='SHORT',stages=sell?short:long;
   const definitions=[
-   ['data','50 נרות סגורים ורציפים + מחיר ונר פתוח עדכניים',['quote','bar','history']],
    ['channel','תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
    ['slope',sell?'רגרסיה יורדת':'רגרסיה עולה',['slope']],
    ['break',sell?'שבירה חדשה מתחת לגבול התחתון':'פריצה חדשה מעל הגבול העליון',['break']],
@@ -54,7 +53,9 @@
   const count=rows.filter(r=>r.state==='passed').length;
   // Null blocker is absence of a reported block, never proof of account approval.
   rows.push({id:'execution',label:'אישור ביצוע · הרשאות, יתרה, מקום והגנות',state:transport&&blocker?'blocked':'unknown'});
-  return {rows,count,total:definitions.length,current,status:!supported?'unsupported':!timely?'stale':!known?'unknown':'recorded'};
+  // Data availability is a background prerequisite, not a counted signal.
+  const dataPending=current&&['quote','bar','history'].includes(failed);
+  return {rows,count,total:definitions.length,current,dataPending,status:!supported?'unsupported':!timely?'stale':!known?'unknown':'recorded'};
  }
  root.LEVI_ENTRY_CHECKLIST={project};
 })(typeof window==='undefined'?globalThis:window);

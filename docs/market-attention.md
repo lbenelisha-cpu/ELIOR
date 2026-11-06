@@ -24,6 +24,13 @@ Even a complete technical checklist does not authorize an order. The UI uses the
 existing response and adds no API requests. This is a static Netlify update with
 no VPS installation or changes to entry rules, settings, allocation or exits.
 
+Data availability (the rolling 50 closed bars, fresh quote and current open bar)
+is not a checklist row and does not count toward the ten technical conditions.
+While the server awaits those inputs, or the recorded scan has expired, the
+summary says it is waiting for updated data instead of dropping to a misleading
+zero score. All server data validation and expiry checks remain in effect;
+the UI does not retain checkmarks from an expired candle.
+
 Binance Overview and Scans include an authenticated “איתותים ותצפיתנים” board. The existing agent response supplies it; the widget makes no requests or order submissions. A news report creates a watch highlight, never a buy/sell decision. The server ignores the legacy MARKET_NEWS_ENTRY_OVERLAY activation for execution. Automatic candidate ordering, final submission, POC, quantities and exits do not consult news.
 
 ### Hebrew headline briefs (2026-11-06)

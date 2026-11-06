@@ -20,11 +20,11 @@ const state=(v,id)=>v.rows.find(r=>r.id===id).state;
 test('checklists follow real LONG and SHORT results without treating observation as account approval',()=>{
  for(const side of ['LONG','SHORT']){
   const i=input(side),good=evaluate(side,i);assert.equal(good.ready,true,good.reason);
-  const all=view(side,good.reason);assert.equal(all.count,all.total);assert.equal(state(all,'execution'),'unknown');
+  const all=view(side,good.reason);assert.equal(all.count,all.total);assert.equal(all.total,10);assert.equal(all.rows.some(r=>r.id==='data'),false);assert.equal(state(all,'execution'),'unknown');
   i.liveBar.volume=1499;
   const low=evaluate(side,i),waiting=view(side,low.reason);
   assert.match(low.reason,/VOLUME_LOW/);
-  for(const id of ['data','channel','slope','break','center'])assert.equal(state(waiting,id),'passed',side+' '+id);
+  for(const id of ['channel','slope','break','center'])assert.equal(state(waiting,id),'passed',side+' '+id);
   assert.equal(state(waiting,'volume'),'waiting');
   for(const id of ['liquidity','signal','range','rangeBreak','plan','execution'])assert.equal(state(waiting,id),'unknown',side+' '+id);
   // No historical latch: losing the price condition removes later checkmarks.
@@ -63,8 +63,8 @@ test('signal and data failures do not skip ahead to authorize later conditions',
   const i=input(side);i.entryAfter=end;
   const v=view(side,evaluate(side,i).reason);assert.equal(state(v,'signal'),'waiting');assert.equal(state(v,'channel'),'unknown');
   i.entryAfter=0;i.priceAsOf=now-20000;
-  const stale=view(side,evaluate(side,i).reason);assert.equal(state(stale,'data'),'waiting');assert.equal(stale.count,0);
+  const stale=view(side,evaluate(side,i).reason);assert.equal(stale.dataPending,true);assert.equal(stale.count,0);assert.equal(stale.rows.some(r=>r.id==='data'),false);
   i.priceAsOf=now;i.bars=i.bars.slice(-49);
-  const missing=view(side,evaluate(side,i).reason);assert.equal(state(missing,'data'),'waiting');assert.equal(state(missing,'channel'),'unknown');
+  const missing=view(side,evaluate(side,i).reason);assert.equal(missing.dataPending,true);assert.equal(state(missing,'channel'),'unknown');
  }
 });
