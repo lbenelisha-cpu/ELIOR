@@ -15,7 +15,7 @@ tests=(market-attention.test.mjs market-attention-ui.test.mjs market-news.test.m
 ln -s /opt/levi-binance/node_modules "$stage/release/node_modules"
 release_tests=()
 for file in "${tests[@]}"; do release_tests+=("$stage/release/tests/$file"); done
-node --test "${release_tests[@]}"
+node --test "$stage/release/tests/market-attention-installer.test.mjs" "${release_tests[@]}"
 
 cp -a lib/. "$stage/runtime/lib/"
 cp server.mjs binance-agent.html regression-trend.js parallel-channel.js "$stage/runtime/"
