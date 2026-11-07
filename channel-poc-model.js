@@ -1,23 +1,23 @@
 // Shared, deterministic geometry for the server and chart. No account or order access.
 (function(root){
  'use strict';
- const STEP=300000,VERSION='CHANNEL_POC_RETEST_V1',REPORT='CHANNEL_POC_CONDITIONS_V1';
+ const STEP=300000,VERSION='CHANNEL_POC_RETEST_V2',REPORT='CHANNEL_POC_CONDITIONS_V1';
  const ANCHOR_POLICY='RECENT_WAVE_POC_V2';
  const consolidationPolicy=Object.freeze({version:'CHANNEL_INITIAL_CONSOLIDATION_V2',minBars:3,maxBars:8,maxRangeFraction:.35,maxDriftFraction:.5,lowerZone:1/3,upperZone:2/3,selection:'CONTAINS_FIRST_CHANNEL_ANCHOR',middle:'ALLOW_BOTH'});
  const positive=n=>Number.isFinite(n)&&n>0;
- function profile(input,bins=32){
+ function profile(input,bins=128){
   if(!Array.isArray(input)||!input.length||!Number.isInteger(bins)||bins<2||bins>128)return null;
   if(input.some(b=>!['low','high','volume'].every(k=>Number.isFinite(b[k]))||b.low<=0||b.high<b.low||b.volume<0))return null;
   const low=Math.min(...input.map(b=>b.low)),high=Math.max(...input.map(b=>b.high)),step=(high-low)/bins;
   if(!(step>0))return null;
-  const volumes=Array(bins).fill(0);
+  const volumes=Array(bins).fill(0),priceMass=Array(bins).fill(0);
   for(const b of input){
-   if(b.high===b.low){volumes[Math.min(bins-1,Math.floor((b.low-low)/step))]+=b.volume;continue;}
-   for(let i=0;i<bins;i++)volumes[i]+=b.volume*Math.max(0,Math.min(low+(i+1)*step,b.high)-Math.max(low+i*step,b.low))/(b.high-b.low);
+   if(b.high===b.low){const i=Math.min(bins-1,Math.floor((b.low-low)/step));volumes[i]+=b.volume;priceMass[i]+=b.volume*b.low;continue;}
+   for(let i=0;i<bins;i++){const lo=Math.max(low+i*step,b.low),hi=Math.min(low+(i+1)*step,b.high),overlap=Math.max(0,hi-lo),allocated=b.volume*overlap/(b.high-b.low);volumes[i]+=allocated;priceMass[i]+=allocated*(lo+hi)/2;}
   }
   const max=Math.max(...volumes);if(!(max>0))return null;
   const index=volumes.indexOf(max);
-  return {method:'OHLC_UNIFORM_ESTIMATE',estimated:true,bins,low,high,step,volumes,max,index,poc:low+(index+.5)*step,totalVolume:volumes.reduce((a,b)=>a+b,0)};
+  return {method:'OHLC_RANGE_WEIGHTED_ESTIMATE',estimated:true,bins,low,high,step,volumes,max,index,poc:volumes[index]>0?priceMass[index]/volumes[index]:low+(index+.5)*step,totalVolume:volumes.reduce((a,b)=>a+b,0)};
  }
  function initialRange(history,channel,side){
   const p=consolidationPolicy,first=Math.round((channel.anchorStart-channel.start)/STEP),width=2*channel.width;
