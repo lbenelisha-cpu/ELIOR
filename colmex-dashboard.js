@@ -23,6 +23,7 @@ function renderMap(now){
  if(!p){const empty=el('div',null,'map-empty');empty.append(el('div',null,'empty-rail'),el('p',!status||statusFailed?'ממתין לנתוני הפוזיציות.':account?.data?.positions?.length?'ההחזקות מופיעות בפרטי החשבון. המפה תוצג לפוזיציה שבמעקב האוטומטי.':'אין כרגע פוזיציה במעקב האוטומטי.\nכשתיפתח פוזיציה, רמות המחיר יוצגו כאן.'));host.append(empty);return;}
  const protection=protectionView(p,status.pendingActions,now),entry=Number(p.entryPrice)>0?Number(p.entryPrice):null,current=freshAt(p.lastQuoteAt,now,120000)&&Number(p.lastBid)>0?Number(p.lastBid):null;
  host.append(positionChangeBadge(el,entry,current,p.side));
+ const exitHost=el('div');host.append(exitHost);globalThis.LEVI_EXIT_SNAPSHOT?.render(exitHost,{venue:'COLMEX',status,error:statusFailed},p.symbol,now);
  const stop=protection.stop>0?protection.stop:null,target=protection.target>0?protection.target:null;
  const grid=el('div',null,'position-prices');
  for(const [label,value,cls] of [['כניסה',entry,''],['מחיר שנצפה',current,''],['סטופ מאושר',stop,'negative'],['יעד מאושר',target,'positive']]){const item=el('div');item.append(el('span',label),el('b',value===null?'—':'$'+price(value),cls));grid.append(item);}host.append(grid);

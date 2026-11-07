@@ -87,7 +87,7 @@ test('published Binance-only intrabar plus settings/consolidation installs indep
   const {spawnSync}=await import('node:child_process'),env={...process.env};delete env.NODE_TEST_CONTEXT;
   // Run exactly the same complete suite as the VPS installer. A smaller subset
   // previously missed local hook and historical-installer fixture mismatches.
-  const {patchChannelPoc}=await import('../scripts/patch-channel-poc.mjs');patchChannelPoc(root,JSON.parse(fs.readFileSync(new URL('../scripts/channel-poc-patches.json',import.meta.url),'utf8')));
+  const {patchChannelPoc}=await import('../scripts/patch-channel-poc.mjs'),{prepareLegacyPocHelpers}=await import('./helpers/upgrade-poc-fixture.mjs');const poc=JSON.parse(fs.readFileSync(new URL('../scripts/channel-poc-patches.json',import.meta.url),'utf8'));prepareLegacyPocHelpers(root,poc);patchChannelPoc(root,poc);
   const run=spawnSync(process.execPath,[path.join(root,'scripts/test-channel-poc-runtime.mjs'),root],{env,encoding:'utf8',timeout:120000,maxBuffer:2000000});
   assert.ifError(run.error);assert.equal(run.status,0,run.stdout+run.stderr);
  }finally{fs.rmSync(root,{recursive:true,force:true});}

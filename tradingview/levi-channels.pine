@@ -112,6 +112,8 @@ var float savedRangeLow = na
 var float savedRangeHigh = na
 var int vpA = na
 var int vpB = na
+var int vpReturnedAt = na
+var int processedBar = na
 var int vpSide = 0
 var int vpZone = 0
 var float vpLow = na
@@ -186,56 +188,82 @@ if bar_index >= n and bar_index >= last_bar_index - 200
     bool provisional1 = lc1<2 or hc1<2
     bool provisional2 = lc2<2 or hc2<2
     bool choose1 = v1 and (not v2 or b1>b2 or (b1==b2 and ((not provisional1 and provisional2) or (provisional1==provisional2 and u1-l1<=u2-l2))))
-    // Freeze at the completed breakout candle; returning candles never extend B.
-    if not na(savedLast) and last == savedLast+1 and (na(vpB) or last > vpB) and savedLowTouches >= 2 and savedHighTouches >= 2
-        float topNow = savedUpper+savedSlope*(last-savedFirst)
-        float lowNow = savedLower+savedSlope*(last-savedFirst)
-        float topBefore = topNow-savedSlope
-        float lowBefore = lowNow-savedSlope
-        bool brokeUp = close[offset+1] <= topBefore and high[offset] > topNow
-        bool brokeDown = close[offset+1] >= lowBefore and low[offset] < lowNow
-        if brokeUp and brokeDown
+    // RECENT_WAVE_POC_V2: closed candles only; A is the latest pullback,
+    // B follows that wave's extreme until its first completed POC return.
+    bool recalcProfile = false
+    if na(processedBar) or last > processedBar
+        processedBar := last
+        if not na(vpA) and last-vpA >= 490
+            vpA := na
             vpB := na
             vpPoc := na
-        if brokeUp != brokeDown
-            vpSide := brokeUp ? 1 : -1
-            vpA := savedStart
-            for i = savedStart to last-1
-                int back = bar_index-i
-                int anchorBack = bar_index-vpA
-                if vpSide == 1 ? low[back] < low[anchorBack] : high[back] > high[anchorBack]
-                    vpA := i
-            vpPriceA := vpSide == 1 ? low[bar_index-vpA] : high[bar_index-vpA]
-            vpPriceB := vpSide == 1 ? high[offset] : low[offset]
-            vpB := last
-            vpZone := savedZone
-            vpLow := low[bar_index-vpA]
-            vpHigh := high[bar_index-vpA]
+            vpReturnedAt := na
+        if not na(vpB) and na(vpReturnedAt)
+            bool better = vpSide == 1 ? high[offset] > vpPriceB : low[offset] < vpPriceB
+            if better
+                vpB := last
+                vpPriceB := vpSide == 1 ? high[offset] : low[offset]
+                recalcProfile := true
+            else if last > vpB and not na(vpPoc) and (vpSide == 1 ? close[offset+1] > vpPoc and low[offset] <= vpPoc : close[offset+1] < vpPoc and high[offset] >= vpPoc)
+                vpReturnedAt := last
+        if not na(savedLast) and last > savedLast and last-savedFirst < 490 and savedLowTouches >= 2 and savedHighTouches >= 2
+            float topNow = savedUpper+savedSlope*(last-savedFirst)
+            float lowNow = savedLower+savedSlope*(last-savedFirst)
+            bool brokeUp = close[offset+1] <= topNow-savedSlope and high[offset] > topNow
+            bool brokeDown = close[offset+1] >= lowNow-savedSlope and low[offset] < lowNow
+            if brokeUp and brokeDown
+                vpA := na
+                vpB := na
+                vpPoc := na
+                vpReturnedAt := na
+                savedLast := na
+                recalcProfile := false
+            else if brokeUp or brokeDown
+                int direction = brokeUp ? 1 : -1
+                bool newWave = na(vpB) or direction != vpSide or not na(vpReturnedAt)
+                int begin = na(vpB) ? savedStart : math.max(savedFirst,direction == vpSide ? vpReturnedAt : vpB)
+                if newWave and not na(begin) and begin < last
+                    vpSide := direction
+                    vpA := begin
+                    for i = begin to last-1
+                        int back = bar_index-i
+                        int anchorBack = bar_index-vpA
+                        if vpSide == 1 ? low[back] <= low[anchorBack] : high[back] >= high[anchorBack]
+                            vpA := i
+                    vpPriceA := vpSide == 1 ? low[bar_index-vpA] : high[bar_index-vpA]
+                    vpPriceB := vpSide == 1 ? high[offset] : low[offset]
+                    vpB := last
+                    vpReturnedAt := na
+                    vpZone := savedZone
+                    vpSlope := savedSlope
+                    vpLower := savedLower
+                    vpUpper := savedUpper
+                    vpFirst := savedFirst
+                    vpChannelStart := savedStart
+                    recalcProfile := true
+    if recalcProfile and not na(vpA)
+        vpLow := low[bar_index-vpA]
+        vpHigh := high[bar_index-vpA]
+        for i = vpA to vpB
+            int back = bar_index-i
+            vpLow := math.min(vpLow,low[back])
+            vpHigh := math.max(vpHigh,high[back])
+        array.fill(vpVolumes,0)
+        float step = (vpHigh-vpLow)/32
+        bool volumeValid = step > 0
+        if step > 0
             for i = vpA to vpB
                 int back = bar_index-i
-                vpLow := math.min(vpLow,low[back])
-                vpHigh := math.max(vpHigh,high[back])
-            array.fill(vpVolumes,0)
-            float step = (vpHigh-vpLow)/32
-            bool volumeValid = step > 0
-            if step > 0
-                for i = vpA to vpB
-                    int back = bar_index-i
-                    volumeValid := volumeValid and not na(volume[back]) and volume[back] >= 0
-                    if high[back] > low[back]
-                        for bin = 0 to 31
-                            float overlap = math.max(0,math.min(vpLow+(bin+1)*step,high[back])-math.max(vpLow+bin*step,low[back]))
-                            array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back])*overlap/(high[back]-low[back]))
-                    else
-                        int bin = math.max(0,math.min(31,int(math.floor((low[back]-vpLow)/step))))
-                        array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back]))
-            float largest = array.max(vpVolumes)
-            vpPoc := volumeValid and largest > 0 ? vpLow+(array.indexof(vpVolumes,largest)+0.5)*step : na
-            vpSlope := savedSlope
-            vpLower := savedLower
-            vpUpper := savedUpper
-            vpFirst := savedFirst
-            vpChannelStart := savedStart
+                volumeValid := volumeValid and not na(volume[back]) and volume[back] >= 0
+                if high[back] > low[back]
+                    for bin = 0 to 31
+                        float overlap = math.max(0,math.min(vpLow+(bin+1)*step,high[back])-math.max(vpLow+bin*step,low[back]))
+                        array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back])*overlap/(high[back]-low[back]))
+                else
+                    int bin = math.max(0,math.min(31,int(math.floor((low[back]-vpLow)/step))))
+                    array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back]))
+        float largest = array.max(vpVolumes)
+        vpPoc := volumeValid and largest > 0 ? vpLow+(array.indexof(vpVolumes,largest)+0.5)*step : na
     if not na(savedLast) and last > savedLast and na(brokenAt)
         float tolerance = math.max((savedUpper-savedLower)*0.025,close[offset]*0.0001)
         float projectedLower = savedLower+savedSlope*(last-savedFirst)
@@ -299,19 +327,19 @@ if barstate.islast
         for bin = 0 to 31
             float v = array.get(vpVolumes,bin)
             if v > 0
-                int right = histogramLeft+math.max(1,int(math.round(10*v/largest)))
+                int right = histogramLeft+math.max(1,int(math.round(math.min(10,math.max(1,vpB-vpA))*v/largest)))
                 color c = vpLow+(bin+0.5)*step == vpPoc ? color.yellow : color.new(color.aqua,65)
                 array.push(vpBoxes,box.new(histogramLeft,vpLow+(bin+1)*step,right,vpLow+bin*step,border_color=color.new(c,100),bgcolor=c))
         array.push(vpLines,line.new(vpB,vpPoc,bar_index+2,vpPoc,color=color.yellow,width=2,style=line.style_dashed))
         for band = 0 to 1
             float edge = band == 0 ? vpLower : vpUpper
             array.push(vpLines,line.new(vpChannelStart,edge+vpSlope*(vpChannelStart-vpFirst),bar_index,edge+vpSlope*(bar_index-vpFirst),color=color.orange,width=2))
-        array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
-        array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=vpSide == 1 ? label.style_label_up : label.style_label_down,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=vpSide == 1 ? label.style_label_down : label.style_label_up,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
         bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
-        bool returned = bar_index > vpB and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
-        table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" · Fixed A–B · POC estimate",text_color=color.yellow)
+        bool returned = bar_index > vpB and (vpSide == 1 ? high <= vpPriceB : low >= vpPriceB) and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
+        table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" · Recent wave A–B · POC estimate",text_color=color.yellow)
         table.cell(pocTable,0,1,"1 ✓ Confirmed channel · 3 ✓ Breakout",text_color=color.white)
         table.cell(pocTable,0,2,rangeOK ? "8 ✓ Initial consolidation" : "8 ○ Initial consolidation does not match",text_color=rangeOK ? color.lime : color.orange)
         table.cell(pocTable,0,3,returned ? "4 ✓ Return to POC" : "4 ○ Waiting for return to POC",text_color=returned ? color.lime : color.orange)
@@ -326,7 +354,7 @@ bool showExitTarget = input.bool(false, "Show Take Profit line", group="Bot exit
 bool showExitActivation = input.bool(false, "Show profit activation line", group="Bot exit levels")
 var array<line> exitLines = array.new<line>()
 var array<label> exitLabels = array.new<label>()
-var table exitTable = table.new(position.bottom_left, 1, 4, bgcolor=color.new(color.black, 15))
+var table exitTable = table.new(position.bottom_left, 1, 6, bgcolor=color.new(color.black, 15))
 
 if barstate.islast
     for item in exitLines
@@ -335,11 +363,11 @@ if barstate.islast
     for item in exitLabels
         label.delete(item)
     array.clear(exitLabels)
-    table.clear(exitTable, 0, 0, 0, 3)
+    table.clear(exitTable, 0, 0, 0, 5)
     string raw = str.trim(exitSnapshot)
     if str.length(raw) > 0
         array<string> fields = str.split(raw, "|")
-        bool valid = array.size(fields) == 10 and str.length(raw) <= 800
+        bool valid = (array.size(fields) == 10 or array.size(fields) == 15) and str.length(raw) <= 800
         string status = "Invalid bot snapshot - copy again from LEVI"
         if valid
             string version = array.get(fields, 0)
@@ -352,10 +380,19 @@ if barstate.islast
             float activationValue = str.tonumber(array.get(fields, 7))
             float armedValue = str.tonumber(array.get(fields, 8))
             float brokerStopValue = str.tonumber(array.get(fields, 9))
-            valid := version == "LEVI_EXIT_V1" and not na(atValue) and not na(entryAtValue) and not na(entryValue) and not na(stopValue) and not na(targetValue) and not na(activationValue) and not na(armedValue) and not na(brokerStopValue)
-            valid := valid and atValue > 0 and entryAtValue > 0 and entryAtValue <= atValue and entryValue > 0 and stopValue > 0 and targetValue > entryValue and activationValue >= 0 and brokerStopValue >= 0 and (armedValue == 0 or armedValue == 1)
+            bool v2 = version == "LEVI_EXIT_V2" and array.size(fields) == 15
+            string side = v2 ? array.get(fields, 10) : "LONG"
+            float direction = side == "SHORT" ? -1 : 1
+            float stopPct = v2 ? str.tonumber(array.get(fields, 11)) : na
+            float targetPct = v2 ? str.tonumber(array.get(fields, 12)) : na
+            float activationPct = v2 ? str.tonumber(array.get(fields, 13)) : na
+            float gapPp = v2 ? str.tonumber(array.get(fields, 14)) : na
+            valid := ((version == "LEVI_EXIT_V1" and array.size(fields) == 10) or v2) and (side == "LONG" or side == "SHORT") and not na(atValue) and not na(entryAtValue) and not na(entryValue) and not na(stopValue) and not na(targetValue) and not na(activationValue) and not na(armedValue) and not na(brokerStopValue)
+            valid := valid and atValue > 0 and entryAtValue > 0 and entryAtValue <= atValue and entryValue > 0 and stopValue > 0 and direction*(targetValue-entryValue) > 0 and activationValue >= 0 and brokerStopValue >= 0 and (armedValue == 0 or armedValue == 1)
+            valid := valid and (not v2 or (not na(stopPct) and not na(targetPct) and not na(activationPct) and not na(gapPp) and stopPct >= -1 and targetPct >= -1 and activationPct >= -1 and gapPp >= -1))
+            bool usStock = symbol == "US:" + syminfo.ticker and syminfo.currency == "USD" and (syminfo.type == "stock" or syminfo.type == "fund") and (syminfo.prefix == "NASDAQ" or syminfo.prefix == "NYSE" or syminfo.prefix == "AMEX" or syminfo.prefix == "NYSEARCA")
             if valid
-                if symbol != syminfo.prefix + ":" + syminfo.ticker
+                if symbol != syminfo.prefix + ":" + syminfo.ticker and not usStock
                     valid := false
                     status := "Snapshot is for " + symbol + " - select that symbol or copy again"
                 else if atValue > timenow or timenow - atValue > 120000
@@ -364,6 +401,8 @@ if barstate.islast
             if valid
                 int at = int(atValue)
                 string stamp = str.format_time(at, "HH:mm:ss", "Asia/Jerusalem")
+                array.push(exitLines, line.new(at, entryValue, at + 60000, entryValue, xloc=xloc.bar_time, extend=extend.right, color=color.silver, style=line.style_dotted))
+                array.push(exitLabels, label.new(at, entryValue, side + " entry " + str.tostring(entryValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.gray, 35), textcolor=color.white, size=size.small))
                 array.push(exitLines, line.new(at, stopValue, at + 60000, stopValue, xloc=xloc.bar_time, extend=extend.right, color=color.red, style=line.style_dashed, width=2))
                 array.push(exitLabels, label.new(at, stopValue, (armedValue == 1 ? "Bot trailing stop " : "Bot stop ") + str.tostring(stopValue, format.mintick) + " · snapshot " + stamp, xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.red, 25), textcolor=color.white, size=size.small))
                 if showExitTarget
@@ -372,9 +411,12 @@ if barstate.islast
                 if showExitActivation and activationValue > 0
                     array.push(exitLines, line.new(at, activationValue, at + 60000, activationValue, xloc=xloc.bar_time, extend=extend.right, color=color.yellow, style=line.style_dotted))
                     array.push(exitLabels, label.new(at, activationValue, "Protection activation (not a sale) " + str.tostring(activationValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.orange, 25), textcolor=color.white, size=size.small))
-                table.cell(exitTable, 0, 0, "BOT SNAPSHOT · " + stamp + " Israel · NOT LIVE", text_color=color.orange, text_size=size.small)
+                table.cell(exitTable, 0, 0, side + " · BOT SNAPSHOT · " + stamp + " Israel · NOT LIVE", text_color=color.orange, text_size=size.small)
                 table.cell(exitTable, 0, 1, "Stop " + str.tostring(stopValue, format.mintick) + " · TP " + str.tostring(targetValue, format.mintick), text_color=color.white, text_size=size.small)
                 table.cell(exitTable, 0, 2, activationValue > 0 ? "Activation " + str.tostring(activationValue, format.mintick) + (armedValue == 1 ? " · armed" : " · waiting") : "Fixed exit policy", text_color=color.white, text_size=size.small)
+                table.cell(exitTable, 0, 4, "Entry " + str.tostring(entryValue, format.mintick) + " · stop P/L " + str.tostring(direction*(stopValue/entryValue-1)*100,"#.##") + "% · target " + str.tostring(direction*(targetValue/entryValue-1)*100,"#.##") + "%", text_color=color.white, text_size=size.small)
+                if v2
+                    table.cell(exitTable, 0, 5, "Settings: SL " + (stopPct < 0 ? "unknown" : str.tostring(stopPct,"#.##")) + "% · TP " + (targetPct < 0 ? "unknown" : str.tostring(targetPct,"#.##")) + "% · activation " + (activationPct < 0 ? "unknown" : str.tostring(activationPct,"#.##")) + "% · trail gap " + (gapPp < 0 ? "unknown" : str.tostring(gapPp,"#.##")) + " pp", text_color=color.aqua, text_size=size.small)
                 table.cell(exitTable, 0, 3, brokerStopValue > 0 ? "Exchange stop at snapshot: " + str.tostring(brokerStopValue, format.mintick) : "Exchange stop not verified", text_color=brokerStopValue > 0 ? color.silver : color.orange, text_size=size.small)
         if not valid
             table.cell(exitTable, 0, 0, status, text_color=color.orange, text_size=size.small)
