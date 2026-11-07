@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {colmexChannelConditions,colmexLiveTradeMarks,renderColmexChannelConditions} from '../lib/colmex-channel-conditions.mjs';
-import {CHANNEL_PRIMARY_POLICY} from '../lib/channel-primary-entry.mjs';
+import {CHANNEL_PRIMARY_POLICY,channelEntryConfig} from '../lib/channel-primary-entry.mjs';
+import {colmexChannelSignal} from '../lib/colmex-channel-entry.mjs';
+import {pocFixture} from './helpers/poc-channel-fixture.mjs';
 
 const now=Date.parse('2026-11-03T19:00:00Z');
 const status={enabled:true,channelPrimary:{version:CHANNEL_PRIMARY_POLICY.version,requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_long_short',channel:{ready:false}}}}};
@@ -63,6 +65,7 @@ test('POC rules describe a closed B and an intrabar return, while stale server v
 
 test('Colmex displays both independent server reports and cannot mix them with chart or historical data',()=>{
  const s=structuredClone(status),at=now;s.checks.AAPL.at=at;
+ s.channelPrimary.version='CHANNEL_PRIMARY_INTRABAR_V2';
  const ids=['channel','slope','break','center','volume','liquidity','signal','range','rangeBreak','plan'];
  s.checks.AAPL.entryDecisions.channel.conditionReports=Object.fromEntries(['LONG','SHORT'].map(side=>[side,{version:'CHANNEL_CONDITIONS_PARALLEL_V1',side,at,expiresAt:(Math.floor(at/300000)+1)*300000,rows:ids.map(id=>({id,state:id==='slope'?'waiting':'passed'}))}]));
  const v=colmexChannelConditions({channels,status:s,symbol:'AAPL',now});
@@ -70,4 +73,67 @@ test('Colmex displays both independent server reports and cannot mix them with c
  for(const patch of [{manual:true},{historical:true},{now:now+300000},{symbol:'MSFT'},{status:{...s,unavailable:true}}]){
   const view=colmexChannelConditions({channels,status:s,symbol:'AAPL',now,...patch});assert.equal(view.conditionViews.every(c=>c.count===0),true);
  }
+});
+
+const pocIds=['channel','break','poc','range','execution'];
+test('Colmex POC policy keeps four unverified conditions when the saved scan has no report, including the overnight screenshot',()=>{
+ for(const patch of [{},{checks:{}},{checks:{AAPL:{...status.checks.AAPL,at:now-43200000}}}]){
+  const s={...structuredClone(status),...patch};
+  const v=colmexChannelConditions({channels,status:s,symbol:'AAPL',now});
+  for(const c of v.conditionViews){
+   assert.deepEqual(c.rows.map(r=>r.id),pocIds);assert.equal(c.total,4);assert.equal(c.count,0);assert.equal(c.current,false);
+   assert.ok(c.rows.every(r=>r.state==='unknown'));
+  }
+ }
+ const v=colmexChannelConditions({symbol:'AAPL',now});
+ assert.ok(v.conditionViews.every(c=>c.total===4&&c.count===0));assert.match(v.route,/המצב אינו זמין/);
+});
+
+test('a declared POC policy cannot borrow approvals or old labels from a legacy report',()=>{
+ const s=structuredClone(status);s.checks.AAPL.at=now;
+ s.checks.AAPL.entryDecisions.channel.conditionReports=Object.fromEntries(['LONG','SHORT'].map(side=>[side,{
+  version:'CHANNEL_CONDITIONS_PARALLEL_V1',side,at:now,expiresAt:now+300000,
+  rows:['channel','slope','break','center','volume','liquidity','signal','range','rangeBreak','plan'].map(id=>({id,state:'passed'}))
+ }]));
+ for(const c of colmexChannelConditions({status:s,symbol:'AAPL',now}).conditionViews){
+  assert.deepEqual(c.rows.map(r=>r.id),pocIds);assert.equal(c.status,'invalid-report');assert.equal(c.count,0);
+ }
+});
+
+test('actual Colmex POC evaluation renders its own four rows for each side and clears stale or unrelated evidence',()=>{
+ for(const side of ['LONG','SHORT']){
+  const input=pocFixture({side}),at=input.now;
+  const channelPrimary=channelEntryConfig({COLMEX_CHANNEL_PRIMARY_ENABLED:'true',COLMEX_CHANNEL_PRIMARY_AFTER:new Date(at-600000).toISOString()},'COLMEX');
+  const result=colmexChannelSignal({...input,symbol:'AAPL',ask:input.price},channelPrimary);
+  assert.equal(result.ready,true,result.reason);assert.equal(result.side,side);
+  const s={enabled:true,channelPrimary,checks:{AAPL:{at,reason:result.reason,entryDecisions:{primary:'channel_long_short',channel:result}}}};
+  const v=colmexChannelConditions({channels,status:s,symbol:'AAPL',now:at});
+  for(const c of v.conditionViews){
+   assert.equal(c.current,true);assert.deepEqual(c.rows.map(r=>r.id),pocIds);
+   assert.deepEqual(c.rows.slice(0,4).map(r=>[r.id,r.state]),result.conditionReports[c.side].rows.map(r=>[r.id,r.state]));
+   assert.equal(c.rows.at(-1).state,'unknown');
+  }
+  assert.equal(v.conditionViews.find(c=>c.side===side).count,4);
+  assert.ok(v.conditionViews.find(c=>c.side!==side).count<4);
+  for(const patch of [{manual:true},{historical:true},{now:at+300000},{now:at-1},{symbol:'MSFT'},{status:{...s,unavailable:true}}]){
+   const unavailable=colmexChannelConditions({channels,status:s,symbol:'AAPL',now:at,...patch});
+   assert.ok(unavailable.conditionViews.every(c=>c.total===4&&c.count===0&&!c.current));
+  }
+ }
+});
+
+test('Colmex renders only the four POC conditions plus execution for an old saved scan',()=>{
+ const doc={createElement:tag=>({tag,dataset:{},children:[],textContent:'',ownerDocument:doc,append(...nodes){this.children.push(...nodes);},replaceChildren(){this.children=[];}})};
+ const host=doc.createElement('section'),s=structuredClone(status);s.checks.AAPL.at=now-43200000;
+ renderColmexChannelConditions(host,{channels,status:s,symbol:'AAPL',now});
+ const checks=host.children.find(n=>n.className==='channel-parallel-checks');
+ assert.equal(checks.children.length,2);
+ for(const section of checks.children){
+  const list=section.children.find(n=>n.tag==='ul');assert.equal(list.children.length,5);
+  assert.ok(list.children.every(n=>n.dataset.state==='unknown'));
+  assert.match(list.children.map(n=>n.textContent).join(' '),/1 ·.*3 ·.*4 ·.*8 ·/);
+ }
+ const text=n=>n.textContent+' '+n.children.map(text).join(' ');
+ assert.match(text(host),/הבדיקה מלפני יותר מ־30 דקות/);
+ assert.doesNotMatch(text(checks),/רגרסיה עולה|רגרסיה יורדת|מרכז הרגרסיה|מחזור בנר|10,000|תבנית שלא נוצלה|יציאה מעל טווח|יציאה מתחת לטווח|יעד שטרם הושג/);
 });
