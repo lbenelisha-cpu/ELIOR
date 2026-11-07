@@ -226,7 +226,20 @@ function renderTradingRules(s){
  host.replaceChildren();for(const text of tradingRuleLines(tradingRulesSnapshot)){const p=document.createElement('p');p.textContent=text;host.append(p);}
 }
 
+function publishEntryPolicySnapshot(s){
+  if(!['live','demo'].includes(s?.mode))return;
+  const previous=window.LEVI_ENTRY_POLICY_SNAPSHOT;
+  const detail=previous?.mode===s.mode?{...previous}:{mode:s.mode};
+  // Partial scanner responses do not replace the independently read Futures
+  // policy. This event carries labels/configuration only, never account data.
+  if(Object.hasOwn(s,'channelPrimary'))detail.long=s.channelPrimary||null;
+  if(Object.hasOwn(s,'shortTrading'))detail.short=s.shortTrading?.policy||null;
+  window.LEVI_ENTRY_POLICY_SNAPSHOT=detail;
+  window.dispatchEvent(new CustomEvent('levi:binance-entry-policies',{detail}));
+}
+
 function mode(s){
+  publishEntryPolicySnapshot(s);
   renderTradingRules(s);
   renderFuturesShortStatus(s);
   window.LEVI_FUTURES_TABLE?.update(s);

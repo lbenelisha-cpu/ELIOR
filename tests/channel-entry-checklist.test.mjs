@@ -13,6 +13,18 @@ const evaluate=(side,i)=>side==='SHORT'?shortSignal(i,configs[side]):channelEntr
 const view=(side,reason,extra={})=>project({side,reason,at:now,now,expiresAt:end+D,transport:true,supported:true,...extra});
 const state=(v,id)=>v.rows.find(r=>r.id===id).state;
 const report=(side,i=input(side),extra={})=>{const r=evaluate(side,i);return view(side,r.reason,{conditions:r.conditions,...extra});};
+test('POC policy keeps four unknown conditions when a report is missing; old reasons cannot create POC passes',()=>{
+ for(const side of ['LONG','SHORT'])for(const reason of [undefined,'WAIT_SHORT_OBSERVATION','FUTURES_SYMBOL_UNAVAILABLE','CHANNEL_BREAKOUT_READY','SHORT_CHANNEL_READY','CHANNEL_VOLUME_LOW']){
+  const v=view(side,reason,{schemaVersion:'CHANNEL_POC_CONDITIONS_V1'});
+  assert.deepEqual(v.rows.map(r=>r.id),['channel','break','poc','range','execution']);
+  assert.equal(v.total,4);assert.equal(v.count,0);assert.equal(v.current,false);assert.ok(v.rows.every(r=>r.state==='unknown'));
+ }
+});
+test('declared policy rejects an incompatible report rather than rendering retired gates',()=>{
+ const old={version:'CHANNEL_CONDITIONS_PARALLEL_V1',side:'SHORT',at:now,expiresAt:end+D,rows:['channel','slope','break','center','volume','liquidity','signal','range','rangeBreak','plan'].map(id=>({id,state:'passed'}))};
+ const v=view('SHORT','SHORT_CHANNEL_READY',{schemaVersion:'CHANNEL_POC_CONDITIONS_V1',conditions:old});
+ assert.equal(v.total,4);assert.equal(v.current,false);assert.equal(v.count,0);assert.equal(v.status,'invalid-report');
+});
 test('both actual entry reports contain only four technical checks and never infer account approval',()=>{
  for(const side of ['LONG','SHORT']){const i=input(side),r=evaluate(side,i),v=report(side,i);assert.equal(r.ready,true,r.reason);assert.deepEqual(v.rows.map(r=>r.id),['channel','break','poc','range','execution']);assert.equal(v.count,4);assert.equal(v.total,4);assert.equal(state(v,'execution'),'unknown');
  i.price=side==='LONG'?r.model.profile.poc+1:r.model.profile.poc-1;
