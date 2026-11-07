@@ -48,7 +48,7 @@ validateShortSettings(Object.fromEntries(keys.map(k=>[k,d.exitSettings?.[k]])));
 if(fs.existsSync(journal)&&JSON.parse(fs.readFileSync(journal,'utf8')).pending)throw Error('SHORT_PENDING_ORDER_RETRY_LATER');
 if(fs.existsSync(spotJournal)&&JSON.parse(fs.readFileSync(spotJournal,'utf8')).pending)throw Error('SPOT_PENDING_ORDER_RETRY_LATER');
 const flags=c=>({enabled:c?.enabled,requested:c?.requested,enabledAfter:c?.enabledAfter});
-fs.writeFileSync(stage+'/preflight.json',JSON.stringify({journal,spotJournal,port,long:flags(d.channelPrimary),short:flags(d.shortTrading?.policy),exitSettings:d.exitSettings}),{mode:0o600});
+fs.writeFileSync(stage+'/preflight.json',JSON.stringify({journal,spotJournal,port,long:flags(d.channelPrimary),short:flags(d.shortTrading?.policy),shortEntryMode:d.shortTrading?.policy?.entryMode??null,exitSettings:d.exitSettings}),{mode:0o600});
 console.log('Existing settings recorded; activation flags and risk parameters will be retained.');
 JS
 backup="/root/levi-before-channel-poc-$(date +%Y%m%d-%H%M%S)-$$"
@@ -90,12 +90,12 @@ let ready=false;
 for(let i=0;i<20;i++){
  try{
   const r=await fetch('http://127.0.0.1:'+port+'/api/binance-mode',{signal:AbortSignal.timeout(1500)}),d=await r.json();
-  if(r.ok&&d.channelPrimary?.conditionReportVersion==='CHANNEL_POC_CONDITIONS_V1'&&d.shortTrading?.policy?.conditionReportVersion==='CHANNEL_POC_CONDITIONS_V1'&&JSON.stringify(d.exitSettings)===JSON.stringify(expected.exitSettings)&&d.channelPrimary?.consolidationPolicy?.version==='CHANNEL_INITIAL_CONSOLIDATION_V2'&&d.shortTrading?.policy?.consolidationPolicy?.version==='CHANNEL_INITIAL_CONSOLIDATION_V2'&&d.shortTrading?.policy?.exitPolicy==='FUTURES_SHORT_SETTINGS_V2'&&JSON.stringify(flags(d.channelPrimary))===JSON.stringify(expected.long)&&JSON.stringify(flags(d.shortTrading?.policy))===JSON.stringify(expected.short)){ready=true;break;}
+  if(r.ok&&d.channelPrimary?.conditionReportVersion==='CHANNEL_POC_CONDITIONS_V1'&&d.shortTrading?.policy?.conditionReportVersion==='CHANNEL_POC_CONDITIONS_V1'&&JSON.stringify(d.exitSettings)===JSON.stringify(expected.exitSettings)&&d.channelPrimary?.consolidationPolicy?.version==='CHANNEL_INITIAL_CONSOLIDATION_V2'&&d.shortTrading?.policy?.consolidationPolicy?.version==='CHANNEL_INITIAL_CONSOLIDATION_V2'&&d.shortTrading?.policy?.exitPolicy==='FUTURES_SHORT_SETTINGS_V2'&&JSON.stringify(flags(d.channelPrimary))===JSON.stringify(expected.long)&&JSON.stringify(flags(d.shortTrading?.policy))===JSON.stringify(expected.short)&&(d.shortTrading?.policy?.entryMode??null)===expected.shortEntryMode){ready=true;break;}
  }catch{}
  await new Promise(r=>setTimeout(r,1000));
 }
 if(!ready)throw Error('CHANNEL_POC_POLICY_NOT_VERIFIED');
-console.log('Verified CHANNEL_POC_CONDITIONS_V1 for LONG and SHORT; activation flags and exit settings retained');
+console.log('Verified CHANNEL_POC_CONDITIONS_V1 for LONG and SHORT; activation flags, SHORT mode and exit settings retained');
 JS
 systemctl is-active --quiet levi-binance
 trap - ERR
