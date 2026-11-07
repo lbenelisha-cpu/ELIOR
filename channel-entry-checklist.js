@@ -1,6 +1,7 @@
 /* Read-only display of independent server checks; legacy ordered results remain labelled. Never authorizes a trade. */
 (function(root){
  const STEP=300000;
+ const transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR','WAIT_CHANNEL_HISTORY','WAIT_FUTURES_HISTORY','GAPPED_CHANNEL_HISTORY','GAPPED_FUTURES_HISTORY']);
  // A recorded rejection proves only the gates reached before it. Later gates
  // remain unknown, even when a different (closed-bar) observer looks favorable.
  const long=[
@@ -52,11 +53,14 @@
    ['plan','תקינות האיתות ויעד שטרם הושג',sell?['price','plan']:['atr','plan']]
   ];
   const validSide=side==='LONG'||sell;
-  const timely=transport&&Number.isFinite(at)&&at>0&&Number.isFinite(now)&&at<=now&&now-at<(sell?180000:90000)&&now<(Math.floor(at/STEP)+1)*STEP&&(!sell||Number.isFinite(expiresAt)&&expiresAt>now);
+  const recent=transport&&Number.isFinite(at)&&at>0&&Number.isFinite(now)&&at<=now&&now-at<(sell?180000:90000);
   const success=reason===(sell?'SHORT_CHANNEL_READY':'CHANNEL_BREAKOUT_READY');
   const stop=stages.findIndex(([,reasons])=>reasons.includes(reason));
   const parallel=conditions!=null;
-  const validReport=parallel&&conditions.version===(pocPolicy?'CHANNEL_POC_CONDITIONS_V1':'CHANNEL_CONDITIONS_PARALLEL_V1')&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  const validReport=parallel&&conditions.version===(pocPolicy?'CHANNEL_POC_CONDITIONS_V1':'CHANNEL_CONDITIONS_PARALLEL_V1')&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at>0&&conditions.at<=at&&at-conditions.at<15000&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  // An envelope may be recorded just after a candle ends. The report's own
+  // expiry remains authoritative; a later delivery time never renews it.
+  const timely=recent&&now<(Math.floor(at/STEP)+1)*STEP&&(!sell||Number.isFinite(expiresAt)&&expiresAt>now)&&(!validReport||now<conditions.expiresAt&&now-conditions.at<(sell?180000:90000));
   const known=parallel?validReport:!pocPolicy&&(success||stop>=0),current=validSide&&supported&&timely&&known;
   const passed=new Set(current?stages.slice(0,success?stages.length:stop).map(([key])=>key):[]);
   const failed=current&&!success&&stop>=0?stages[stop][0]:null;
@@ -65,15 +69,16 @@
   // Null blocker is absence of a reported block, never proof of account approval.
   rows.push({id:'execution',label:'אישור ביצוע · הרשאות, יתרה, מקום והגנות',state:transport&&blocker?'blocked':'unknown'});
   // Data availability is a background prerequisite, not a counted signal.
-  const dataPending=current&&(['quote','bar','history'].includes(failed)||parallel&&/^(WAIT_FRESH_PRICE|WAIT_CHANNEL_LIVE_BAR|WAIT_CHANNEL_HISTORY|GAPPED_CHANNEL_HISTORY)$/.test(reason));
+  const dataPending=validSide&&supported&&recent&&(!parallel||validReport)&&transient.has(reason);
   return {rows,count,total:definitions.length,current,dataPending,parallel:!!validReport,status:!supported?'unsupported':parallel&&!validReport?'invalid-report':!timely?'stale':!known?'unknown':'recorded'};
  }
- function createTracker(){
-  const records=new Map(),transient=new Set(['WAIT_FRESH_PRICE','WAIT_FRESH_FUTURES_PRICE','WAIT_CHANNEL_LIVE_BAR','WAIT_FUTURES_LIVE_BAR','WAIT_CHANNEL_HISTORY','WAIT_FUTURES_HISTORY','GAPPED_CHANNEL_HISTORY','GAPPED_FUTURES_HISTORY']);
-  const symbolOK=s=>typeof s==='string'&&/^[A-Z0-9]{2,24}USDT$/.test(s);
+ function createTracker({market='BINANCE'}={}){
+  const records=new Map(),seen=new Set();
+  const symbolOK=s=>typeof s==='string'&&(market==='COLMEX'?/^[A-Z][A-Z0-9.-]{0,15}$/.test(s):market==='BINANCE'&&/^[A-Z0-9]{2,24}USDT$/.test(s));
   function update(input){
    const now=input.now??Date.now(),view=project({...input,now}),key=input.side+':'+input.symbol;
    const identity=input.marketSymbol,age=input.side==='SHORT'?180000:90000;
+   const firstView=!seen.has(key);seen.add(key);if(seen.size>300)seen.delete(seen.values().next().value);
    // History is presentation-only, per asset/market/side, and keeps the original
    // observation time. Refresh attempts cannot extend its lifetime.
    for(const [k,r] of records)if(!Number.isFinite(now)||now<r.at||now-r.at>=r.age)records.delete(k);
@@ -82,19 +87,27 @@
    }
    let previous=records.get(key);
    if(previous&&(previous.identity!==identity||previous.view.rows.map(r=>r.id).join()!==view.rows.map(r=>r.id).join())){records.delete(key);previous=null;}
-   if(previous&&Number.isFinite(input.at)&&input.at<previous.at)return project({...input,now,transport:false});
+   const evidenceAt=view.parallel?input.conditions.at:input.at;
+   if(previous&&Number.isFinite(evidenceAt)&&evidenceAt<previous.at)return project({...input,now,transport:false});
    if(view.current&&!view.dataPending){
-    records.set(key,{identity,at:input.at,reason:input.reason,age,view});
+    records.set(key,{identity,at:evidenceAt,observedAt:input.at,reason:input.reason,age,view});
     if(records.size>300)records.delete(records.keys().next().value);
     return view;
    }
-   const sameExpiredScan=view.status==='stale'&&input.at===previous?.at&&(input.reason===previous?.reason||input.side==='SHORT'&&input.reason==='STALE_SHORT_OBSERVATION');
+   // A panel opened just after rollover can still label a valid recent report
+   // as historical. No cache, chart geometry or reason string creates passes.
+   if(firstView&&!previous&&view.status==='stale'&&view.parallel&&now>=evidenceAt&&now-evidenceAt<age&&!view.dataPending){
+    const recorded=project({...input,at:evidenceAt,now:evidenceAt,expiresAt:input.conditions.expiresAt});
+    if(recorded.current&&!recorded.dataPending)previous={identity,at:evidenceAt,observedAt:input.at,reason:input.reason,age,view:recorded};
+    if(previous)records.set(key,previous);
+   }
+   const sameExpiredScan=view.status==='stale'&&input.at===previous?.observedAt&&(input.reason===previous?.reason||input.side==='SHORT'&&input.reason==='STALE_SHORT_OBSERVATION');
    const awaitingBar=view.dataPending&&transient.has(input.reason)&&input.at>=previous?.at;
    if(previous&&(sameExpiredScan||awaitingBar))return {...view,current:false,count:0,status:'refreshing',previousCount:previous.view.count,previousAt:previous.at,
     rows:view.rows.map(row=>row.id==='execution'?row:{...row,state:'previous_'+previous.view.rows.find(r=>r.id===row.id).state})};
    records.delete(key);return view;
   }
-  return {update,clear:()=>records.clear(),retain:symbols=>{const keep=new Set(symbols);for(const key of records.keys())if(!keep.has(key.slice(key.indexOf(':')+1)))records.delete(key);}};
+  return {update,clear:()=>{records.clear();seen.clear();},retain:symbols=>{const keep=new Set(symbols);for(const key of records.keys())if(!keep.has(key.slice(key.indexOf(':')+1)))records.delete(key);}};
  }
  root.LEVI_ENTRY_CHECKLIST={project,createTracker};
 })(typeof window==='undefined'?globalThis:window);

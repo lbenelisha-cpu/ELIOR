@@ -181,3 +181,25 @@ test('parallel reports render later passes and multiple failures from the same s
  row.longDecision.conditions.rows=[];row.shortObservation.conditions.side='LONG';h.send(s,config);
  assert.equal(h.find(e=>e.dataset.state==='passed').length,0);assert.match(h.panel.textContent,/דוח התנאים אינו תקין/);
 });
+
+test('POC candle rollover and a quote wait without a report keep previous marks in both visible cards',()=>{
+ const h=ui();h.clock.now=Math.ceil(h.clock.now/300000)*300000-1000;
+ const at=h.clock.now,expiry=at+1000,s=snapshot(at),row=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const report=side=>({version:'CHANNEL_POC_CONDITIONS_V1',side,at,expiresAt:expiry,rows:['channel','break','poc','range'].map(id=>({id,state:id==='poc'?'waiting':'passed'}))});
+ const config={channelPrimary:{requested:true,version:'CHANNEL_POC_RETEST_V1',period:50,consolidationPolicy:{version:'CHANNEL_INITIAL_CONSOLIDATION_V2'}}};
+ h.policies({mode:'live',short:{entryPolicyVersion:'CHANNEL_POC_RETEST_V1'}});
+ row.longDecision={at,reason:'WAIT_POC_RETEST',conditions:report('LONG')};
+ row.shortObservation={available:true,observationOnly:true,spotSymbol:row.symbol,futuresSymbol:row.symbol,at,expiresAt:expiry,reason:'WAIT_POC_RETEST',conditions:report('SHORT')};
+ h.send(s,config);assert.equal(h.find(n=>n.dataset.state==='passed').length,6);
+ h.clock.now=expiry;s.checkedAt=h.clock.now;row.shortObservation.reason='STALE_SHORT_OBSERVATION';row.shortObservation.conditions=null;row.shortObservation.expiresAt=null;
+ h.send(s,config);assert.equal(h.find(n=>n.dataset.state==='previous_passed').length,6);
+ h.clock.now++;s.checkedAt=h.clock.now;
+ row.longDecision={at:h.clock.now,reason:'WAIT_FRESH_PRICE',conditions:null};
+ Object.assign(row.shortObservation,{at:h.clock.now,expiresAt:h.clock.now+30000,reason:'WAIT_FRESH_FUTURES_PRICE'});
+ h.send(s,config);assert.equal(h.find(n=>n.dataset.state==='previous_passed').length,6);assert.equal(h.find(n=>n.dataset.state==='passed').length,0);
+ assert.match(h.panel.textContent,/3\/4 בבדיקה האחרונה · ממתין לעדכון/);assert.match(h.panel.textContent,/הסימונים הקודמים אינם אישור כניסה כעת/);
+ row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_TWO_TOUCHES',conditions:{...report('LONG'),at:h.clock.now,expiresAt:expiry+300000,rows:report('LONG').rows.map(r=>({...r,state:r.id==='channel'?'waiting':'unknown'}))}};
+ h.send(s,config);assert.equal(h.find(n=>n.dataset.condition==='channel'&&n.dataset.state==='waiting').length,1);
+ assert.equal(h.find(n=>n.dataset.condition==='channel'&&n.dataset.state==='previous_passed').length,1);
+ h.expire();assert.equal(h.find(n=>n.dataset.state?.startsWith('previous_')).length,0);
+});

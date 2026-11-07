@@ -2,7 +2,7 @@ import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colm
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
 import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
-import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-poc-checklist';
+import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-rollover';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';

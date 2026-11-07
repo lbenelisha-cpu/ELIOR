@@ -6,3 +6,4 @@
 @media(max-width:440px){.channel-conditions{padding:12px}.channel-condition-metrics{gap:5px}.channel-condition-metrics>div{padding:9px 4px}.channel-condition-metrics strong{font-size:21px}}
 
 .channel-parallel-checks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.channel-parallel-checks section{border:1px solid #31465c;border-radius:10px;padding:12px}.channel-parallel-checks ul{list-style:none;padding:0;margin:0}.channel-parallel-checks li{padding:5px 0}.channel-parallel-checks [data-state=passed]{color:#67e0ae}.channel-parallel-checks [data-state=waiting],.channel-parallel-checks [data-state=blocked]{color:#ffbf69}.channel-parallel-checks [data-state=unknown]{color:#93a8bf}
+.channel-parallel-checks [data-state^=previous_]{color:#9ac9f1;border-inline-start:2px dashed #7396b6;padding-inline-start:8px}.channel-refresh-note{color:#9ac9f1;font-size:.85em}
