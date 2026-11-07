@@ -2,6 +2,7 @@
 (function(root){
  'use strict';
  const STEP=300000,VERSION='CHANNEL_POC_RETEST_V1',REPORT='CHANNEL_POC_CONDITIONS_V1';
+ const ANCHOR_POLICY='RECENT_WAVE_POC_V2';
  const consolidationPolicy=Object.freeze({version:'CHANNEL_INITIAL_CONSOLIDATION_V2',minBars:3,maxBars:8,maxRangeFraction:.35,maxDriftFraction:.5,lowerZone:1/3,upperZone:2/3,selection:'CONTAINS_FIRST_CHANNEL_ANCHOR',middle:'ALLOW_BOTH'});
  const positive=n=>Number.isFinite(n)&&n>0;
  function profile(input,bins=32){
@@ -43,37 +44,66 @@
   const c=root.LEVI_PARALLEL.analyze(mapped,{period:50,interval:'5m',now:52*STEP,deviations:2,requireConfirmed:true});
   return c.ready&&!c.provisional?c:null;
  }
- function freeze(history,b,c,side){
-  const first=Math.round((c.anchorStart-c.start)/STEP),basis=history.slice(first);
-  const consolidation=initialRange(history,c,side),key=side==='LONG'?'low':'high';
-  let ai=first;for(let i=first+1;i<history.length;i++)if(side==='LONG'?history[i].low<history[ai].low:history[i].high>history[ai].high)ai=i;
-  const selected=[...history.slice(ai),b],vp=profile(selected),level=c.intercept+c.slope*50+(side==='LONG'?c.width:-c.width);
-  return {version:VERSION,side,breakoutAt:b.openTime,frozenAt:b.closeTime,anchorA:{time:history[ai].openTime,price:history[ai][key]},anchorB:{time:b.openTime,price:b[side==='LONG'?'high':'low']},profile:vp,consolidation,
-   channel:{startAt:history[0].openTime,anchorAt:basis[0].openTime,endAt:b.openTime,barTimes:history.map(b=>b.openTime),intercept:c.intercept,slope:c.slope,width:c.width,lowTouches:c.lowTouches,highTouches:c.highTouches,level},
-   id:['poc',side,history[first].openTime,history[Math.round((c.anchorEnd-c.start)/STEP)].openTime,b.openTime].join(':')};
+ function makeWave(bars,ref,side,breakIndex,startIndex){
+  const {history,c,start}=ref,b=bars[breakIndex],key=side==='LONG'?'low':'high';
+  const first=start+Math.round((c.anchorStart-c.start)/STEP),begin=Math.max(start,startIndex??first);
+  if(begin>=breakIndex)return null;
+  let ai=begin;
+  // A belongs to the latest pullback. Equal extremes prefer the recent candle.
+  for(let j=begin+1;j<breakIndex;j++)if(side==='LONG'?bars[j].low<=bars[ai].low:bars[j].high>=bars[ai].high)ai=j;
+  const level=c.intercept+c.slope*(breakIndex-start)+(side==='LONG'?c.width:-c.width);
+  const model={version:VERSION,anchorPolicy:ANCHOR_POLICY,side,breakoutAt:b.openTime,frozenAt:b.closeTime,
+   anchorA:{time:bars[ai].openTime,price:bars[ai][key]},anchorB:{time:b.openTime,price:b[side==='LONG'?'high':'low']},profile:profile(bars.slice(ai,breakIndex+1)),consolidation:initialRange(history,c,side),
+   channel:{startAt:history[0].openTime,anchorAt:bars[first].openTime,endAt:b.openTime,barTimes:bars.slice(start,breakIndex).map(row=>row.openTime),intercept:c.intercept,slope:c.slope,width:c.width,lowTouches:c.lowTouches,highTouches:c.highTouches,level},
+   id:['poc-wave-v2',side,bars[ai].openTime,b.openTime].join(':')};
+  return {model,aIndex:ai,bIndex:breakIndex,returnIndex:null};
  }
+ function extendWave(wave,bars,index){
+  const m=wave.model,b=bars[index],long=m.side==='LONG',prior=bars[index-1];
+  if(wave.returnIndex!==null)return;
+  const better=long?b.high>m.anchorB.price:b.low<m.anchorB.price;
+  if(better){
+   wave.bIndex=index;m.anchorB={time:b.openTime,price:long?b.high:b.low};
+   m.frozenAt=b.closeTime;m.profile=profile(bars.slice(wave.aIndex,index+1));
+  }
+  // Once a completed return has occurred, retain this wave's B. A later break
+  // starts a new wave from the intervening pullback, not the older channel low.
+  const pc=m.profile?.poc;
+  if(index>wave.bIndex&&positive(pc)&&(long?prior.close>pc&&b.low<=pc:prior.close<pc&&b.high>=pc))wave.returnIndex=index;
+ }
+ function freeze(history,b,c,side){return makeWave([...history,b],{history,c,start:0},side,history.length)?.model||null;}
  function analyze({bars=[],side,price,liveBar,now=Date.now()}){
   if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
   const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
-  let model=null;
-  // Rebuild only from information already available at each historical candle.
-  // No regression direction, volume multiplier, liquidity floor, target or pattern-age gate.
+  let wave=null,reference=null;
+  // Replay forward only. A valid channel may remain the reference while its
+  // breakout/return unfolds; no future candle identifies the wave's peak.
   for(let i=50;i<closed.length;i++){
    const history=closed.slice(i-50,i),b=closed[i],c=geometry(history);
-   if(!c)continue;
-   const upper=c.intercept+c.slope*50+c.width,lower=c.intercept+c.slope*50-c.width;
-   const brokeUp=history.at(-1).close<=upper-c.slope&&b.high>upper;
-   const brokeDown=history.at(-1).close>=lower-c.slope&&b.low<lower;
-   if(brokeUp||brokeDown)model=brokeUp!==brokeDown&&(side==='LONG'?brokeUp:brokeDown)?freeze(history,b,c,side):null;
+   if(c)reference={history,c,start:i-50};
+   if(wave)extendWave(wave,closed,i);
+   if(!reference)continue;
+   const ref=reference,offset=i-ref.start,upper=ref.c.intercept+ref.c.slope*offset+ref.c.width,lower=ref.c.intercept+ref.c.slope*offset-ref.c.width;
+   const brokeUp=closed[i-1].close<=upper-ref.c.slope&&b.high>upper;
+   const brokeDown=closed[i-1].close>=lower-ref.c.slope&&b.low<lower;
+   if(brokeUp&&brokeDown){wave=null;reference=null;continue;}
+   if(!brokeUp&&!brokeDown)continue;
+   const direction=brokeUp?'LONG':'SHORT';
+   if(wave&&wave.model.side===direction&&wave.returnIndex===null)continue;
+   const start=wave?(wave.model.side===direction?wave.returnIndex:wave.bIndex):null;
+   if(start!==null&&start>=i)continue;
+   wave=makeWave(closed,ref,direction,i,start);
   }
+  const model=wave?.model.side===side?wave.model:null;
   let reason;
   if(model){
    states.channel='passed';states.break='passed';states.range=model.consolidation.passed?'passed':'waiting';
    const pc=model.profile?.poc,previous=closed.at(-1),outside=positive(pc)&&(side==='LONG'?previous.close>pc:previous.close<pc);
    // Touch during the current return, not an old wick followed by a bounce.
-   const touched=outside&&liveBar?.openTime>=model.frozenAt&&(side==='LONG'?price<=pc&&liveBar.low<=pc:price>=pc&&liveBar.high>=pc);
+   const pendingExtreme=liveBar&&(side==='LONG'?liveBar.high>model.anchorB.price:liveBar.low<model.anchorB.price);
+   const touched=!pendingExtreme&&outside&&liveBar?.openTime>=model.frozenAt&&(side==='LONG'?price<=pc&&liveBar.low<=pc:price>=pc&&liveBar.high>=pc);
    states.poc=!model.profile?'unknown':touched?'passed':'waiting';
-   reason=!model.consolidation.passed?model.consolidation.reason:!model.profile?'WAIT_POC_VOLUME_DATA':!touched?'WAIT_POC_RETEST':'CHANNEL_POC_READY';
+   reason=!model.consolidation.passed?model.consolidation.reason:!model.profile?'WAIT_POC_VOLUME_DATA':pendingExtreme?'WAIT_POC_WAVE_CLOSE':!touched?'WAIT_POC_RETEST':'CHANNEL_POC_READY';
   }else{
    const h=closed.slice(-50),c=geometry(h);
    states.channel=c?'passed':'waiting';
@@ -83,5 +113,5 @@
   const conditions={version:REPORT,side,at:now,expiresAt:(Math.floor(now/STEP)+1)*STEP,rows:Object.entries(states).map(([id,state])=>({id,state})),model,chart:model?{interval:'5m',bars:[...closed.slice(-79),...(liveBar?[liveBar]:[])].map(({openTime,closeTime,open,high,low,close,volume,closed})=>({openTime,closeTime,open,high,low,close,volume,closed})),price,at:now}:null};
   return {ready:Object.values(states).every(s=>s==='passed'),reason,model,conditions};
  }
- root.LEVI_CHANNEL_POC=Object.freeze({VERSION,REPORT,STEP,consolidationPolicy,profile,initialRange,geometry,freeze,analyze});
+ root.LEVI_CHANNEL_POC=Object.freeze({VERSION,REPORT,STEP,ANCHOR_POLICY,consolidationPolicy,profile,initialRange,geometry,freeze,analyze});
 })(globalThis);

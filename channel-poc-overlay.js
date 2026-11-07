@@ -20,7 +20,7 @@ export function drawPocModel(svg,config,model){
  const py=y(p.poc);add('line',{x1:bounds.left,y1:py,x2:bounds.right,y2:py,stroke:'#ffe080','stroke-width':2,'stroke-dasharray':'7 4','data-poc-level':p.poc},null,plot);
  const source=config.sourceBars||bars;
  const post=source.filter(b=>Number(b.time??b.openTime)>model.breakoutAt).map(b=>Number(b.time??b.openTime));
- const ordinal=t=>{const i=c.barTimes.indexOf(t);return i>=0?i:t===model.breakoutAt?50:50+post.filter(at=>at<=t).length;};
+ const ordinal=t=>{const i=c.barTimes.indexOf(t),n=c.barTimes.length;return i>=0?i:t===model.breakoutAt?n:n+post.filter(at=>at<=t).length;};
  const pts=times.map((t,i)=>({t,i,n:ordinal(t)})).filter(v=>v.t>=c.anchorAt);
  if(pts.length>=2){const first=pts[0],last=pts.at(-1);for(const sign of [-1,1])add('line',{x1:x(first.i),x2:x(last.i),y1:y(c.intercept+c.slope*first.n+sign*c.width),y2:y(c.intercept+c.slope*last.n+sign*c.width),stroke:'#ffb547','stroke-width':2,'data-frozen-channel':model.side},null,plot);}
  const range=model.consolidation;

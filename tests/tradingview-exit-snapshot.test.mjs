@@ -63,7 +63,7 @@ test('UI copy is read-only, rechecks freshness, handles clipboard denial and cle
  const ctx={Date:Clock,document:{createElement:node},navigator:{clipboard:{async writeText(){copied++;throw Error('denied');}}},setInterval(fn){callback=fn;}};
  vm.runInNewContext(source,ctx);const api=ctx.LEVI_EXIT_SNAPSHOT,host=node(),s=fixture();
  api.render(host,s,'TAOUSDT');const ui=host._exitUI;
- await ui.button.onclick();assert.equal(copied,1);assert.match(ui.field.value,/LEVI_EXIT_V1\|BINANCE:TAOUSDT/);assert.match(ui.copied.textContent,/העתק את הטקסט/);
+ await ui.button.onclick();assert.equal(copied,1);assert.match(ui.field.value,/LEVI_EXIT_V2\|BINANCE:TAOUSDT/);assert.match(ui.copied.textContent,/העתק את הטקסט/);
  clock+=MAX_AGE;await ui.button.onclick();assert.equal(copied,1);assert.equal(ui.button.disabled,true);assert.equal(ui.field.hidden,true);
  clock=now;api.render(host,s,'TAOUSDT');await ui.button.onclick();api.render(host,s,'BTCUSDT');assert.equal(ui.field.value,'');
  api.render(host,s,'TAOUSDT');clock+=MAX_AGE;callback();assert.equal(ui.button.disabled,true);
@@ -74,4 +74,20 @@ test('very small asset prices export as decimal text that Pine can parse',()=>{
  p.entryPrice=1e-8;p.effectiveStopPrice=9.9e-9;p.targetPrice=1.5e-8;p.activationPrice=1.04e-8;p.price=1.02e-8;
  const r=build(s,'TAOUSDT',now),fields=r.data.split('|');
  assert.equal(r.ok,true);assert.equal(fields[5],'0.0000000099');assert.equal(Number(fields[5]),p.effectiveStopPrice);
+});
+
+for(const side of ['LONG','SHORT'])test('Colmex '+side+' exports actual exit levels and saved settings with broker observation age',()=>{
+ const p={symbol:'AAPL',side,qty:1,entryAt:now-600000,entryPrice:100,lastBid:side==='LONG'?105:95,lastQuoteAt:now-1000,effectiveStopPrice:side==='LONG'?103:97,targetPrice:side==='LONG'?120:80,activationPrice:side==='LONG'?104:96,profitFloorArmed:true,exitPolicy:side==='LONG'?'PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2':'COLMEX_CHANNEL_SHORT_EXIT_V1',exitSettings:{stopLossPct:2,takeProfitPct:20,profitActivationPct:4,trailingGapPp:2},brokerProtection:{stopLoss:side==='LONG'?102.9:97.1,verifiedAt:now-1500}};
+ const s={venue:'COLMEX',status:{live:true,lastBrokerSnapshotAt:now-2000,positions:[p]}};
+ const r=build(s,'AAPL',now);assert.equal(r.ok,true);assert.equal(r.side,side);assert.equal(r.at,now-2000);assert.equal(r.stopGainPct.toFixed(3),'3.000');assert.equal(r.data.split('|')[10],side);assert.equal(r.stopLossPct,2);assert.equal(r.data.split('|')[1],'US:AAPL');
+ s.status.pendingActions=[{symbol:'AAPL'}];assert.equal(build(s,'AAPL',now).ok,false);s.status.pendingActions=[];
+ p.lastQuoteAt=now-MAX_AGE-1;assert.equal(build(s,'AAPL',now).ok,false);
+});
+test('Futures SHORT targets the perpetual chart, retains its tighter stop and never exports an old protection as verified',()=>{
+ const p={symbol:'ABCUSDT',qty:2,entryAt:now-600000,entryPrice:100,currentPrice:95,priceAt:now-1000,stopPrice:97,targetPrice:80,activationPrice:96,armed:true,exitPolicy:'FUTURES_SHORT_SETTINGS_V2',settings:{stopLossPct:2,takeProfitPct:20,profitActivationPct:4,trailingGapPp:2},protectedAt:now-1500,algos:[{kind:'STOP_MARKET',status:'NEW',price:97}]};
+ const s={mode:'live',venue:'BINANCE_FUTURES',shortTrading:{checkedAt:now-2000,account:{hedgeMode:false,multiAssetsMargin:false},positions:[p]}};
+ let r=build(s,'ABCUSDT',now);assert.equal(r.ok,true);assert.equal(r.chartSymbol,'BINANCE:ABCUSDT.P');assert.equal(r.stop,97);assert.equal(r.brokerStop,97);
+ p.currentPrice=97;assert.equal(build(s,'ABCUSDT',now).reached,'STOP');p.currentPrice=80;assert.equal(build(s,'ABCUSDT',now).reached,'TARGET');
+ p.protectedAt=now-MAX_AGE-1;assert.equal(build(s,'ABCUSDT',now).brokerStop,0);
+ p.targetPrice=120;assert.equal(build(s,'ABCUSDT',now).ok,false);
 });

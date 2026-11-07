@@ -59,6 +59,6 @@ test('position map integrates server exit levels and removes them when the accou
  const d=fixture(),p=d.agent.agents[0].strategy;
  Object.assign(p,{exitPolicy:'PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2',entryAt:new Date(Date.now()-3600000).toISOString(),positionQuoteAt:Date.now()-1000,price:51,effectiveStopPrice:50.25,targetPrice:70,activationPrice:52,profitFloorArmed:true});
  Object.assign(d.account,{connected:true,updatedAt:new Date().toISOString()});
- const u=ui(d,{exitLevels:true});assert.match(u.text('positionMapContent'),/סף מכירה נגרר · 50.25/);assert.match(u.text('positionMapContent'),/העתק ספי מכירה/);
- u.update({...d,error:true});assert.doesNotMatch(u.text('positionMapContent'),/50.25|העתק ספי מכירה/);
+ const u=ui(d,{exitLevels:true});assert.match(u.text('positionMapContent'),/סטופ נגרר · 50.25/);assert.match(u.text('positionMapContent'),/העתק הגנות ורווח/);
+ u.update({...d,error:true});assert.doesNotMatch(u.text('positionMapContent'),/50.25|העתק הגנות ורווח/);
 });
