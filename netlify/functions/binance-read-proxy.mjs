@@ -1,3 +1,4 @@
+import {compactChartResponse} from '../../lib/binance-chart-response.mjs';
 const UPSTREAM='https://levi-binance.2-29-48-20.sslip.io';
 const READ_PATHS=new Set(['/api/binance-poc-paper','/api/binance-poc-live-monitor','/api/binance-live/poc','/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account']);
 export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account','/api/binance-mode','/api/binance-agent','/api/binance-trade-history'].includes(path)?25000:10000;
@@ -17,7 +18,10 @@ export function createReadProxy(fetcher=fetch){return async event=>{
   const r=await fetcher(target,{method:'GET',headers:{Accept:'application/json',...(/^Bearer [A-Za-z0-9_-]{32,256}$/.test(event.headers?.authorization||event.headers?.Authorization||'')?{Authorization:event.headers.authorization||event.headers.Authorization}:{})},redirect:'error',signal:AbortSignal.timeout(readTimeoutMs(target.pathname))});
   const contentType=r.headers.get('content-type')||'';
   if(!contentType.includes('application/json'))return reply(502,{error:'שרת הנתונים החזיר תשובה לא תקינה'});
-  const data=await r.json();return reply(r.status,data);
+  const data=await r.json();
+  // Repeated POC evidence includes full chart bars and volume bins per scan.
+  // Sending it with display history can exceed the platform response limit.
+  return reply(r.status,r.status===200&&target.pathname==='/api/binance-chart'?compactChartResponse(data):data);
  }catch{return reply(504,{error:'לא ניתן לקרוא נתונים מהשרת דרך האתר כרגע. ניסיון נוסף יתבצע אוטומטית.'});}
 };}
 export const handler=createReadProxy();
