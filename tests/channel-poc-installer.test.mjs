@@ -1,3 +1,4 @@
+import {prepareLegacyPocHelpers} from './helpers/upgrade-poc-fixture.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import vm from 'node:vm';import {spawnSync} from 'node:child_process';
 import {patchChannelPoc} from '../scripts/patch-channel-poc.mjs';
 const base=new URL('../',import.meta.url),patches=JSON.parse(fs.readFileSync(new URL('../scripts/channel-poc-patches.json',import.meta.url),'utf8'));
@@ -5,6 +6,7 @@ function fixture(historical=false){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'poc-installer-'));
  for(const dir of ['lib','scripts','tests'])fs.cpSync(new URL('../'+dir,import.meta.url),path.join(root,dir),{recursive:true});
  for(const f of fs.readdirSync(base,{withFileTypes:true}))if(f.isFile()&&!f.name.startsWith('.'))fs.copyFileSync(new URL('../'+f.name,import.meta.url),path.join(root,f.name));
+ prepareLegacyPocHelpers(root,patches,{installedRisk:true});
  for(const p of [...patches].reverse()){
   const file=path.join(root,p.file);if(p.before===null){fs.rmSync(file,{force:true});continue;}
   const s=fs.readFileSync(file,'utf8');assert.equal(s.split(p.after).length,2,p.id);fs.writeFileSync(file,s.replace(p.after,p.before));

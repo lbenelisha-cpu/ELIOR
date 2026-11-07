@@ -299,13 +299,13 @@ function liveEntryStatus(a,account,maxPositions){
   if(held>=maxPositions)return waiting('WAIT_NO_SLOT','NO_SLOT','איתות כניסה אושר · אין מקום פנוי לפוזיציה נוספת');
   const plan=account.nextBuyAllocation;
   const spend=Number(plan?.amountUsdt??account.fixedPositionUsdt),cash=Number(account.usdtFree);
-  if(plan?.code==='LIVE_ORDER_LIMIT')return waiting('WAIT_ALLOCATION','LIVE_ORDER_LIMIT','יתרת הפוזיציה האחרונה חורגת ממגבלת סכום הקנייה שהוגדרה');
+  if(plan?.code==='LIVE_ORDER_LIMIT')return waiting('WAIT_ALLOCATION','LIVE_ORDER_LIMIT','סכום הפוזיציה חורג ממגבלת סכום הקנייה שהוגדרה');
   if(!Number.isFinite(spend)||spend<5)return waiting('WAIT_ALLOCATION',plan?.code||'WAIT_ALLOCATION','איתות כניסה אושר · סכום הקנייה אינו זמין או נמוך מהמינימום');
   if(!Number.isFinite(cash))return waiting('WAIT_ACCOUNT','WAIT_ACCOUNT','איתות כניסה אושר · יתרת USDT אינה זמינה');
   const required=spend*1.002;
   if(cash<required)return waiting('WAIT_CASH','NO_CASH','איתות כניסה אושר · ממתין ליתרה: זמינים '+cash.toFixed(2)+', נדרשים '+required.toFixed(2)+' USDT כולל מרווח לעמלות · חסרים '+(required-cash).toFixed(2)+' USDT');
   if(a.lastError)return waiting('WAIT_EXECUTION_ERROR','EXECUTION_ERROR','איתות כניסה אושר · שגיאת ביצוע: '+a.lastError);
-  return {decision:'BUY_READY',blocker:plan?.lastSlot?{code:'BUY_READY',text:'איתות כניסה אושר · פוזיציה אחרונה: קנייה ב־'+spend.toFixed(2)+' USDT מהיתרה, עם מרווח לעמלות'}:a.blocker};
+  return {decision:'BUY_READY',blocker:plan?.lastSlot&&plan.allocationMode!=='CURRENT_EQUITY_EQUAL_FIVE_V1'?{code:'BUY_READY',text:'איתות כניסה אושר · פוזיציה אחרונה: קנייה ב־'+spend.toFixed(2)+' USDT מהיתרה, עם מרווח לעמלות'}:a.blocker};
 }
 
 function decisionFor(a,isHeld,activeCount,maxPositions,weakestActive,rotationGap,isLive,liveAccount=null){
@@ -658,7 +658,7 @@ async function loadLiveAccount(prefetched=null){
     put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות'+(a.profitReinvestmentPaused?' · ההקצאה הקיימת נשמרת; עדכון מרווחים ממתין להמרת עמלה':''));
     put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
     put('#slots',((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
-    put('#slotValue',a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
+    put('#slotValue',a.allocationMode==='CURRENT_EQUITY_EQUAL_FIVE_V1'?fmt(a.nextBuyAllocation?.amountUsdt??a.fixedPositionUsdt/1.002)+' USDT · חמישית משווי Spot העדכני, לאחר רזרבת עמלה':a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
     put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';

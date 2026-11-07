@@ -1,3 +1,4 @@
+import {LIVE_EQUITY_ALLOCATION,LIVE_BUY_FEE_RESERVE} from '../lib/live-buy-allocation.mjs';
 import vm from 'node:vm';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
 import {patchPocFastWatch} from '../scripts/patch-poc-fast-watch.mjs';
@@ -43,7 +44,7 @@ test('unknown or duplicate integration and edited helper abort before writing an
 const statusPatch=patches.find(p=>p.id==='server-7');
 const scopeOf=source=>source.slice(source.indexOf(statusPatch.scope.start),source.indexOf(statusPatch.scope.end));
 function publicStatus(source,{paused=false,channel=true}={}){
- const context={u:{pathname:'/api/binance-mode'},req:{method:'GET'},res:{},send:(_res,value)=>value,mode:'live',authorized:false,
+ const context={LIVE_EQUITY_ALLOCATION,LIVE_BUY_FEE_RESERVE,u:{pathname:'/api/binance-mode'},req:{method:'GET'},res:{},send:(_res,value)=>value,mode:'live',authorized:false,
  controlDevices:{enabled:true},HOURLY_TREND_RULE:{},BINANCE_ENTRY_RSI:{},ENTRY_POLICY_VERSION:'entry',BINANCE_CONFIRMED_POLICY:{},
  channelPrimary:{enabled:channel},independentEntry:{},marketNewsConfig:{},ATTENTION_POLICY:{},RESEARCH_PROTOCOL:{},ENTRY_COMPARISON_POLICY:{},EARLY_WAVE_POLICY:{},
  futuresShort:{config:{enabled:true},checkedAt:123},tradeSettings:{values:{stopLossPct:2},policyVersion:'settings'},TRAILING_EXIT_POLICY:'preserved-exits',
