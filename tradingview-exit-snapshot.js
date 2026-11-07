@@ -6,6 +6,15 @@
   const positive = value => Number.isFinite(Number(value)) && Number(value) > 0;
   const timestamp = value => typeof value === 'number' ? value : Date.parse(value);
   const fresh = (value, now) => Number.isFinite(value) && value <= now && now - value <= MAX_AGE;
+  function spotQuoteAt(snapshot, symbol, position, now) {
+    if (position.positionQuoteAt != null) return timestamp(position.positionQuoteAt);
+    // Older servers serialized Number(ISO date) as null. Use the original
+    // connected stream observation only when it proves this exact price;
+    // never redate a quote to the browser's receipt or copy time.
+    const stream = snapshot.agent?.streams?.[symbol], at = timestamp(stream?.lastEventAt);
+    return stream?.status === 'connected' && positive(stream.lastPrice) &&
+      Number(stream.lastPrice) === Number(position.price) && fresh(at, now) && now - at <= 90000 ? at : NaN;
+  }
   function build(snapshot, symbol, now = Date.now()) {
     if(snapshot?.venue==='COLMEX')return buildColmex(snapshot, symbol, now);
     if(snapshot?.venue==='BINANCE_FUTURES')return buildShort(snapshot, symbol, now);
@@ -20,7 +29,7 @@
       return fail('לא אומתה פוזיציה פעילה שמנוהלת בבוט.');
     if (Math.abs(Number(p.qty) - Number(wallet.qty)) > Math.max(1e-8, Number(p.qty) * 1e-6))
       return fail('הכמות בחשבון ובפוזיציה אינה תואמת; ממתין להתאמה.');
-    const times = [snapshot.receivedAt, timestamp(snapshot.account.updatedAt), timestamp(p.positionQuoteAt)];
+    const times = [snapshot.receivedAt, timestamp(snapshot.account.updatedAt), spotQuoteAt(snapshot, symbol, p, now)];
     if (agent.staleData || times.some(t => !fresh(t, now))) return fail('נתוני הפוזיציה אינם עדכניים; ממתין לרענון.');
     const at = Math.min(...times), entryAt = timestamp(p.entryAt);
     const entry = Number(p.entryPrice), stop = Number(p.effectiveStopPrice), target = Number(p.targetPrice);
