@@ -15,9 +15,58 @@ function ui(){
  const context={document:{getElementById:id=>id==='marketAttentionPanel'?panel:null,createElement:tag=>new Element(tag),hidden:false,addEventListener:(name,fn)=>listeners[name]=fn},window:{addEventListener:(name,fn)=>listeners[name]=fn,dispatchEvent:e=>{h.lastEvent=e;listeners[e.type]?.(e);}},CustomEvent:class{constructor(type,args){this.type=type;this.detail=args?.detail;}},Date:class extends Date{static now(){return h.now;}},URL,setInterval:fn=>timers.push(fn)};
  vm.runInNewContext(fs.readFileSync(new URL('../channel-entry-checklist.js',import.meta.url),'utf8'),context);
  vm.runInNewContext(fs.readFileSync(new URL('../market-attention.js',import.meta.url),'utf8'),context);
- return {...h,panel,timers,clock:h,send:(s,config)=>listeners['levi:binance-agent']({detail:{marketAttention:s,config}}),expire:()=>listeners['trade-device-expired'](),find:fn=>panel.findAll(fn),context};
+ return {...h,panel,timers,clock:h,send:(s,config)=>listeners['levi:binance-agent']({detail:{marketAttention:s,config}}),policies:s=>listeners['levi:binance-entry-policies']?.({detail:s}),expire:()=>listeners['trade-device-expired'](),find:fn=>panel.findAll(fn),context};
 }
 const snapshot=now=>({policy:{version:'MARKET_ATTENTION_V1'},checkedAt:now,rows:[{symbol:'ETHUSDT',news:{active:true,covered:true,expiresAt:now+600000,evidence:[{title:'<img src=x onerror=alert(1)>',url:'https://www.coindesk.com/news/example',source:'CoinDesk',publishedAt:now-60000,firstSeenAt:now-30000,checkedAt:now,verification:'SINGLE_REPORT'}]},technical:{ready:true,watch:true,reason:'NEAR_CHANNEL_BOUNDARY',checkedAt:now,dataAt:now-1000,expiresAt:now+180000,channel:{highTouches:2,lowTouches:2,confirmed:true},regression:{side:'UP'},volume:{ratio:1.4},missing:['VOLUME_RATIO']}}],sourceStatus:[],events:[]});
+test('unmapped stock SHORT shows four POC conditions, no inherited LONG checks, and the contract block',()=>{
+ const h=ui(),s=snapshot(h.clock.now),r=s.rows[0],at=h.clock.now;
+ s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};r.symbol='NVDABUSDT';
+ r.longDecision={at,reason:'WAIT_INITIAL_CHANNEL_CONSOLIDATION',conditions:{version:'CHANNEL_POC_CONDITIONS_V1',side:'LONG',at,expiresAt:(Math.floor(at/300000)+1)*300000,rows:['channel','break','poc','range'].map(id=>({id,state:['channel','break'].includes(id)?'passed':'waiting'}))}};
+ r.shortObservation={available:false,spotSymbol:r.symbol,futuresSymbol:null,mappingReason:'FUTURES_SYMBOL_UNAVAILABLE',observationOnly:true,at:null,conditions:null};
+ const config={channelPrimary:{requested:true,version:'CHANNEL_POC_RETEST_V1',conditionReportVersion:'CHANNEL_POC_CONDITIONS_V1',period:50,consolidationPolicy:{version:'CHANNEL_INITIAL_CONSOLIDATION_V2'}}};
+ const original=JSON.stringify(s);h.send(s,config);
+ const checks=h.find(e=>e.className==='attention-checklist');assert.equal(checks.length,2);
+ for(const list of checks)assert.deepEqual(list.children.map(e=>e.dataset.condition),['channel','break','poc','range','execution']);
+ assert.equal(checks[0].children.filter(e=>e.dataset.state==='passed').length,2);
+ assert.equal(checks[1].children.filter(e=>e.dataset.state==='passed').length,0);
+ assert.match(checks[1].textContent,/חזרה מלמטה אל POC/);assert.match(checks[1].textContent,/דשדוש בתחילת התעלה · עליון או אמצעי/);
+ assert.equal(checks[1].children.at(-1).dataset.state,'blocked');
+ assert.match(h.panel.textContent,/לא נבדק · חסר חוזה Futures מאומת/);
+ assert.doesNotMatch(checks[1].textContent,/רגרסיה יורדת|פי 1.5|10,000|תבנית שלא נוצלה|יציאה מתחת לטווח/);
+ assert.equal(JSON.stringify(s),original);
+});
+test('missing SHORT scan follows its own declared policy and cannot borrow LONG readiness',()=>{
+ const h=ui(),s=snapshot(h.clock.now),r=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ r.shortObservation={available:true,spotSymbol:r.symbol,futuresSymbol:r.symbol,observationOnly:true,at:null,reason:'WAIT_SHORT_OBSERVATION',conditions:null};
+ const config={channelPrimary:{requested:true,version:'CHANNEL_POC_RETEST_V1',period:50,consolidationPolicy:{version:'CHANNEL_INITIAL_CONSOLIDATION_V2'}}};
+ h.policies({mode:'live',short:{entryPolicyVersion:'FUTURES_CHANNEL_SHORT_INTRABAR_V2'}});h.send(s,config);
+ let lists=h.find(e=>e.className==='attention-checklist');assert.equal(lists[0].children.length,5);assert.equal(lists[1].children.length,11);
+ h.policies({mode:'live',short:{entryPolicyVersion:'CHANNEL_POC_RETEST_V1',conditionReportVersion:'CHANNEL_POC_CONDITIONS_V1'}});
+ lists=h.find(e=>e.className==='attention-checklist');assert.equal(lists[1].children.length,5);assert.equal(lists[1].children.filter(e=>e.dataset.state==='passed').length,0);
+ h.expire();h.send(s,config);assert.equal(h.find(e=>e.className==='attention-checklist')[1].children.length,5);
+});
+test('the dashboard publishes the independent SHORT policy without balances or positions and retains it across partial mode reads',()=>{
+ const h=ui(),code=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf8');
+ const start=code.indexOf('function publishEntryPolicySnapshot('),end=code.indexOf('\nfunction mode(',start);assert.ok(start>=0&&end>start);
+ vm.runInNewContext(code.slice(start,end),h.context);
+ const policy={entryPolicyVersion:'CHANNEL_POC_RETEST_V1',conditionReportVersion:'CHANNEL_POC_CONDITIONS_V1'};
+ h.context.publishEntryPolicySnapshot({mode:'live',shortTrading:{policy,account:{availableUsdt:123},positions:[{symbol:'SECRET'}]}});
+ assert.equal(h.context.window.LEVI_ENTRY_POLICY_SNAPSHOT.short,policy);assert.equal(h.clock.lastEvent.type,'levi:binance-entry-policies');
+ assert.doesNotMatch(JSON.stringify(h.context.window.LEVI_ENTRY_POLICY_SNAPSHOT),/availableUsdt|positions|SECRET/);
+ h.context.publishEntryPolicySnapshot({mode:'live'});assert.equal(h.context.window.LEVI_ENTRY_POLICY_SNAPSHOT.short,policy);
+ h.context.publishEntryPolicySnapshot({mode:'demo'});assert.equal(h.context.window.LEVI_ENTRY_POLICY_SNAPSHOT.short,undefined);
+ h.context.publishEntryPolicySnapshot({mode:'live',shortTrading:{policy}});h.expire();assert.equal(h.context.window.LEVI_ENTRY_POLICY_SNAPSHOT,null);
+});
+test('contract removal or account mode changes clear a previous SHORT approval while keeping POC labels',()=>{
+ const h=ui(),s=snapshot(h.clock.now),r=s.rows[0],at=h.clock.now;s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ const conditions={version:'CHANNEL_POC_CONDITIONS_V1',side:'SHORT',at,expiresAt:(Math.floor(at/300000)+1)*300000,rows:['channel','break','poc','range'].map(id=>({id,state:'passed'}))};
+ r.shortObservation={available:true,spotSymbol:r.symbol,futuresSymbol:r.symbol,observationOnly:true,at,expiresAt:conditions.expiresAt,reason:'SHORT_POC_READY',conditions};
+ h.send(s);let list=()=>h.find(e=>e.className==='attention-checklist')[1];assert.equal(list().children.filter(e=>e.dataset.state==='passed').length,4);
+ r.shortObservation={available:false,spotSymbol:r.symbol,futuresSymbol:null,observationOnly:true,mappingReason:'FUTURES_MARKETS_UNVERIFIED'};
+ h.send(s);assert.equal(list().children.length,5);assert.equal(list().children.filter(e=>e.dataset.state.includes('passed')).length,0);
+ r.shortObservation={available:true,spotSymbol:r.symbol,futuresSymbol:r.symbol,observationOnly:true,at,expiresAt:conditions.expiresAt,reason:'SHORT_POC_READY',conditions};
+ h.send(s);h.policies({mode:'demo'});assert.equal(h.find(e=>e.dataset.state?.includes('passed')).length,0);
+});
 test('attention display uses text nodes, validates links, expires highlights and clears on auth loss',()=>{
  const h=ui(),s=snapshot(h.clock.now);h.send(s);
  assert.equal(h.find(e=>e.className.includes('attention-active')).length,1);assert.match(h.panel.textContent,/2 נגיעות למעלה/);assert.match(h.panel.textContent,/<img src=x/);assert.equal(h.find(e=>e.tag==='img').length,0);
@@ -65,6 +114,7 @@ test('shared cards show both directions, mapped contract and separate execution 
 
 test('entry checklists show recorded passes per market, never closed-bar volume or final execution approval',()=>{
  const h=ui(),s=snapshot(h.clock.now),row=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
+ h.policies({mode:'live',short:{entryPolicyVersion:'FUTURES_CHANNEL_SHORT_INTRABAR_V2'}});
  const config={channelPrimary:{requested:true,version:'CHANNEL_PRIMARY_INTRABAR_V2',period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}}};
  row.longDecision={at:h.clock.now,reason:'CHANNEL_VOLUME_LOW'};
  row.shortObservation={available:true,observationOnly:true,spotSymbol:row.symbol,futuresSymbol:'ETHUSDT',at:h.clock.now,expiresAt:h.clock.now+60000,reason:'WAIT_TWO_TOUCHES_PER_SIDE'};
@@ -95,6 +145,7 @@ test('entry checklists show recorded passes per market, never closed-bar volume 
 
 test('a pending candle update preserves the previous touch check and count with explicit historical labels',()=>{
  const h=ui();h.clock.now=Math.ceil(h.clock.now/300000)*300000-1000;
+ h.policies({mode:'live',short:{entryPolicyVersion:'FUTURES_CHANNEL_SHORT_INTRABAR_V2'}});
  const s=snapshot(h.clock.now),row=s.rows[0];s.mode='live';s.sharedWatchPolicy={version:'SHARED_LONG_SHORT_WATCH_V1'};
  const config={channelPrimary:{requested:true,version:'CHANNEL_PRIMARY_INTRABAR_V2',period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,consolidationPolicy:{version:'CHANNEL_CONSOLIDATION_V1'}}};
  row.longDecision={at:h.clock.now,reason:'WAIT_CHANNEL_LIVE_BREAKOUT'};

@@ -28,9 +28,12 @@
   ['range',['WAIT_CHANNEL_CONSOLIDATION','INVALID_CHANNEL_CONSOLIDATION','CHANNEL_CONSOLIDATION_SIDE_BLOCK']],
   ['rangeBreak',['WAIT_CHANNEL_CONSOLIDATION_BREAK']]
  ];
- function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null,conditions=null}={}){
+ function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null,conditions=null,schemaVersion=null}={}){
   const sell=side==='SHORT',stages=sell?short:long;
-  const pocPolicy=conditions?.version==='CHANNEL_POC_CONDITIONS_V1';
+  // Policy selects the labels even when a scan/report is unavailable. Labels
+  // are not evidence: POC checks can pass only from a valid matching report.
+  const reportVersion=schemaVersion??conditions?.version;
+  const pocPolicy=reportVersion==='CHANNEL_POC_CONDITIONS_V1';
   const definitions=pocPolicy?[
    ['channel','1 · תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
    ['break',sell?'3 · שבירה מתחת לתעלה וקיבוע הטווח':'3 · פריצה מעל התעלה וקיבוע הטווח',['break']],
@@ -53,8 +56,8 @@
   const success=reason===(sell?'SHORT_CHANNEL_READY':'CHANNEL_BREAKOUT_READY');
   const stop=stages.findIndex(([,reasons])=>reasons.includes(reason));
   const parallel=conditions!=null;
-  const validReport=parallel&&['CHANNEL_CONDITIONS_PARALLEL_V1','CHANNEL_POC_CONDITIONS_V1'].includes(conditions.version)&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
-  const known=parallel?validReport:success||stop>=0,current=validSide&&supported&&timely&&known;
+  const validReport=parallel&&conditions.version===(pocPolicy?'CHANNEL_POC_CONDITIONS_V1':'CHANNEL_CONDITIONS_PARALLEL_V1')&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  const known=parallel?validReport:!pocPolicy&&(success||stop>=0),current=validSide&&supported&&timely&&known;
   const passed=new Set(current?stages.slice(0,success?stages.length:stop).map(([key])=>key):[]);
   const failed=current&&!success&&stop>=0?stages[stop][0]:null;
   const rows=definitions.map(([id,label,gates])=>({id,label,state:parallel?(current?conditions.rows.find(r=>r.id===id).state:'unknown'):gates.includes(failed)?'waiting':gates.every(g=>passed.has(g))?'passed':'unknown'}));
