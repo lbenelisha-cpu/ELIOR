@@ -44,7 +44,7 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartWorkbench=null;
 let fixedRangeProfile=null;
-import('./fixed-range-volume-profile.js?v=20261104-frvp').then(({createFixedRangeVolumeProfile})=>{
+import('./fixed-range-volume-profile.js?v=20261107-poc').then(({createFixedRangeVolumeProfile})=>{
  fixedRangeProfile=createFixedRangeVolumeProfile({host:$('#priceChart').parentElement,toolbarHost:$('#chartTools')});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
@@ -202,18 +202,20 @@ let tradingRulesSnapshot=null;
 function tradingRuleLines(s){
  const p=s?.channelPrimary,e=s?.exitSettings||{},lines=[];
  const n=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null;
- if(s?.mode==='live'&&p?.requested){
-  lines.push('LONG · תעלת קיצון ורגרסיה · '+(p.enabled?'המסלול מופעל; ביצוע כפוף להרשאות ולכל הבדיקות':'המסלול חסום: '+(p.error||'אינו מופעל')));
-  lines.push('קנייה: '+(n(p.period)??'מספר לא ידוע של')+' נרות סגורים של 5 דקות לפני נר הפריצה · לפחות שתי נגיעות בכל גבול · רגרסיה עולה · '+(p.waitForBreakoutClose===false?'מחיר חי מעל הגבול העליון ומרכז הרגרסיה, ללא המתנה לסגירת נר הפריצה':'נר פריצה נסגר מעל הגבול העליון ומרכז הרגרסיה')+'.');
-  lines.push((p.waitForBreakoutClose===false?'מחזור מצטבר בנר הפתוח: לפחות פי ':'מחזור: לפחות פי ')+(n(p.minVolumeRatio)??'—')+' מממוצע 20 הנרות הקודמים · ממוצע שווי מחזור מינימלי '+(n(p.minMeanDollarVolume)??'—')+' USDT לנר.');
-  lines.push('לפני שליחה: מחיר עדכני מעל רמות הפריצה ומרכז הרגרסיה, איתות שלא נוצל, יתרה, מקום והגנות. '+(p.livePriceRule==='CURRENT_PRICE'?'נגיעה קודמת במהלך הנר אינה פוסלת לאחר התאוששות.':'השרת לא אישר את כלל ההתאוששות החדש.')+(p.waitForBreakoutClose===false?' תוקף האיתות עד סוף נר הפריצה הנוכחי; כל התנאים נבדקים שוב לפני השליחה.':' תוקף האיתות: '+(n(p.signalValidityMs)!==null?p.signalValidityMs/60000:'—')+' דקות מסגירת נר הפריצה; אין המתנה חובה נוספת.'));
+ if(s?.mode==='live'&&p?.requested&&p.version==='CHANNEL_POC_RETEST_V1'){
+  lines.push('LONG · תעלת קיצון + פרופיל נפח + חזרה ל־POC · '+(p.enabled?'מופעל':'כבוי'));
+  lines.push('ארבעה תנאים: שתי נגיעות בכל גבול; דשדוש בתחילת התעלה בחלק התחתון או האמצעי; פריצה; חזרה מלמעלה ל־POC.');
+  lines.push('טווח הפרופיל: השפל הנמוך בתעלה עד סוף נר הפריצה ושיאו. הפרופיל קבוע, ונרות החזרה אינם נכללים. POC משוער מנפח הנרות.');
+  lines.push('רגרסיה לתצוגה בלבד. אין סף מחזור, סף נזילות, דרישת תבנית חדשה, יציאה מהדשדוש או יעד כתנאי כניסה. הרשאות, יתרה והגנות נבדקות בנפרד.');
   lines.push('יעד LONG חדש: הגבול העליון שנפרץ + רוחב התעלה שנקבע לפני הפריצה. וויקוף וגל מוקדם אינם מסלולי כניסה חלופיים כשהמסלול הראשי מופעל.');
- }else if(s?.mode==='demo')lines.push('מצב DEMO: כללי מסלול LIVE אינם אישור לתנאי הדמו. תנאי הנכס וסיבת ההמתנה מוצגים ליד הגרף.');
+ }else if(s?.mode==='live'&&p?.requested)lines.push('מסלול התעלות הקודם מדווח מהשרת. עדכון POC עדיין לא אומת בשרת; התנאים הפעילים מוצגים ברשימת בדיקת הכניסה.');
+ else if(s?.mode==='demo')lines.push('מצב DEMO: כללי מסלול LIVE אינם אישור לתנאי הדמו. תנאי הנכס וסיבת ההמתנה מוצגים ליד הגרף.');
  else if(p)lines.push('מסלול התעלות אינו נבחר בשרת. יש לבדוק את מסלול הכניסה וסיבת ההמתנה של הנכס; אין להסיק שכללי התעלות פעילים.');
  else lines.push('ממתין לאימות כללי הכניסה מהשרת.');
  lines.push('הגדרות יציאה לכניסות חדשות: סטופ '+(n(e.stopLossPct)??'—')+'% · הפעלת הגנה '+(n(e.profitActivationPct)??'—')+'% · מרחק נגרר '+(n(e.trailingGapPp)??'—')+' נקודות אחוז ממחיר הכניסה. לפוזיציה קיימת יש לבדוק את הסטופ והיעד המתועדים שלה. המחירים לפני עמלות.');
  const f=s?.shortTrading?.policy;
- if(f)lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · '+(n(f.period)??'לא נמסר מספר')+' נרות 5 דקות · שתי נגיעות בכל גבול · רגרסיה יורדת · '+(f.waitForBreakoutClose===false?'פריצה מטה במחיר חי, ללא המתנה לסגירת הנר · מחזור מצטבר בנר הפתוח פי 1.5 מממוצע 20':'פריצה מטה בנר סגור · מחזור פי 1.5 מממוצע 20')+'. יעד: הגבול התחתון פחות רוחב התעלה. '+(f.livePriceRule==='CURRENT_PRICE'?'חזרה זמנית מעלה אינה פוסלת אם המחיר העדכני שוב מתחת לרמות.':'')+' תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(f?.entryPolicyVersion==='CHANNEL_POC_RETEST_V1')lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(f&&f.entryPolicyVersion!=='CHANNEL_POC_RETEST_V1')lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');
  return lines;
 }
 function renderTradingRules(s){
@@ -255,7 +257,7 @@ function mode(s){
 }
 
 function buyReasonLabel(r){
-  const independent={WAIT_CHANNEL_CONSOLIDATION:'ממתין לדשדוש של לפחות 3 נרות סגורים לפני הכניסה',INVALID_CHANNEL_CONSOLIDATION:'נתוני הדשדוש אינם תקינים',CHANNEL_CONSOLIDATION_SIDE_BLOCK:'מיקום הדשדוש אינו מתאים לכיוון העסקה',WAIT_CHANNEL_CONSOLIDATION_BREAK:'ממתין ליציאה מהדשדוש בכיוון העסקה',CHANNEL_CONSOLIDATION_CHANGED:'הדשדוש השתנה או חסר בבדיקה החוזרת',WAIT_CHANNEL_LIVE_BREAKOUT:'ממתין לפריצה מעל תעלת הקיצון בזמן הנר',WAIT_FRESH_PRICE:'ממתין למחיר עדכני',CHANNEL_TARGET_ALREADY_REACHED:'המחיר כבר הגיע ליעד התעלה',CHANNEL_SIGNAL_CHANGED:'האיתות השתנה בבדיקה החוזרת',CHANNEL_PROTECTION_CHANGED:'תוכנית ההגנה השתנתה',CHANNEL_BREAKOUT_READY:'פריצת תעלת קיצון אושרה עם רגרסיה עולה',WAIT_CHANNEL_BREAKOUT:'ממתין לנר סגור מעל תעלת הקיצון',WAIT_CHANNEL_PIVOTS:'ממתין לתעלה מאושרת עם שתי נגיעות בכל גבול',WAIT_CHANNEL_TWO_TOUCHES:'חסרות שתי נגיעות בכל גבול',REGRESSION_DIRECTION_BLOCK:'הרגרסיה אינה עולה',REGRESSION_CENTER_BLOCK:'המחיר אינו מעל מרכז הרגרסיה',CHANNEL_VOLUME_LOW:'מחזור הפריצה נמוך מפי 1.5',CHANNEL_LIQUIDITY_LOW:'שווי מחזור נמוך מהמינימום',CHANNEL_PRIMARY_REQUIRED:'כניסה דורשת תעלת קיצון',WAIT_NEW_CHANNEL_SIGNAL:'ממתין לאיתות תעלה חדש אחרי הפעלה או מכירה',CHANNEL_PRICE_INVALIDATED:'המחיר חזר מתחת לסף התעלה או הרגרסיה',CHANNEL_SIGNAL_EXPIRED:'איתות התעלה פג',CHANNEL_PRIMARY_DISABLED:'מסלול תעלת קיצון אינו מורשה',CHANNEL_ACTIVATION_TIME_REQUIRED:'חסר זמן הפעלה מאומת',CHANNEL_PATTERN_ALREADY_USED:'איתות התעלה כבר נוצל',WAIT_CHANNEL_HISTORY:'חסרה היסטוריה לחישוב התעלה ונר הפריצה',GAPPED_CHANNEL_HISTORY:'חסרים נרות ברצף',INVALID_CHANNEL_HISTORY:'נתוני התעלה אינם תקינים',WAIT_CHANNEL_LIVE_BAR:'ממתין לנר החי',INDEPENDENT_BREAKOUT_READY:'פריצה עצמאית אושרה בנר סגור',WAIT_BREAKOUT:'ממתין לסגירה מעל שיא 20 הנרות',WAIT_BREAKOUT_HISTORY:'חסרים נרות לבדיקת פריצה',BREAKOUT_VOLUME_LOW:'מחזור הפריצה נמוך מפי 1.5 מהממוצע',BREAKOUT_LIQUIDITY_LOW:'שווי מחזור נמוך מהמינימום',GAPPED_BREAKOUT_HISTORY:'חסרים נרות ברצף המחירים',INVALID_BREAKOUT_HISTORY:'נתוני הפריצה אינם תקינים',WAIT_NEW_BREAKOUT_SIGNAL:'ממתין לפריצה חדשה אחרי ההפעלה או המכירה',BREAKOUT_PATTERN_ALREADY_USED:'איתות הפריצה כבר נוצל',BREAKOUT_SIGNAL_EXPIRED:'איתות הפריצה פג',BREAKOUT_PRICE_INVALIDATED:'המחיר חזר לרמת הפריצה או מתחתיה',WAIT_BREAKOUT_LIVE_BAR:'ממתין לנתוני הנר החי',INDEPENDENT_ENTRY_DISABLED:'מסלול הפריצה כבוי',READY:'תנאי הכניסה מתקיימים'};
+  const independent={CHANNEL_POC_READY:"חזרה ל־POC אושרה · בכפוף לבדיקת ביצוע",SHORT_POC_READY:"חזרה מלמטה ל־POC אושרה · SHORT",WAIT_POC_RETEST:"הפרופיל נקבע · ממתין לחזרה ל־POC",WAIT_POC_CHANNEL_BREAKOUT:"ממתין לפריצת התעלה ולקיבוע פרופיל הנפח",WAIT_INITIAL_CHANNEL_CONSOLIDATION:"ממתין לדשדוש בתחילת התעלה",WAIT_POC_VOLUME_DATA:"חסרים נתוני נפח לחישוב POC",POC_RETURN_ALREADY_EXECUTED:"אירוע החזרה הזה כבר נשלח · מניעת הוראה כפולה",POC_PRICE_INVALIDATED:"המחיר כבר אינו בנקודת החזרה ל־POC",POC_MODEL_CHANGED:"טווח פרופיל הנפח השתנה בבדיקה החוזרת",WAIT_CHANNEL_CONSOLIDATION:'ממתין לדשדוש של לפחות 3 נרות סגורים לפני הכניסה',INVALID_CHANNEL_CONSOLIDATION:'נתוני הדשדוש אינם תקינים',CHANNEL_CONSOLIDATION_SIDE_BLOCK:'מיקום הדשדוש אינו מתאים לכיוון העסקה',WAIT_CHANNEL_CONSOLIDATION_BREAK:'ממתין ליציאה מהדשדוש בכיוון העסקה',CHANNEL_CONSOLIDATION_CHANGED:'הדשדוש השתנה או חסר בבדיקה החוזרת',WAIT_CHANNEL_LIVE_BREAKOUT:'ממתין לפריצה מעל תעלת הקיצון בזמן הנר',WAIT_FRESH_PRICE:'ממתין למחיר עדכני',CHANNEL_TARGET_ALREADY_REACHED:'המחיר כבר הגיע ליעד התעלה',CHANNEL_SIGNAL_CHANGED:'האיתות השתנה בבדיקה החוזרת',CHANNEL_PROTECTION_CHANGED:'תוכנית ההגנה השתנתה',CHANNEL_BREAKOUT_READY:'פריצת תעלת קיצון אושרה עם רגרסיה עולה',WAIT_CHANNEL_BREAKOUT:'ממתין לנר סגור מעל תעלת הקיצון',WAIT_CHANNEL_PIVOTS:'ממתין לתעלה מאושרת עם שתי נגיעות בכל גבול',WAIT_CHANNEL_TWO_TOUCHES:'חסרות שתי נגיעות בכל גבול',REGRESSION_DIRECTION_BLOCK:'הרגרסיה אינה עולה',REGRESSION_CENTER_BLOCK:'המחיר אינו מעל מרכז הרגרסיה',CHANNEL_VOLUME_LOW:'מחזור הפריצה נמוך מפי 1.5',CHANNEL_LIQUIDITY_LOW:'שווי מחזור נמוך מהמינימום',CHANNEL_PRIMARY_REQUIRED:'כניסה דורשת תעלת קיצון',WAIT_NEW_CHANNEL_SIGNAL:'ממתין לאיתות תעלה חדש אחרי הפעלה או מכירה',CHANNEL_PRICE_INVALIDATED:'המחיר חזר מתחת לסף התעלה או הרגרסיה',CHANNEL_SIGNAL_EXPIRED:'איתות התעלה פג',CHANNEL_PRIMARY_DISABLED:'מסלול תעלת קיצון אינו מורשה',CHANNEL_ACTIVATION_TIME_REQUIRED:'חסר זמן הפעלה מאומת',CHANNEL_PATTERN_ALREADY_USED:'איתות התעלה כבר נוצל',WAIT_CHANNEL_HISTORY:'חסרה היסטוריה לחישוב התעלה ונר הפריצה',GAPPED_CHANNEL_HISTORY:'חסרים נרות ברצף',INVALID_CHANNEL_HISTORY:'נתוני התעלה אינם תקינים',WAIT_CHANNEL_LIVE_BAR:'ממתין לנר החי',INDEPENDENT_BREAKOUT_READY:'פריצה עצמאית אושרה בנר סגור',WAIT_BREAKOUT:'ממתין לסגירה מעל שיא 20 הנרות',WAIT_BREAKOUT_HISTORY:'חסרים נרות לבדיקת פריצה',BREAKOUT_VOLUME_LOW:'מחזור הפריצה נמוך מפי 1.5 מהממוצע',BREAKOUT_LIQUIDITY_LOW:'שווי מחזור נמוך מהמינימום',GAPPED_BREAKOUT_HISTORY:'חסרים נרות ברצף המחירים',INVALID_BREAKOUT_HISTORY:'נתוני הפריצה אינם תקינים',WAIT_NEW_BREAKOUT_SIGNAL:'ממתין לפריצה חדשה אחרי ההפעלה או המכירה',BREAKOUT_PATTERN_ALREADY_USED:'איתות הפריצה כבר נוצל',BREAKOUT_SIGNAL_EXPIRED:'איתות הפריצה פג',BREAKOUT_PRICE_INVALIDATED:'המחיר חזר לרמת הפריצה או מתחתיה',WAIT_BREAKOUT_LIVE_BAR:'ממתין לנתוני הנר החי',INDEPENDENT_ENTRY_DISABLED:'מסלול הפריצה כבוי',READY:'תנאי הכניסה מתקיימים'};
   if(independent[r])return independent[r];
   if(['WAIT_SECOND_RECOVERY_CONFIRMATION','SECOND_RECOVERY_NOT_HIGHER','WAIT_CLOSED_CONFIRMATION','WAIT_MA_HISTORY','MA_DOWNTREND_BLOCK','WAIT_VOLUME_HISTORY','CONFIRMATION_VOLUME_LOW','WAIT_ATR_HISTORY','VOLATILITY_RISK_TOO_HIGH','QUALITY_SIGNAL_INVALIDATED'].includes(r))return decisionReasonLabel(r);
   if(/^WAIT_PROFIT_ACTIVATION_/.test(r||''))return 'ממתין לרווח '+String(r).replace('WAIT_PROFIT_ACTIVATION_','').replace('_PERCENT','')+'% להפעלת ההגנה';
@@ -502,16 +504,16 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#chartWave',s.currentWave==null?'לא זמין':fmt(s.currentWave,2)+'%');
   put('#chartPrevDown',s.previousDownWave==null?'לא זמין':fmt(s.previousDownWave,2)+'%');
   put('#chartQualification',buyReasonLabel(a.buyReason));
-  put('#entryRouteDecision',a.entryDecisions?.primary==='channel_breakout'?'תעלת קיצון ראשית + רגרסיה: '+buyReasonLabel(a.entryDecisions.channel.reason):a.entryDecisions?'מסלול קיים: '+buyReasonLabel(a.entryDecisions.current.reason)+' · פריצה עצמאית: '+buyReasonLabel(a.entryDecisions.breakout.reason):'');
+  put('#entryRouteDecision',a.entryDecisions?.primary==='channel_breakout'?'תעלת קיצון + חזרה ל־POC: '+buyReasonLabel(a.entryDecisions.channel.reason):a.entryDecisions?'מסלול קיים: '+buyReasonLabel(a.entryDecisions.current.reason)+' · פריצה עצמאית: '+buyReasonLabel(a.entryDecisions.breakout.reason):'');
   const hourly=a.entryFilters;
-  put('#hourlyTrendStatus',currentModeArg==='live'&&d.config?.channelPrimary?.requested?'כניסה: תעלת קיצון + רגרסיה · '+(d.config.channelPrimary.period??'—')+' נרות 5 דקות · שתי נגיעות בכל גבול · מחזור פי 1.5 מממוצע 20':d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' או גל 1% ופריצת 3 נרות · ללא מסנן שעה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
+  put('#hourlyTrendStatus',currentModeArg==='live'&&d.config?.channelPrimary?.requested?'כניסה: דשדוש התחלתי · תעלה מאושרת · פריצה · חזרה ל־POC':d.config?.hourlyTrendFilter?.enabled===false?'כניסה: Spring ו־RSI עד '+(d.config.entryRsi?.max??40)+' או גל 1% ופריצת 3 נרות · ללא מסנן שעה':d.config?.hourlyTrendFilter?.enabled!==true?'תנאי כניסה: ממתין לעדכון השרת':isHeld(a)?'אישור מגמת שעה חל על כניסות אוטומטיות חדשות':hourly?.sma20!=null?
     'מגמת שעה: '+(hourly.ok?'מאושרת':'ממתינה')+' · סגירה '+fmt(hourly.close,8)+' · ממוצע 20 '+fmt(hourly.sma20,8)+' · ממוצע 50 '+fmt(hourly.sma50,8)+' · '+new Date(hourly.asOf).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'מגמת שעה: ממתין ל־50 שעות מלאות ועדכניות');
 
   const selectedPnl=positionPnlDisplay(currentModeArg==='live'?liveAccount?.balances?.find(x=>x.asset+'USDT'===a.symbol):p.positions?.[a.symbol],currentModeArg==='live'?'USDT':moneyUnit);
   const badge=$('#chartDecisionBadge');
   put('#chartDecisionBadge',isHeld(a)?decisionLabel(dec)+' · '+selectedPnl.text:decisionLabel(dec));
   if(badge)for(const kind of ['profit','loss','flat','unknown'])badge.classList.toggle('pnl-'+kind,isHeld(a)&&selectedPnl.kind===kind);
-  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':(a.strategy?.entryMode==='channel_breakout'||a.entryDecisions?.primary==='channel_breakout')?'תעלת קיצון ראשית · רגרסיה עזר · '+buyReasonLabel(a.buyReason):a.strategy?.entryMode==='independent_breakout'?'פריצה עצמאית · נר 5 דקות סגור, מחזור ומגמה · '+buyReasonLabel(a.buyReason):(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
+  put('#chartMeta',a.accountOnly?'החזקה מהחשבון · ללא ניהול אוטומטי מתועד · עלות לפי היסטוריית בייננס כשזמינה':(a.strategy?.entryMode==='channel_breakout'||a.entryDecisions?.primary==='channel_breakout')?'תעלת קיצון + POC · רגרסיה לתצוגה · '+buyReasonLabel(a.buyReason):a.strategy?.entryMode==='independent_breakout'?'פריצה עצמאית · נר 5 דקות סגור, מחזור ומגמה · '+buyReasonLabel(a.buyReason):(a.strategy?.entryMode==='early_wave_live'?'גל מוקדם · 5 דקות · ':'וואיקוף 5 דקות · ')+(d.config?.hourlyTrendFilter?.enabled?'נדרש אישור מגמת שעה':d.config?.hourlyTrendFilter?.enabled===false?'Spring עם RSI עד '+(d.config.entryRsi?.max??40)+' או גל מוקדם · ללא מסנן שעה':'ממתין לאימות תנאי השרת')+' · '+buyReasonLabel(a.buyReason));
 
   put('#actionSelectedSymbol',a.symbol);
   put('#actionSelectedDecision',decisionLabel(dec));
@@ -938,7 +940,7 @@ function drawCandles(candles){
   const canvas=$('#priceChart');
   const channelBadge=$('#channelTouchBadge');
   if(channelBadge){channelBadge.hidden=true;channelBadge.replaceChildren();}
-  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();return;}
+  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -964,7 +966,7 @@ function drawCandles(candles){
   const view=visibleWindow.bars;
   const viewMas=mas.slice(start,end);
   drawIndicators(candles,{start,end});
-  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();chartTerminal?.clear();return;}
+  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
   const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
@@ -983,9 +985,10 @@ function drawCandles(candles){
   if(sellLevel)vals.push(sellLevel.price);
   if(heldNow)for(const value of [selectedPosition.entryPrice,selectedPosition.peakPrice])if(Number(value)>0&&Number.isFinite(Number(value)))vals.push(Number(value));
   put('#currentSellLevel',sellLevel?'סף מכירה לפי מחיר: '+fmt(sellLevel.price,12)+' USDT · '+sellLevel.reason+' · מתעדכן עם נתוני הסוכן'+(sellLevel.rsiSell?' · קיים גם אות RSI למכירה':''):'אין סף מחיר מתועד לפוזיציה פעילה');
-  const parallelOn=$('#showParallel')?.checked!==false;
+  const livePocModel=selectedInterval==='5m'&&fixedRangeProfile?.isAutomatic?.()?(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions?.channel?.conditions?.model:null;
+  const parallelOn=$('#showParallel')?.checked!==false&&!livePocModel?.profile;
   const parallel=parallelOn?globalThis.LEVI_PARALLEL?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||50)}):null;
-  put('#parallelChannelStatus',parallelOn?(globalThis.LEVI_PARALLEL?.describe(parallel)||'רכיב התעלה המקבילה לא נטען — נדרש עדכון'):'התעלה המקבילה מוסתרת');
+  put('#parallelChannelStatus',parallelOn?(globalThis.LEVI_PARALLEL?.describe(parallel)||'רכיב התעלה המקבילה לא נטען — נדרש עדכון'):livePocModel?.profile?'מוצגת התעלה הקבועה של איתות ה־POC':'התעלה המקבילה מוסתרת');
   if(parallel?.ready)for(const c of view){const at=Number(c.openTime);if(at>=parallel.anchorStart&&at<=parallel.end){const p=globalThis.LEVI_REGRESSION.levels(parallel,at);vals.push(p.upper,p.lower);}}
   const regressionOn=$('#showRegression')?.checked!==false;
   const regression=regressionOn?globalThis.LEVI_REGRESSION?.analyze(candles.slice(0,end),{interval:selectedInterval,period:Number($('#regressionPeriod')?.value||50),deviations:Number($('#regressionDeviation')?.value||2)}):null;
@@ -1113,7 +1116,7 @@ function drawCandles(candles){
   }
   chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
   chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
-  fixedRangeProfile?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view.map(b=>({...b,time:Number(b.openTime)})),width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch},x:i=>left+step*(i+.5),y});
+  fixedRangeProfile?.update({onModeChange:()=>drawCandles(chartCandles),models:selectedInterval==='5m'?{LONG:(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions?.channel?.conditions?.model}:null,sourceBars:candles,symbol:selectedSymbol,interval:selectedInterval,bars:view.map(b=>({...b,time:Number(b.openTime)})),width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch},x:i=>left+step*(i+.5),y});
 }
 
 let dashboardLoadInFlight=false;

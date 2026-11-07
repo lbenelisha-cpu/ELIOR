@@ -2,7 +2,7 @@ import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colm
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
 import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
-import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261106-parallel-checks';
+import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-poc';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
@@ -18,7 +18,7 @@ const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261104-frvp';
 import {createChartTimeNavigation} from './chart-time-navigation.js?v=20261101-chart-terminal';
-import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261104-frvp';
+import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261107-poc';
 import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261029-higher-recovery';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
@@ -84,7 +84,8 @@ function renderChart(){
  add('rect',{x:15,y:2,width:plotRight-15,height:22,rx:4,fill:'#08111f'});
  add('text',{x:25,y:18,fill:'#edf5ff','font-size':16,'font-weight':'bold','data-chart-symbol':selected},chartName===selected?selected:selected+' · '+chartName);
  const sim=manualCharts.has(selected)?{points:[],lines:[],cards:[]}:(PAPER_MODE?simulationMarks(selected):colmexLiveTradeMarks(actualPosition));const interval=markets[selected]?.interval||$('#marketInterval').value;const history=!PAPER_MODE||manualCharts.has(selected)?[]:mergeWyckoffOccurrences(simulationWyckoffHistory(selected),wyckoffHistories[selected]||[]);const occurrences=PAPER_MODE&&$('#showWyckoffHistory')?.checked?numberedWyckoffOccurrences(history,bars,interval):[];const arrowPoints=wyckoffArrowPoints(sim.points,occurrences,bars,interval).map(point=>PAPER_MODE?point:{...point,name:point.name.replace('מדומה','בחשבון')});const visiblePoints=[...sim.points.filter(p=>!arrowPoints.some(a=>a.id===p.id)).map(point=>({...point,index:markBarIndex(point,bars,interval)})).filter(point=>point.index>=0),...arrowPoints];const channels=colmexChartChannels(chartBars().slice(0,visibleWindow.end),{interval});
- const segments=channelSegments(channels,bars).filter(s=>s.kind==='swing'?$('#showColmexSwing')?.checked!==false:$('#showColmexRegression')?.checked!==false);
+ const hasPoc=!manualCharts.has(selected)&&['5m','5min'].includes(interval)&&fixedRangeProfile.isAutomatic?.()&&Object.values(liveSearchState?.checks?.[selected]?.entryDecisions?.channel?.conditionReports||{}).some(r=>r.model?.profile);
+ const segments=channelSegments(channels,bars).filter(s=>s.kind==='swing'?$('#showColmexSwing')?.checked!==false&&!hasPoc:$('#showColmexRegression')?.checked!==false);
  renderColmexChannelConditions($('#colmexChannelConditions'),{channels,status:liveSearchState,symbol:selected,manual:manualCharts.has(selected),historical:visibleWindow.end<chartBars().length});
  const channelStatus=$('#colmexChannelStatus');if(channelStatus)channelStatus.textContent=channels.regression.reason==='FIVE_MINUTE_CHART_REQUIRED'?'בחר נרות 5 דקות להצגת שתי התעלות על 50 נרות.':globalThis.LEVI_PARALLEL.describe(channels.swing)+' · '+(channels.regression.ready?'רגרסיה · 50 נרות סגורים · '+(channels.regression.slope>0?'עולה':channels.regression.slope<0?'יורדת':'שטוחה'):'רגרסיה · נדרשים 50 נרות סגורים ורציפים');
  const entry=PAPER_MODE?state.positions[selected]?.entry:null,values=bars.flatMap(b=>[b.high,b.low]);for(const s of segments)values.push(s.start.upper,s.start.lower,s.end.upper,s.end.lower);if(tradeRisk)values.push(tradeRisk.target,tradeRisk.stop,tradeRisk.entry);for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);const scaleValues=chartTerminal.fitCandles?bars.flatMap(b=>[b.high,b.low]):values;let lo=Math.min(...scaleValues),hi=Math.max(...scaleValues),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const x=i=>20+(i+.5)*plotWidth/bars.length,bounds=wyckoffEdgeBands(arrowPoints,x,{left:16,right:plotRight}),y=p=>bounds.bottom-(p-lo)/(hi-lo)*250;svg.setAttribute('viewBox','0 0 '+W+' '+bounds.height);root.style.aspectRatio=W+' / '+bounds.height;
@@ -93,7 +94,7 @@ function renderChart(){
  if(PAPER_MODE){
  const resistance=globalThis.LEVI_RESISTANCE?.detect(chartBars().slice(0,visibleWindow.end),{interval});
  const route=liveSearchState.checks?.[selected]?.entryDecisions;
- $('#resistancePatternStatus').textContent=(globalThis.LEVI_RESISTANCE?.describe(resistance,interval)||'')+(route?.primary==='channel_long_short'?' · מסלול ראשי: תעלת קיצון ורגרסיה · LONG / SHORT · '+(route.channel.ready?'איתות '+route.channel.side+' אושר, כפוף לבדיקות החשבון':entryReasonLabel(route.channel.reason)):route?' · מסלול פריצה בשרת: '+(route.breakout.reason==='INDEPENDENT_ENTRY_DISABLED'?'לא מופעל':route.breakout.ready?'תנאי הניתוח מתקיימים; הביצוע כפוף לבדיקות החשבון':'ממתין לתנאי כניסה'):'');
+ $('#resistancePatternStatus').textContent=(globalThis.LEVI_RESISTANCE?.describe(resistance,interval)||'')+(route?.primary==='channel_long_short'?' · מסלול ראשי: תעלת קיצון + חזרה ל־POC · LONG / SHORT · '+(route.channel.ready?'איתות '+route.channel.side+' אושר, כפוף לבדיקות החשבון':entryReasonLabel(route.channel.reason)):route?' · מסלול פריצה בשרת: '+(route.breakout.reason==='INDEPENDENT_ENTRY_DISABLED'?'לא מופעל':route.breakout.ready?'תנאי הניתוח מתקיימים; הביצוע כפוף לבדיקות החשבון':'ממתין לתנאי כניסה'):'');
  globalThis.LEVI_RESISTANCE?.drawSvg({svg,zone:resistance,view:bars,x,y,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
  }
  bars.forEach((b,i)=>{const marks=visiblePoints.filter(p=>p.index===i),primary=marks.find(p=>p.kind==='peak')||marks.find(p=>p.kind==='buy'||p.kind==='sell')||marks.at(-1),color=primary?.color||(b.close>=b.open?'#67e0ae':'#ff798b'),w=Math.max(2,Math.min(12,plotWidth/bars.length*.6));const line=add('line',{x1:x(i),x2:x(i),y1:y(b.high),y2:y(b.low),stroke:color,'stroke-width':primary?2:1});const body=add('rect',{x:x(i)-w/2,y:Math.min(y(b.open),y(b.close)),width:w,height:Math.max(primary?3:1,Math.abs(y(b.open)-y(b.close))),fill:color});
@@ -131,7 +132,7 @@ function renderChart(){
  svg.append(channelLabels);root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
  workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:W,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · '+bars.length+' נרות בחלון הזמן הנבחר.');
  chartTerminal.update({symbol:selected,interval,bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
- fixedRangeProfile.update({symbol:selected,interval,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom},x,y});
+ fixedRangeProfile.update({onModeChange:()=>renderChart(),models:!manualCharts.has(selected)&&['5m','5min'].includes(interval)?Object.fromEntries(['LONG','SHORT'].map(side=>[side,liveSearchState?.checks?.[selected]?.entryDecisions?.channel?.conditionReports?.[side]?.model])):null,sourceBars:chartBars().map(b=>({...b,time:Date.parse(b.date)})),symbol:selected,interval,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom},x,y});
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
 if(PAPER_MODE)$('#positionForm').onsubmit=e=>{e.preventDefault();const f=e.target,entry=Number(f.elements.entry.value),qty=Number(f.elements.qty.value),raw=f.elements.mark.value,mark=raw===''?null:Number(raw);if(!positive(entry)||!positive(qty)||(mark!==null&&!positive(mark)))return message('מחיר וכמות חייבים להיות מספרים חיוביים.');state.positions[selected]={entry,qty,mark,updatedAt:new Date().toISOString()};message('הפוזיציה נשמרה למעקב מקומי בלבד.');save();render();};

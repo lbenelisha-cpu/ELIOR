@@ -1,3 +1,4 @@
+import {pocFixture} from './helpers/poc-channel-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,13 +11,8 @@ import {validateTradeSettings} from '../lib/trade-settings.mjs';
 const D=300000,end=Date.parse('2026-11-01T10:00Z'),now=end+1000;
 const config=shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true',BINANCE_FUTURES_SHORT_AFTER:new Date(end-D).toISOString()});
 const settings=validateTradeSettings({});
-function input(){
- const bars=Array.from({length:205},(_,i)=>{const t=end-(205-i)*D,p=210-(100+i*.02+Math.cos(i*Math.PI/5));return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
+function input(){return pocFixture({side:'SHORT',end,entryPrice:104});}
 
- // A completed central consolidation precedes the live breakout.
- for(const [j,bar] of bars.slice(-3).entries()){const p=(105.95)+(j===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
- return {bars,price:104,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+D,open:105,close:104,high:105.1,low:103.9,volume:2000,closed:false,receivedAt:now},quote:{symbol:'ABCUSDT',bidPrice:'104',askPrice:'104.01',time:now}};
-}
 const info={symbol:'ABCUSDT',baseAsset:'ABC',status:'TRADING',contractType:'PERPETUAL',marginAsset:'USDT',quoteAsset:'USDT',filters:[{filterType:'LOT_SIZE',minQty:'.001',maxQty:'10000',stepSize:'.001'},{filterType:'PRICE_FILTER',tickSize:'.01'},{filterType:'MIN_NOTIONAL',notional:'5'}]};
 function harness(options={}){
  const writes=[],algos=new Map(),orders=new Map();let positions=[],saved,control={allowEntries:true,resumedAt:0},ownerSettings={...settings},quote=input().quote;
@@ -84,23 +80,20 @@ test('contract-price test replies follow quote changes and retain strict endpoin
  const failing=harness({onGet(p){if(p==='/fapi/v1/ticker/price')throw Error('CONTRACT_PRICE_FAILURE');}});
  await assert.rejects(failing.api.get('/fapi/v1/ticker/price',{symbol:'ABCUSDT'}),/CONTRACT_PRICE_FAILURE/);
 });
-test('SHORT records central consolidation and a changed lower consolidation blocks SELL at final recheck',async()=>{
- const first=shortSignal(input(),config);assert.equal(first.setup.consolidation.zone,'MIDDLE');
+test('SHORT records initial upper consolidation and changed initial evidence blocks final SELL',async()=>{
+ const first=shortSignal(input(),config);assert.equal(first.setup.consolidation.zone,'UPPER');
  const h=harness(),get=h.api.get;
- h.api.get=async(p,q)=>{
-  const rows=await get(p,q);
-  if(p==='/fapi/v1/klines')for(let k=202;k<205;k++){const v=210-(100+k*.02+Math.cos(k*Math.PI/5));rows[k].splice(1,4,v,v+.1,v-.1,v);}
-  return rows;
- };
- await assert.rejects(h.runner.enter('ABCUSDT',first),/CONSOLIDATION_SIDE_BLOCK/);
- assert.equal(h.writes.some(w=>w.q.side==='SELL'),false);
+ h.api.get=async(p,q)=>{const rows=await get(p,q);if(p==='/fapi/v1/klines')for(let k=24;k<30;k++)rows[k][3]-=4;return rows;};
+ await assert.rejects(h.runner.enter('ABCUSDT',first));assert.equal(h.writes.some(w=>w.q.side==='SELL'),false);
 });
-test('SHORT requires a fresh intrabar lower break, falling regression and volume; replay and invalidation are rejected',()=>{
- const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.ok(good.setup.regressionSlope<0);
- for(const mutate of [i=>i.priceAsOf=now-11000,i=>i.bars.splice(150,1),i=>i.bars.at(-1).high=1,i=>i.liveBar.volume=1000,i=>i.liveBar.high=NaN,i=>i.price=110,i=>i.price=1,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
- assert.equal(shortSignal(input(),shortConfig({})).ready,false);
- assert.equal(shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true'}).enabled,false);
+
+test('SHORT requires the four POC conditions plus fresh authoritative data and durable order deduplication',()=>{
+ const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.equal(good.conditions.rows.length,4);
+ for(const mutate of [i=>i.priceAsOf=now-16000,i=>i.bars.splice(15,1),i=>i.bars.at(-1).high=1,i=>i.liveBar.high=NaN,i=>i.price=103,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
+ for(const volume of [0,.0001,1,100000]){const i=input();i.liveBar.volume=volume;assert.equal(shortSignal(i,config).ready,true);}
+ assert.equal(shortSignal(input(),shortConfig({})).ready,false);assert.equal(shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true'}).enabled,false);
 });
+
 test('SHORT uses owner stop/activation/gap with frozen channel target and never loosens earned protection',()=>{
  const p={entryPrice:100,targetPrice:90};let e=shortExit(p,96,settings);assert.equal(e.stopPrice,101);assert.equal(e.armed,false);
  e=shortExit(e,94,settings);assert.equal(e.stopPrice,95);assert.equal(e.armed,true);
@@ -243,21 +236,19 @@ test('empty disabled stop-all leaves Spot-only deployments entirely untouched',a
 test('candidate is configured only to Isolated 1x and price invalidation during the final read prevents entry',async()=>{
  const h=harness();h.symbolConfig.marginType='CROSSED';h.symbolConfig.leverage=20;await h.runner.enter('ABCUSDT',shortSignal(input(),config));
  assert.deepEqual(h.writes.filter(x=>x.p.endsWith('/leverage')).map(x=>x.q.leverage),[1]);assert.deepEqual(h.writes.filter(x=>x.p.endsWith('/marginType')).map(x=>x.q.marginType),['ISOLATED']);
- let histories=0;const k=harness({onGet(p){if(p.endsWith('/klines')&&++histories===2)k.setQuote({bidPrice:'110',askPrice:'110.01'});}});await assert.rejects(k.runner.enter('ABCUSDT',shortSignal(input(),config)));assert.equal(k.writes.some(x=>x.q.side==='SELL'),false);
+ let histories=0;const k=harness({onGet(p){if(p.endsWith('/klines')&&++histories===2)k.setQuote({bidPrice:'103',askPrice:'103.01'});}});await assert.rejects(k.runner.enter('ABCUSDT',shortSignal(input(),config)));assert.equal(k.writes.some(x=>x.q.side==='SELL'),false);
 });
 test('unknown protection reply is not retried as another algo, and stop-all reports confirmed closures',async()=>{
  const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));const p=h.runner.state.positions.ABCUSDT,ref=p.algos[0],before=h.writes.length;
  ref.status='PENDING';await h.runner.ensureAlgo(p,ref.kind,ref.price);assert.equal(h.writes.length,before);
  const result=await h.runner.closeAll();assert.deepEqual(result,{sold:['FUTURES:ABCUSDT'],failed:[]});assert.equal(h.runner.forceClose,false);
 });
-test('50 pre-breakout SHORT bars suffice; recovered upper wick passes but current ceiling and expiry block',()=>{
- const i=input();i.bars=i.bars.slice(-50);i.liveBar.high=110;
- const r=shortSignal(i,config);assert.equal(config.period,50);assert.equal(r.ready,true,r.reason);
- assert.deepEqual(r.setup,shortSignal({...i,bars:input().bars},config).setup);
- const ceiling=Math.min(r.setup.level,r.setup.liveLevel,r.setup.regressionCenter);
- for(const price of [ceiling,ceiling+.01])assert.equal(shortSignal({...i,price},config).reason,'WAIT_LOWER_CHANNEL_LIVE_BREAK');
- assert.equal(shortSignal({...i,bars:i.bars.slice(1)},config).reason,'WAIT_FUTURES_HISTORY');
- assert.equal(shortSignal({...i,now:end+D,priceAsOf:end+D},config).reason,'WAIT_FUTURES_LIVE_BAR');
+test('SHORT needs 50 pre-breakout bars and retains its fixed POC across the returning candles',()=>{
+ const i=input(),good=shortSignal(i,config);assert.equal(good.ready,true,good.reason);
+ assert.equal(good.setup.pocModel.channel.barTimes.length,50);assert.ok(good.setup.pocModel.frozenAt<i.liveBar.openTime);
+ const early=structuredClone(i);early.bars=early.bars.slice(-50);assert.equal(shortSignal(early,config).ready,false);
+ assert.equal(shortSignal({...i,price:103},config).ready,false);
+ assert.equal(shortSignal({...i,now:end+D},config).ready,false);
 });
 
 const missingAlgo=()=>Object.assign(Error('FUTURES_API_-2013'),{code:-2013,status:400});
@@ -349,13 +340,10 @@ test('POC SHORT preserves the halt, account guards and two slot budget and prote
  const h=harness({fillFraction:.5});assert.equal((await h.runner.enterPoc(intent,async()=>{})).ok,true);assert.ok(h.runner.state.positions.ABCUSDT.protectedAt);assert.ok(h.runner.state.positions.ABCUSDT.qty<.2);
 });
 
-test('SHORT enters during the open bar with cumulative volume, while stale data and old policy signals stay blocked',async()=>{
- const i=input();i.now=end+120000;i.priceAsOf=i.now;i.liveBar.receivedAt=i.now;i.liveBar.close=105;
- i.liveBar.volume=1499;assert.equal(shortSignal(i,config).reason,'SHORT_VOLUME_LOW');
- i.liveBar.volume=1500;const r=shortSignal(i,config);assert.equal(r.ready,true,r.reason);assert.equal(r.setup.volumeRatio,1.5);assert.ok(i.now<r.setup.expiresAt);
- assert.equal(r.setup.signalTime,end);assert.equal(config.waitForBreakoutClose,false);
- for(const patch of [{volume:undefined},{volume:0},{volume:-1},{closed:true},{receivedAt:i.now-10001},{receivedAt:i.now+1}])assert.equal(shortSignal({...i,liveBar:{...i.liveBar,...patch}},config).ready,false);
- const h=harness();let reads=0;const original=h.api.get;h.api.get=async(p,q)=>{const rows=await original(p,q);if(p==='/fapi/v1/klines')rows.at(-1)[5]=2100+(++reads)*100;return rows;};
- await h.runner.enter('ABCUSDT',shortSignal(input(),config));assert.equal(h.writes.filter(w=>w.q.side==='SELL').length,1);assert.equal(reads,2);assert.equal(h.saved.version,'FUTURES_CHANNEL_SHORT_V1');
- const old=harness();await assert.rejects(old.runner.enter('ABCUSDT',{...r,setup:{...r.setup,entryPolicyVersion:undefined}}),/FUTURES_SIGNAL_CHANGED/);assert.equal(old.writes.filter(w=>w.q.side==='SELL').length,0);
+test('SHORT enters on the open return candle without a volume multiplier and rejects stale data or old policy',async()=>{
+ const i=input();i.now=end+120000;i.priceAsOf=i.now;i.liveBar.receivedAt=i.now;
+ const r=shortSignal(i,config);assert.equal(r.ready,true,r.reason);assert.ok(i.now<r.setup.expiresAt);assert.equal(i.liveBar.volume,0);
+ for(const patch of [{volume:undefined},{volume:-1},{closed:true},{receivedAt:i.now-16001},{receivedAt:i.now+1}])assert.equal(shortSignal({...i,liveBar:{...i.liveBar,...patch}},config).ready,false);
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));assert.equal(h.writes.filter(w=>w.q.side==='SELL').length,1);assert.equal(h.saved.version,'FUTURES_CHANNEL_SHORT_V1');
+ const old=harness();await assert.rejects(old.runner.enter('ABCUSDT',{...r,setup:{...r.setup,entryPolicyVersion:undefined}}),/POC_MODEL_CHANGED/);assert.equal(old.writes.filter(w=>w.q.side==='SELL').length,0);
 });

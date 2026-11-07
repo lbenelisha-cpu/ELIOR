@@ -56,7 +56,7 @@
     add('p','בדיקה: '+(lf?entryReason(ld.reason):'ממתין לבדיקה עדכנית'),long);
     const longBlocker=transport?(r.entryBlockers?.long||(lf?ld.blocker:null)):null;
     add('small','ביצוע: '+(longBlocker?entryReason(longBlocker):'כפוף לבדיקה סופית'),long);
-    const longSupported=snapshot.mode==='live'&&longPolicy?.requested===true&&longPolicy.version==='CHANNEL_PRIMARY_INTRABAR_V2'&&longPolicy.period===50&&longPolicy.minVolumeRatio===1.5&&longPolicy.minMeanDollarVolume===10000&&longPolicy.consolidationPolicy?.version==='CHANNEL_CONSOLIDATION_V1';
+    const longSupported=snapshot.mode==='live'&&longPolicy?.requested===true&&longPolicy.period===50&&((longPolicy.version==='CHANNEL_POC_RETEST_V1'&&longPolicy.consolidationPolicy?.version==='CHANNEL_INITIAL_CONSOLIDATION_V2')||(longPolicy.version==='CHANNEL_PRIMARY_INTRABAR_V2'&&longPolicy.minVolumeRatio===1.5&&longPolicy.minMeanDollarVolume===10000&&longPolicy.consolidationPolicy?.version==='CHANNEL_CONSOLIDATION_V1'));
     checklist(long,{symbol:r.symbol,marketSymbol:r.symbol,side:'LONG',conditions:ld?.conditions,reason:ld?.reason,at:ld?.at,now,transport,supported:longSupported,blocker:longBlocker});
     add('small','בדיקה אחרונה: '+date(ld?.at),long);
     add('strong','SHORT · '+(o?.futuresSymbol||'חוזה לא מאומת'),short);
@@ -66,6 +66,7 @@
     add('small','ביצוע: '+(shortBlocker?entryReason(shortBlocker):'כפוף לבדיקה סופית'),short);
     checklist(short,{symbol:r.symbol,marketSymbol:o?.futuresSymbol,side:'SHORT',conditions:o?.conditions,reason:o?.reason,at:o?.at,expiresAt:o?.expiresAt,now,transport,supported:snapshot.mode==='live'&&o?.available===true&&o.observationOnly===true&&o.spotSymbol===r.symbol&&/^[A-Z0-9]{2,24}USDT$/.test(o.futuresSymbol||''),blocker:shortBlocker});
     add('small','בדיקה אחרונה: '+date(o?.at),short);
+    if(o?.available&&o.conditions?.model&&o.conditions?.chart){const chart=add('button','פתח גרף SHORT · Futures + POC',short);chart.type='button';chart.onclick=async()=>{try{const ui=await import('./poc-signal-chart.js?v=20261107-poc');ui.openSignalChart({symbol:o.futuresSymbol,market:'Binance Futures',conditions:o.conditions});}catch{chart.textContent='לא ניתן לטעון את הגרף · נסה לרענן';}};}
     add('small','✓ התקיים בבדיקה · ○ ממתין · — טרם אומת. כל תנאי שניתן לחשב נבדק באותה סריקה; כניסה דורשת את כל התנאים ובדיקה סופית.',card,'attention-check-legend');
    }
    if(t.ready){

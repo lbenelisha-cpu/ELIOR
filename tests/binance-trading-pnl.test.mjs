@@ -85,6 +85,9 @@ test('report proxy accepts only the private GET path and integration patch is at
  try{
   const files=['server.mjs','binance-agent.js','binance-agent.html','lib/futures-short-api.mjs','netlify/functions/binance-read-proxy.mjs'];
   for(const file of files){fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.copyFileSync(new URL('../'+file,import.meta.url),path.join(root,file));}
+  // Freeze the original installer's client-script version; later releases add poc=1 and new cache keys.
+  const htmlFile=path.join(root,'binance-agent.html');fs.writeFileSync(htmlFile,fs.readFileSync(htmlFile,'utf8').replace(/\/binance-agent\.js\?[^"']+/, '/binance-agent.js?v=20261102-pnl'));
+  patchTradingPnl(root);
   const before=files.map(f=>fs.readFileSync(path.join(root,f),'utf8'));patchTradingPnl(root);patchTradingPnl(root);assert.deepEqual(files.map(f=>fs.readFileSync(path.join(root,f),'utf8')),before);
   const proxyFile=path.join(root,'netlify/functions/binance-read-proxy.mjs');
   fs.writeFileSync(proxyFile,before[4].replace("'/api/binance-trading-pnl',",'').replace("'/api/binance-trade-history',",''));

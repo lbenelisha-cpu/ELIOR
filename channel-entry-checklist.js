@@ -30,7 +30,13 @@
  ];
  function project({side,reason,at,now=Date.now(),expiresAt,transport=false,supported=false,blocker=null,conditions=null}={}){
   const sell=side==='SHORT',stages=sell?short:long;
-  const definitions=[
+  const pocPolicy=conditions?.version==='CHANNEL_POC_CONDITIONS_V1';
+  const definitions=pocPolicy?[
+   ['channel','1 · תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
+   ['break',sell?'3 · שבירה מתחת לתעלה וקיבוע הטווח':'3 · פריצה מעל התעלה וקיבוע הטווח',['break']],
+   ['poc',sell?'4 · חזרה מלמטה אל POC':'4 · חזרה מלמעלה אל POC',['poc']],
+   ['range',sell?'8 · דשדוש בתחילת התעלה · עליון או אמצעי':'8 · דשדוש בתחילת התעלה · תחתון או אמצעי',['range']]
+  ]:[
    ['channel','תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
    ['slope',sell?'רגרסיה יורדת':'רגרסיה עולה',['slope']],
    ['break',sell?'שבירה חדשה מתחת לגבול התחתון':'פריצה חדשה מעל הגבול העליון',['break']],
@@ -47,7 +53,7 @@
   const success=reason===(sell?'SHORT_CHANNEL_READY':'CHANNEL_BREAKOUT_READY');
   const stop=stages.findIndex(([,reasons])=>reasons.includes(reason));
   const parallel=conditions!=null;
-  const validReport=parallel&&conditions.version==='CHANNEL_CONDITIONS_PARALLEL_V1'&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  const validReport=parallel&&['CHANNEL_CONDITIONS_PARALLEL_V1','CHANNEL_POC_CONDITIONS_V1'].includes(conditions.version)&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at<=at&&at-conditions.at<15000&&Math.floor(conditions.at/STEP)===Math.floor(at/STEP)&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
   const known=parallel?validReport:success||stop>=0,current=validSide&&supported&&timely&&known;
   const passed=new Set(current?stages.slice(0,success?stages.length:stop).map(([key])=>key):[]);
   const failed=current&&!success&&stop>=0?stages[stop][0]:null;
@@ -56,7 +62,7 @@
   // Null blocker is absence of a reported block, never proof of account approval.
   rows.push({id:'execution',label:'אישור ביצוע · הרשאות, יתרה, מקום והגנות',state:transport&&blocker?'blocked':'unknown'});
   // Data availability is a background prerequisite, not a counted signal.
-  const dataPending=current&&['quote','bar','history'].includes(failed);
+  const dataPending=current&&(['quote','bar','history'].includes(failed)||parallel&&/^(WAIT_FRESH_PRICE|WAIT_CHANNEL_LIVE_BAR|WAIT_CHANNEL_HISTORY|GAPPED_CHANNEL_HISTORY)$/.test(reason));
   return {rows,count,total:definitions.length,current,dataPending,parallel:!!validReport,status:!supported?'unsupported':parallel&&!validReport?'invalid-report':!timely?'stale':!known?'unknown':'recorded'};
  }
  function createTracker(){
@@ -72,7 +78,7 @@
     records.delete(key);return view;
    }
    let previous=records.get(key);
-   if(previous&&previous.identity!==identity){records.delete(key);previous=null;}
+   if(previous&&(previous.identity!==identity||previous.view.rows.map(r=>r.id).join()!==view.rows.map(r=>r.id).join())){records.delete(key);previous=null;}
    if(previous&&Number.isFinite(input.at)&&input.at<previous.at)return project({...input,now,transport:false});
    if(view.current&&!view.dataPending){
     records.set(key,{identity,at:input.at,reason:input.reason,age,view});

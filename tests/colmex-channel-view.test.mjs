@@ -17,7 +17,7 @@ test('stock chart matches shared 50-bar channel geometry across verified overnig
  assert.equal(colmexChartChannels(input.map((b,i)=>i===60?{...b,low:200}:b),{now:end}).regression.ready,false);
 });
 const element=tag=>({tag,attributes:{},children:[],textContent:'',setAttribute(k,v){this.attributes[k]=v;},append(...n){this.children.push(...n);},replaceChildren(){this.children=[];}});
-test('SVG channels stay within the measured visible bars and include counted upper/lower touches',()=>{
+test('SVG channels stay within measured bars and touch labels occupy the separate header band',()=>{
  const input=bars(),r=colmexChartChannels(input,{now:end}),segments=channelSegments(r,input.slice(-20)),prior=globalThis.document;globalThis.document={createElementNS:(_,tag)=>element(tag)};
  try{
   for(const width of [205,700]){
@@ -26,7 +26,7 @@ test('SVG channels stay within the measured visible bars and include counted upp
    const group=svg.children[1];assert.match(group.attributes['clip-path'],/^url/);assert.equal(group.tag,'g');assert.equal(group.children.filter(n=>n.tag==='line').length,6);
    assert.ok(group.children.some(n=>n.tag==='line'&&n.attributes.stroke==='#b7a3ff'));
    const badge=labels.children.find(n=>n.attributes['data-channel-label']==='swing');assert.match(badge.attributes['aria-label'],/למעלה: \d+ · למטה: \d+ נגיעות/);
-   for(const label of labels.children){const rect=label.children[0];assert.ok(rect.attributes.x>=bounds.left);assert.ok(rect.attributes.x+rect.attributes.width<=bounds.right);assert.ok(rect.attributes.y>=bounds.top);assert.ok(rect.attributes.y+rect.attributes.height<=bounds.bottom);}
+   for(const label of labels.children){const rect=label.children[0];assert.ok(rect.attributes.x>=bounds.left);assert.ok(rect.attributes.x+rect.attributes.width<=bounds.right);assert.ok(rect.attributes.y>=Math.max(4,bounds.top-42));assert.ok(rect.attributes.y+rect.attributes.height<=bounds.bottom);}
   }
   assert.ok(segments.every(s=>s.last.i<20&&s.first.i>=0));assert.deepEqual(channelSegments(r,input.slice(0,2)),[]);
   const labels=drawColmexChannels({svg:element('svg'),segments:[],x:i=>i,y:p=>p,bounds:{left:20,right:225,top:30,bottom:300}});assert.equal(labels.children.length,0);
@@ -36,8 +36,8 @@ test('SVG channels stay within the measured visible bars and include counted upp
 test('strategy description follows server activation and cannot present a disabled or unknown route as active',()=>{
  assert.match(colmexStrategyView(null).title,/אינו זמין/);
  const status={enabled:true,channelPrimary:{requested:false,enabled:false}};assert.match(colmexStrategyView(status).title,/התעלות כבוי/);
- status.channelPrimary={requested:true,enabled:false,enabledAfter:null};assert.match(colmexStrategyView(status).title,/חסומות/);
- status.channelPrimary={requested:true,enabled:true,enabledAfter:end};const active=colmexStrategyView(status);assert.match(active.title,/מופעל/);assert.match(active.entry,/50 נרות/);assert.match(active.entry,/1.5/);assert.match(active.exit,/רוחב התעלה/);
+ status.channelPrimary={version:'CHANNEL_POC_RETEST_V1',requested:true,enabled:false,enabledAfter:null};assert.match(colmexStrategyView(status).title,/חסומות/);
+ status.channelPrimary={version:'CHANNEL_POC_RETEST_V1',requested:true,enabled:true,enabledAfter:end};const active=colmexStrategyView(status);assert.match(active.title,/מופעל/);assert.match(active.entry,/ארבעה תנאים/);assert.match(active.entry,/POC/);assert.match(active.exit,/רוחב התעלה/);
  status.enabled=false;assert.match(colmexStrategyView(status).title,/המסחר כבוי/);
 });
 test('channel search never presents a stale Wyckoff reset as the active entry condition',()=>{
@@ -48,7 +48,7 @@ test('channel search never presents a stale Wyckoff reset as the active entry co
  }finally{globalThis.document=prior;}
 });
 
-test('Colmex intrabar policy describes current broker price and keeps confirmed channel pivots',()=>{
- const view=colmexStrategyView({enabled:true,channelPrimary:{enabled:true,requested:true,enabledAfter:end,waitForBreakoutClose:false}});
- assert.match(view.entry,/ללא המתנה לסגירה/);assert.match(view.entry,/50 נרות סגורים/);assert.match(view.entry,/המחזור המצטבר בנר הפתוח/);assert.match(view.entry,/SHORT: מחיר Ask מתחת/);assert.match(view.entry,/LONG: מחיר Bid מעל/);assert.doesNotMatch(view.entry,/נדרשת סגירה מעל/);
+test('Colmex POC policy describes mirrored entries and excludes removed thresholds',()=>{
+ const view=colmexStrategyView({enabled:true,channelPrimary:{version:'CHANNEL_POC_RETEST_V1',enabled:true,requested:true,enabledAfter:end}});
+ assert.match(view.entry,/בסיום נר הפריצה/);assert.match(view.entry,/המחיר בנר החזרה נבדק בזמן אמת/);assert.match(view.entry,/SHORT/);assert.match(view.entry,/LONG/);assert.doesNotMatch(view.entry,/פי 1.5|מחזור מצטבר/);assert.match(view.consolidation,/רגרסיה לתצוגה בלבד/);
 });

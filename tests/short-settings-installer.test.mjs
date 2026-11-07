@@ -1,7 +1,8 @@
+import {upgradePocFixture} from './helpers/upgrade-poc-fixture.mjs';
 import {beforeParallelChecks,restorePreParallelLayout} from './helpers/pre-parallel-entry-layout.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import {prePocFs as fs} from './helpers/pre-poc-source.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -78,6 +79,7 @@ test('staged tests support and preserve an installed runner with additional cont
   patchShortSettings(dir,patches);patchShortSettings(dir,patches);
   patchChannelConsolidation(dir,consolidationPatches.filter(p=>fs.existsSync(path.join(dir,p.file))));
   assert.ok(fs.readFileSync(runnerPath,'utf8').includes(contractCheck),'retain deployed contract-price checks');
+  upgradePocFixture(dir);
   const files=['futures-short.test.mjs','futures-short-recovery.test.mjs','futures-short-fill.test.mjs'].map(f=>path.join(dir,'tests',f));
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const run=()=>spawnSync(process.execPath,['--test','--test-reporter=tap',...files],{env,encoding:'utf8',timeout:30000,maxBuffer:2*1024*1024});

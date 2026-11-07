@@ -1,9 +1,11 @@
 //@version=6
-indicator("LEVI · Swing channel + Regression", overlay=true, max_lines_count=10, max_labels_count=6, max_bars_back=300)
+indicator("LEVI · Channel + Fixed Range POC", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=80, max_bars_back=500)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
 int n = input.int(50, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
-bool confirmedOnly = input.bool(false, "Require two touches on each swing boundary")
+bool showRegression = input.bool(true, "Show regression (display only)")
+bool showPoc = input.bool(true, "Show fixed range volume profile / POC")
+bool confirmedOnly = input.bool(true, "Require two touches on each swing boundary")
 var array<line> drawings = array.new<line>()
 var array<label> captions = array.new<label>()
 
@@ -70,6 +72,64 @@ swingCandidate(array<float> lows, array<float> highs, array<float> closes, bool 
                         lc += 1
     [valid, slope, lower, upper, a, b, lc, hc]
 
+// Range must contain the first channel anchor; it cannot be moved to the exit.
+initialZone(array<float> lows, array<float> highs, array<float> closes, int first, float slope, float lower, float upper, int count, int timeOffset) =>
+    int zone = 0
+    int rangeStart = na
+    int rangeEnd = na
+    float rangeLow = na
+    float rangeHigh = na
+    if not na(first) and upper > lower
+        for length = 8 to 3
+            if zone == 0
+                for start = math.max(0,first-length+1) to first
+                    if zone == 0 and start+length <= count
+                        float lo = array.get(lows,start)
+                        float hi = array.get(highs,start)
+                        float location = 0
+                        bool inside = true
+                        for i = start to start+length-1
+                            lo := math.min(lo,array.get(lows,i))
+                            hi := math.max(hi,array.get(highs,i))
+                            float q = ((array.get(highs,i)+array.get(lows,i))/2-lower-slope*i)/(upper-lower)
+                            inside := inside and q >= 0 and q <= 1
+                            if i > start
+                                inside := inside and time[timeOffset+count-1-i]-time[timeOffset+count-i] == 300000
+                            location += q/length
+                        float drift = hi > lo ? math.abs(array.get(closes,start+length-1)-array.get(closes,start))/(hi-lo) : 1
+                        if inside and hi > lo and (hi-lo)/(upper-lower) <= 0.35 and drift <= 0.5
+                            zone := location <= 1.0/3 ? 1 : location >= 2.0/3 ? 3 : 2
+                            rangeStart := start
+                            rangeEnd := start+length-1
+                            rangeLow := lo
+                            rangeHigh := hi
+    [zone,rangeStart,rangeEnd,rangeLow,rangeHigh]
+
+var int savedZone = 0
+var int savedRangeStart = na
+var int savedRangeEnd = na
+var float savedRangeLow = na
+var float savedRangeHigh = na
+var int vpA = na
+var int vpB = na
+var int vpSide = 0
+var int vpZone = 0
+var float vpLow = na
+var float vpHigh = na
+var float vpPriceA = na
+var float vpPriceB = na
+var float vpPoc = na
+var float vpSlope = na
+var float vpLower = na
+var float vpUpper = na
+var int vpFirst = na
+var int vpChannelStart = na
+var array<float> vpVolumes = array.new<float>(32,0)
+var array<box> vpBoxes = array.new<box>()
+var array<line> vpLines = array.new<line>()
+var array<label> vpLabels = array.new<label>()
+var table pocTable = table.new(position.top_right,1,5,bgcolor=color.new(color.black,15))
+
 // Rebuild the last valid geometry on reload from a bounded 200-bar history.
 // Only closed candles update the snapshot; no bot entry state is inferred.
 var float savedSlope = na
@@ -114,7 +174,7 @@ if bar_index >= n and bar_index >= last_bar_index - 200
     for i = 0 to n-1
         squaredError += math.pow(array.get(closes,i)-intercept-slope*i,2)
     float width = deviations*math.sqrt(squaredError/n)
-    if barstate.islast
+    if barstate.islast and showRegression
         for band = -1 to 1
             array.push(drawings,line.new(first,intercept+band*width,last,intercept+slope*(n-1)+band*width,color=color.aqua,width=band==0 ? 1 : 2))
         array.push(captions,label.new(last,intercept+slope*(n-1)+width,"Regression · closed bars",style=label.style_label_left,color=color.new(color.blue,65),textcolor=color.white))
@@ -126,6 +186,56 @@ if bar_index >= n and bar_index >= last_bar_index - 200
     bool provisional1 = lc1<2 or hc1<2
     bool provisional2 = lc2<2 or hc2<2
     bool choose1 = v1 and (not v2 or b1>b2 or (b1==b2 and ((not provisional1 and provisional2) or (provisional1==provisional2 and u1-l1<=u2-l2))))
+    // Freeze at the completed breakout candle; returning candles never extend B.
+    if not na(savedLast) and last == savedLast+1 and (na(vpB) or last > vpB) and savedLowTouches >= 2 and savedHighTouches >= 2
+        float topNow = savedUpper+savedSlope*(last-savedFirst)
+        float lowNow = savedLower+savedSlope*(last-savedFirst)
+        float topBefore = topNow-savedSlope
+        float lowBefore = lowNow-savedSlope
+        bool brokeUp = close[offset+1] <= topBefore and high[offset] > topNow
+        bool brokeDown = close[offset+1] >= lowBefore and low[offset] < lowNow
+        if brokeUp and brokeDown
+            vpB := na
+            vpPoc := na
+        if brokeUp != brokeDown
+            vpSide := brokeUp ? 1 : -1
+            vpA := savedStart
+            for i = savedStart to last-1
+                int back = bar_index-i
+                int anchorBack = bar_index-vpA
+                if vpSide == 1 ? low[back] < low[anchorBack] : high[back] > high[anchorBack]
+                    vpA := i
+            vpPriceA := vpSide == 1 ? low[bar_index-vpA] : high[bar_index-vpA]
+            vpPriceB := vpSide == 1 ? high[offset] : low[offset]
+            vpB := last
+            vpZone := savedZone
+            vpLow := low[bar_index-vpA]
+            vpHigh := high[bar_index-vpA]
+            for i = vpA to vpB
+                int back = bar_index-i
+                vpLow := math.min(vpLow,low[back])
+                vpHigh := math.max(vpHigh,high[back])
+            array.fill(vpVolumes,0)
+            float step = (vpHigh-vpLow)/32
+            bool volumeValid = step > 0
+            if step > 0
+                for i = vpA to vpB
+                    int back = bar_index-i
+                    volumeValid := volumeValid and not na(volume[back]) and volume[back] >= 0
+                    if high[back] > low[back]
+                        for bin = 0 to 31
+                            float overlap = math.max(0,math.min(vpLow+(bin+1)*step,high[back])-math.max(vpLow+bin*step,low[back]))
+                            array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back])*overlap/(high[back]-low[back]))
+                    else
+                        int bin = math.max(0,math.min(31,int(math.floor((low[back]-vpLow)/step))))
+                        array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back]))
+            float largest = array.max(vpVolumes)
+            vpPoc := volumeValid and largest > 0 ? vpLow+(array.indexof(vpVolumes,largest)+0.5)*step : na
+            vpSlope := savedSlope
+            vpLower := savedLower
+            vpUpper := savedUpper
+            vpFirst := savedFirst
+            vpChannelStart := savedStart
     if not na(savedLast) and last > savedLast and na(brokenAt)
         float tolerance = math.max((savedUpper-savedLower)*0.025,close[offset]*0.0001)
         float projectedLower = savedLower+savedSlope*(last-savedFirst)
@@ -142,12 +252,18 @@ if bar_index >= n and bar_index >= last_bar_index - 200
         savedLast := last
         savedLowTouches := choose1 ? lc1 : lc2
         savedHighTouches := choose1 ? hc1 : hc2
+        [zone,rs,re,rl,rh] = initialZone(lows,highs,closes,choose1 ? a1 : a2,savedSlope,savedLower,savedUpper,n,offset)
+        savedZone := zone
+        savedRangeStart := na(rs) ? na : first+rs
+        savedRangeEnd := na(re) ? na : first+re
+        savedRangeLow := rl
+        savedRangeHigh := rh
         brokenAt := na
         brokenDirection := ""
     if barstate.islast
         bool active = v1 or v2
         bool retained = not na(savedLast) and last-savedLast <= 200
-        if active or retained
+        if (active or retained) and (not showPoc or na(vpPoc))
             int endBar = active ? last : (na(brokenAt) ? savedLast : brokenAt)
             color channelColor = active ? color.orange : color.gray
             for band = -1 to 1
@@ -157,9 +273,51 @@ if bar_index >= n and bar_index >= last_bar_index - 200
             string confirmation = savedLowTouches<2 or savedHighTouches<2 ? " · provisional" : " · confirmed"
             string status = active ? "Swing · "+touches+confirmation : "תעלה קודמת · "+(na(brokenAt) ? "לא תקפה כעת" : brokenDirection)+" · "+touches+confirmation+" · לא איתות בוט"
             array.push(captions,label.new(endBar,savedLower+savedSlope*(endBar-savedFirst),status,style=label.style_label_left,color=color.new(channelColor,65),textcolor=color.white,tooltip="Gray dotted lines preserve previous geometry. Break direction uses a closed candle beyond the boundary tolerance. A new valid channel replaces this snapshot. History retention: up to 200 bars."))
-        else
+        else if not showPoc or na(vpPoc)
             string missing = geometryFound ? "Swing · waiting for two touches on each boundary" : "Swing · no valid pivot channel in " + str.tostring(n) + " closed bars"
             array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
+
+// One combined indicator keeps the regression optional and the frozen POC visible.
+// This OHLC allocation estimate is the app's calculation, not TradingView's native FRVP.
+if barstate.islast
+    for item in vpBoxes
+        box.delete(item)
+    array.clear(vpBoxes)
+    for item in vpLines
+        line.delete(item)
+    array.clear(vpLines)
+    for item in vpLabels
+        label.delete(item)
+    array.clear(vpLabels)
+    table.clear(pocTable,0,0,0,4)
+    if timeframe.in_seconds() != 300
+        table.cell(pocTable,0,0,"Select 5-minute candles for LEVI entry geometry",text_color=color.orange)
+    else if showPoc and not na(vpPoc) and not na(vpB)
+        float step = (vpHigh-vpLow)/32
+        float largest = array.max(vpVolumes)
+        int histogramLeft = math.max(vpA,bar_index-80)
+        for bin = 0 to 31
+            float v = array.get(vpVolumes,bin)
+            if v > 0
+                int right = histogramLeft+math.max(1,int(math.round(10*v/largest)))
+                color c = vpLow+(bin+0.5)*step == vpPoc ? color.yellow : color.new(color.aqua,65)
+                array.push(vpBoxes,box.new(histogramLeft,vpLow+(bin+1)*step,right,vpLow+bin*step,border_color=color.new(c,100),bgcolor=c))
+        array.push(vpLines,line.new(vpB,vpPoc,bar_index+2,vpPoc,color=color.yellow,width=2,style=line.style_dashed))
+        for band = 0 to 1
+            float edge = band == 0 ? vpLower : vpUpper
+            array.push(vpLines,line.new(vpChannelStart,edge+vpSlope*(vpChannelStart-vpFirst),bar_index,edge+vpSlope*(bar_index-vpFirst),color=color.orange,width=2))
+        array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
+        bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
+        bool returned = bar_index > vpB and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
+        table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" · Fixed A–B · POC estimate",text_color=color.yellow)
+        table.cell(pocTable,0,1,"1 ✓ Confirmed channel · 3 ✓ Breakout",text_color=color.white)
+        table.cell(pocTable,0,2,rangeOK ? "8 ✓ Initial consolidation" : "8 ○ Initial consolidation does not match",text_color=rangeOK ? color.lime : color.orange)
+        table.cell(pocTable,0,3,returned ? "4 ✓ Return to POC" : "4 ○ Waiting for return to POC",text_color=returned ? color.lime : color.orange)
+        table.cell(pocTable,0,4,"Chart data only · not broker execution approval",text_color=color.silver,text_size=size.small)
+    else if showPoc
+        table.cell(pocTable,0,0,"Waiting for confirmed channel and breakout to fix A–B",text_color=color.orange)
 
 // Broker exit thresholds are imported explicitly. Pine does not read the bot account.
 // No trading logic, reconstructed peak, alerts or assumed fills are used here.

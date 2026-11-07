@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import {prePocFs as fs} from './helpers/pre-poc-source.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import {patchIntrabar} from '../scripts/patch-channel-intrabar.mjs';
