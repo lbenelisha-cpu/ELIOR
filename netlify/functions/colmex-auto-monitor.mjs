@@ -1,3 +1,4 @@
+import {dispatchColmexFast} from '../../lib/colmex-fast-dispatch.mjs';
 import {recordEntryBlocker} from '../../lib/entry-method-comparison.mjs';
 import {maAuditStore,colmexAuditPrefix,createColmexAudit,flushColmexAudit} from '../../lib/colmex-ma-audit.mjs';
 import {configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mjs';
@@ -12,9 +13,10 @@ export function cycleError(error,stage){
 export default async function(request,context){
  const env=runtimeEnvironment(process.env,context);
  if(!configuredLive(env))return new Response(null,{status:204});
+ // Leave room inside the scheduled function's 30-second limit for lease release and dispatch.
+ const deadline=Date.now()+26000;
  const contextRead=Promise.resolve().then(()=>maAuditStore().get(colmexAuditPrefix(env.COLMEX_AUTO_ACCOUNT_ID)+'/contexts',{type:'json'})).catch(()=>null);
- const lock=await lease(autoStore(),env.COLMEX_AUTO_ACCOUNT_ID);if(!lock)return new Response(null,{status:204});
- const deadline=Date.now()+27000;
+ const store=autoStore(),lock=await lease(store,env.COLMEX_AUTO_ACCOUNT_ID);if(!lock){await dispatchColmexFast({store,env}).catch(()=>{});return new Response(null,{status:204});}
  let timer;const contextData=await Promise.race([contextRead,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),750);})]);clearTimeout(timer);
  const audit=createColmexAudit(lock.state,contextData?.contexts||{});
  try{const result=await runCycle({state:lock.state,save:lock.save,broker:new AutoBroker({env,deadline}),env,deadline,audit});if(result.reason!=='CYCLE_COOLDOWN'){lock.state.lastResult=result.reason;lock.state.lastCompletedAt=Date.now();lock.state.lastError=null;
@@ -27,6 +29,7 @@ export default async function(request,context){
   lock.state.lastError=cycleError(error,lock.state.stage);recordEntryBlocker(lock.state,{reason:lock.state.lastError.reason});await lock.save(lock.state);
  }
  finally{await lock.release();}
+ await dispatchColmexFast({store,env,state:lock.state}).catch(()=>{});
  return new Response(null,{status:204});
 }
 export const config={schedule:'* * * * *'};
