@@ -18,6 +18,41 @@ function fixture(historical=false){
  return root;
 }
 const configSource=s=>s.slice(s.indexOf('export function shortConfig('),s.indexOf('export function shortSignal('));
+const equityRiskFixture=new URL('./fixtures/pre-poc/lib/confirmed-risk-sizing-equity-v1.mjs',import.meta.url);
+test('V1 equal-equity risk reproduces the released failure and upgrades without changing allocation',async()=>{
+ const root=fixture('deployed');try{
+  const file=path.join(root,'lib/confirmed-risk-sizing.mjs'),before=fs.readFileSync(equityRiskFixture,'utf8');
+  fs.writeFileSync(file,before);
+  const files=[...new Set(patches.map(p=>p.file))],snapshot=files.map(f=>[f,fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null]);
+  const released=patches.map(p=>p.file==='lib/confirmed-risk-sizing.mjs'?{...p,alternatives:[]}:p);
+  assert.throws(()=>patchChannelPoc(root,released),/integration-confirmed-risk-sizing.mjs-1.*no files changed/);
+  for(const [f,s]of snapshot)assert.equal(fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null,s);
+  patchChannelPoc(root,patches);
+  const after=fs.readFileSync(file,'utf8');
+  assert.equal(after,before.replace("input?.source==='CHANNEL_POC_RETEST_V1'","['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(input?.source)"));
+  patchChannelPoc(root,patches);assert.equal(fs.readFileSync(file,'utf8'),after);
+  const {sizeRisk}=await import('file://'+file),{BINANCE_CONFIRMED_POLICY,BINANCE_STOP_POLICY}=await import('file://'+path.join(root,'lib/confirmed-entry-quality.mjs'));
+  const input={version:BINANCE_CONFIRMED_POLICY.version,stopLossPolicy:BINANCE_STOP_POLICY,source:'CHANNEL_POC_RETEST_V2',allocationMode:'CURRENT_EQUITY_EQUAL_FIVE_V1'};
+  const risk=sizeRisk(100,20,{stopLossPct:2},input);
+  assert.equal(risk.reason,'READY');assert.equal(risk.budget,20);assert.equal(risk.riskPlan.riskBudgetUsd,.4);assert.equal(risk.riskPlan.allocationMode,input.allocationMode);
+  assert.equal(sizeRisk(100,1e9,{stopLossPct:2},input).reason,'POSITION_RISK_LIMIT');
+  assert.equal(sizeRisk(100,20,{stopLossPct:2},{...input,source:'UNREVIEWED_POLICY'}).reason,'INVALID_RISK_INPUT');
+  const env={...process.env};delete env.NODE_TEST_CONTEXT;
+  const r=spawnSync(process.execPath,[path.join(root,'scripts/test-channel-poc-runtime.mjs'),root],{env,encoding:'utf8',timeout:60000,maxBuffer:2000000});
+  assert.ifError(r.error);assert.equal(r.status,0,r.stdout+r.stderr);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('current equal-equity release is idempotent; modified allocation remains an atomic refusal',()=>{
+ for(const kind of ['current','constant','budget']){const root=fixture('deployed');try{
+  const file=path.join(root,'lib/confirmed-risk-sizing.mjs');let s=fs.readFileSync(new URL('../lib/confirmed-risk-sizing.mjs',import.meta.url),'utf8');
+  if(kind==='constant')s=s.replace('CURRENT_EQUITY_EQUAL_FIVE_V1','CURRENT_EQUITY_EQUAL_FOUR_V1');
+  if(kind==='budget')s=s.replace('amount*stopLossPct/100:','amount*stopLossPct/200:');
+  fs.writeFileSync(file,s);
+  const files=[...new Set(patches.map(p=>p.file))],snapshot=files.map(f=>[f,fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null]);
+  if(kind==='current'){patchChannelPoc(root,patches);patchChannelPoc(root,patches);assert.equal(fs.readFileSync(file,'utf8'),s);}
+  else{assert.throws(()=>patchChannelPoc(root,patches),/confirmed-risk-sizing.*no files changed/);for(const [f,original]of snapshot)assert.equal(fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null,original);}
+ }finally{fs.rmSync(root,{recursive:true,force:true});}}
+});
 for(const old of [false,true,'deployed'])test('POC installer atomically migrates '+(old==='deployed'?'actual VPS POC selector':old?'published Binance-only':'shared')+' policy, retains exits and passes installed execution tests',()=>{
  const root=fixture(old);try{
   const server=fs.readFileSync(path.join(root,'server.mjs'),'utf8'),file=path.join(root,'lib/futures-short-policy.mjs'),before=fs.readFileSync(file,'utf8');
