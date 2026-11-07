@@ -8,6 +8,15 @@ export function readPrePocSource(file,...args){
   const relative=path.relative(root,path.resolve(original)),candidate=path.join(fixtures,relative);
   if(relative.startsWith('lib/')&&fs.existsSync(candidate))return fs.readFileSync(candidate,...args);
  }
- return fs.readFileSync(file,...args);
+ const data=fs.readFileSync(file,...args);
+ if(typeof data!=='string')return data;
+ const basename=typeof original==='string'?path.basename(original):'';
+ if(!['server.mjs','futures-short-runner.mjs','wyckoff-five-minute-data.mjs'].includes(basename))return data;
+ const patches=JSON.parse(fs.readFileSync(new URL('../../scripts/poc-fast-watch-patches.json',import.meta.url),'utf8'));
+ // Reverse only exact reviewed additions for legacy installer fixtures, including
+ // their temporary copies. Current trading tests use node:fs directly.
+ let text=data;
+ for(const p of [...patches].reverse())if(p.before&&path.basename(p.file)===basename&&text.split(p.after).length===2)text=text.replace(p.after,p.before);
+ return text;
 }
 export const prePocFs={...fs,readFileSync:readPrePocSource};

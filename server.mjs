@@ -2,6 +2,8 @@ import {PocPaperService} from './lib/poc-paper-service.mjs';
 import {BinancePoc} from './lib/binance-poc.mjs';
 import {createTradingPnlReader} from './lib/binance-trading-pnl-reader.mjs';
 import {FuturesShortAPI} from './lib/futures-short-api.mjs';
+import {appendClosedFiveMinuteBar} from './lib/wyckoff-five-minute-data.mjs';
+import {PocFastWatch,createPocFastLane,POC_FAST_WATCH_POLICY} from './lib/poc-fast-watch.mjs';
 import {FuturesShortRunner} from './lib/futures-short-runner.mjs';
 import {shortConfig} from './lib/futures-short-policy.mjs';
 import {channelEntryConfig,assertChannelSubmission} from './lib/channel-primary-entry.mjs';
@@ -1238,6 +1240,8 @@ function startMarketStream(){
           const previous=streams[s]?.channelBar,eventAt=Number(m.E);
           if(streams[s]&&Number.isFinite(eventAt)&&(!previous||candle.openTime>previous.openTime||candle.openTime===previous.openTime&&eventAt>=previous.receivedAt)){
             streams[s].channelBar={...candle,closeTime:candle.closeTime+1,receivedAt:eventAt};
+            const advanced=appendClosedFiveMinuteBar(dailyCandleCache.get(s),candle,Date.now());
+            if(advanced)dailyCandleCache.set(s,advanced);
           }
           return;
         }
@@ -1319,13 +1323,17 @@ function backtestWindow(candles,{initial=5000}={}){
   return {...r,initial,finalValue:r.value*initial/10000,closedTrades:sells.length,maxDrawdownPct:-r.maxDrawdown,openPosition:buys.length>sells.length,trades:r.journal,strategyId:'WYCKOFF_D1_V1'};
 }
 
+const candleLoads=new Map();
 async function candles(s,{force=false}={}){
   const now=Date.now(),bucket=Math.floor(now/FIVE_MINUTE_MS);
   const cached=dailyCandleCache.get(s);
   if(!force&&cached&&cached.bucket===bucket)return cached.rows;
-  const rows=await loadFiveMinuteBars(j,s,now);
-  dailyCandleCache.set(s,{at:now,bucket,rows});
-  return rows;
+  const existing=candleLoads.get(s);if(existing?.bucket===bucket)return existing.pending;
+  const pending=loadFiveMinuteBars(j,s,now).then(rows=>{
+    if((dailyCandleCache.get(s)?.bucket??-1)<=bucket)dailyCandleCache.set(s,{at:now,bucket,rows});
+    return rows;
+  }).finally(()=>{if(candleLoads.get(s)?.pending===pending)candleLoads.delete(s);});
+  candleLoads.set(s,{bucket,pending});return pending;
 }
 
 function markPaperToMarket(){
@@ -1538,7 +1546,14 @@ function scoreStrategy(st){
 }
 
 const rsiSearchBoundaries=createSearchBoundaries(process.env.BINANCE_RSI_SEARCH_BOUNDARIES_FILE||'/var/data/binance-rsi-search-boundaries.json');
-async function evaluateSymbol(s){
+const spotPocWatch=new PocFastWatch();
+const symbolEvaluations=new Map();
+function evaluateSymbol(s){
+ if(symbolEvaluations.has(s))return symbolEvaluations.get(s);
+ const pending=evaluateSymbolOnce(s).finally(()=>{if(symbolEvaluations.get(s)===pending)symbolEvaluations.delete(s);});
+ symbolEvaluations.set(s,pending);return pending;
+}
+async function evaluateSymbolOnce(s){
   try{
     let p=tradingPositions()[s]||null;
     let used=paper.actionLog.filter(a=>a.type==='BUY'&&a.symbol===s).map(a=>a.patternId);
@@ -1557,6 +1572,7 @@ async function evaluateSymbol(s){
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
     const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:mode==='live'&&channelPrimary.requested?streams[s]?.channelBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
+    if(mode==='live'&&!p)spotPocWatch.observe(s,ev.entryDecisions?.channel);else spotPocWatch.remove(s);
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
     if(ev.wyckoffTrade)ev.wyckoffTrade.exitSettings={...tradeSettings.values};
     if(!p&&mode==='live'){recordStrategyObservation(strategyReviewState,{symbol:s,bars:entryBars,at:Date.now(),price:livePrice,comparison:ev.comparison,version:ENTRY_POLICY_VERSION});saveStrategyReview();}
@@ -2143,6 +2159,12 @@ async function refreshUniverse(){
 }
 
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
+const spotPocFastLane=createPocFastLane({watch:spotPocWatch,symbols:()=>SYMBOLS.filter(s=>!liveManagedPositions()[s]),
+ enabled:()=>mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused&&liveStateHealth.journalReady,
+ eligible:row=>{try{const price=requireLivePrice(streams[row.symbol],Date.now(),15000);return row.sides.some(s=>s.side==='LONG'&&price<=s.poc);}catch{return false;}},
+ evaluate:evaluateSymbol,execute:maybeExecuteLive});
+setInterval(()=>spotPocFastLane.tick().catch(error=>console.error('POC fast watch',error.message)),1000).unref();
+
 // Read-only MA context for held assets. Independent of the one-second risk loop;
 // at most one cached five-minute history refresh per held symbol per bar.
 let maContextBusy=false;
@@ -2480,6 +2502,7 @@ const server=http.createServer((req,res)=>{
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
+      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
@@ -2668,6 +2691,7 @@ const server=http.createServer((req,res)=>{
         persistentState:true,
         demoExitMonitorIntervalMs:5000,
         decisionIntervalMs:DECISION_INTERVAL_MS,
+        pocFastWatch:spotPocWatch.snapshot(SYMBOLS),
         rsiExitEnabled:false,
         rsiPeriod:14,
         qualityPolicy:QUALITY_POLICY,
