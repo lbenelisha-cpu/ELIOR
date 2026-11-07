@@ -327,15 +327,15 @@ if barstate.islast
         for bin = 0 to 31
             float v = array.get(vpVolumes,bin)
             if v > 0
-                int right = histogramLeft+math.max(1,int(math.round(10*v/largest)))
+                int right = histogramLeft+math.max(1,int(math.round(math.min(10,math.max(1,vpB-vpA))*v/largest)))
                 color c = vpLow+(bin+0.5)*step == vpPoc ? color.yellow : color.new(color.aqua,65)
                 array.push(vpBoxes,box.new(histogramLeft,vpLow+(bin+1)*step,right,vpLow+bin*step,border_color=color.new(c,100),bgcolor=c))
         array.push(vpLines,line.new(vpB,vpPoc,bar_index+2,vpPoc,color=color.yellow,width=2,style=line.style_dashed))
         for band = 0 to 1
             float edge = band == 0 ? vpLower : vpUpper
             array.push(vpLines,line.new(vpChannelStart,edge+vpSlope*(vpChannelStart-vpFirst),bar_index,edge+vpSlope*(bar_index-vpFirst),color=color.orange,width=2))
-        array.push(vpLabels,label.new(vpA,vpPriceA,"A · wave base",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
-        array.push(vpLabels,label.new(vpB,vpPriceB,"B · wave extreme",style=label.style_label_left,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=vpSide == 1 ? label.style_label_up : label.style_label_down,color=color.new(color.blue,50),textcolor=color.white))
+        array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=vpSide == 1 ? label.style_label_down : label.style_label_up,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
         bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
         bool returned = bar_index > vpB and (vpSide == 1 ? high <= vpPriceB : low >= vpPriceB) and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
