@@ -2650,7 +2650,7 @@ const server=http.createServer((req,res)=>{
       tradeControl,
       symbols:SYMBOLS,
       streams,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Number(streams[a.symbol]?.lastEventAt):null}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Date.parse(streams[a.symbol]?.lastEventAt):null}};}),
       paper:accountSnapshot(),
       universeStatus,
       universeError,
@@ -2734,7 +2734,7 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-agent/evaluate'&&req.method==='POST'){
     evalAll().then(()=>send(res,{
       ok:true,
-      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Number(streams[a.symbol]?.lastEventAt):null}};}),
+      agents:Object.values(agents).map(a=>{const p=tradingPositions()[a.symbol];if(!p)return mode==='live'&&a.position==='LONG'?{...a,position:'CASH',decision:'HOLD',strategy:{...a.strategy,qty:0,entryPrice:null,brokerProtection:null}}:a;let price;try{price=requireLivePrice(streams[a.symbol]);wyckoffExit(p,price);}catch{}return {...a,position:'LONG',strategy:{...a.strategy,...p,price:price??a.strategy?.price,positionQuoteAt:price!=null?Date.parse(streams[a.symbol]?.lastEventAt):null}};}),
       paper:accountSnapshot()
     })).catch(e=>send(res,{ok:false,error:e.message},502));
     return;

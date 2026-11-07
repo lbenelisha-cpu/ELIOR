@@ -56,6 +56,27 @@ test('unverified broker stops are not advertised as verified while planned exit 
   const s=fixture();mutate(s.agent.agents[0].strategy);const r=build(s,'TAOUSDT',now);assert.equal(r.ok,true);assert.equal(r.brokerStop,0);
  }
 });
+test('legacy null quote time uses only a fresh connected stream with the same price and keeps its original age',()=>{
+ const s=fixture(),p=s.agent.agents[0].strategy;
+ p.positionQuoteAt=null;s.agent.streams={TAOUSDT:{status:'connected',lastPrice:p.price,lastEventAt:new Date(now-3000).toISOString()}};
+ assert.equal(build(s,'TAOUSDT',now).at,now-3000);
+ for(const mutate of [x=>x.agent.streams.TAOUSDT.status='connecting',x=>x.agent.streams.TAOUSDT.lastPrice=106,
+   x=>x.agent.streams.TAOUSDT.lastEventAt=new Date(now-90001).toISOString(),x=>x.agent.streams.TAOUSDT.lastEventAt=new Date(now+1).toISOString(),
+   x=>x.agent.streams={},x=>x.agent.agents[0].staleData=true,x=>x.agent.agents[0].strategy.positionQuoteAt=now-MAX_AGE-1]){
+  const bad=structuredClone(s);mutate(bad);assert.equal(build(bad,'TAOUSDT',now).ok,false,String(mutate));
+ }
+ s.receivedAt=now+90001;assert.equal(build(s,'TAOUSDT',now+90001).ok,false);
+});
+test('both live API position projections serialize the ISO stream timestamp as finite milliseconds',()=>{
+ const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+ const maps=[...server.matchAll(/agents:Object\.values\(agents\)\.map\(a=>\{const p=tradingPositions\(\)\[a\.symbol\];[^\n]+/g)];
+ assert.equal(maps.length,2);
+ for(const [line] of maps){
+  const expression=line.slice('agents:'.length).replace(/,$/,'');
+  const rows=vm.runInNewContext(expression,{agents:{TAOUSDT:{symbol:'TAOUSDT',strategy:{}}},tradingPositions:()=>({TAOUSDT:{qty:2}}),streams:{TAOUSDT:{lastEventAt:new Date(now-1000).toISOString()}},requireLivePrice:()=>105,wyckoffExit(){},mode:'live'});
+  const serialized=JSON.parse(JSON.stringify(rows));assert.equal(serialized[0].strategy.positionQuoteAt,now-1000);
+ }
+});
 test('UI copy is read-only, rechecks freshness, handles clipboard denial and clears the prior symbol',async()=>{
  let clock=now,callback,copied=0;
  const node=()=>({children:[],textContent:'',value:'',classList:{add(){}},append(...items){this.children.push(...items);},setAttribute(){},focus(){},select(){},isConnected:true});
