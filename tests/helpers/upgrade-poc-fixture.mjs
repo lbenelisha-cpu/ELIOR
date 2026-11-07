@@ -9,8 +9,12 @@ export function upgradePocFixture(root){
  patchChannelPoc(root,poc);
 }
 
-export function prepareLegacyPocHelpers(root,patches){
+export function prepareLegacyPocHelpers(root,patches,{installedRisk=false}={}){
  // Fixture-only: today's support files are copied beside historical policies.
  // Restore each original helper from that installer's immutable manifest.
  for(const p of patches.filter(p=>p.before===null))fs.writeFileSync(root+'/'+p.file,p.after);
+ // Historical installer tests must use the historical risk helper, not today's allocation policy.
+ let risk=fs.readFileSync(new URL('../fixtures/pre-poc/lib/confirmed-risk-sizing.mjs',import.meta.url),'utf8');
+ if(installedRisk)for(const p of patches.filter(p=>p.file==='lib/confirmed-risk-sizing.mjs'))risk=risk.replace(p.before,p.after);
+ fs.writeFileSync(root+'/lib/confirmed-risk-sizing.mjs',risk);
 }

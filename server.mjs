@@ -42,7 +42,7 @@ import {DeviceControlSessions} from './lib/binance-device-auth.mjs';
 import {BINANCE_ENTRY_RSI,BINANCE_HOURLY_TREND_FILTER as HOURLY_TREND_RULE} from './lib/binance-quality-policy.mjs';
 import {LiveExecutionLock} from './lib/live-execution-lock.mjs';
 import {manualTradeInput,manualBuyAmount,manualPosition,manualSellQuantity,ManualTradeRequests} from './lib/binance-manual-trades.mjs';
-import {liveNextBuyAllocation} from './lib/live-buy-allocation.mjs';
+import {liveNextBuyAllocation,liveEquityAllocation,LIVE_EQUITY_ALLOCATION,LIVE_BUY_FEE_RESERVE} from './lib/live-buy-allocation.mjs';
 import {kellyLearningReport,KELLY_RULESET} from './lib/binance-kelly.mjs';
 import {MarketWatch,recordedEntryAudit} from './lib/binance-market-watch.mjs';
 import {QUALITY_POLICY,STABLE_BASES,ENTRY_POLICY_VERSION,assessQualityEntry,atr14,atrPolicy} from './lib/binance-quality-policy.mjs';
@@ -567,6 +567,16 @@ function liveRealizedPnl(actions){
   }
   return realized;
 }
+function currentLiveAllocation(total){
+  const allocation=liveEquityAllocation(total,LIVE_MAX_POSITIONS);
+  if(!allocation)return null;
+  try{liveRealizedPnl(liveActionLog);}
+  catch(error){
+    if(!['LIVE_REALIZED_FEE_VALUATION_REQUIRED','LIVE_ACCOUNT_RECONCILIATION_REQUIRED'].includes(error.message))throw error;
+    return {...allocation,realizedPnlComplete:false,profitReinvestmentPaused:false,allocationWarning:error.message};
+  }
+  return {...allocation,realizedPnlComplete:true,profitReinvestmentPaused:false};
+}
 function fixedLiveAllocation(total){
   if(!liveAllocation&&fs.existsSync(LIVE_ALLOCATION_FILE)){
     liveAllocation=JSON.parse(fs.readFileSync(LIVE_ALLOCATION_FILE,'utf8'));
@@ -831,7 +841,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     quoteUsdt=allocation.amountUsdt;
   }
   if(reason!=='MANUAL_BUY'&&meta.wyckoffTrade?.riskInput){
-    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,meta.wyckoffTrade.riskInput);
+    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,{...meta.wyckoffTrade.riskInput,allocationMode:funding.allocationMode});
     if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};
   }
@@ -1083,7 +1093,7 @@ async function getLiveAccountSnapshot(){
 
   const usdt=balances.find(x=>x.asset==='USDT')||{asset:'USDT',free:0,locked:0,qty:0,usdtPrice:1,valueUsdt:0};
   const totalValueUsdt=balances.reduce((sum,x)=>sum+(Number.isFinite(x.valueUsdt)?x.valueUsdt:0),0);
-  const fixedAllocation=fixedLiveAllocation(totalValueUsdt);
+  const fixedAllocation=currentLiveAllocation(totalValueUsdt);
 
   const snapshot={
     connected:true,
@@ -1102,8 +1112,8 @@ async function getLiveAccountSnapshot(){
     realizedPnlComplete:fixedAllocation?.realizedPnlComplete!==false,
     profitReinvestmentPaused:fixedAllocation?.profitReinvestmentPaused===true,
     allocationWarning:fixedAllocation?.allocationWarning??null,
-    allocationMode:'FIXED_EQUAL_LAST_REMAINDER',
-    nextBuyAllocation:liveNextBuyAllocation({balances,usdtFree:usdt.free,fixedPositionUsdt:fixedAllocation?.positionUsdt},{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT}),
+    allocationMode:LIVE_EQUITY_ALLOCATION,
+    nextBuyAllocation:liveNextBuyAllocation({balances,usdtFree:usdt.free,totalValueUsdt,allocationMode:LIVE_EQUITY_ALLOCATION,fixedPositionUsdt:fixedAllocation?.positionUsdt},{maxPositions:LIVE_MAX_POSITIONS,maxOrderUsdt:LIVE_MAX_USDT}),
     maxPositions:LIVE_MAX_POSITIONS,
     permissions:Array.isArray(acct.permissions)?acct.permissions:[],
     makerCommission:acct.makerCommission,
@@ -2505,6 +2515,7 @@ const server=http.createServer((req,res)=>{
       pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
+      allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
