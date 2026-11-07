@@ -38,8 +38,14 @@
   {
     "id": "server-7",
     "file": "server.mjs",
-    "before": "      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocTrading:{version:1},\n      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n",
-    "after": "      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n      pocTrading:{version:1},\n      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n"
+    "before": "    return send(res,{\n      mode,\n",
+    "after": "    return send(res,{\n      mode,\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n",
+    "scope": {
+      "start": "  if(u.pathname==='/api/binance-mode'&&req.method==='GET'){\n",
+      "end": "  if(u.pathname==='/api/binance-mode'&&req.method==='POST'){\n"
+    },
+    "installedMarker": "      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n",
+    "propertyName": "pocFastWatch"
   },
   {
     "id": "server-8",
