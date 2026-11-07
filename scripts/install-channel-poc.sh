@@ -20,7 +20,7 @@ if ! node "$stage/release/scripts/patch-channel-poc.mjs" "$stage/runtime"; then
  exit 1
 fi
 ln -s /opt/levi-binance/node_modules "$stage/runtime/node_modules"
-files=(channel-poc-model.js lib/channel-poc-entry.mjs lib/channel-primary-entry.mjs lib/futures-short-policy.mjs lib/channel-profit-protection.mjs lib/wyckoff-evaluation.mjs lib/confirmed-risk-sizing.mjs)
+files=(channel-poc-model.js lib/poc-fast-watch.mjs lib/channel-poc-entry.mjs lib/channel-primary-entry.mjs lib/futures-short-policy.mjs lib/channel-profit-protection.mjs lib/wyckoff-evaluation.mjs lib/confirmed-risk-sizing.mjs)
 for file in "${files[@]}"; do node --check "$stage/runtime/$file"; done
 echo 'Checking behavior against the staged installed runtime, including local server integrations.'
 if ! node "$stage/release/scripts/test-channel-poc-runtime.mjs" "$stage/runtime"; then

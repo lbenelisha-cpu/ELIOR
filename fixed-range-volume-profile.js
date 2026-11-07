@@ -1,5 +1,5 @@
 import './channel-poc-model.js?v=20261107-poc';
-import {drawPocModel} from './channel-poc-overlay.js?v=20261107-poc';
+import {drawPocModel} from './channel-poc-overlay.js?v=20261107-poc-v2';
 const NS='http://www.w3.org/2000/svg';
 const PROFILE_BINS=32;
 const fmt=value=>Number(value).toLocaleString('en-US',{maximumSignificantDigits:8});

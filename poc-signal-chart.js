@@ -1,4 +1,4 @@
-import {drawPocModel} from './channel-poc-overlay.js?v=20261107-poc';
+import {drawPocModel} from './channel-poc-overlay.js?v=20261107-poc-v2';
 // A read-only chart of the exact market bars from the server's signal report.
 // Futures evidence is never painted over the Spot candles.
 export function drawSignalChart(host,{symbol,market,conditions},now=Date.now()){

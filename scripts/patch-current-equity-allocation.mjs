@@ -17,7 +17,9 @@ export function patchCurrentEquityAllocation(root){
    source=source.replace(p.before,p.after);
   }else{
    if(source===p.after)continue;
-   if(source!==p.before)fail();
+   const alternatives=p.alternatives||[];
+   if(!Array.isArray(alternatives)||alternatives.some(v=>typeof v!=='string'||!v))fail();
+   if(source!==p.before&&!alternatives.includes(source))fail();
    source=p.after;
   }
   staged.set(p.file,source);

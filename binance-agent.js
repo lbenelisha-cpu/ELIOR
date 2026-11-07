@@ -44,7 +44,7 @@ let chartCandles=[];
 let chartDecisions=[];
 let chartWorkbench=null;
 let fixedRangeProfile=null;
-import('./fixed-range-volume-profile.js?v=20261107-poc').then(({createFixedRangeVolumeProfile})=>{
+import('./fixed-range-volume-profile.js?v=20261107-poc-v2').then(({createFixedRangeVolumeProfile})=>{
  fixedRangeProfile=createFixedRangeVolumeProfile({host:$('#priceChart').parentElement,toolbarHost:$('#chartTools')});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
@@ -202,7 +202,7 @@ let tradingRulesSnapshot=null;
 function tradingRuleLines(s){
  const p=s?.channelPrimary,e=s?.exitSettings||{},lines=[];
  const n=v=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))?Number(v):null;
- if(s?.mode==='live'&&p?.requested&&p.version==='CHANNEL_POC_RETEST_V1'){
+ if(s?.mode==='live'&&p?.requested&&['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(p.version)){
   lines.push('LONG · תעלת קיצון + פרופיל נפח + חזרה ל־POC · '+(p.enabled?'מופעל':'כבוי'));
   lines.push('ארבעה תנאים: שתי נגיעות בכל גבול; דשדוש בתחילת התעלה בחלק התחתון או האמצעי; פריצה; חזרה מלמעלה ל־POC.');
   lines.push('טווח הפרופיל: A בבסיס הגל האחרון; B מתקדם עם שיא הגל בנרות סגורים עד החזרה הראשונה ל־POC. גל חדש מקבל טווח חדש. POC משוער מנפח הנרות.');
@@ -214,8 +214,8 @@ function tradingRuleLines(s){
  else lines.push('ממתין לאימות כללי הכניסה מהשרת.');
  lines.push('הגדרות יציאה לכניסות חדשות: סטופ '+(n(e.stopLossPct)??'—')+'% · הפעלת הגנה '+(n(e.profitActivationPct)??'—')+'% · מרחק נגרר '+(n(e.trailingGapPp)??'—')+' נקודות אחוז ממחיר הכניסה. לפוזיציה קיימת יש לבדוק את הסטופ והיעד המתועדים שלה. המחירים לפני עמלות.');
  const f=s?.shortTrading?.policy;
- if(f?.entryPolicyVersion==='CHANNEL_POC_RETEST_V1')lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
- if(f&&f.entryPolicyVersion!=='CHANNEL_POC_RETEST_V1')lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');
+ if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(f&&!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f.entryPolicyVersion))lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');
  return lines;
 }
 function renderTradingRules(s){

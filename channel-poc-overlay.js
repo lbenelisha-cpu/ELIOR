@@ -3,7 +3,7 @@ const NS='http://www.w3.org/2000/svg';
 const fmt=n=>Number(n).toLocaleString('en-US',{maximumSignificantDigits:7});
 export function drawPocModel(svg,config,model){
  const {bars,bounds,x,y}=config,p=model?.profile,c=model?.channel;
- if(model?.version!=='CHANNEL_POC_RETEST_V1'||!p||!c)return false;
+ if(!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(model?.version)||!p||!c)return false;
  const add=(tag,attrs,text,parent=svg)=>{const e=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);if(text)e.textContent=text;parent.append(e);return e;};
  const times=bars.map(b=>Number(b.time??b.openTime)),timeIndex=t=>{
   const i=times.indexOf(t);if(i>=0)return i;

@@ -1,5 +1,5 @@
 //@version=6
-indicator("LEVI · Channel + Fixed Range POC", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=80, max_bars_back=500)
+indicator("LEVI · Channel + Fixed Range POC", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=160, max_bars_back=500)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
 int n = input.int(50, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
