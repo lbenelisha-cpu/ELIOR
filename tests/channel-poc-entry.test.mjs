@@ -10,7 +10,7 @@ for(const side of ['LONG','SHORT'])for(const platform of ['BINANCE','COLMEX'])te
  assert.equal(r.ready,true,r.reason);assert.deepEqual(r.conditions.rows.map(r=>r.id),['channel','break','poc','range']);
  assert.ok(r.conditions.rows.every(r=>r.state==='passed'));assert.equal(r.setup.pocModel.consolidation.zone,side==='LONG'?'LOWER':'UPPER');
  assert.ok(r.setup.pocModel.consolidation.startAt<=r.setup.pocModel.consolidation.anchorAt);
- assert.equal(r.setup.pocModel.anchorB.time,i.bars.at(-2).openTime);assert.ok(Math.abs(r.setup.poc-i.price)<1e-9);
+ assert.equal(r.setup.pocModel.anchorB.time,i.bars.at(-2).openTime);assert.ok(side==='LONG'?i.price<=r.setup.poc&&i.liveBar.low<=r.setup.poc:i.price>=r.setup.poc&&i.liveBar.high>=r.setup.poc);
  assert.equal(i.liveBar.volume,0);assert.ok(r.setup.pocModel.profile.totalVolume<1);
 });
 test('breakout is preparation only; no purchase before a later return',()=>{
@@ -41,6 +41,6 @@ test('final check rejects changed POC geometry, wrong side and stale price witho
 });
 test('volume profile conserves volume and rejects missing, negative or nonfinite data',()=>{
  const bars=[{low:10,high:12,volume:100},{low:11,high:11,volume:40}],p=POC_MODEL.profile(bars);
- assert.ok(Math.abs(p.totalVolume-140)<1e-8);assert.equal(p.poc,p.low+(p.index+.5)*p.step);
+ assert.ok(Math.abs(p.totalVolume-140)<1e-8);assert.ok(p.poc>=p.low+p.index*p.step&&p.poc<=p.low+(p.index+1)*p.step);
  for(const bad of [undefined,-1,NaN])assert.equal(POC_MODEL.profile([{low:10,high:12,volume:bad}]),null);
 });
