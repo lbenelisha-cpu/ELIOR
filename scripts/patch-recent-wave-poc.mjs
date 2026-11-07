@@ -13,7 +13,7 @@ export function patchRecentWavePoc(root){
    const file=path.join(stage,p.file);if(!fs.existsSync(file))throw Error('Missing '+p.file+'; no files changed');
    let source=fs.readFileSync(file,'utf8');
    if(p.fragment){if(source.split(p.after).length===2)source=source.replace(p.after,p.before);if(source.split(p.before).length!==2)throw Error('Unknown '+p.file+' wave context; no files changed');}
-   else {if(source===p.after)source=p.before;if(source!==p.before)throw Error('Unknown '+p.file+' wave version; no files changed');}
+   else {const previous=p.previous||[];if(!Array.isArray(previous)||previous.some(v=>typeof v!=='string'||!v))throw Error('Invalid prior wave source');if(source===p.after||previous.includes(source))source=p.before;if(source!==p.before)throw Error('Unknown '+p.file+' wave version; no files changed');}
    fs.writeFileSync(file,source);
   }
   patchPocFastWatch(stage,fast);

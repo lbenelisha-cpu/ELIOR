@@ -2,7 +2,7 @@ import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colm
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
 import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
-import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-rollover';
+import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-poc-v2';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
@@ -18,7 +18,7 @@ const simulationWyckoffHistory=s=>paperUI?.simulationWyckoffHistory(s)||[];
 import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261104-frvp';
 import {createChartTimeNavigation} from './chart-time-navigation.js?v=20261101-chart-terminal';
-import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261107-poc';
+import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261107-poc-v2';
 import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261029-higher-recovery';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';

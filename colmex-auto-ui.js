@@ -1,4 +1,4 @@
-import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261106-consolidation';
+import {renderColmexStrategy} from './lib/colmex-strategy-view.mjs?v=20261107-poc-v2';
 import {entryReasonLabel as reason} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
 import {monitorView} from './lib/colmex-monitor-view.mjs?v=20261029-higher-recovery';
 const badge=document.getElementById('autoLiveBadge'),status=document.getElementById('autoLiveStatus'),positions=document.getElementById('autoLivePositions'),checks=document.getElementById('autoLiveChecks');
