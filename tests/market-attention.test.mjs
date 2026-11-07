@@ -24,9 +24,8 @@ test('observers use the entry window and confirmed geometry, exclude open candle
  const b=bars();Object.assign(b.at(-1),{volume:2000});
  // A neutral pre-entry range lets the entry and observer geometry be compared.
  for(const [i,bar] of b.slice(-3).entries()){const p=104.05+(i===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
- const config=channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_CHANNEL_PRIMARY_AFTER:new Date(end-STEP).toISOString()});
- const entry=channelEntry({bars:b,price:106,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+STEP,open:105,high:106.1,low:104.9,close:106,volume:2000,closed:false,receivedAt:now}},config);assert.equal(entry.ready,true,entry.reason);
- const o=technicalObservation({symbol:'ETHUSDT',bars:b,at:now});assert.equal(o.period,50);assert.equal(o.dataAt,end);assert.equal(o.channel.upper,entry.setup.level);assert.equal(o.channel.lowTouches,entry.setup.lowTouches);assert.equal(o.channel.highTouches,entry.setup.highTouches);assert.equal(o.volume.ratio,2);assert.equal(o.volume.basis,'LAST_CLOSED_BAR');assert.equal(o.regression.slope,entry.setup.regressionSlope);
+ // The observer is a current-window measurement, not the frozen POC entry model.
+ const o=technicalObservation({symbol:'ETHUSDT',bars:b,at:now});assert.equal(o.period,50);assert.equal(o.dataAt,end);assert.ok(o.channel.upper>0);assert.ok(o.channel.lowTouches>=2);assert.ok(o.channel.highTouches>=2);assert.equal(o.volume.ratio,2);assert.equal(o.volume.basis,'LAST_CLOSED_BAR');assert.ok(Number.isFinite(o.regression.slope));
  const live={...b.at(-1),openTime:end,closeTime:end+STEP,closed:false,close:9999,high:10000};assert.deepEqual(technicalObservation({symbol:'ETHUSDT',bars:[...b,live],at:now}),o);
  const missing=structuredClone(b);delete missing.at(-1).volume;const m=technicalObservation({symbol:'ETHUSDT',bars:missing,at:now});assert.equal(m.volume.ratio,null);assert.ok(m.missing.includes('VOLUME_DATA'));
  for(const mutate of [x=>x.splice(-4,1),x=>x.at(-1).high=1,x=>x.push(x.at(-1)),x=>x.splice(0,160)]){const x=structuredClone(b);mutate(x);assert.equal(technicalObservation({symbol:'ETHUSDT',bars:x,at:now}).ready,false);}

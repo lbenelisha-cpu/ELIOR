@@ -1,3 +1,4 @@
+import {pocFixture} from './helpers/poc-channel-fixture.mjs';
 import fs from 'node:fs';import vm from 'node:vm';
 import {withLiveSafety} from './helpers/live-safety.mjs';
 import {sizeRisk} from '../lib/confirmed-risk-sizing.mjs';
@@ -10,52 +11,31 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {channelEntryConfig,channelEntry,assertChannelSubmission,assertChannelEntry} from '../lib/channel-primary-entry.mjs';
 import {evaluateDailyTrade,assertSpringEntryReady} from '../lib/wyckoff-evaluation.mjs';
 import {regularSession} from '../lib/colmex-market-hours.mjs';
-const D=300000,end=Date.parse('2026-10-30T15:00:00Z'),now=end+1000;
+const D=300000,end=Date.parse('2026-11-06T20:00:00Z'),now=end+1000;
 const config=(platform='BINANCE')=>channelEntryConfig({[platform+'_CHANNEL_PRIMARY_ENABLED']:'true',[platform+'_CHANNEL_PRIMARY_AFTER']:new Date(end-D).toISOString()},platform);
-function bars(platform='BINANCE'){
- let times=[];for(let t=end-8*86400000;t<end;t+=D)if(platform==='BINANCE'||regularSession(t))times.push(t);times=times.slice(-205);
- const b=times.map((t,i)=>{const p=100+i*.02+Math.cos(i*Math.PI/5);return {openTime:t,closeTime:t+D,open:p,close:p,high:p+.1,low:p-.1,volume:1000,closed:true};});
- // A completed central consolidation precedes the live breakout.
- for(const [j,bar] of b.slice(-3).entries()){const p=(104.05)+(j===1?.01:0);Object.assign(bar,{open:p,close:p,high:p+.1,low:p-.1});}
- return b;
-}
-const input=(platform='BINANCE')=>({symbol:'ABCUSDT',bars:bars(platform),price:106,priceAsOf:now,now,liveBar:{openTime:end,closeTime:end+D,open:105,close:106,low:104.9,high:106.1,volume:2000,closed:false,receivedAt:now},entryMode:'confirmed_quality',timeframe:'5m',allowEarlyWave:true});
-test('LONG records central consolidation and blocks a latest upper consolidation on both platforms',()=>{
- for(const platform of ['BINANCE','COLMEX']){
-  const i=input(platform),c=config(platform),good=channelEntry(i,c);
-  assert.equal(good.setup.consolidation.zone,'MIDDLE');
-  const trade={entryMode:'channel_breakout',patternId:good.setup.patternId,setup:good.setup};
-  assert.throws(()=>assertChannelSubmission(i,c,{...trade,setup:{...good.setup,consolidation:null}}),/CONSOLIDATION_CHANGED/);
-  for(let k=202;k<205;k++){const p=100+k*.02+Math.cos(k*Math.PI/5);Object.assign(i.bars[k],{open:p,close:p,high:p+.1,low:p-.1});}
-  const blocked=channelEntry(i,c);assert.equal(blocked.reason,'CHANNEL_CONSOLIDATION_SIDE_BLOCK');assert.equal(blocked.consolidation.zone,'UPPER');
-  assert.throws(()=>assertChannelSubmission(i,c,trade),/CONSOLIDATION_SIDE_BLOCK/);
- }
+function bars(){return pocFixture({end,entryPrice:106}).bars;}
+const input=()=>({...pocFixture({end,entryPrice:106}),symbol:'ABCUSDT',entryMode:'confirmed_quality',timeframe:'5m',allowEarlyWave:true});
+test('LONG records initial consolidation and refuses altered evidence at submission',()=>{
+ for(const platform of ['BINANCE','COLMEX']){const i=input(),c=config(platform),r=channelEntry(i,c);assert.equal(r.setup.consolidation.zone,'LOWER');
+ const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};
+ assert.throws(()=>assertChannelSubmission(i,c,{...trade,setup:{...r.setup,pocModel:null}}),/POC_MODEL_CHANGED/);}
 });
-test('channel primary uses frozen pre-breakout pivots, regression and settings on both platforms',()=>{
- for(const platform of ['BINANCE','COLMEX']){
-  const r=channelEntry(input(platform),config(platform));assert.equal(r.ready,true,r.reason);assert.ok(r.setup.lowTouches>=2&&r.setup.highTouches>=2);assert.ok(r.setup.regressionSlope>0);assert.ok(r.setup.level<106);assert.equal(r.setup.entryMode,'channel_breakout');
-  assert.doesNotThrow(()=>assertChannelEntry(r.setup,106,now,input(platform).liveBar));
- }
+test('channel primary freezes A–B and enters only on the POC return on both platforms',()=>{
+ for(const platform of ['BINANCE','COLMEX']){const i=input(),r=channelEntry(i,config(platform));assert.equal(r.ready,true,r.reason);assert.ok(r.setup.lowTouches>=2&&r.setup.highTouches>=2);assert.equal(r.conditions.rows.length,4);assert.equal(r.setup.pocModel.frozenAt,i.bars.at(-2).closeTime);assert.doesNotThrow(()=>assertChannelEntry(r.setup,106,now,i.liveBar));}
 });
 test('primary gate suppresses old routes, including invalid activation; exits remain independent',()=>{
  const i={...input(),priceAsOf:new Date(now).toISOString(),channelPrimary:config(),independentEntry:{enabled:true,enabledAfter:end-D},exitSettings:{stopLossPct:2,profitActivationPct:6,trailingGapPp:2}};
- const ev=evaluateDailyTrade(i);assert.equal(ev.entryConfirmed,true,ev.buyReason);assert.equal(ev.entryDecisions.selected,'channel_breakout');assert.equal(ev.wyckoffTrade.exitSettings.stopLossPct,2);assert.equal(ev.wyckoffTrade.exitSettings.profitActivationPct,6);assert.match(ev.wyckoffTrade.entryPolicyVersion,/CHANNEL_PRIMARY/);
+ const ev=evaluateDailyTrade(i);assert.equal(ev.entryConfirmed,true,ev.buyReason);assert.equal(ev.entryDecisions.selected,'channel_breakout');assert.equal(ev.wyckoffTrade.exitSettings.stopLossPct,2);assert.equal(ev.wyckoffTrade.exitSettings.profitActivationPct,6);assert.match(ev.wyckoffTrade.entryPolicyVersion,/CHANNEL_POC/);
  const bad=evaluateDailyTrade({...i,channelPrimary:channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true'})});assert.equal(bad.entryConfirmed,false);assert.equal(bad.buyReason,'CHANNEL_ACTIVATION_TIME_REQUIRED');
  const held=evaluateDailyTrade({...i,bars:[],position:ev.wyckoffTrade,exitEvaluator:()=>({sell:true,reason:'STOP'})});assert.equal(held.rawDecision,'SELL');
- assert.throws(()=>assertSpringEntryReady(ev.wyckoffTrade,100,now,i.liveBar),/INVALIDATED/);
+ assert.throws(()=>assertSpringEntryReady(ev.wyckoffTrade,107,now,i.liveBar),/INVALIDATED/);
 });
-test('stale, consumed, malformed, gapped, weak-volume, falling-regression and invalid live-price signals cannot buy',()=>{
+test('malformed or stale market data and duplicate return receipts block entries',()=>{
  const c=config(),i=input(),good=channelEntry(i,c);
- for(const mutate of [
-  x=>x.priceAsOf=now-15001,x=>x.bars.splice(150,1),x=>x.bars.push({...x.bars.at(-1)}),x=>x.bars.at(-1).high=1,
-  x=>x.bars.at(-1).closed=false,x=>x.liveBar.volume=1000,x=>x.entryAfter=end,x=>x.now=end+D,
-  x=>x.usedPatternIds=[good.setup.patternId],x=>x.liveBar.low=NaN,x=>x.liveBar=null,
-  x=>{x.bars=x.bars.map((b,i)=>({...b,open:b.open-i*.05,high:b.high-i*.05,low:b.low-i*.05,close:b.close-i*.05}));},
- ]){const x=structuredClone(i);mutate(x);assert.equal(channelEntry(x,c).ready,false);}
+ for(const mutate of [x=>x.priceAsOf=now-15001,x=>x.bars.splice(15,1),x=>x.bars.push({...x.bars.at(-1)}),x=>x.bars.at(-1).high=1,x=>x.bars.at(-1).closed=false,x=>x.entryAfter=end,x=>x.now=end+D,x=>x.usedPatternIds=[good.setup.patternId],x=>x.liveBar.low=NaN,x=>x.liveBar=null]){const x=structuredClone(i);mutate(x);assert.equal(channelEntry(x,c).ready,false);}
  assert.equal(channelEntry(i,{}).ready,false);
  const trade={entryMode:'channel_breakout',patternId:good.setup.patternId,setup:good.setup};assert.doesNotThrow(()=>assertChannelSubmission(i,c,trade));
  assert.throws(()=>assertChannelSubmission(i,c,{...trade,entryMode:'independent_breakout'}),/PRIMARY_REQUIRED/);
- assert.throws(()=>assertChannelSubmission(i,c,{...trade,setup:{...good.setup,level:1}}),/SIGNAL_CHANGED/);
 });
 
 function executor(overrides={}){
@@ -74,21 +54,21 @@ function executor(overrides={}){
 }
 
 test('Binance final order path preserves settings, protection and provenance and blocks cached old routes',async()=>{
- const good=executor();await good.run();assert.equal(good.writes.length,1);assert.equal(good.writes[0].meta.meta.wyckoffTrade.entryMode,'channel_breakout');assert.match(good.writes[0].meta.meta.wyckoffTrade.entryPolicyVersion,/CHANNEL_PRIMARY/);assert.equal(good.writes[0].meta.meta.wyckoffTrade.riskPlan.stopLossPct,1);assert.deepEqual(good.protectedSymbols,['ABCUSDT']);
+ const good=executor();await good.run();assert.equal(good.writes.length,1);assert.equal(good.writes[0].meta.meta.wyckoffTrade.entryMode,'channel_breakout');assert.match(good.writes[0].meta.meta.wyckoffTrade.entryPolicyVersion,/CHANNEL_POC/);assert.equal(good.writes[0].meta.meta.wyckoffTrade.riskPlan.stopLossPct,1);assert.deepEqual(good.protectedSymbols,['ABCUSDT']);
  for(const overrides of [
   {channelPrimary:config('COLMEX')},{channelPrimary:{requested:true,enabled:false}},
   {liveReadiness:()=>({ready:false})},{nativeProtection:{rows:{},uncertain:()=>true}},
   {tradeControl:{paused:true}},{getLiveAccountSnapshot:async()=>({balances:[],usdtFree:1})},
-  {streams:{ABCUSDT:{status:'connected',lastPrice:106,lastEventAt:new Date(now).toISOString(),channelBar:{...input().liveBar,volume:1}}}},
+  {streams:{ABCUSDT:{status:'connected',lastPrice:106,lastEventAt:new Date(now).toISOString(),channelBar:{...input().liveBar,volume:NaN}}}},
   {liveActionLog:[{symbol:'ABCUSDT',type:'SELL',at:new Date(now).toISOString()}]},
  ]){const x=executor(overrides);await assert.rejects(x.run);assert.equal(x.writes.length,0);}
  const old=executor();await assert.rejects(()=>old.context.placeLiveMarketBuy('ABCUSDT',20,'OLD_SIGNAL',{wyckoffTrade:{entryMode:'early_wave_confirmed'}}),/CHANNEL_PRIMARY_REQUIRED/);assert.equal(old.writes.length,0);
- const changed=executor();changed.context.candles=async()=>{changed.context.streams.ABCUSDT.lastPrice=100;return bars();};await assert.rejects(changed.run);assert.equal(changed.writes.length,0);
+ const changed=executor();changed.context.candles=async()=>{changed.context.streams.ABCUSDT.lastPrice=107;return bars();};await assert.rejects(changed.run);assert.equal(changed.writes.length,0);
 });
 function colmexFixture(){
  const state=initialState(end-D);state.cursor=AUTO_POLICY.symbols.indexOf('AAPL');
  const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:2000},positions:[],orders:[],history:[],historyAvailable:true});
- const history=()=>({barDetails:[...bars('COLMEX').map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume})),{t:end,o:105,h:106.1,l:104.9,c:106,v:2000}]});
+ const history=()=>({barDetails:[...bars(),input().liveBar].map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume}))});
  const b={writes:[],reads:0,snapshot:async()=>snapshot(),instruments:async()=>[{name:'AAPL',type:'EQUITY',tradableInstrumentId:1}],details:async()=>({quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000}),quote:async()=>({bp:106,ap:106.01}),history:async()=>{b.reads++;return history();},write:async(a,i)=>{b.writes.push(structuredClone(i));return {orderId:'offline'};}};
  const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123',COLMEX_CHANNEL_PRIMARY_ENABLED:'true',COLMEX_CHANNEL_PRIMARY_AFTER:new Date(end-D).toISOString()};
  return {state,b,snapshot,history,args:{state,broker:b,env,now:()=>now,deadline:now+27000,save:async()=>{}}};
@@ -102,8 +82,8 @@ test('Colmex submits exactly one protected channel intent and rechecks history a
   if(kind==='cash')f.b.snapshot=async()=>({...f.snapshot(),state:{availableCash:1}});
   if(kind==='permission')f.b.snapshot=async()=>({...f.snapshot(),account:{tradingRules:{}}});
   if(kind==='halt')f.state.halt='UNRESOLVED_ORDER_REQUIRES_REVIEW';
-  if(kind==='changed-signal')f.b.history=async()=>{const h=f.history();if(++f.b.reads>1)h.barDetails.at(-1).v=100;return h;};
-  if(kind==='changed-price'){let count=0;f.b.quote=async()=>++count===1?{bp:106,ap:106.01}:{bp:100,ap:100.01};}
+  if(kind==='changed-signal')f.b.history=async()=>{const h=f.history();if(++f.b.reads>1)h.barDetails.at(-1).v=undefined;return h;};
+  if(kind==='changed-price'){let count=0;f.b.quote=async()=>++count===1?{bp:106,ap:106.01}:{bp:107,ap:107.01};}
   if(kind==='save')f.args.save=async s=>{if(s.pending)throw Error('durability');};
   if(kind==='save')await assert.rejects(runCycle(f.args),/durability/);else await runCycle(f.args);
   assert.equal(f.b.writes.length,0,kind);
@@ -128,42 +108,25 @@ test('Colmex channel protection submits the frozen absolute target',async()=>{
  const f=colmexFixture();f.state.settings=values;await runCycle(f.args);assert.equal(f.b.writes.length,1,JSON.stringify(f.state.checks));assert.equal(f.b.writes[0].setup.channelProtection.version,'CHANNEL_TAKE_PROFIT_V2');assert.equal(f.b.writes[0].order.takeProfitType,'absolute');assert.ok(Math.abs(f.b.writes[0].order.takeProfit-f.b.writes[0].setup.channelProtection.targetPrice)<.011);
 });
 
-test('50 pre-breakout LONG bars suffice; recovered wick passes while current invalid price and expiry still block',()=>{
- for(const platform of ['BINANCE','COLMEX']){
-  const c=config(platform),i=input(platform);i.bars=i.bars.slice(-50);i.liveBar.low=100;
-  const r=channelEntry(i,c);assert.equal(c.period,50);assert.equal(r.ready,true,r.reason);
-  assert.deepEqual(r.setup,channelEntry({...i,bars:bars(platform)},c).setup);
-  const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};
-  assert.doesNotThrow(()=>assertChannelSubmission(i,c,trade));
-  const floor=Math.max(r.setup.level,r.setup.liveLevel,r.setup.regressionCenter);
-  for(const price of [floor,floor-.01])assert.throws(()=>assertChannelSubmission({...i,price},c,trade),/WAIT_CHANNEL_LIVE_BREAKOUT|REGRESSION_CENTER_BLOCK/);
-  assert.equal(channelEntry({...i,bars:i.bars.slice(1)},c).reason,'WAIT_CHANNEL_HISTORY');
-  assert.equal(channelEntry({...i,now:end+D,priceAsOf:end+D},c).reason,'WAIT_CHANNEL_LIVE_BAR');
-  assert.throws(()=>assertChannelEntry(r.setup,106,end+D,i.liveBar),/EXPIRED/);
- }
+test('LONG retains the fixed profile until a return and does not revive stale return data',()=>{
+ for(const platform of ['BINANCE','COLMEX']){const c=config(platform),i=input(),r=channelEntry(i,c);assert.equal(r.ready,true,r.reason);assert.equal(r.setup.pocModel.channel.barTimes.length,50);
+ const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};assert.doesNotThrow(()=>assertChannelSubmission(i,c,trade));
+ assert.throws(()=>assertChannelSubmission({...i,price:107},c,trade),/WAIT_POC_RETEST/);
+ assert.equal(channelEntry({...i,bars:i.bars.slice(-49)},c).reason,'WAIT_CHANNEL_HISTORY');
+ assert.throws(()=>assertChannelEntry(r.setup,106,end+D,i.liveBar),/WAIT_CHANNEL_LIVE_BAR/);}
 });
 test('LONG final order accepts a recovered wick and still installs protection',async()=>{
  const e=executor();e.context.streams.ABCUSDT.channelBar.low=100;await e.run();
  assert.equal(e.writes.length,1);assert.deepEqual(e.protectedSymbols,['ABCUSDT']);
 });
 
-test('LONG triggers before candle close from the live price and actual accumulated volume on both platforms',()=>{
- for(const platform of ['BINANCE','COLMEX']){
-  const i=input(platform),c=config(platform);i.now=end+120000;i.priceAsOf=i.now;i.liveBar.receivedAt=i.now;
-  // The history snapshot still reports a close below the live bid. No future
-  // closing price or projected end-of-bar volume is supplied to the strategy.
-  i.liveBar.close=105;i.liveBar.volume=1499;
-  assert.equal(channelEntry(i,c).reason,'CHANNEL_VOLUME_LOW');
-  i.liveBar.volume=1500;const r=channelEntry(i,c);assert.equal(r.ready,true,r.reason);
-  assert.ok(i.now<i.liveBar.closeTime);assert.equal(r.setup.signalTime,end);assert.equal(r.setup.signalExpiresAt,end+D);
-  assert.equal(r.setup.volumeRatio,1.5);assert.equal(c.waitForBreakoutClose,false);
-  assert.equal(r.setup.confirmation.price,106);assert.ok(i.bars.at(-1).close<r.setup.level);
-  const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};
-  const fresh={...i,now:i.now+1000,priceAsOf:i.now+1000,price:106.01,liveBar:{...i.liveBar,volume:1900,receivedAt:i.now+1000}};
-  const rechecked=assertChannelSubmission(fresh,c,trade);assert.equal(rechecked.setup.volumeRatio,1.9);assert.deepEqual(rechecked.setup.channelProtection,r.setup.channelProtection);
-  for(const patch of [{policyVersion:'CHANNEL_PRIMARY_BREAKOUT_V1'},{platform:'OTHER'},{signalTime:end-D},{period:100}])assert.throws(()=>assertChannelSubmission(fresh,c,{...trade,setup:{...r.setup,...patch}}),/SIGNAL_CHANGED/);
-  for(const patch of [{receivedAt:i.now-15001},{receivedAt:i.now+1},{volume:undefined},{volume:NaN},{volume:-1},{high:100},{closed:true},{closeTime:end+D-1},{openTime:end-D}])assert.equal(channelEntry({...i,liveBar:{...i.liveBar,...patch}},c).reason,'WAIT_CHANNEL_LIVE_BAR');
- }
+test('LONG triggers on the live POC return without minimum candle volume',()=>{
+ for(const platform of ['BINANCE','COLMEX']){const i=input(),c=config(platform);i.now=end+120000;i.priceAsOf=i.now;i.liveBar.receivedAt=i.now;i.liveBar.volume=0;
+ const r=channelEntry(i,c);assert.equal(r.ready,true,r.reason);assert.equal(r.setup.signalTime,end);
+ const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};
+ const fresh={...i,now:i.now+1000,priceAsOf:i.now+1000,liveBar:{...i.liveBar,volume:1900,receivedAt:i.now+1000}};
+ assert.deepEqual(assertChannelSubmission(fresh,c,trade).setup.pocModel,r.setup.pocModel);
+ for(const patch of [{receivedAt:i.now-15001},{receivedAt:i.now+1},{volume:undefined},{volume:NaN},{volume:-1},{high:100},{closed:true},{closeTime:end+D-1},{openTime:end-D}])assert.equal(channelEntry({...i,liveBar:{...i.liveBar,...patch}},c).reason,'WAIT_CHANNEL_LIVE_BAR');}
 });
 
 test('Colmex rechecks live volume and prevents stale or expired data from reaching the broker write',async()=>{

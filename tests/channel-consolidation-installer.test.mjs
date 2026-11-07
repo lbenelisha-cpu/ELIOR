@@ -1,7 +1,8 @@
+import {upgradePocFixture} from './helpers/upgrade-poc-fixture.mjs';
 import {restorePreParallelLayout} from './helpers/pre-parallel-entry-layout.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import {prePocFs as fs} from './helpers/pre-poc-source.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -51,6 +52,7 @@ test('consolidation installer is repeatable, rejects unknown context atomically 
   const releaseTest=new URL('./futures-short-installer.test.mjs',import.meta.url);
   const release=spawnSync(process.execPath,['--test',releaseTest.pathname],options);
   assert.ifError(release.error);assert.equal(release.status,0,release.stdout+release.stderr);
+  upgradePocFixture(dir);
   const tests=['channel-consolidation','channel-consolidation-entry','futures-short','futures-short-recovery','futures-short-fill'].map(f=>path.join(dir,'tests',f+'.test.mjs'));
   const run=spawnSync(process.execPath,['--test',...tests],options);
   assert.ifError(run.error);assert.equal(run.status,0,run.stdout+run.stderr);

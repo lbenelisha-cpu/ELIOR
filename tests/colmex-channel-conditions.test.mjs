@@ -5,7 +5,7 @@ import {colmexChannelConditions,colmexLiveTradeMarks,renderColmexChannelConditio
 import {CHANNEL_PRIMARY_POLICY} from '../lib/channel-primary-entry.mjs';
 
 const now=Date.parse('2026-11-03T19:00:00Z');
-const status={enabled:true,channelPrimary:{requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_long_short',channel:{ready:false}}}}};
+const status={enabled:true,channelPrimary:{version:CHANNEL_PRIMARY_POLICY.version,requested:true,enabled:true,enabledAfter:now-86400000},checks:{AAPL:{at:now-60000,reason:'WAIT_CHANNEL_TWO_TOUCHES',entryDecisions:{primary:'channel_long_short',channel:{ready:false}}}}};
 const channels={axis:new Map([[now-300000,300000]]),swing:{ready:true,highTouches:2,lowTouches:1,upper:333,lower:330,provisional:true},regression:{ready:true,slope:.1,middle:331.5}};
 test('consolidation rule is advertised only by the updated server and recorded blockers identify its zone',()=>{
  const current=structuredClone(status);current.channelPrimary.consolidationPolicy=CHANNEL_PRIMARY_POLICY.consolidationPolicy;
@@ -13,7 +13,7 @@ test('consolidation rule is advertised only by the updated server and recorded b
  current.checks.AAPL.entryDecisions.channel.consolidation={zone:'UPPER',bars:3,endAt:now-300000};
  const view=colmexChannelConditions({channels,status:current,symbol:'AAPL',now});
  assert.match(view.server,/מיקום הדשדוש אינו מתאים/);assert.match(view.server,/דשדוש עליון · 3 נרות/);
- assert.match(view.rules.join(' '),/אמצעי מאפשר את שני הכיוונים/);
+ assert.match(view.rules.join(' '),/אמצעי לשורט/);
  assert.doesNotMatch(colmexChannelConditions({channels,status,symbol:'AAPL',now}).rules.join(' '),/דשדוש לפני הכניסה/);
 });
 test('channel panel separates dynamic touch counts from the timestamped server decision and states actual entry requirements',()=>{
@@ -22,8 +22,7 @@ test('channel panel separates dynamic touch counts from the timestamped server d
  assert.match(view.server,/ממתין לשתי נגיעות מאושרות/);assert.match(view.server,/לא אישור כניסה בזמן הרענון/);
  assert.match(view.chartNote,/לתעלה המצוירת/);assert.match(view.levels,/333/);assert.match(view.center,/331.5/);
  assert.match(view.rules.join(' '),new RegExp(CHANNEL_PRIMARY_POLICY.period+' נרות'));
- assert.match(view.rules.join(' '),new RegExp(String(CHANNEL_PRIMARY_POLICY.minVolumeRatio).replace('.','\\.')));
- assert.equal(CHANNEL_PRIMARY_POLICY.minMeanDollarVolume,10000);assert.match(view.rules.join(' '),/10,000/);
+ assert.match(view.rules.join(' '),/חזרה מלמעלה ל־POC/);assert.equal(CHANNEL_PRIMARY_POLICY.minMeanDollarVolume,undefined);assert.doesNotMatch(view.rules.join(' '),/10,000|פי 1.5/);
  assert.doesNotMatch(JSON.stringify(view),/וויקוף|וואיקוף|התאוששות|Spring/);
  assert.equal(colmexChannelConditions({channels:{...channels,regression:{ready:true,slope:-.1}},now}).metrics[2][1],'יורדת');
 });
@@ -50,18 +49,16 @@ test('panel renders unknown metrics without stale cards and LIVE markup keeps on
  const doc={createElement:tag=>({tag,dataset:{},children:[],textContent:'',ownerDocument:doc,append(...nodes){this.children.push(...nodes);},replaceChildren(){this.children=[];}})};
  const host=doc.createElement('section');renderColmexChannelConditions(host,{channels,status,symbol:'AAPL',now});
  const text=n=>n.textContent+' '+n.children.map(text).join(' ');
- assert.match(text(host),/נגיעות למעלה/);assert.match(text(host),/נגיעות למטה/);assert.match(text(host),/פי 1.5/);
+ assert.match(text(host),/נגיעות למעלה/);assert.match(text(host),/נגיעות למטה/);assert.match(text(host),/POC/);
  renderColmexChannelConditions(host,{now});assert.doesNotMatch(text(host),/333|331.5/);assert.match(text(host),/לא זמין/);
  const html=readFileSync(new URL('../colmex-pro.html',import.meta.url),'utf8');
  assert.doesNotMatch(html,/id="(?:showWyckoffHistory|wyckoffSearchStatus|wyckoffOccurrenceStatus|closedMarketPreparation|resistancePatternStatus)"|כל שלב וואיקוף/);
  for(const id of ['chart','colmexChannelConditions','showColmexSwing','showColmexRegression','chartMarkLegend','colmexChartRisk','autoLiveChecks'])assert.ok(html.includes('id="'+id+'"'));
 });
 
-test('intrabar and previous-server requirements are described separately using reported policy',()=>{
- const current=structuredClone(status);current.channelPrimary.waitForBreakoutClose=false;
- const rules=colmexChannelConditions({status:current,now}).rules.join(' ');
- assert.match(rules,/ללא המתנה לסגירתו/);assert.match(rules,/הצטבר בנר הפריצה הפתוח/);assert.match(rules,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(rules,/דקות מסגירת/);
- assert.match(colmexChannelConditions({status,now}).rules.join(' '),/SHORT/);
+test('POC rules describe a closed B and an intrabar return, while stale server versions are labelled',()=>{
+ const rules=colmexChannelConditions({status,now}).rules.join(' ');assert.match(rules,/בסיום נר הפריצה/);assert.match(rules,/הפרופיל קבוע/);assert.doesNotMatch(rules,/מחזור מצטבר|פי 1.5/);
+ const old=structuredClone(status);delete old.channelPrimary.version;assert.match(colmexChannelConditions({status:old,now}).route,/טרם אומת/);
 });
 
 test('Colmex displays both independent server reports and cannot mix them with chart or historical data',()=>{

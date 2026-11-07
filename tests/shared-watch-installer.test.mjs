@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import {prePocFs as fs} from './helpers/pre-poc-source.mjs';
 import path from 'node:path';
 import os from 'node:os';
 import {spawnSync} from 'node:child_process';
@@ -12,7 +12,7 @@ test('shared watch stages local runtime changes atomically and retains local pro
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'shared-watch-install-'));
  try{
   for(const name of ['lib','scripts','tests'])fs.cpSync(new URL('../'+name,import.meta.url),path.join(root,name),{recursive:true});
-  for(const name of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(root,name));
+  for(const name of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js','channel-poc-model.js'])fs.copyFileSync(new URL('../'+name,import.meta.url),path.join(root,name));
   for(const file of [...new Set(patches.map(p=>p.file))]){
    const filePath=path.join(root,file);let text=fs.readFileSync(filePath,'utf8');
    for(const patch of patches.filter(p=>p.file===file).reverse()){assert.ok(text.includes(patch.after));text=text.replace(patch.after,patch.before);}

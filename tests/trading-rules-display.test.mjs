@@ -6,18 +6,13 @@ const source=fs.readFileSync(new URL('../binance-agent.js',import.meta.url),'utf
 const host={children:[],replaceChildren(){this.children=[];},append(p){this.children.push(p);}};
 const ctx=vm.createContext({$:()=>host,document:{createElement:()=>({})}});
 vm.runInContext(source.slice(source.indexOf('let tradingRulesSnapshot='),source.indexOf('function mode(')),ctx);
-const live={mode:'live',channelPrimary:{requested:true,enabled:true,period:50,minVolumeRatio:1.5,minMeanDollarVolume:10000,signalValidityMs:300000,livePriceRule:'CURRENT_PRICE'},exitSettings:{stopLossPct:1,profitActivationPct:5,trailingGapPp:1},shortTrading:{policy:{enabled:true,period:50,budgetUsdt:70,maxPositions:2,livePriceRule:'CURRENT_PRICE'}}};
-test('rules describe reported channel policy, current price recovery and owner exit settings',()=>{
- const text=ctx.tradingRuleLines(live).join('\n');assert.match(text,/50 נרות/);assert.match(text,/ממוצע 20/);assert.match(text,/5 דקות מסגירת/);assert.match(text,/אינה פוסלת לאחר התאוששות/);assert.match(text,/סטופ 1%/);assert.match(text,/תקציב 70 USDT/);assert.doesNotMatch(text,/RSI עד 40|100 נרות/);
+const live={mode:'live',channelPrimary:{version:'CHANNEL_POC_RETEST_V1',requested:true,enabled:true,period:50},exitSettings:{stopLossPct:1,profitActivationPct:5,trailingGapPp:1},shortTrading:{policy:{entryPolicyVersion:'CHANNEL_POC_RETEST_V1',enabled:true,budgetUsdt:70,maxPositions:2}}};
+test('rules describe four POC conditions, frozen range, initial consolidation and retained exit settings',()=>{
+ const text=ctx.tradingRuleLines(live).join(' ');for(const re of [/ארבעה תנאים/,/POC/,/בתחילת התעלה/,/רגרסיה לתצוגה בלבד/,/סטופ 1%/,/תקציב 70 USDT/])assert.match(text,re);assert.doesNotMatch(text,/פי 1.5|10,000|רגרסיה יורדת/);
 });
-test('fallback preserves reported policy; mode changes clear it and missing values are not defaults',()=>{
- ctx.renderTradingRules(live);ctx.renderTradingRules({mode:'live'});assert.match(host.children.map(p=>p.textContent).join('\n'),/תקציב 70/);
- ctx.renderTradingRules({mode:'demo'});const demo=host.children.map(p=>p.textContent).join('\n');assert.match(demo,/DEMO/);assert.doesNotMatch(demo,/תקציב 70|סטופ 1%/);
- assert.match(ctx.tradingRuleLines({mode:'live'}).join('\n'),/ממתין לאימות/);
- assert.match(ctx.tradingRuleLines({...live,channelPrimary:{requested:true,enabled:false,error:'BLOCKED'}}).join('\n'),/חסום: BLOCKED/);
-});
-
-test('intrabar rules follow verified LONG and SHORT policies without advertising a closing-candle wait',()=>{
- const x=structuredClone(live);x.channelPrimary.waitForBreakoutClose=false;x.shortTrading.policy.waitForBreakoutClose=false;
- const text=ctx.tradingRuleLines(x).join('\n');assert.match(text,/ללא המתנה לסגירת נר הפריצה/);assert.match(text,/מחזור מצטבר בנר הפתוח/);assert.match(text,/עד סוף נר הפריצה הנוכחי/);assert.doesNotMatch(text,/נר פריצה נסגר|פריצה מטה בנר סגור|דקות מסגירת/);
+test('mode changes clear cached rules and missing or old versions cannot claim POC is active',()=>{
+ ctx.renderTradingRules(live);ctx.renderTradingRules({mode:'live'});assert.match(host.children.map(p=>p.textContent).join(' '),/תקציב 70/);
+ ctx.renderTradingRules({mode:'demo'});const text=host.children.map(p=>p.textContent).join(' ');assert.match(text,/DEMO/);assert.doesNotMatch(text,/תקציב 70|סטופ 1%/);
+ assert.match(ctx.tradingRuleLines({mode:'live'}).join(' '),/ממתין לאימות/);
+ const old=structuredClone(live);delete old.channelPrimary.version;delete old.shortTrading.policy.entryPolicyVersion;assert.match(ctx.tradingRuleLines(old).join(' '),/טרם אומת|לא אומת/);assert.doesNotMatch(ctx.tradingRuleLines(old).join(' '),/ארבעה תנאים/);
 });
