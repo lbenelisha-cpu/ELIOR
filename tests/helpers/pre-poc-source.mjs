@@ -16,7 +16,10 @@ export function readPrePocSource(file,...args){
  // Reverse only exact reviewed additions for legacy installer fixtures, including
  // their temporary copies. Current trading tests use node:fs directly.
  let text=data;
- for(const p of [...patches].reverse())if(p.before&&path.basename(p.file)===basename&&text.split(p.after).length===2)text=text.replace(p.after,p.before);
+ for(const p of [...patches].reverse())if(p.before&&path.basename(p.file)===basename){
+  if(p.scope&&text.split(p.installedMarker).length===2)text=text.replace(p.installedMarker,'');
+  else if(text.split(p.after).length===2)text=text.replace(p.after,p.before);
+ }
  return text;
 }
 export const prePocFs={...fs,readFileSync:readPrePocSource};

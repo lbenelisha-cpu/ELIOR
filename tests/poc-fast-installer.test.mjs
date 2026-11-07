@@ -1,3 +1,4 @@
+import vm from 'node:vm';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
 import {patchPocFastWatch} from '../scripts/patch-poc-fast-watch.mjs';
 const patches=JSON.parse(fs.readFileSync(new URL('../scripts/poc-fast-watch-patches.json',import.meta.url),'utf8'));
@@ -7,7 +8,9 @@ function fixture(){
  for(const f of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js','channel-poc-model.js'])fs.copyFileSync(new URL('../'+f,import.meta.url),path.join(root,f));
  for(const p of [...patches].reverse()){
   const file=path.join(root,p.file);if(p.before===null){fs.rmSync(file);continue;}
-  const text=fs.readFileSync(file,'utf8');assert.equal(text.split(p.after).length,2,p.id);fs.writeFileSync(file,text.replace(p.after,p.before));
+  const text=fs.readFileSync(file,'utf8');
+  if(p.scope){assert.equal(text.split(p.installedMarker).length,2,p.id);fs.writeFileSync(file,text.replace(p.installedMarker,''));}
+  else{assert.equal(text.split(p.after).length,2,p.id);fs.writeFileSync(file,text.replace(p.after,p.before));}
  }
  return root;
 }
@@ -32,6 +35,73 @@ test('unknown or duplicate integration and edited helper abort before writing an
    if(kind==='helper')fs.writeFileSync(path.join(root,'lib/poc-fast-watch.mjs'),'// unreviewed helper');
    const before=new Map([...new Set(patches.map(p=>p.file))].map(f=>[f,fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null]));
    assert.throws(()=>patchPocFastWatch(root,patches),/no files changed/);
+   for(const [f,s]of before)assert.equal(fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null,s);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+ }
+});
+
+const statusPatch=patches.find(p=>p.id==='server-7');
+const scopeOf=source=>source.slice(source.indexOf(statusPatch.scope.start),source.indexOf(statusPatch.scope.end));
+function publicStatus(source,{paused=false,channel=true}={}){
+ const context={u:{pathname:'/api/binance-mode'},req:{method:'GET'},res:{},send:(_res,value)=>value,mode:'live',authorized:false,
+ controlDevices:{enabled:true},HOURLY_TREND_RULE:{},BINANCE_ENTRY_RSI:{},ENTRY_POLICY_VERSION:'entry',BINANCE_CONFIRMED_POLICY:{},
+ channelPrimary:{enabled:channel},independentEntry:{},marketNewsConfig:{},ATTENTION_POLICY:{},RESEARCH_PROTOCOL:{},ENTRY_COMPARISON_POLICY:{},EARLY_WAVE_POLICY:{},
+ futuresShort:{config:{enabled:true},checkedAt:123},tradeSettings:{values:{stopLossPct:2},policyVersion:'settings'},TRAILING_EXIT_POLICY:'preserved-exits',
+ POC_FAST_WATCH_POLICY:{version:'POC_FAST_WATCH_V1'},LIVE:true,AUTO_EXECUTION:true,tradeControl:{paused},LIVE_MAX_USDT:800,LIVE_MAX_POSITIONS:3,DEMO_TRADING:false,KEYS_CONFIGURED:true};
+ return vm.runInNewContext('(function(){'+scopeOf(source)+'})()',context);
+}
+test('public fast-watch status tolerates optional, extended and reordered neighbour fields without altering them',()=>{
+ const variants=[
+  s=>s.replace("      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n",''),
+  s=>s.replace('      pocTrading:{version:1},','      pocTrading:{version:2,localGuard:true},'),
+  s=>s.replace('exitPolicy:TRAILING_EXIT_POLICY},','exitPolicy:TRAILING_EXIT_POLICY,ownerExtension:true},'),
+  s=>s.replace('      shortTrading:',"      ownerStatus:{label:'preserve local integration'},\n      shortTrading:"),
+  s=>s.replace('      pocTrading:{version:1},\n','').replace('      hourlyTrendFilter:', '      pocTrading:{version:1},\n      hourlyTrendFilter:')
+ ];
+ // These compatibility fixtures model independent local status integrations;
+ // they are not presented as a copy of the user's unknown server source.
+ for(const transform of variants){const root=fixture();try{
+  const file=path.join(root,'server.mjs'),original=transform(fs.readFileSync(file,'utf8'));fs.writeFileSync(file,original);
+  const before=scopeOf(original);patchPocFastWatch(root,patches);const once=fs.readFileSync(file,'utf8');
+  assert.equal(scopeOf(once).replace(statusPatch.installedMarker,''),before,'preserve every existing status field byte for byte');
+  const result=publicStatus(once),old=publicStatus(original);delete result.pocFastWatch;assert.equal(JSON.stringify(result),JSON.stringify(old));
+  assert.equal(publicStatus(once).pocFastWatch.policy.version,'POC_FAST_WATCH_V1');assert.equal(publicStatus(once).pocFastWatch.enabled,true);
+  assert.equal(publicStatus(once,{paused:true}).pocFastWatch.enabled,false);assert.equal(publicStatus(once,{channel:false}).pocFastWatch.enabled,false);
+  patchPocFastWatch(root,patches);assert.equal(fs.readFileSync(file,'utf8'),once);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}}
+});
+test('the previous status matcher reproduces server-7 failure while the scoped insertion accepts the same layout',()=>{
+ const root=fixture();try{
+  const file=path.join(root,'server.mjs'),source=fs.readFileSync(file,'utf8').replace("      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n",'');fs.writeFileSync(file,source);
+  const oldBefore="      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocTrading:{version:1},\n      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n";
+  const legacy={id:'server-7',file:'server.mjs',before:oldBefore,after:oldBefore.replace('      pocTrading:',statusPatch.installedMarker+'      pocTrading:')};
+  assert.throws(()=>patchPocFastWatch(root,patches.map(p=>p.id==='server-7'?legacy:p)),/server-7.*no files changed/);assert.equal(fs.readFileSync(file,'utf8'),source);
+  patchPocFastWatch(root,patches);assert.equal(publicStatus(fs.readFileSync(file,'utf8')).pocFastWatch.policy.version,'POC_FAST_WATCH_V1');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('an already installed original-layout status is recognized without relocation or duplication',()=>{
+ const root=fixture();try{
+  const file=path.join(root,'server.mjs'),source=fs.readFileSync(file,'utf8').replace('      pocTrading:',statusPatch.installedMarker+'      pocTrading:');fs.writeFileSync(file,source);
+  patchPocFastWatch(root,patches);const once=fs.readFileSync(file,'utf8');assert.equal(scopeOf(once),scopeOf(source));patchPocFastWatch(root,patches);assert.equal(fs.readFileSync(file,'utf8'),once);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+test('missing or ambiguous status routes and edited or duplicate public fields abort every staged write',()=>{
+ for(const kind of ['missing-get','missing-post','duplicate-get','duplicate-return','wrong-response','edited-field','duplicate-field','two-keys','quoted-field','computed-field']){
+  const root=fixture();try{
+   const file=path.join(root,'server.mjs');let source=fs.readFileSync(file,'utf8');
+   if(kind==='missing-get')source=source.replace(statusPatch.scope.start,'  if(false){\n');
+   if(kind==='missing-post')source=source.replace(statusPatch.scope.end,'  if(false){\n');
+   if(kind==='duplicate-get')source+=statusPatch.scope.start;
+   if(kind==='duplicate-return')source=source.replace(statusPatch.before,statusPatch.before+statusPatch.before);
+   if(kind==='wrong-response')source=source.replace(statusPatch.before,'    return anotherResponse(res,{\n      mode,\n');
+   if(kind==='edited-field')source=source.replace(statusPatch.before,statusPatch.before+statusPatch.installedMarker.replace("mode==='live'",'true'));
+   if(kind==='duplicate-field')source=source.replace(statusPatch.before,statusPatch.before+statusPatch.installedMarker.repeat(2));
+   if(kind==='quoted-field')source=source.replace(statusPatch.before,statusPatch.before+"      'pocFastWatch': {enabled:true},\n");
+   if(kind==='computed-field')source=source.replace(statusPatch.before,statusPatch.before+"      ['pocFastWatch']: {enabled:true},\n");
+   if(kind==='two-keys')source=source.replace(statusPatch.before,statusPatch.after+'      pocFastWatch: {enabled:true},\n');
+   fs.writeFileSync(file,source);
+   const before=new Map([...new Set(patches.map(p=>p.file))].map(f=>[f,fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null]));
+   assert.throws(()=>patchPocFastWatch(root,patches),/server-7.*no files changed/);
    for(const [f,s]of before)assert.equal(fs.existsSync(path.join(root,f))?fs.readFileSync(path.join(root,f),'utf8'):null,s);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
  }
