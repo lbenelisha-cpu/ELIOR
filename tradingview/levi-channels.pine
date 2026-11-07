@@ -126,7 +126,8 @@ var float vpLower = na
 var float vpUpper = na
 var int vpFirst = na
 var int vpChannelStart = na
-var array<float> vpVolumes = array.new<float>(32,0)
+var array<float> vpVolumes = array.new<float>(128,0)
+var array<float> vpPriceMass = array.new<float>(128,0)
 var array<box> vpBoxes = array.new<box>()
 var array<line> vpLines = array.new<line>()
 var array<label> vpLabels = array.new<label>()
@@ -249,21 +250,29 @@ if bar_index >= n and bar_index >= last_bar_index - 200
             vpLow := math.min(vpLow,low[back])
             vpHigh := math.max(vpHigh,high[back])
         array.fill(vpVolumes,0)
-        float step = (vpHigh-vpLow)/32
+        array.fill(vpPriceMass,0)
+        float step = (vpHigh-vpLow)/128
         bool volumeValid = step > 0
         if step > 0
             for i = vpA to vpB
                 int back = bar_index-i
                 volumeValid := volumeValid and not na(volume[back]) and volume[back] >= 0
                 if high[back] > low[back]
-                    for bin = 0 to 31
-                        float overlap = math.max(0,math.min(vpLow+(bin+1)*step,high[back])-math.max(vpLow+bin*step,low[back]))
-                        array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back])*overlap/(high[back]-low[back]))
+                    for bin = 0 to 127
+                        float segmentLow = math.max(vpLow+bin*step,low[back])
+                        float segmentHigh = math.min(vpLow+(bin+1)*step,high[back])
+                        float overlap = math.max(0,segmentHigh-segmentLow)
+                        float allocated = nz(volume[back])*overlap/(high[back]-low[back])
+                        array.set(vpVolumes,bin,array.get(vpVolumes,bin)+allocated)
+                        array.set(vpPriceMass,bin,array.get(vpPriceMass,bin)+allocated*(segmentLow+segmentHigh)/2)
                 else
-                    int bin = math.max(0,math.min(31,int(math.floor((low[back]-vpLow)/step))))
+                    int bin = math.max(0,math.min(127,int(math.floor((low[back]-vpLow)/step))))
                     array.set(vpVolumes,bin,array.get(vpVolumes,bin)+nz(volume[back]))
+                    array.set(vpPriceMass,bin,array.get(vpPriceMass,bin)+nz(volume[back])*low[back])
         float largest = array.max(vpVolumes)
-        vpPoc := volumeValid and largest > 0 ? vpLow+(array.indexof(vpVolumes,largest)+0.5)*step : na
+        int pocIndex = array.indexof(vpVolumes,largest)
+        float pocBinVolume = pocIndex>=0 ? array.get(vpVolumes,pocIndex) : 0
+        vpPoc := volumeValid and largest > 0 and pocBinVolume>0 ? array.get(vpPriceMass,pocIndex)/pocBinVolume : na
     if not na(savedLast) and last > savedLast and na(brokenAt)
         float tolerance = math.max((savedUpper-savedLower)*0.025,close[offset]*0.0001)
         float projectedLower = savedLower+savedSlope*(last-savedFirst)
@@ -306,7 +315,7 @@ if bar_index >= n and bar_index >= last_bar_index - 200
             array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
 
 // One combined indicator keeps the regression optional and the frozen POC visible.
-// This OHLC allocation estimate is the app's calculation, not TradingView's native FRVP.
+// This 128-bin OHLC range-weighted estimate is approximate; it is not trade-by-trade POC.
 if barstate.islast
     for item in vpBoxes
         box.delete(item)
@@ -321,10 +330,10 @@ if barstate.islast
     if timeframe.in_seconds() != 300
         table.cell(pocTable,0,0,"Select 5-minute candles for LEVI entry geometry",text_color=color.orange)
     else if showPoc and not na(vpPoc) and not na(vpB)
-        float step = (vpHigh-vpLow)/32
+        float step = (vpHigh-vpLow)/128
         float largest = array.max(vpVolumes)
         int histogramLeft = math.max(vpA,bar_index-80)
-        for bin = 0 to 31
+        for bin = 0 to 127
             float v = array.get(vpVolumes,bin)
             if v > 0
                 int right = histogramLeft+math.max(1,int(math.round(math.min(10,math.max(1,vpB-vpA))*v/largest)))
@@ -336,7 +345,7 @@ if barstate.islast
             array.push(vpLines,line.new(vpChannelStart,edge+vpSlope*(vpChannelStart-vpFirst),bar_index,edge+vpSlope*(bar_index-vpFirst),color=color.orange,width=2))
         array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=vpSide == 1 ? label.style_label_up : label.style_label_down,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=vpSide == 1 ? label.style_label_down : label.style_label_up,color=color.new(color.blue,50),textcolor=color.white))
-        array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
+        array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate · 128 bins "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
         bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
         bool returned = bar_index > vpB and (vpSide == 1 ? high <= vpPriceB : low >= vpPriceB) and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
         table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" · Recent wave A–B · POC estimate",text_color=color.yellow)
