@@ -1,6 +1,6 @@
 # Channel + fixed range POC entry (2026-11-07)
 
-`CHANNEL_POC_RETEST_V1` implements the owner's four approved technical checks. Original numbers are retained in the UI:
+`CHANNEL_POC_RETEST_V2` implements the owner's four approved technical checks. Original numbers are retained in the UI:
 
 | Check | LONG | SHORT |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ The latest unambiguous channel breakout supplies the model; an opposite or two-s
 
 ## Volume calculation and display
 
-The shared server/browser calculator allocates each candle's volume uniformly across its high–low interval into 32 price bins. POC is the center of the maximum-volume bin; tied bins select the lowest price. This is explicitly an **OHLC volume estimate**, not trade-by-trade or TradingView's built-in lower-timeframe FRVP. Return candles never extend B or change the frozen histogram. A missing/zero-volume profile cannot produce a POC.
+The shared calculator freezes the profile over the wave from A through B: LONG uses the latest pullback low through the breakout high; SHORT mirrors this from the latest pullback high through the breakdown low. It allocates each 5-minute candle's volume across its high–low range into 128 bins and calculates the POC as the volume-weighted price inside the maximum-volume bin (ties select the lowest price). This reduces bin-rounding error and improves on the old 32-bin midpoint, but it remains an **OHLC estimate**, not exact trade-by-trade volume-at-price; the feed does not contain tick-level trades. Return candles do not extend B or alter the frozen histogram. Missing/zero volume cannot produce a POC. Binance LONG/SHORT and Colmex LONG/SHORT use this same shared calculation.
 
 Both apps display the exact report model by default. Manual range selection remains display-only. Binance SHORT opens a separate read-only chart from the Futures report's own candles, never over Spot candles. Old or unavailable reports are labelled; chart output does not authorize orders.
 
