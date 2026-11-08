@@ -2786,7 +2786,7 @@ async function refreshEntryComparison(){
   const open=(strategyReviewState.entryComparison?.cohorts||[]).flatMap(c=>Object.values(c.items).filter(i=>Object.values(i.methods).some(m=>m.position||m.pending)).map(i=>i.symbol));
   for(const symbol of prioritizeObservationSymbols([...SYMBOLS,...open,...Object.keys(strategyReviewState.channelComparison?.pending||{})],marketNews.snapshot())){
    if(mode!=='live')break;
-   try{const bars=await candles(symbol);recordAttention(strategyReviewState,{symbol,bars,at:Date.now()});observeChannels(strategyReviewState,{symbol,bars,at:Date.now()});observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
+   try{const bars=await candles(symbol);recordAttention(strategyReviewState,{symbol,bars,at:Date.now(),positionOpen:!!(tradingPositions()[symbol]||futuresShort.state.positions[symbol])});observeChannels(strategyReviewState,{symbol,bars,at:Date.now(),positionOpen:!!(tradingPositions()[symbol]||futuresShort.state.positions[symbol])});observeEntryComparison(strategyReviewState,{symbol,bars,at:Date.now(),platform:'BINANCE',settings:tradeSettings.values,universe:SYMBOLS});}
    catch{recordAttention(strategyReviewState,{symbol,at:Date.now(),error:'HISTORY_UNAVAILABLE'});recordEntryBlocker(strategyReviewState,{symbol,reason:'COMPARISON_HISTORY_UNAVAILABLE'});}
    saveStrategyReview();
   }
