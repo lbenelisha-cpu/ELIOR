@@ -14,7 +14,7 @@ git archive "$revision" | tar -x -C "$stage/release"
 cp -a lib "$stage/runtime/lib"
 cp ./*.js ./*.mjs "$stage/runtime/"
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
-node "$stage/release/scripts/patch-poc-lifecycle-reset.mjs" "$stage/runtime"
+node "$stage/release/scripts/patch-poc-lifecycle-reset.mjs" "$stage/runtime" --binance-only
 node --check "$stage/runtime/channel-poc-model.js"
 echo 'Checking lifecycle reset and execution against the actual installed runtime.'
 if ! node --test "$stage/runtime/tests/poc-lifecycle-reset.test.mjs" "$stage/runtime/tests/channel-poc-entry.test.mjs" "$stage/runtime/tests/poc-recent-wave.test.mjs" "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/futures-short-recovery.test.mjs" "$stage/runtime/tests/futures-short-fill.test.mjs"; then
@@ -42,7 +42,7 @@ if(fs.existsSync(journal)&&JSON.parse(fs.readFileSync(journal,'utf8')).pending)t
 fs.writeFileSync(stage+'/preflight.json',JSON.stringify({journal,port}),{mode:0o600});
 console.log('SHORT settings validated; configured percentages will be retained.');
 JS
-files=(channel-poc-model.js lib/wyckoff-evaluation.mjs lib/futures-short-runner.mjs lib/colmex-auto-runner.mjs lib/colmex-poc-fast.mjs server.mjs)
+files=(channel-poc-model.js lib/wyckoff-evaluation.mjs lib/futures-short-runner.mjs server.mjs)
 backup="/root/levi-before-poc-lifecycle-reset-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -m 700 "$backup"
 existing=();missing=()
