@@ -21,7 +21,7 @@ for(const preFast of [true,false])test('recent-wave installer accepts '+(preFast
   const deployed=fs.readFileSync(new URL('./fixtures/binance-live-cycle-deployed-20261106.txt',import.meta.url),'utf8');
   fs.writeFileSync(server,s.slice(0,start)+deployed+s.slice(end));
   const runner=path.join(root,'lib/futures-short-runner.mjs'),check="\n  const q=await this.api.get('/fapi/v1/ticker/price',{symbol:p.symbol});\n  if(!(Number(q.price)>0))throw Error('CONTRACT_PRICE_UNVERIFIED');";
-  fs.writeFileSync(runner,fs.readFileSync(runner,'utf8').replace(' async ensureAlgo(p,kind,price){',' async ensureAlgo(p,kind,price){'+check));
+  fs.writeFileSync(runner,fs.readFileSync(runner,'utf8').replace(' async ensureAlgo(p,kind,price,allowConflictRecovery=true){',' async ensureAlgo(p,kind,price,allowConflictRecovery=true){'+check));
   fs.writeFileSync(path.join(root,'positions.json'),'{"existing":"untouched"}');
   patchRecentWavePoc(root);assert.ok(fs.readFileSync(server,'utf8').includes(deployed));assert.ok(fs.readFileSync(runner,'utf8').includes(check));
   const once=recentWaveFiles.map(f=>fs.readFileSync(path.join(root,f),'utf8'));patchRecentWavePoc(root);assert.deepEqual(recentWaveFiles.map(f=>fs.readFileSync(path.join(root,f),'utf8')),once);assert.equal(fs.readFileSync(path.join(root,'positions.json'),'utf8'),'{"existing":"untouched"}');
