@@ -19,10 +19,13 @@
   const index=volumes.indexOf(max);
   return {method:'OHLC_RANGE_WEIGHTED_ESTIMATE',estimated:true,bins,low,high,step,volumes,max,index,poc:volumes[index]>0?priceMass[index]/volumes[index]:low+(index+.5)*step,totalVolume:volumes.reduce((a,b)=>a+b,0)};
  }
- function initialRange(history,channel,side){
-  const p=consolidationPolicy,first=Math.round((channel.anchorStart-channel.start)/STEP),width=2*channel.width;
-  // The range must contain the channel's first anchor, not any later sideways pause.
-  for(let count=p.maxBars;count>=p.minBars;count--)for(let start=Math.max(0,first-count+1);start<=first;start++){
+ function initialRange(history,channel,side,after=0){
+  const p=consolidationPolicy,freshStart=after>0?history.findIndex(b=>b.openTime>after):0;
+  if(freshStart<0)return {version:p.version,side,passed:false,reason:'WAIT_INITIAL_CHANNEL_CONSOLIDATION'};
+  const first=Math.max(freshStart,Math.round((channel.anchorStart-channel.start)/STEP)),width=2*channel.width;
+  // Initially use the channel anchor. After a close, require fresh range evidence
+  // from the beginning of the new lifecycle within the retained channel.
+  for(let count=p.maxBars;count>=p.minBars;count--)for(let start=Math.max(freshStart,first-count+1);start<=first;start++){
    const end=start+count;if(end>history.length||end<=first)continue;
    const bars=history.slice(start,end);
    if(bars.some((b,i)=>i&&b.openTime!==bars[i-1].closeTime))continue;
@@ -44,7 +47,7 @@
   const c=root.LEVI_PARALLEL.analyze(mapped,{period:50,interval:'5m',now:52*STEP,deviations:2,requireConfirmed:true});
   return c.ready&&!c.provisional?c:null;
  }
- function makeWave(bars,ref,side,breakIndex,startIndex){
+ function makeWave(bars,ref,side,breakIndex,startIndex,after=0){
   const {history,c,start}=ref,b=bars[breakIndex],key=side==='LONG'?'low':'high';
   const first=start+Math.round((c.anchorStart-c.start)/STEP),begin=Math.max(start,startIndex??first);
   if(begin>=breakIndex)return null;
@@ -53,7 +56,7 @@
   for(let j=begin+1;j<breakIndex;j++)if(side==='LONG'?bars[j].low<=bars[ai].low:bars[j].high>=bars[ai].high)ai=j;
   const level=c.intercept+c.slope*(breakIndex-start)+(side==='LONG'?c.width:-c.width);
   const model={version:VERSION,anchorPolicy:ANCHOR_POLICY,side,breakoutAt:b.openTime,frozenAt:b.closeTime,
-   anchorA:{time:bars[ai].openTime,price:bars[ai][key]},anchorB:{time:b.openTime,price:b[side==='LONG'?'high':'low']},profile:profile(bars.slice(ai,breakIndex+1)),consolidation:initialRange(history,c,side),
+   anchorA:{time:bars[ai].openTime,price:bars[ai][key]},anchorB:{time:b.openTime,price:b[side==='LONG'?'high':'low']},profile:profile(bars.slice(ai,breakIndex+1)),consolidation:initialRange(history,c,side,after),
    channel:{startAt:history[0].openTime,anchorAt:bars[first].openTime,endAt:b.openTime,barTimes:bars.slice(start,breakIndex).map(row=>row.openTime),intercept:c.intercept,slope:c.slope,width:c.width,lowTouches:c.lowTouches,highTouches:c.highTouches,level},
    id:['poc-wave-v2',side,bars[ai].openTime,b.openTime].join(':')};
   return {model,aIndex:ai,bIndex:breakIndex,returnIndex:null};
@@ -112,14 +115,14 @@
    if(start!==null&&start>=i)continue;
    // Rebuild the reference after the lifecycle boundary. Historical candles
    // remain available for geometry, but no pre-close A, B or wave survives.
-   wave=makeWave(closed,ref,direction,i,entryAfter>0?Math.max(firstFresh,start??0):start);
+   wave=makeWave(closed,ref,direction,i,entryAfter>0?Math.max(firstFresh,start??0):start,entryAfter);
   }
   return wave?.model||null;
  }
  function analyze({bars=[],side,price,liveBar,now=Date.now(),pocResetAfter=0}){
   const entryAfter=Number(pocResetAfter)||0;
   if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
-  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now&&(!(entryAfter>0)||b.openTime>entryAfter)),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
+  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
   const replayed=replay(closed,entryAfter),model=replayed?.side===side?replayed:null;
   let reason;
   if(model){
@@ -133,7 +136,7 @@
   }else{
    const h=closed.slice(-50),c=geometry(h);
    states.channel=c?'passed':'waiting';
-   if(c){const range=initialRange(h,c,side);states.range=range.passed?'passed':'waiting';states.break='waiting';reason=range.passed?'WAIT_POC_CHANNEL_BREAKOUT':range.reason;}
+   if(c){const range=initialRange(h,c,side,entryAfter);states.range=range.passed?'passed':'waiting';states.break='waiting';reason=range.passed?'WAIT_POC_CHANNEL_BREAKOUT':range.reason;}
    else reason='WAIT_CHANNEL_TWO_TOUCHES';
   }
   const conditions={version:REPORT,side,at:now,expiresAt:(Math.floor(now/STEP)+1)*STEP,rows:Object.entries(states).map(([id,state])=>({id,state})),model,chart:model?{interval:'5m',bars:[...closed.slice(-79),...(liveBar?[liveBar]:[])].map(({openTime,closeTime,open,high,low,close,volume,closed})=>({openTime,closeTime,open,high,low,close,volume,closed})),price,at:now}:null};
