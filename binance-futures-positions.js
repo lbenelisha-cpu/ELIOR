@@ -9,6 +9,12 @@
  Object.assign(reasons,{FUTURES_MARKETS_UNVERIFIED:'רשימת חוזי Futures טרם אומתה',FUTURES_SYMBOL_UNAVAILABLE:'אין חוזה USDT תואם ומאומת למסחר',FUTURES_CONTRACT_VERIFIED:'חוזה Futures תואם אומת',WAIT_SHORT_OBSERVATION:'ממתין לסריקת SHORT ראשונה',STALE_SHORT_OBSERVATION:'סריקת SHORT התיישנה · ממתין לעדכון',FUTURES_OBSERVATION_UNAVAILABLE:'נתוני Futures לא התקבלו · ניסיון נוסף בסבב הבא',FUTURES_HISTORY_UNVERIFIED:'היסטוריית Futures לא אומתה',FUTURES_NOT_IN_SHARED_WATCH:'הנכס הוסר מרשימת המעקב המשותפת',FUTURES_ENTRIES_PAUSED:'פתיחת עסקאות מושהית',FUTURES_TWO_SLOTS_FULL:'שני מקומות השורט תפוסים',FUTURES_NEED_35_USDT_FREE_PER_SLOT:'נדרשים 35 USDT פנויים בארנק Futures',FUTURES_ACCOUNT_UNVERIFIED:'מצב חשבון Futures טרם אומת',FUTURES_ORDER_PENDING:'ממתין לבירור הוראה קיימת',FUTURES_EXTERNAL_POSITION_BLOCK:'קיימת פוזיציה שאינה מנוהלת על ידי הבוט',FUTURES_STOP_ALL:'עצירת מסחר פעילה',FUTURES_SHORT_DISABLED:'פתיחת עסקאות SHORT כבויה',TRADING_PAUSED:'פתיחת עסקאות מושהית',NO_FREE_SLOT:'אין מקום פנוי לעסקה',CHANNEL_PRIMARY_DISABLED:'כניסות בתעלה כבויות',REGRESSION_DIRECTION_BLOCK:'הרגרסיה אינה עולה',REGRESSION_CENTER_BLOCK:'המחיר אינו מעל מרכז הרגרסיה',WAIT_CHANNEL_PIVOTS:'ממתין לנקודות קיצון',WAIT_CHANNEL_TWO_TOUCHES:'ממתין לשתי נגיעות בכל גבול',WAIT_CHANNEL_LIVE_BREAKOUT:'ממתין לפריצת הגבול העליון',WAIT_CHANNEL_LIVE_BAR:'ממתין לנתוני הנר הפתוח',WAIT_CHANNEL_HISTORY:'חסרה היסטוריית נרות',CHANNEL_VOLUME_LOW:'מחזור הפריצה קטן מפי 1.5 מהממוצע',CHANNEL_LIQUIDITY_LOW:'שווי המחזור נמוך מהמינימום',CHANNEL_BREAKOUT_READY:'תנאי LONG מתקיימים · נדרשת בדיקה סופית',CHANNEL_PRIMARY:'מסלול כניסה בתעלה',WAIT_NEW_CHANNEL_SIGNAL:'ממתין לאיתות LONG חדש'});
  Object.assign(reasons,{CHANNEL_POC_READY:'חזרה ל־POC אושרה · בכפוף לבדיקת ביצוע',SHORT_POC_READY:'חזרה מלמטה ל־POC אושרה · SHORT',WAIT_POC_WAVE_CLOSE:'הגל קבע קיצון חדש בנר פתוח · ממתין לעדכון B והפרופיל בסגירת הנר',WAIT_POC_RETEST:'הפרופיל נקבע · ממתין לחזרה ל־POC',WAIT_POC_CHANNEL_BREAKOUT:'ממתין לפריצת התעלה ולקיבוע פרופיל הנפח',WAIT_INITIAL_CHANNEL_CONSOLIDATION:'ממתין לדשדוש בתחילת התעלה',WAIT_POC_VOLUME_DATA:'חסרים נתוני נפח לחישוב POC',POC_RETURN_ALREADY_EXECUTED:'אירוע החזרה הזה כבר נשלח · מניעת הוראה כפולה',POC_PRICE_INVALIDATED:'המחיר אינו בנקודת החזרה ל־POC',POC_MODEL_CHANGED:'פרופיל הנפח השתנה בבדיקה החוזרת',WAIT_FRESH_PRICE:'ממתין למחיר עדכני',GAPPED_CHANNEL_HISTORY:'חסרים נרות ברצף'});
  const reason=v=>reasons[v]||v||'לא נמסרה סיבה';
+ function chartLink(symbol){
+  if(!/^[A-Z0-9]+USDT$/.test(symbol||''))return '';
+  const contract='BINANCE:'+symbol+'.P';
+  const url=root.LEVI_TRADINGVIEW_URL?.(contract)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(contract)+'&interval=5';
+  return '<br><a class="tradingview-link short-chart-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף Futures של '+esc(symbol)+' ב־TradingView">גרף ↗</a>';
+ }
  function view(snapshot,now=Date.now()){
   const f=snapshot?.shortTrading;
   const title='<div class="panel-title-row"><h2>פוזיציות פעילות · SHORT Futures</h2></div>';
@@ -42,7 +48,7 @@
    const cls=!live?'pnl-unknown':pnl>0?'pnl-profit':pnl<0?'pnl-loss':'pnl-flat';
    const signed=n=>number(n)?(n>0?'+':'')+format(n,2):'—';
    const protectedNow=fresh(p.protectedAt,now,30000)&&['STOP_MARKET','TAKE_PROFIT_MARKET'].every(kind=>p.algos?.some(a=>a.kind===kind&&a.status==='NEW'));
-   html+='<tr><td><b>'+esc(p.symbol)+'</b><br>SHORT</td><td>'+esc(time(p.entryAt))+'</td><td>'+format(p.qty,8)+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+format(p.currentPrice,8)+'<br><small>'+(live?'עודכן: ':'מחיר לא עדכני: ')+esc(time(p.priceAt))+'</small></td><td>'+format(valid?Number(p.entryPrice)*Number(p.qty):null,2)+'</td><td class="'+cls+'">'+signed(pnl)+'</td><td class="'+cls+'">'+signed(pct)+(live?'%':'')+'</td><td>'+format(p.targetPrice,8)+'</td><td>'+format(p.stopPrice,8)+'</td><td>'+(protectedNow?'אומתו בבורסה':'לא אומתו לאחרונה')+'<br><small>'+esc(time(p.protectedAt))+'</small></td></tr>';
+   html+='<tr><td><b>'+esc(p.symbol)+'</b><br>SHORT'+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+format(p.qty,8)+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+format(p.currentPrice,8)+'<br><small>'+(live?'עודכן: ':'מחיר לא עדכני: ')+esc(time(p.priceAt))+'</small></td><td>'+format(valid?Number(p.entryPrice)*Number(p.qty):null,2)+'</td><td class="'+cls+'">'+signed(pnl)+'</td><td class="'+cls+'">'+signed(pct)+(live?'%':'')+'</td><td>'+format(p.targetPrice,8)+'</td><td>'+format(p.stopPrice,8)+'</td><td>'+(protectedNow?'אומתו בבורסה':'לא אומתו לאחרונה')+'<br><small>'+esc(time(p.protectedAt))+'</small></td></tr>';
   }
   if(!rows.length)html+='<tr><td colspan="11">אין כרגע פוזיציות SHORT מתועדות פתוחות.</td></tr>';
   html+='</tbody></table></div><p class="mini">רווח / הפסד לא ממומש מחושב לפי מחיר הקנייה החוזרת (Ask), לפני עמלות ומימון. מחיר חסר או ישן לא מוצג כרווח אפס. זמני התצוגה בשעון ישראל.</p>';
@@ -65,7 +71,7 @@
   html+='</tbody></table></div></details>';
   const closed=Array.isArray(f.closed)?f.closed:[];
   html+='<details data-short-detail="closed"><summary>סגירות SHORT אחרונות · '+closed.length+'</summary><p class="mini">מועד הסגירה הוא מועד הזיהוי בשרת. מחיר מילוי הסגירה ורווח ממומש אינם כלולים בנתונים אלה.</p><div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס</th><th>כניסה</th><th>סגירה זוהתה</th><th>מחיר כניסה</th><th>סיבה מתועדת</th></tr></thead><tbody>';
-  for(const p of [...closed].reverse())html+='<tr><td>'+esc(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+esc(time(p.closedAt))+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+esc(reason(p.reason))+'</td></tr>';
+  for(const p of [...closed].reverse())html+='<tr><td>'+esc(p.symbol)+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+esc(time(p.closedAt))+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+esc(reason(p.reason))+'</td></tr>';
   if(!closed.length)html+='<tr><td colspan="5">אין סגירות מתועדות בנתונים שהתקבלו.</td></tr>';
   html+='</tbody></table></div></details>';
   return html;
