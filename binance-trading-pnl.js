@@ -61,6 +61,7 @@ export function createTradingPnlPanel(host,{read,download=()=>{},now=Date.now,on
   for(const r of rows.slice(0,shown)){
    const tr=el('tr');const cell=(...children)=>{const td=el('td');td.append(...children);tr.append(td);};
    cell(el('b',r.symbol),el('small',r.direction+' · '+(r.status==='PARTIAL'?'יציאה חלקית':'סגירה'),'pnl-side '+r.direction.toLowerCase()));
+   globalThis.LEVI_ASSET_CHART?.append(tr.firstChild,r.symbol,r.direction==='SHORT'?'FUTURES':'SPOT');
    cell(el('span',when(r.entryAt)),el('small',when(r.closedAt)));
    cell(el('span','כניסה '+format(r.entryPrice,10)),el('small','יציאה '+format(r.exitPrice,10)));
    cell(el('span',format(r.qty,8)),el('small',format(r.costUsdt)+' USDT'));

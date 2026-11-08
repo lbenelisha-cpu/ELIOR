@@ -25,7 +25,8 @@ function renderMap(now){
  host.append(positionChangeBadge(el,entry,current,p.side));
  const exitHost=el('div');host.append(exitHost);globalThis.LEVI_EXIT_SNAPSHOT?.render(exitHost,{venue:'COLMEX',status,error:statusFailed},p.symbol,now);
  const stop=protection.stop>0?protection.stop:null,target=protection.target>0?protection.target:null;
- const grid=el('div',null,'position-prices');
+ globalThis.LEVI_ASSET_CHART?.append(card,p.symbol,'STOCK');
+  const grid=el('div',null,'position-prices');
  for(const [label,value,cls] of [['כניסה',entry,''],['מחיר שנצפה',current,''],['סטופ מאושר',stop,'negative'],['יעד מאושר',target,'positive']]){const item=el('div');item.append(el('span',label),el('b',value===null?'—':'$'+price(value),cls));grid.append(item);}host.append(grid);
  const points=[[stop,'stop'],[entry,'entry'],[current,'current'],[target,'target']].filter(([v])=>v!==null),values=points.map(([v])=>v),lo=Math.min(...values),hi=Math.max(...values);
  if(points.length>=2&&hi>lo){const rail=el('div',null,'price-rail');rail.setAttribute('role','img');rail.setAttribute('aria-label',`מפת מחירים: כניסה ${price(entry)}, מחיר שנצפה ${price(current)}, סטופ מאושר ${price(stop)}, יעד מאושר ${price(target)}`);for(const [v,kind] of points){const dot=el('i',null,'price-marker '+kind);dot.style.setProperty('--marker',(v-lo)/(hi-lo)*100+'%');rail.append(dot);}host.append(rail);}
@@ -61,6 +62,7 @@ function render(){
  else for(const p of positions){
   const protection=protectionView(p,status.pendingActions,now),card=el('article',null,'colmex-position');
   card.append(el('h3',p.symbol+' · '+(p.side||'LONG')),el('span',protection.label,'protection-state '+protection.kind));
+  globalThis.LEVI_ASSET_CHART?.append(card,p.symbol,'STOCK');
   const grid=el('div',null,'position-prices');
   for(const [label,value] of [['כמות',n(p.qty)],['כניסה','$'+price(p.entryPrice)],['מחיר שנצפה',freshAt(p.lastQuoteAt,now,120000)&&p.lastBid>0?'$'+price(p.lastBid):'—'],['סטופ מאושר',protection.stop>0?'$'+price(protection.stop):'—'],['יעד מאושר',protection.target>0?'$'+price(protection.target):'—'],[p.side==='SHORT'?'שפל שנצפה':'שיא שנצפה','$'+price(p.side==='SHORT'?p.lowPrice:p.peakPrice)]]){const item=el('div');item.append(el('span',label),el('b',value));grid.append(item);}card.append(grid);
   card.append(el('p','נבדק: '+time(p.brokerProtection?.verifiedAt)+' · מחיר הביצוע עשוי להיות שונה.','small muted'));host.append(card);

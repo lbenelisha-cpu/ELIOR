@@ -460,7 +460,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
       dec==='ROTATE READY'?'rotate-alert':''
     ].filter(Boolean).join(' ');
     return {symbol:a.symbol,className:rowClasses,cells:[
-      {html:`<b>${a.symbol.replace('USDT','')}</b>${watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+watch.text+' · לא אישור קנייה</div>':''}<div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
+      {html:`<b>${a.symbol.replace('USDT','')}</b>${globalThis.LEVI_ASSET_CHART?.html(a.symbol,'SPOT')||''}${watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+watch.text+' · לא אישור קנייה</div>':''}<div class="mini ${held?pnl.className:''}">${held?pnl.text:(a.demoTradable===false?'נסרק בלבד · לא זמין בדמו':blockerLabel(displayBlocker))}</div>${a.accountOnly?'<div class="mini">החזקה מהחשבון · ללא ניהול אוטומטי מתועד</div>':held?'<div class="mini trend-note">מגמה: '+trendLabel+'</div>':''}`},
       {html:fmt(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice,Math.abs(Number(s.price??liveBalances.find(x=>x.asset+'USDT'===a.symbol)?.usdtPrice))<10?8:4)},
       {className:held?pnl.className:'',html:held?pnl.text:'—'},
       {className:'decision '+String(dec).toLowerCase().replaceAll(' ','-'),html:decisionLabel(dec)}
@@ -474,9 +474,9 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
   }else{
     const ps=Object.values(paperPos);
     $('#positions').innerHTML=ps.length
-      ? ps.map(x=>{const pnl=positionPnlDisplay(x);return `<div><b>${x.symbol}</b> · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה ${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}<div class="${pnl.className}">${pnl.text}</div></div>`;}).join('')
+      ? ps.map(x=>{const pnl=positionPnlDisplay(x);return `<div><b>${x.symbol}</b>${globalThis.LEVI_ASSET_CHART?.html(x.symbol,'SPOT')||''} · ${fmt(x.allocationIls)} ${moneyUnit} · כניסה ${fmt(x.entryPrice)} · כמות ${fmt(x.qty,8)}<div class="${pnl.className}">${pnl.text}</div></div>`;}).join('')
       : '<div class="mini">אין פוזיציות פעילות.</div>';
-    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b> · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
+    $('#paperHistory').innerHTML=(p.trades||[]).slice(0,10).map(t=>`<div><b>${t.symbol}</b>${globalThis.LEVI_ASSET_CHART?.html(t.symbol,'SPOT')||''} · $${fmt(t.buyPrice)} → $${fmt(t.sellPrice)} · ${+t.pnlPct>=0?'+':''}${fmt(t.pnlPct)}% · ${+t.pnlIls>=0?'+':''}${fmt(t.pnlIls)} ${moneyUnit}<div class="mini">עמלת קנייה: ${commissionsText(t.buyCommissions)} · עמלת מכירה: ${commissionsText(t.sellCommissions)}</div><div class="mini">מועד מכירה: ${tradeExecutionTime(t.at)} · שעון ישראל</div></div>`).join('')||'<div class="mini">עדיין אין עסקאות סגורות.</div>';
   }
 
   if(activeView==='portfolio')renderPortfolioView();
@@ -623,7 +623,7 @@ async function loadActionJournal(currentModeArg){
     const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
     window.dispatchEvent(new CustomEvent('levi:binance-history',{detail:{mode:currentModeArg,visible:activeView==='journal',symbols:[...new Set([...list.map(a=>a.symbol),...(currentLiveAccount?.balances||[]).filter(b=>b.asset!=='USDT'&&b.valueUsdt>=5).map(b=>b.asset+'USDT')])].filter(s=>/^[A-Z0-9]+USDT$/.test(s)),selectedSymbol}}));
     const journal=d.netJournal?.[currentModeArg]||[];
-    const netPanel=$('#netTradeJournal');if(netPanel)netPanel.innerHTML=journal.length?journal.slice(0,30).map(t=>'<div><b>'+t.symbol+' · '+(t.closed?'נסגרה':'מכירה חלקית')+'</b><div>'+tradeExecutionTime(t.at)+' · קנייה '+fmt(t.entryPrice,12)+' → מכירה '+fmt(t.sellPrice,12)+'</div><div class="'+(t.netPnlUsdt===null?'pnl-unknown':t.netPnlUsdt>=0?'pnl-profit':'pnl-loss')+'">רווח נטו: '+(t.netPnlUsdt===null?'חסרים נתוני עלות / עמלות':fmt(t.netPnlUsdt,4)+' USDT ('+fmt(t.netPnlPct)+'%)')+'</div><div>שיא רווח לפני עמלות: '+fmt(t.maxGrossPnlUsdt,4)+' USDT · שיא מחיר '+fmt(t.peakPrice,12)+'</div><div>עמלת קנייה: '+commissionsText(t.buyCommissions)+' · עמלת מכירה: '+commissionsText(t.sellCommissions)+'</div><div>סיבה: '+decisionReasonLabel(t.reason)+'</div></div>').join(''):'אין עסקאות עם עלות כניסה מתועדת';
+    const netPanel=$('#netTradeJournal');if(netPanel)netPanel.innerHTML=journal.length?journal.slice(0,30).map(t=>'<div>'+(globalThis.LEVI_ASSET_CHART?.html(t.symbol,'SPOT')||'')+'<b>'+t.symbol+' · '+(t.closed?'נסגרה':'מכירה חלקית')+'</b><div>'+tradeExecutionTime(t.at)+' · קנייה '+fmt(t.entryPrice,12)+' → מכירה '+fmt(t.sellPrice,12)+'</div><div class="'+(t.netPnlUsdt===null?'pnl-unknown':t.netPnlUsdt>=0?'pnl-profit':'pnl-loss')+'">רווח נטו: '+(t.netPnlUsdt===null?'חסרים נתוני עלות / עמלות':fmt(t.netPnlUsdt,4)+' USDT ('+fmt(t.netPnlPct)+'%)')+'</div><div>שיא רווח לפני עמלות: '+fmt(t.maxGrossPnlUsdt,4)+' USDT · שיא מחיר '+fmt(t.peakPrice,12)+'</div><div>עמלת קנייה: '+commissionsText(t.buyCommissions)+' · עמלת מכירה: '+commissionsText(t.sellCommissions)+'</div><div>סיבה: '+decisionReasonLabel(t.reason)+'</div></div>').join(''):'אין עסקאות עם עלות כניסה מתועדת';
     put('#actionJournalTitle','יומן פעולות · '+(currentModeArg==='live'?'LIVE':'DEMO'));
     $('#actionJournal').innerHTML=list.length?list.slice(0,30).map(x=>{
       const when=x.at?new Date(x.at).toLocaleString('he-IL'):'—';

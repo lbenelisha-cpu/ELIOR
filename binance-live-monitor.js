@@ -24,6 +24,7 @@ export function createLiveMonitor(host,{read,now=Date.now}){
   else{const tr=el('tr'),td=el('td',empty);td.colSpan=columns.length;tr.append(td);body.append(tr);}
   wrap.append(table);section.append(wrap);tables.append(section);
  }
+ function asset(symbol,market){const node=el('span',symbol);globalThis.LEVI_ASSET_CHART?.append(node,symbol,market);return node;}
  function render(){
   metrics.replaceChildren();pocState.replaceChildren();tables.replaceChildren();
   if(!data)return;
@@ -44,14 +45,14 @@ export function createLiveMonitor(host,{read,now=Date.now}){
     el('span',`${(data.poc?.pendingSetups||[]).length} תבניות ממתינות · ${(data.poc?.executions||[]).filter(x=>['FILLED','CLOSED'].includes(x.status)).length} ביצועים אמיתיים ביומן`));
   if(data.poc?.error||data.poc?.fatal)state.append(el('small','מצב מנגנון: '+(data.poc.fatal||data.poc.error)));
   pocState.append(el('h3','מצב מנגנון POC'),state);
-  const spotRows=(s.positions||[]).map(p=>[p.symbol,money(p.quantity),price(p.markPrice),money(p.valueUsdt)+' USDT',signed(p.unrealizedPnlUsdt)+' USDT',finite(p.pnlPct)?signed(p.pnlPct)+'%':'—']);
+  const spotRows=(s.positions||[]).map(p=>[asset(p.symbol,'SPOT'),money(p.quantity),price(p.markPrice),money(p.valueUsdt)+' USDT',signed(p.unrealizedPnlUsdt)+' USDT',finite(p.pnlPct)?signed(p.pnlPct)+'%':'—']);
   table('נכסים מוחזקים · Spot LONG',['נכס','כמות','מחיר נוכחי','שווי','רווח פתוח','שינוי'],spotRows,
     s.unpricedAssets?.length?'אין נכסים מתומחרים; חסר מחיר עבור '+s.unpricedAssets.join(', '):'אין כרגע נכסי Spot בחשבון.');
-  const futuresRows=(f.positions||[]).map(p=>[p.symbol,p.quantity>0?'LONG':'SHORT',money(Math.abs(p.quantity)),price(p.entryPrice),price(p.markPrice),signed(p.unrealizedPnlUsdt)+' USDT',p.managed?'מנוהל בבוט':'לא משויך ליומן הבוט']);
+  const futuresRows=(f.positions||[]).map(p=>[asset(p.symbol,'FUTURES'),p.quantity>0?'LONG':'SHORT',money(Math.abs(p.quantity)),price(p.entryPrice),price(p.markPrice),signed(p.unrealizedPnlUsdt)+' USDT',p.managed?'מנוהל בבוט':'לא משויך ליומן הבוט']);
   table('פוזיציות פתוחות · Futures',['נכס','כיוון','כמות','כניסה','מחיר סימון','רווח פתוח','שיוך'],futuresRows,f.ok?'אין כרגע פוזיציות Futures פתוחות.':'לא ניתן לאמת פוזיציות Futures.');
-  const setups=(data.poc?.pendingSetups||[]).map(x=>[x.symbol,x.side,price(x.poc),price(x.structuralStop),statusLabel(x.status||'WAITING'),time(x.expiresAt)]);
+  const setups=(data.poc?.pendingSetups||[]).map(x=>[asset(x.symbol,x.side==='SHORT'?'FUTURES':'SPOT'),x.side,price(x.poc),price(x.structuralStop),statusLabel(x.status||'WAITING'),time(x.expiresAt)]);
   table('המתנות POC · LIVE',['נכס','כיוון','POC','רמה מבנית','מצב','תוקף'],setups,'אין כרגע הוראות POC ממתינות.');
-  const executions=(data.poc?.executions||[]).map(x=>[x.symbol,x.side,statusLabel(x.status),time(x.intentAt),x.result?.order?.executedQty??x.result?.executedQty??'—',x.error||x.result?.error||'—']);
+  const executions=(data.poc?.executions||[]).map(x=>[asset(x.symbol,x.side==='SHORT'?'FUTURES':'SPOT'),x.side,statusLabel(x.status),time(x.intentAt),x.result?.order?.executedQty??x.result?.executedQty??'—',x.error||x.result?.error||'—']);
   table('יומן ביצועי POC · LIVE',['נכס','כיוון','מצב','זמן ניסיון','כמות שבוצעה','פרטים'],executions,'עדיין אין ביצועי POC ביומן LIVE.');
  }
  async function load(){if(!connected||busy)return;busy=true;const request=++generation;refresh.disabled=true;

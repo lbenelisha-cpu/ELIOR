@@ -56,7 +56,7 @@
   const shared=f.watch?.policy?.version==='SHARED_LONG_SHORT_WATCH_V1'?f.watch:null;
   if(shared){
    html+='<details data-short-detail="shared"><summary>מעקב LONG / SHORT משותף · '+shared.rows.length+' נכסים</summary><p class="mini">הסריקה ממשיכה גם כשפתיחת עסקאות חסומה. תנאי השורט נבדקים על גרף חוזה Futures, בנפרד מ־Spot.</p><p>ביצוע SHORT: '+esc(shared.entryBlocker?reason(shared.entryBlocker):'כפוף לבדיקת ההרשאות וההגנות לפני שליחה')+'</p><div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס במעקב Spot</th><th>חוזה SHORT תואם</th><th>סריקה אחרונה</th><th>תוצאת בדיקת SHORT</th></tr></thead><tbody>';
-   for(const row of shared.rows){const current=fresh(shared.checkedAt,now,90000)&&fresh(row.at,now,180000)&&row.expiresAt>now;const result=!fresh(shared.checkedAt,now,90000)?'STALE_SHORT_OBSERVATION':!row.available?row.mappingReason:current?row.reason:row.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION';html+='<tr><td>'+esc(row.spotSymbol)+'</td><td>'+esc(row.futuresSymbol||'לא זמין')+'</td><td>'+esc(time(row.at))+'</td><td>'+esc(reason(result))+'</td></tr>';}
+   for(const row of shared.rows){const current=fresh(shared.checkedAt,now,90000)&&fresh(row.at,now,180000)&&row.expiresAt>now;const result=!fresh(shared.checkedAt,now,90000)?'STALE_SHORT_OBSERVATION':!row.available?row.mappingReason:current?row.reason:row.at?'STALE_SHORT_OBSERVATION':'WAIT_SHORT_OBSERVATION';html+='<tr><td>'+esc(row.spotSymbol)+(root.LEVI_ASSET_CHART?.html(row.spotSymbol,'SPOT')||'')+'</td><td>'+esc(row.futuresSymbol||'לא זמין')+chartLink(row.futuresSymbol)+'</td><td>'+esc(time(row.at))+'</td><td>'+esc(reason(result))+'</td></tr>';}
    html+='</tbody></table></div></details>';
   }
   const checks=Object.entries(f.checks||{}).sort((a,b)=>Number(b[1]?.at||0)-Number(a[1]?.at||0));
@@ -65,7 +65,7 @@
    const watch=root.LEVI_CHANNEL_WATCH?.candidate({reason:c.reason,at:c.at,now,enabled:f.enabled===true&&!f.halt&&fresh(f.checkedAt,now,60000),held:rows.some(p=>p.symbol===symbol)});
    const consolidation=c.consolidation||c.setup?.consolidation;
    const consolidationNote=consolidation?.zone?' · דשדוש '+({UPPER:'עליון',LOWER:'תחתון',MIDDLE:'אמצעי'}[consolidation.zone]||'')+' · '+consolidation.bars+' נרות · עד '+time(consolidation.endAt):'';
-   html+='<tr'+(watch?' class="channel-watch"':'')+'><td>'+esc(symbol)+'</td><td>'+esc(time(c.at))+(fresh(c.at,now,60000)?'':' · נתון קודם')+'</td><td>'+esc(reason(c.reason))+esc(consolidationNote)+(watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+esc(watch.text)+' · לא אישור מכירה</div>':'')+'</td></tr>';
+   html+='<tr'+(watch?' class="channel-watch"':'')+'><td>'+esc(symbol)+chartLink(symbol)+'</td><td>'+esc(time(c.at))+(fresh(c.at,now,60000)?'':' · נתון קודם')+'</td><td>'+esc(reason(c.reason))+esc(consolidationNote)+(watch?'<div class="channel-watch-badge" data-watch-expires="'+watch.expiresAt+'">'+esc(watch.text)+' · לא אישור מכירה</div>':'')+'</td></tr>';
   }
   if(!checks.length)html+='<tr><td colspan="3">טרם התקבלו תוצאות סריקה. אין בכך אישור שאין מועמדים.</td></tr>';
   html+='</tbody></table></div></details>';

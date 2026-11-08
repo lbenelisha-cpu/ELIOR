@@ -7,7 +7,7 @@ let latest=null,loading=false;
 const labels={CYCLE_ERROR:'הסבב נכשל · נדרשת בדיקה',DISABLED:'כבוי · לא נשלחות הוראות',REQUIRES_REVIEW:'נעצר לבדיקת הוראה אצל הברוקר',PENDING_BROKER_CONFIRMATION:'ממתין לאישור ביצוע מהברוקר',MONITORING:'המעקב האוטומטי מופעל',WAITING_FIRST_CYCLE:'ממתין לסבב הראשון',STATUS_UNAVAILABLE:'לא ניתן לאמת מצב כרגע'};
 
 const time=t=>t?new Date(t).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'טרם בוצעה בדיקה';
-function line(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);}
+function line(parent,text){const p=document.createElement('p');p.textContent=text;parent.append(p);return p;}
 function renderPreparation(){
  const root=document.getElementById('preparationRows'),summary=document.getElementById('preparationSummary');if(!root||!summary)return;
  const p=latest?.preparation,rows=p?.rows||{},symbols=latest?.policy?.symbols||[];
@@ -18,6 +18,7 @@ function renderPreparation(){
   const r=rows[symbol],tr=document.createElement('tr');
   tr.dataset.state=r?.error||r?.complete===false?'old':r?'checked':'unseen';
   for(const value of [symbol,r?(r.reason==='WAIT_RSI_0_40'?'RSI בסגירה מחוץ לטווח 0–40':r.reason==='WAIT_RSI_0_30'?'RSI בסגירה מחוץ לטווח 0–30':reason(r.error||r.reason)):'ממתין לסריקת הכנה',Number.isFinite(r?.rsi)?r.rsi.toFixed(2):'—',r?.dataAt?time(r.dataAt):'—',r?.checkedAt?time(r.checkedAt):'—']){const td=document.createElement('td');td.textContent=value;tr.append(td);}
+  globalThis.LEVI_ASSET_CHART?.append(tr.firstChild,symbol,'STOCK');
   root.append(tr);
  }
 }
@@ -35,6 +36,7 @@ function renderMonitor(){
   for(const value of [row.symbol,row.reason?reason(row.reason)+recoveryText+(row.entryRsi!==null?' · RSI '+row.entryRsi.toFixed(2):'')+(row.entryBlockReason?' · '+reason(row.entryBlockReason):''):'טרם תועדה בדיקת כניסה',time(row.at),row.state==='old'?'בדיקה מלפני יותר מ־30 דקות':row.state==='unseen'?'ממתין לבדיקה מתועדת':'בדיקה מתועדת']){
    const td=document.createElement('td');td.textContent=value;tr.append(td);
   }
+  globalThis.LEVI_ASSET_CHART?.append(tr.firstChild,row.symbol,'STOCK');
   checks.append(tr);
  }
  document.getElementById('autoMonitorHistory').replaceChildren();
@@ -53,7 +55,7 @@ async function refresh(){if(document.hidden||loading)return;loading=true;refresh
  if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi-colmex-rsi',{detail:d}));
  latest=d;received.textContent='מצב השרת נקרא במסך: '+time(Date.now());document.getElementById('autoMonitorHistory').replaceChildren();renderMonitor();
  badge.textContent=labels[d.status]||d.status;status.textContent=(d.enabled?'חשבון אמיתי · ':'ההפעלה טרם אושרה בשרת · ')+time(d.lastCompletedAt||d.lastCycleAt)+(!d.lastError&&d.lastResult?' · '+reason(d.lastResult):'')+(d.halt&&d.halt!==d.lastResult?' · '+reason(d.halt):'')+(d.lastError?' · '+(d.lastError.reason==='NETWORK'?'קריאת קולמקס נכשלה או חרגה מזמן ההמתנה':d.lastError.reason==='AUTH_DENIED'?'קולמקס דחתה את פרטי החיבור':'שגיאת שרת: '+d.lastError.reason)+' · ניסיון אחרון: '+time(d.lastError.at):'');
- positions.replaceChildren();for(const p of d.positions||[])line(positions,`${p.symbol} · ${p.side||'LONG'} · כמות ${p.qty} · כניסה $${p.entryPrice} · ${p.side==='SHORT'?'שפל שנצפה $'+p.lowPrice:'שיא שנצפה $'+p.peakPrice}`);
+ positions.replaceChildren();for(const p of d.positions||[]){const item=line(positions,`${p.symbol} · ${p.side||'LONG'} · כמות ${p.qty} · כניסה $${p.entryPrice} · ${p.side==='SHORT'?'שפל שנצפה $'+p.lowPrice:'שיא שנצפה $'+p.peakPrice}`);globalThis.LEVI_ASSET_CHART?.append(item,p.symbol,'STOCK');}
  if(!d.positions?.length)line(positions,'אין פוזיציות שמנוהלות בידי המנגנון הזה. פוזיציות ידניות מוצגות בחלונית החשבון.');
  }catch{renderColmexStrategy(document,null);if(typeof window!=='undefined')window.LEVI_COLMEX_STATUS={data:null,error:true};if(typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('levi:colmex-status-error'));latest=null;badge.textContent='מצב לא זמין';status.textContent='לא ניתן לאמת אם המסחר מופעל. יש לבדוק את השרת.';health.textContent='אין חיבור לתצוגת המעקב · לא ניתן לאמת שהבדיקות ממשיכות';health.dataset.health='error';summary.textContent='זמן הסבב האחרון אינו מאומת כעת.';positions.replaceChildren();checks.replaceChildren();document.getElementById('autoMonitorHistory').replaceChildren();}finally{loading=false;refreshButton.disabled=false;}}
 refreshButton.addEventListener('click',refresh);
