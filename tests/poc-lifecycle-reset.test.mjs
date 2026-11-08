@@ -29,3 +29,17 @@ for(const side of ['LONG','SHORT'])test(side+' rebuilds a new wave after closing
  assert.deepEqual(m.profile,POC_MODEL.profile(bars.filter(b=>b.openTime>=m.anchorA.time&&b.openTime<=m.anchorB.time)));
  assert.equal(POC_MODEL.analyze({bars,side,pocResetAfter:now,now,price:bars.at(-1).close}).model,null);
 });
+
+for(const side of ['LONG','SHORT'])test(side+' requires a full new channel and consolidation, not only new A/B, after closure',()=>{
+ const input=pocFixture({side}),cutoff=input.bars[20].closeTime;
+ const old=POC_MODEL.analyze({...input,side});assert.equal(old.ready,true);
+ const result=POC_MODEL.analyze({...input,side,pocResetAfter:cutoff});
+ assert.equal(result.ready,false);assert.equal(result.model,null);
+ assert.ok(result.conditions.rows.every(row=>row.state!=='passed'));
+ const next=pocFixture({side}),shift=input.bars.at(-1).closeTime+D-next.bars[0].openTime;
+ const fresh=next.bars.map(b=>({...b,openTime:b.openTime+shift,closeTime:b.closeTime+shift}));
+ const liveBar={...next.liveBar,openTime:next.liveBar.openTime+shift,closeTime:next.liveBar.closeTime+shift};
+ const r=POC_MODEL.analyze({bars:[...input.bars,...fresh],side,pocResetAfter:cutoff,now:next.now+shift,liveBar,price:next.price});
+ assert.equal(r.ready,true,r.reason);assert.ok(r.conditions.rows.every(row=>row.state==='passed'));
+ assert.ok(r.model.channel.startAt>cutoff);assert.ok(r.model.consolidation.startAt>cutoff);assert.ok(r.model.anchorA.time>cutoff);
+});
