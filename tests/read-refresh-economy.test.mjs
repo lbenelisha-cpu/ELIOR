@@ -1,10 +1,15 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 const read=name=>fs.readFileSync(new URL('../'+name,import.meta.url),'utf8');
-test('dashboard schedules 30s reads and makes no scheduled or visibility reads while hidden',()=>{
+test('dashboard and independent status timers stay passive while hidden and resume on online/visibility events',()=>{
  const source=read('binance-agent.js'),start=source.lastIndexOf('load();\nsetInterval('),end=source.indexOf('// Keep account detail',start);assert.ok(start>=0&&end>start);
- const callbacks={},doc={hidden:false,addEventListener:(name,cb)=>callbacks[name]=cb};let calls=0,tick,period;
- vm.runInNewContext(source.slice(start,end),{document:doc,load:()=>calls++,setInterval:(cb,ms)=>{tick=cb;period=ms;}});
- assert.equal(period,30000);assert.equal(calls,1);doc.hidden=true;tick();callbacks.visibilitychange();assert.equal(calls,1);doc.hidden=false;callbacks.visibilitychange();assert.equal(calls,2);tick();assert.equal(calls,3);
+ const callbacks={},online={},timers=new Map(),doc={hidden:false,addEventListener:(name,cb)=>callbacks[name]=cb};let calls=0,statusCalls=0;
+ const refreshSource=source.slice(source.indexOf('function refreshShortStatus(){'),source.indexOf('let dashboardLoadInFlight='));
+ vm.runInNewContext(refreshSource+source.slice(start,end),{document:doc,currentMode:'live',window:{addEventListener:(name,cb)=>online[name]=cb},modeRefresh:{refresh:()=>{statusCalls++;return Promise.resolve();}},load:()=>calls++,setInterval:(cb,ms)=>timers.set(ms,cb)});
+ assert.deepEqual([...timers.keys()],[30000,15000]);assert.equal(calls,1);
+ doc.hidden=true;timers.get(30000)();timers.get(15000)();callbacks.visibilitychange();assert.equal(calls,1);assert.equal(statusCalls,0);
+ doc.hidden=false;timers.get(15000)();assert.equal(statusCalls,1);assert.equal(calls,1);
+ callbacks.visibilitychange();assert.equal(calls,2);assert.equal(statusCalls,2);
+ online.online();assert.equal(statusCalls,3);assert.equal(calls,3);
 });
 test('portfolio consumes dashboard events without a second HTTP request or independent poller',()=>{
  const callbacks={},body={innerHTML:''},window={addEventListener:(name,cb)=>callbacks[name]=cb};
