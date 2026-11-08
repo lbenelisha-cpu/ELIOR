@@ -46,3 +46,24 @@ test('installer patch preserves installed code and rejects unknown observer anch
   fs.writeFileSync(path.join(root,'server.mjs'),'unknown engine');assert.throws(()=>patch(root));assert.equal(fs.readFileSync(path.join(root,'server.mjs'),'utf8'),'unknown engine');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+
+ test('active long or short suspends channel geometry only and resumes with fresh history',()=>{
+  const state={};observeChannels(state,{symbol:'TEST',bars:bars(),at:opts.now});
+  const saved={entryPrice:110,setup:{channelProtection:{targetPrice:125}},stopPrice:108};state.position=saved;
+  const prior={parallel:globalThis.LEVI_PARALLEL,regression:globalThis.LEVI_REGRESSION};
+  try{
+   globalThis.LEVI_PARALLEL=globalThis.LEVI_REGRESSION={analyze:()=>{throw Error('unexpected channel analysis');}};
+   observeChannels(state,{symbol:'TEST',bars:new Proxy([],{get(){throw Error('unexpected history read');}}),positionOpen:true,at:opts.now+1});
+   assert.equal(state.channelComparison.pending.TEST,undefined);assert.equal(state.channelComparison.lastSample.TEST,undefined);
+   assert.equal(channelReport(state).suspended,1);assert.equal(channelReport(state).resolved,0);assert.equal(channelReport(state).expired,0);
+   assert.equal(state.position,saved);
+  }finally{globalThis.LEVI_PARALLEL=prior.parallel;globalThis.LEVI_REGRESSION=prior.regression;}
+  observeChannels(state,{symbol:'TEST',bars:bars(110),positionOpen:false,at:start+110*D});
+  assert.equal(state.channelComparison.pending.TEST.end,start+109*D);
+ });
+
+test('technical channel observer also suspends while a position is open',async()=>{
+ const {technicalObservation}=await import('../lib/market-attention.mjs');
+ const r=technicalObservation({symbol:'TESTUSDT',positionOpen:true,bars:new Proxy([],{get(){throw Error('history accessed');}})});
+ assert.equal(r.ready,false);assert.equal(r.watch,false);assert.equal(r.reason,'POSITION_MANAGEMENT_ONLY');assert.equal(r.channel,undefined);
+});

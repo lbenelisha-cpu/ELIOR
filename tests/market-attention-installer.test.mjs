@@ -12,6 +12,7 @@ test('installer is atomic and idempotent while preserving unrelated production e
   const patches=JSON.parse(fs.readFileSync(new URL('../scripts/market-attention-patches.json',import.meta.url)));
   for(const file of ['server.mjs','binance-agent.html']){
    let s=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
+   s=s.replaceAll(',positionOpen:!!(tradingPositions()[symbol]||futuresShort.state.positions[symbol])','');
    // Reconstruct the original installer's source context before the later shared-watch integration.
    const later=JSON.parse(fs.readFileSync(new URL('../scripts/shared-market-watch-patches.json',import.meta.url),'utf8'));
    for(const p of later.filter(p=>p.file===file).reverse())s=s.replace(p.after,p.before);
