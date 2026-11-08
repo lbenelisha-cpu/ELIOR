@@ -1132,6 +1132,17 @@ function drawCandles(candles){
   fixedRangeProfile?.update({onModeChange:()=>drawCandles(chartCandles),models:selectedInterval==='5m'?{LONG:(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions?.channel?.conditions?.model}:null,sourceBars:candles,symbol:selectedSymbol,interval:selectedInterval,bars:view.map(b=>({...b,time:Number(b.openTime)})),width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch},x:i=>left+step*(i+.5),y});
 }
 
+const modeRefresh=window.LEVI_MODE_REFRESH.create({
+ read:()=>J(MODE,{timeoutMs:15000}),
+ context:()=>window.LEVI_TRADE_AUTH?.read()||'',
+ publish:s=>window.LEVI_FUTURES_TABLE?.update(s)
+});
+function refreshShortStatus(){
+ if(document.hidden||currentMode!=='live')return;
+ // Failure retains the original timestamps; stale prices/protection are never
+ // advertised as fresh. The next scheduled read retries without page reload.
+ modeRefresh.refresh().catch(()=>{});
+}
 let dashboardLoadInFlight=false;
 let dashboardLoaded=false;
 let scannerVerifiedMode=null,scannerVerifiedAt=null;
@@ -1149,7 +1160,7 @@ async function load(){
       if(!dashboardLoaded&&$('#chartSection')?.open!==false&&(activeView==='trade'||activeView==='scans')&&typeof loadChart==='function'&&typeof selectedSymbol==='string')loadChart(selectedSymbol);
       return m;
     };
-    const modeRead=J(MODE,{timeoutMs:35000}).then(applyMode).catch(()=>null);
+    const modeRead=modeRefresh.refresh().then(applyMode).catch(()=>null);
     const agent=await J(AGENT,{timeoutMs:35000});
     agentMode=['live','demo'].includes(agent.mode)?agent.mode:null;
     const m=agentMode?(receivedMode?.mode===agentMode?receivedMode:applyMode({mode:agentMode,tradeControl:agent.tradeControl,liveState:agent.config?.liveState,demoTradingEnabled:agent.config?.demoTradingEnabled===true})):await modeRead;
@@ -1299,7 +1310,9 @@ if(window.ResizeObserver){new ResizeObserver(()=>drawCandles(chartCandles)).obse
 window.addEventListener('resize',()=>drawCandles(chartCandles));
 load();
 setInterval(()=>{if(!document.hidden)load();},30000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+setInterval(refreshShortStatus,15000);
+window.addEventListener('online',()=>{refreshShortStatus();load();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshShortStatus();load();}});
 
 // Keep account detail and recent trades collapsed until explicitly opened.
 document.querySelectorAll('[data-detail-toggle]').forEach(button=>{
