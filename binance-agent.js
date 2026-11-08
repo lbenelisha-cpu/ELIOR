@@ -66,7 +66,7 @@ import('./chart-workbench.js?v=20261104-frvp').then(({createWorkbench})=>{
 
 let chartRequestId=0;
 let chartAnalysisContext=null;
-let manualTradeCapabilities=null;
+let manualTradeCapabilities=null,futuresManualCapabilities=null,futuresManualStatus=null;
 let chartWyckoffHistory=[],chartWyckoffError=null,selectedWyckoffId=null;
 const wyckoffHistoryCache=new Map();
 let wyckoffHistoryEngine=null;
@@ -247,7 +247,7 @@ function mode(s){
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   currentMode=s.mode;
-  manualTradeCapabilities=s.manualTrading||null;
+  manualTradeCapabilities=s.manualTrading||null;futuresManualCapabilities=s.futuresManualTrading||null;futuresManualStatus=s.shortTrading||null;
   renderTradeControlStatus(s);
   const paused=s.tradeControl?.paused===true;
   const stopButton=$('#stopTradingBtn'),startButton=$('#startTradingBtn');
@@ -1334,8 +1334,8 @@ document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{pri
 
 window.LEVI_POC={read:()=>J(B+'/api/binance-live/poc'),write:body=>authenticatedControl(B+'/api/binance-live/poc',body)};
 window.LEVI_MANUAL_TRADES={
- context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities}),
- submit:async body=>{try{return await authenticatedControl(B+'/api/binance-live/manual',body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
+ context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities,futuresCapabilities:futuresManualCapabilities,futures:futuresManualStatus}),
+ submit:async body=>{try{return await authenticatedControl(B+(body.market==='FUTURES'?'/api/binance-live/futures-manual':'/api/binance-live/manual'),body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
  connected:()=>Boolean(tradeControlToken),
  connect:()=>window.LEVI_DEVICE_ACCESS?.open(),
  pair:async code=>{

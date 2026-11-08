@@ -13,7 +13,7 @@
   if(!/^[A-Z0-9]+USDT$/.test(symbol||''))return '';
   const contract='BINANCE:'+symbol+'.P';
   const url=root.LEVI_TRADINGVIEW_URL?.(contract)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(contract)+'&interval=5';
-  return '<br><a class="tradingview-link short-chart-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף Futures של '+esc(symbol)+' ב־TradingView">גרף ↗</a>';
+  return '<br><a class="tradingview-link short-chart-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף Futures של '+esc(symbol)+' ב־TradingView">גרף ↗</a>'+(globalThis.LEVI_ASSET_CHART?.actions(symbol,'FUTURES')||'');
  }
  function view(snapshot,now=Date.now()){
   const f=snapshot?.shortTrading;

@@ -21,6 +21,7 @@ function fixture(quoteFixed=false){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'equity-installer-test-'));
  for(const dir of ['lib','scripts','tests'])fs.cpSync(new URL('../'+dir,import.meta.url),path.join(root,dir),{recursive:true});
  for(const file of ['server.mjs','binance-agent.js','tradingview-exit-snapshot.js','channel-poc-model.js','parallel-channel.js','regression-trend.js'])fs.copyFileSync(new URL('../'+file,import.meta.url),path.join(root,file));
+ const server=path.join(root,'server.mjs');fs.writeFileSync(server,fs.readFileSync(server,'utf8').replace('      futuresManualTrading:{version:1,maxOrderUsdt:35},\n',''));
  for(const p of [...patches].reverse()){
   if(quoteFixed&&p.before.includes('positionQuoteAt:'))continue;
   const file=path.join(root,p.file),source=fs.readFileSync(file,'utf8');

@@ -416,3 +416,27 @@ test('quote halt recovery rejects pending operations, unverified protection, sta
   h.runner.recoverFreshQuoteHalt(account,now);assert.equal(h.runner.state.halt,'FUTURES_QUOTE_STALE');
  }
 });
+
+const manual=(side='OPEN_SHORT',requestId='manual-request-000001')=>({requestId,symbol:'ABCUSDT',side,mode:'live',quoteUsdt:20,all:side==='CLOSE_SHORT'});
+test('manual Futures open and close use isolated short lane and durable idempotency',async()=>{
+ const h=harness(),i=manual();const r=await h.runner.manualTrade(i);assert.equal(r.ok,true);
+ assert.equal(h.runner.state.positions.ABCUSDT.setup.entryMode,'MANUAL');
+ const before=h.writes.length;assert.deepEqual(await h.runner.manualTrade(i),r);assert.equal(h.writes.length,before);
+ await assert.rejects(()=>h.runner.manualTrade({...i,symbol:'XYZUSDT'}),/CONFLICT/);
+ const c=manual('CLOSE_SHORT','manual-request-close1');const close=await h.runner.manualTrade(c);assert.equal(close.ok,true);
+ const exit=h.writes.filter(x=>x.p==='/fapi/v1/order').at(-1);assert.equal(exit.q.side,'BUY');assert.equal(exit.q.reduceOnly,'true');assert.equal(h.runner.state.positions.ABCUSDT,undefined);
+ const n=h.writes.length;assert.deepEqual(await h.runner.manualTrade(c),close);assert.equal(h.writes.length,n);
+});
+test('uncertain manual Futures result is reconciled without a second entry and status never submits',async()=>{
+ const h=harness({unknownOnce:true}),i=manual();assert.equal((await h.runner.manualTrade(i)).uncertain,true);
+ const n=h.writes.length;assert.equal((await h.runner.manualTrade(i)).uncertain,true);assert.equal(h.writes.length,n);
+ await h.runner.recover();assert.equal((await h.runner.manualTrade({...i,statusOnly:true})).ok,true);assert.equal(h.writes.length,n);
+ assert.equal((await h.runner.manualTrade({...i,requestId:'unknown-request-0001',statusOnly:true})).uncertain,true);assert.equal(h.writes.length,n);
+});
+test('manual Futures entry retains halt, budget, reservation and permission guards; close requires owned position',async()=>{
+ for(const modify of [h=>h.runner.state.halt='REVIEW',h=>h.runner.reserved=()=>true,h=>h.control.allowEntries=false]){
+  const h=harness();modify(h);assert.equal((await h.runner.manualTrade(manual())).ok,false);assert.equal(h.writes.filter(x=>x.p==='/fapi/v1/order').length,0);
+ }
+ const h=harness();await assert.rejects(()=>h.runner.manualTrade({...manual(),quoteUsdt:36}),/INVALID/);
+ assert.equal((await h.runner.manualTrade(manual('CLOSE_SHORT'))).ok,false);assert.equal(h.writes.length,0);
+});
