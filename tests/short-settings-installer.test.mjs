@@ -69,7 +69,7 @@ test('staged tests support and preserve an installed runner with additional cont
    const target=path.join(dir,file);fs.writeFileSync(target,beforeConsolidation(file,fs.readFileSync(target,'utf8')));
   }
   const runnerPath=path.join(dir,'lib/futures-short-runner.mjs');
-  const anchor=' async ensureAlgo(p,kind,price){';
+  const anchor=' async ensureAlgo(p,kind,price,allowConflictRecovery=true){';
   const contractCheck=`${anchor}
   const contract=await this.api.get('/fapi/v1/ticker/price',{symbol:p.symbol});
   if(contract.symbol!==p.symbol||!(Number(contract.price)>0)||this.now()-Number(contract.time)>10000)throw Error('CONTRACT_PRICE_UNVERIFIED');

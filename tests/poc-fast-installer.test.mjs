@@ -19,7 +19,7 @@ test('fast-watch installer is idempotent, retains the deployed Spot cycle and ad
  const root=fixture();try{
   const server=path.join(root,'server.mjs'),src=fs.readFileSync(server,'utf8'),start=src.indexOf('async function executeLiveCycle('),end=src.indexOf('async function getLiveAccountSnapshot(',start);
   const installed=fs.readFileSync(new URL('./fixtures/binance-live-cycle-deployed-20261106.txt',import.meta.url),'utf8');fs.writeFileSync(server,src.slice(0,start)+installed+src.slice(end));
-  const runner=path.join(root,'lib/futures-short-runner.mjs'),anchor=' async ensureAlgo(p,kind,price){';
+  const runner=path.join(root,'lib/futures-short-runner.mjs'),anchor=' async ensureAlgo(p,kind,price,allowConflictRecovery=true){';
   const check="\n  const contract=await this.api.get('/fapi/v1/ticker/price',{symbol:p.symbol});\n  if(contract.symbol!==p.symbol||!(Number(contract.price)>0)||this.now()-Number(contract.time)>10000)throw Error('CONTRACT_PRICE_UNVERIFIED');\n  if(kind==='STOP_MARKET'?price<=Number(contract.price):price>=Number(contract.price))throw Error('CONTRACT_TRIGGER_ALREADY_REACHED');";
   fs.writeFileSync(runner,fs.readFileSync(runner,'utf8').replace(anchor,anchor+check));
   patchPocFastWatch(root,patches);assert.ok(fs.readFileSync(server,'utf8').includes(installed));assert.ok(fs.readFileSync(runner,'utf8').includes(check));

@@ -57,6 +57,48 @@ function harness(options={}){
  runner.infos.ABCUSDT=info;runner.marketAt=now;
  return {runner,api,writes,algos,orders,a,symbolConfig,control,ownerSettings,setQuote:q=>quote={...quote,...q},setPositions:p=>positions=p,get saved(){return saved;}};
 }
+test('4130 replaces only a verified owned guard after confirmed cancellation and retains the other protection',async()=>{
+ const options={},h=harness(options);await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ const p=h.runner.state.positions.ABCUSDT,old=p.algos.find(x=>x.kind==='STOP_MARKET'),tp=p.algos.find(x=>x.kind==='TAKE_PROFIT_MARKET'),start=h.writes.length;
+ options.beforePost=(route,q)=>{if(route==='/fapi/v1/algoOrder'&&[...h.algos.values()].some(x=>x.orderType===q.type&&x.algoStatus==='NEW')){const e=Error('FUTURES_API_-4130');e.code=-4130;e.status=400;throw e;}};
+ await h.runner.ensureAlgo(p,'STOP_MARKET',105);
+ assert.equal(h.algos.get(old.clientAlgoId).algoStatus,'CANCELED');assert.equal(h.algos.get(tp.clientAlgoId).algoStatus,'NEW');
+ assert.equal(p.algos.find(x=>x.kind==='STOP_MARKET').price,105);assert.equal(p.algos.find(x=>x.kind==='STOP_MARKET').status,'NEW');
+ const writes=h.writes.slice(start);assert.equal(writes.filter(x=>x.p==='/fapi/v1/order').length,0);
+ assert.equal(writes.filter(x=>x.q.type==='STOP_MARKET').length,2);assert.equal(writes[1].q.clientAlgoId,old.clientAlgoId);
+});
+test('4130 fallback never cancels unverified guards and never retries an ambiguous submission',async()=>{
+ for(const fault of ['identity','ambiguous','external']){
+  const options={},h=harness(options);await h.runner.enter('ABCUSDT',shortSignal(input(),config));const p=h.runner.state.positions.ABCUSDT,start=h.writes.length;
+  if(fault==='identity')h.algos.get(p.algos[0].clientAlgoId).side='SELL';
+  if(fault==='external')p.algos=p.algos.filter(x=>x.kind!=='STOP_MARKET');
+  options.beforePost=(route)=>{if(route==='/fapi/v1/algoOrder'){const e=Error(fault==='ambiguous'?'FUTURES_NETWORK_OUTCOME_UNKNOWN':'FUTURES_API_-4130');if(fault!=='ambiguous'){e.code=-4130;e.status=400;}throw e;}};
+  await assert.rejects(h.runner.ensureAlgo(p,'STOP_MARKET',105));
+  const writes=h.writes.slice(start);assert.equal(writes.length,1);assert.equal(writes[0].q.type,'STOP_MARKET');
+ }
+});
+test('failed replacement is bounded and management retains its emergency close and halt',async()=>{
+ const options={},h=harness(options);await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ options.beforePost=(route)=>{if(route==='/fapi/v1/algoOrder'){const e=Error('FUTURES_API_-4130');e.code=-4130;e.status=400;throw e;}};
+ h.setQuote({bidPrice:'95',askPrice:'95.01'});const before=h.writes.length;
+ await h.runner.manage(await h.runner.snapshot());
+ assert.equal(h.runner.state.halt,'FUTURES_API_-4130');assert.ok(h.writes.slice(before).some(x=>x.p==='/fapi/v1/order'&&x.q.side==='BUY'&&x.q.reduceOnly==='true'));
+ assert.equal(h.writes.slice(before).filter(x=>x.q.type==='STOP_MARKET').length,2);
+});
+test('4130 halt releases only after fresh owned protection and complete exchange reconciliation',async()=>{
+ for(const fault of [null,'foreignOrder','foreignAlgo','stale','pending','otherHalt','unownedPosition']){
+  const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));const p=h.runner.state.positions.ABCUSDT;
+  h.runner.state.halt=fault==='otherHalt'?'FUTURES_FATAL':'FUTURES_API_-4130';
+  if(fault==='stale')p.priceAt=now-11000;
+  if(fault==='pending')h.runner.state.pending={kind:'EXIT'};
+  if(fault==='unownedPosition')h.setPositions([{symbol:'FOREIGNUSDT',positionSide:'BOTH',positionAmt:'-1',entryPrice:'100'}]);
+  const get=h.api.get;h.api.get=async(route,q)=>route==='/fapi/v1/openOrders'&&fault==='foreignOrder'?[{}]:route==='/fapi/v1/openAlgoOrders'&&fault==='foreignAlgo'?[...(await get(route,q)),{clientAlgoId:'foreign'}]:get(route,q);
+  const writes=h.writes.length;
+  try{await h.runner.recoverProtectionConflictHalt(now);}catch(e){assert.equal(fault,'unownedPosition');}
+  assert.equal(h.writes.length,writes,'recovery only reads exchange state');
+  if(fault)assert.ok(h.runner.state.halt);else{assert.equal(h.runner.state.halt,null);assert.equal(h.runner.state.resumedAt,now);assert.equal(h.runner.state.haltReleases.at(-1).reason,'PROTECTION_CONFLICT_RECONCILED');}
+ }
+});
 test('shared SHORT execution universe includes verified stock contracts independently of top-volume rankings',async()=>{
  const h=harness(),get=h.api.get;h.runner.watchSymbols=()=>['GOOGLBUSDT','ABCUSDT','NVDABUSDT'];
  h.api.get=async(route,p)=>{
