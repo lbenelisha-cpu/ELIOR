@@ -24,7 +24,8 @@ function loader(){
   loadLiveAccount:async data=>data.connected?data.account:null,
   render:(agent,mode,account,options)=>{context.currentLiveAccount=account;renders.push({mode,account,options});},
   put:(key,text)=>{labels[key]=text;},tradeExecutionTime:()=> 'last-confirmed',loadActionJournal:async()=>{},$:()=>null});
- vm.runInContext(src.slice(src.indexOf('let dashboardLoadInFlight='),src.indexOf('\nasync function authenticatedControl(')),context);
+ vm.runInContext(fs.readFileSync(new URL('../binance-mode-refresh.js',import.meta.url),'utf8'),context);vm.runInContext('window.LEVI_MODE_REFRESH=LEVI_MODE_REFRESH',context);
+ vm.runInContext(src.slice(src.indexOf('const modeRefresh='),src.indexOf('\nasync function authenticatedControl(')),context);
  return {context,renders,labels,setAccount:a=>{account=a;},failAgent:()=>{failAgent=true;},setMode:m=>{selectedMode=m;}};
 }
 test('first paint shows market data while later refreshes render verified account only',async()=>{
