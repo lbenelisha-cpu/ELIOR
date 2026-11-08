@@ -347,3 +347,30 @@ test('SHORT enters on the open return candle without a volume multiplier and rej
  const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));assert.equal(h.writes.filter(w=>w.q.side==='SELL').length,1);assert.equal(h.saved.version,'FUTURES_CHANNEL_SHORT_V1');
  const old=harness();await assert.rejects(old.runner.enter('ABCUSDT',{...r,setup:{...r.setup,entryPolicyVersion:undefined}}),/POC_MODEL_CHANGED/);assert.equal(old.writes.filter(w=>w.q.side==='SELL').length,0);
 });
+
+
+test('a transient stale quote recovers only after fresh management and both protections, without a duplicate entry',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ h.setQuote({time:now-11000});await h.runner.manage(await h.runner.snapshot());
+ assert.equal(h.runner.state.halt,'FUTURES_QUOTE_STALE');
+ const before=h.writes.length;h.control.allowEntries=false;
+ await h.runner.cycle();assert.equal(h.runner.state.halt,'FUTURES_QUOTE_STALE');
+ h.setQuote({time:now});await h.runner.cycle();
+ assert.equal(h.runner.state.halt,null);assert.equal(h.runner.state.resumedAt,now);
+ assert.equal(h.runner.state.haltReleases.at(-1).reason,'FRESH_QUOTES_AND_PROTECTIONS_REVERIFIED');
+ assert.equal(h.writes.length,before);assert.equal(h.runner.state.positions.ABCUSDT.algos.length,2);
+});
+test('quote recovery never clears a permanent halt or launders it through a later stale quote',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ h.runner.state.halt='FUTURES_PROTECTION_IDENTITY_MISMATCH';h.setQuote({time:now-11000});
+ await h.runner.cycle();assert.equal(h.runner.state.halt,'FUTURES_PROTECTION_IDENTITY_MISMATCH');
+ h.setQuote({time:now});await h.runner.cycle();assert.equal(h.runner.state.halt,'FUTURES_PROTECTION_IDENTITY_MISMATCH');
+});
+test('quote halt recovery rejects pending operations, unverified protection, stale prices and empty journals',async()=>{
+ const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+ h.runner.state.halt='FUTURES_QUOTE_STALE';const original=structuredClone(h.runner.state),account=await h.runner.snapshot();
+ for(const mutate of [r=>r.state.pending={},r=>r.error='FAIL',r=>r.forceClose=true,r=>r.state.positions.ABCUSDT.protectedAt=now-1,r=>r.state.positions.ABCUSDT.priceAt=now-11000,r=>r.state.positions.ABCUSDT.algos.pop(),r=>r.state.positions={}]){
+  h.runner.state=structuredClone(original);h.runner.error=null;h.runner.forceClose=false;mutate(h.runner);
+  h.runner.recoverFreshQuoteHalt(account,now);assert.equal(h.runner.state.halt,'FUTURES_QUOTE_STALE');
+ }
+});
