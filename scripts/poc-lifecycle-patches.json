@@ -1,0 +1,47 @@
+[
+  {
+    "file": "lib/wyckoff-evaluation.mjs",
+    "before": "allowEarlyWave=false,entryAfter=0,",
+    "after": "allowEarlyWave=false,entryAfter=0,pocResetAfter=0,"
+  },
+  {
+    "file": "lib/wyckoff-evaluation.mjs",
+    "before": "channelEntry({bars,price,priceAsOf,now,usedPatternIds,entryAfter,liveBar",
+    "after": "channelEntry({bars,price,priceAsOf,now,usedPatternIds,entryAfter,pocResetAfter,liveBar"
+  },
+  {
+    "file": "server.mjs",
+    "before": "assertChannelSubmission({bars:executionBars,",
+    "after": "assertChannelSubmission({pocResetAfter:Math.max(0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite)),bars:executionBars,"
+  },
+  {
+    "file": "server.mjs",
+    "before": "allowEarlyWave:true,entryAfter:entryBoundary,",
+    "after": "allowEarlyWave:true,entryAfter:entryBoundary,pocResetAfter:latestSaleAt,"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "now:this.now(),liveBar:bars.find",
+    "after": "now:this.now(),pocResetAfter:this.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0,liveBar:bars.find"
+  },
+  {
+    "file": "server.mjs",
+    "before": "boundary:symbol=>({entryAfter:",
+    "after": "boundary:symbol=>({pocResetAfter:futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0,entryAfter:"
+  },
+  {
+    "file": "lib/colmex-auto-runner.mjs",
+    "before": "const entryInput={symbol:intent.symbol,",
+    "after": "const entryInput={pocResetAfter:s.after[intent.symbol]||0,symbol:intent.symbol,"
+  },
+  {
+    "file": "lib/colmex-auto-runner.mjs",
+    "before": "channelPrimary.requested?colmexChannelSignal({symbol,",
+    "after": "channelPrimary.requested?colmexChannelSignal({pocResetAfter:s.after[symbol]||0,symbol,"
+  },
+  {
+    "file": "lib/colmex-poc-fast.mjs",
+    "before": "const result=colmexChannelSignal({symbol,",
+    "after": "const result=colmexChannelSignal({pocResetAfter:state.after[symbol]||0,symbol,"
+  }
+]

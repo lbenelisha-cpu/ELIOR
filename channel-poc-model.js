@@ -76,25 +76,27 @@
  // freshness checks and entry decisions are evaluated on every call.
  const replays=new Map(),replayFields=['openTime','closeTime','open','high','low','close','volume'];
  let replayChars=0,replayEngine=null;
- function replay(closed){
+ function replay(closed,entryAfter){
   if(replayEngine!==root.LEVI_PARALLEL){replays.clear();replayChars=0;replayEngine=root.LEVI_PARALLEL;}
-  const key=closed.length<=10000&&closed.every(b=>replayFields.every(k=>Number.isFinite(b[k])))?JSON.stringify(closed.map(b=>replayFields.map(k=>b[k]))):null;
+  const key=closed.length<=10000&&closed.every(b=>replayFields.every(k=>Number.isFinite(b[k])))?JSON.stringify([entryAfter,closed.map(b=>replayFields.map(k=>b[k]))]):null;
   if(key!==null&&replays.has(key)){
    const cached=replays.get(key);replays.delete(key);replays.set(key,cached);
    return structuredClone(cached);
   }
-  const result=replayClosed(closed);
+  const result=replayClosed(closed,entryAfter);
   if(key!==null&&key.length<=1000000){
    while(replays.size>=128||replayChars+key.length>32000000){const oldest=replays.keys().next().value;replayChars-=oldest.length;replays.delete(oldest);}
    replays.set(key,structuredClone(result));replayChars+=key.length;
   }
   return result;
  }
- function replayClosed(closed){
+ function replayClosed(closed,entryAfter){
+  const firstFresh=entryAfter>0?closed.findIndex(b=>b.openTime>entryAfter):0;
+  if(firstFresh<0)return null;
   let wave=null,reference=null;
   // Replay forward only. A valid channel may remain the reference while its
   // breakout/return unfolds; no future candle identifies the wave's peak.
-  for(let i=50;i<closed.length;i++){
+  for(let i=Math.max(50,firstFresh);i<closed.length;i++){
    const history=closed.slice(i-50,i),b=closed[i],c=geometry(history);
    if(c)reference={history,c,start:i-50};
    if(wave)extendWave(wave,closed,i);
@@ -108,14 +110,17 @@
    if(wave&&wave.model.side===direction&&wave.returnIndex===null)continue;
    const start=wave?(wave.model.side===direction?wave.returnIndex:wave.bIndex):null;
    if(start!==null&&start>=i)continue;
-   wave=makeWave(closed,ref,direction,i,start);
+   // Rebuild the reference after the lifecycle boundary. Historical candles
+   // remain available for geometry, but no pre-close A, B or wave survives.
+   wave=makeWave(closed,ref,direction,i,entryAfter>0?Math.max(firstFresh,start??0):start);
   }
   return wave?.model||null;
  }
- function analyze({bars=[],side,price,liveBar,now=Date.now()}){
+ function analyze({bars=[],side,price,liveBar,now=Date.now(),pocResetAfter=0}){
+  const entryAfter=Number(pocResetAfter)||0;
   if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
   const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
-  const replayed=replay(closed),model=replayed?.side===side?replayed:null;
+  const replayed=replay(closed,entryAfter),model=replayed?.side===side?replayed:null;
   let reason;
   if(model){
    states.channel='passed';states.break='passed';states.range=model.consolidation.passed?'passed':'waiting';

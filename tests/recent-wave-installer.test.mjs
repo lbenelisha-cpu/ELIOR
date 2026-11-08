@@ -1,3 +1,4 @@
+import {rewindLifecycleFixture} from './helpers/pre-lifecycle-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
 import {patchRecentWavePoc,recentWaveFiles} from '../scripts/patch-recent-wave-poc.mjs';
 const manifest=JSON.parse(fs.readFileSync(new URL('../scripts/recent-wave-poc-patches.json',import.meta.url),'utf8')),fast=JSON.parse(fs.readFileSync(new URL('../scripts/poc-fast-watch-patches.json',import.meta.url),'utf8'));
@@ -5,6 +6,7 @@ function fixture(preFast){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'recent-wave-test-'));
  for(const dir of ['lib','scripts','tests'])fs.cpSync(new URL('../'+dir,import.meta.url),path.join(root,dir),{recursive:true});
  for(const file of new Set([...recentWaveFiles,'binance-agent.js','tradingview-exit-snapshot.js','regression-trend.js','parallel-channel.js'])){fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.copyFileSync(new URL('../'+file,import.meta.url),path.join(root,file));}
+ rewindLifecycleFixture(root);
  for(const p of manifest){const file=path.join(root,p.file),s=fs.readFileSync(file,'utf8');fs.writeFileSync(file,p.fragment?s.replace(p.after,p.before):p.before);}
  if(preFast)for(const p of [...fast].reverse()){
   const file=path.join(root,p.file),s=fs.readFileSync(file,'utf8');

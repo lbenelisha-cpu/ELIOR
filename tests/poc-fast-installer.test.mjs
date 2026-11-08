@@ -1,3 +1,4 @@
+import {rewindLifecycleFixture} from './helpers/pre-lifecycle-source.mjs';
 import {LIVE_EQUITY_ALLOCATION,LIVE_BUY_FEE_RESERVE} from '../lib/live-buy-allocation.mjs';
 import vm from 'node:vm';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
@@ -7,6 +8,7 @@ function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'poc-fast-install-'));
  for(const dir of ['lib','scripts','tests'])fs.cpSync(new URL('../'+dir,import.meta.url),path.join(root,dir),{recursive:true});
  for(const f of ['server.mjs','binance-agent.js','regression-trend.js','parallel-channel.js','channel-poc-model.js'])fs.copyFileSync(new URL('../'+f,import.meta.url),path.join(root,f));
+ rewindLifecycleFixture(root);
  for(const p of [...patches].reverse()){
   const file=path.join(root,p.file);if(p.before===null){fs.rmSync(file);continue;}
   const text=fs.readFileSync(file,'utf8');
