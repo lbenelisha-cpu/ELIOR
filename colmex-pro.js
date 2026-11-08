@@ -19,7 +19,7 @@ import {validShape} from './lib/chart-workbench.mjs?v=20261022-tools';
 import {createWorkbench} from './chart-workbench.js?v=20261104-frvp';
 import {createChartTimeNavigation} from './chart-time-navigation.js?v=20261101-chart-terminal';
 import {createFixedRangeVolumeProfile} from './fixed-range-volume-profile.js?v=20261107-poc-v2';
-import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261029-higher-recovery';
+import {syncWatchRows,nextWatchQuote} from './lib/colmex-watch-view.mjs?v=20261108-all-charts';
 import {COLMEX_WATCH_SYMBOLS} from './lib/colmex-watch-universe.mjs';
 'use strict';
 const $=s=>document.querySelector(s),KEY='levi-colmex-stocks-ui-v1',validSymbol=s=>/^[A-Z][A-Z0-9.-]{0,14}$/.test(s),positive=n=>Number.isFinite(Number(n))&&Number(n)>0;

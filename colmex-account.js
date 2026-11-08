@@ -28,7 +28,7 @@ function render(data){
  else {
   const table=node('table'),thead=node('thead'),head=node('tr');for(const label of ['נכס','כיוון','כמות','מחיר כניסה ממוצע','רווח / הפסד פתוח'])head.append(node('th',label));thead.append(head);table.append(thead);const body=node('tbody');
   for(const p of positions){const tr=node('tr');const direction={buy:'LONG',sell:'SHORT',long:'LONG',short:'SHORT'}[String(p.side).toLowerCase()]||String(p.side??'—');
-   for(const v of [p.instrumentName??p.symbol??p.tradableInstrumentId??'—',direction,value(p.qty),value(p.avgPrice),value(p.unrealizedPl,currency)])tr.append(node('td',v));body.append(tr);
+   for(const v of [p.instrumentName??p.symbol??p.tradableInstrumentId??'—',direction,value(p.qty),value(p.avgPrice),value(p.unrealizedPl,currency)])tr.append(node('td',v));globalThis.LEVI_ASSET_CHART?.append(tr.firstChild,p.symbol||p.instrumentName,'STOCK');body.append(tr);
   }table.append(body);$('brokerPositions').append(table);
  }
  const dl=node('dl');for(const [key,v] of Object.entries(state)){dl.append(node('dt',key),node('dd',v===null?'—':String(v)));}$('brokerFields').append(dl);

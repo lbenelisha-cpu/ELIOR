@@ -64,6 +64,8 @@ export function createColmexPnlPanel(host,{refresh=()=>{},download=()=>{},now=Da
   if(!rows.length){const row=el('tr'),cell=el('td','אין סגירות שמורות בטווח ובסינון שנבחרו.');cell.colSpan=8;row.append(cell);tbody.append(row);}
   for(const r of rows.slice(0,shown)){const row=el('tr'),cell=(...nodes)=>{const td=el('td');td.append(...nodes);row.append(td);};
    cell(el('b',r.symbol),el('small',r.direction,'pnl-side '+r.direction.toLowerCase()));
+   globalThis.LEVI_ASSET_CHART?.append(row.firstChild,r.symbol,'STOCK');
+
    cell(el('span',when(r.entryAt)),el('small',when(r.closedAt)));
    cell(el('span','כניסה '+format(r.entryPrice)),el('small','יציאה '+format(r.exitPrice)));
    cell(el('span',format(r.qty)),el('small',format(r.cost)+' USD'));

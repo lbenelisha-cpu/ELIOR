@@ -26,6 +26,7 @@ export function createTerminalDashboard(doc=document,{now=Date.now}={}) {
       else if(!v.positions.length)empty(positions,'אין החזקות פעילות בתצוגה זו',6);
       else for(const p of v.positions){const row=make('tr');
         const asset=cell(row,null,'terminal-asset');asset.append(make('b',p.symbol),make('small','LONG · '+(snapshot.mode==='live'?'SPOT':'DEMO')));
+        globalThis.LEVI_ASSET_CHART?.append(asset,p.symbol,'SPOT');
         cell(row,num(p.qty,8),'terminal-number');cell(row,num(p.price,8),'terminal-number');cell(row,num(p.value),'terminal-number');
         cell(row,signed(p.pnl),'terminal-number '+tone(p.pnl));cell(row,p.weight==null?'—':num(p.weight,1)+'%','terminal-number');positions.append(row);
       }
@@ -35,6 +36,7 @@ export function createTerminalDashboard(doc=document,{now=Date.now}={}) {
       else if(!v.closed.length)empty(closed,'אין יציאות ביומן השמור',4);
       else for(const p of v.closed){const row=make('tr');
         const asset=cell(row,null,'terminal-asset');asset.append(make('b',p.symbol),make('small',p.direction+' · '+(p.status==='PARTIAL'?'יציאה חלקית':'סגירה')));
+        globalThis.LEVI_ASSET_CHART?.append(asset,p.symbol,p.direction==='SHORT'?'FUTURES':'SPOT');
         cell(row,when(p.closedAt),'terminal-number');cell(row,signed(Number.isFinite(p.netPnlUsdt)?p.netPnlUsdt:null),'terminal-number '+tone(Number.isFinite(p.netPnlUsdt)?p.netPnlUsdt:null));
         const reason=cell(row,reasons[p.reason]||p.reason||'לא תועדה');if(p.issue)reason.append(make('small','חסרים נתונים לחישוב'));closed.append(row);
       }
