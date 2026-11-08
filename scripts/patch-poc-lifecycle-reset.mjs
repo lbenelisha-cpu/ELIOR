@@ -3,7 +3,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 export function patchPocLifecycleReset(root,release=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),{binanceOnly=false}={}){
  const file='channel-poc-model.js',current=fs.readFileSync(path.join(root,file),'utf8'),next=fs.readFileSync(path.join(release,file),'utf8'),before=fs.readFileSync(path.join(release,'tests/fixtures/channel-poc-before-lifecycle.js'),'utf8');
- if(current!==before&&current!==next)throw Error('Unrecognized '+file+'; no files changed');
+ const prior=fs.readFileSync(path.join(release,'tests/fixtures/channel-poc-before-fresh-conditions.js'),'utf8');
+ if(current!==before&&current!==prior&&current!==next)throw Error('Unrecognized '+file+'; no files changed');
  const staged=new Map([[file,next]]);
  const patches=JSON.parse(fs.readFileSync(path.join(release,'scripts/poc-lifecycle-patches.json'),'utf8'));
  for(const p of patches){

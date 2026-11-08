@@ -119,7 +119,7 @@
  function analyze({bars=[],side,price,liveBar,now=Date.now(),pocResetAfter=0}){
   const entryAfter=Number(pocResetAfter)||0;
   if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
-  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
+  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now&&(!(entryAfter>0)||b.openTime>entryAfter)),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
   const replayed=replay(closed,entryAfter),model=replayed?.side===side?replayed:null;
   let reason;
   if(model){
