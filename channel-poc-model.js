@@ -72,9 +72,25 @@
   if(index>wave.bIndex&&positive(pc)&&(long?prior.close>pc&&b.low<=pc:prior.close<pc&&b.high>=pc))wave.returnIndex=index;
  }
  function freeze(history,b,c,side){return makeWave([...history,b],{history,c,start:0},side,history.length)?.model||null;}
- function analyze({bars=[],side,price,liveBar,now=Date.now()}){
-  if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
-  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
+ // Cache only deterministic closed-candle replay. Live prices, current candles,
+ // freshness checks and entry decisions are evaluated on every call.
+ const replays=new Map(),replayFields=['openTime','closeTime','open','high','low','close','volume'];
+ let replayChars=0,replayEngine=null;
+ function replay(closed){
+  if(replayEngine!==root.LEVI_PARALLEL){replays.clear();replayChars=0;replayEngine=root.LEVI_PARALLEL;}
+  const key=closed.length<=10000&&closed.every(b=>replayFields.every(k=>Number.isFinite(b[k])))?JSON.stringify(closed.map(b=>replayFields.map(k=>b[k]))):null;
+  if(key!==null&&replays.has(key)){
+   const cached=replays.get(key);replays.delete(key);replays.set(key,cached);
+   return structuredClone(cached);
+  }
+  const result=replayClosed(closed);
+  if(key!==null&&key.length<=1000000){
+   while(replays.size>=128||replayChars+key.length>32000000){const oldest=replays.keys().next().value;replayChars-=oldest.length;replays.delete(oldest);}
+   replays.set(key,structuredClone(result));replayChars+=key.length;
+  }
+  return result;
+ }
+ function replayClosed(closed){
   let wave=null,reference=null;
   // Replay forward only. A valid channel may remain the reference while its
   // breakout/return unfolds; no future candle identifies the wave's peak.
@@ -94,7 +110,12 @@
    if(start!==null&&start>=i)continue;
    wave=makeWave(closed,ref,direction,i,start);
   }
-  const model=wave?.model.side===side?wave.model:null;
+  return wave?.model||null;
+ }
+ function analyze({bars=[],side,price,liveBar,now=Date.now()}){
+  if(!['LONG','SHORT'].includes(side))throw Error('INVALID_POC_SIDE');
+  const closed=bars.filter(b=>b.closed!==false&&b.closeTime<=now),states={channel:'unknown',break:'unknown',poc:'unknown',range:'unknown'};
+  const replayed=replay(closed),model=replayed?.side===side?replayed:null;
   let reason;
   if(model){
    states.channel='passed';states.break='passed';states.range=model.consolidation.passed?'passed':'waiting';

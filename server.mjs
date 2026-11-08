@@ -1727,6 +1727,7 @@ async function runEvaluation(){
   const evals=[];
   for(const s of new Set([...SYMBOLS,...Object.keys(tradingPositions())])){
     evals.push(await evaluateSymbol(s));
+    await new Promise(setImmediate); // Let quotes, protections and HTTP reads run between symbols.
   }
 
   const valid=evals.filter(e=>e.ok);
