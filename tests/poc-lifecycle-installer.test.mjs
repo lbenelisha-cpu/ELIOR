@@ -11,7 +11,7 @@ test('lifecycle installer accepts reviewed runtime, is idempotent and leaves exe
   fs.writeFileSync(path.join(root,'lib/colmex-auto-runner.mjs'),'unrelated Colmex runtime');
   patchPocLifecycleReset(root,undefined,{binanceOnly:true});patchPocLifecycleReset(root,undefined,{binanceOnly:true});
   assert.equal(fs.readFileSync(path.join(root,'lib/colmex-auto-runner.mjs'),'utf8'),'unrelated Colmex runtime');
-  fs.copyFileSync(new URL('./fixtures/channel-poc-before-fresh-conditions.js',import.meta.url),path.join(root,'channel-poc-model.js'));
+  fs.copyFileSync(new URL('./fixtures/channel-poc-before-reused-channel.js',import.meta.url),path.join(root,'channel-poc-model.js'));
   patchPocLifecycleReset(root,undefined,{binanceOnly:true});
   assert.equal(fs.readFileSync(path.join(root,'channel-poc-model.js'),'utf8'),fs.readFileSync(new URL('../channel-poc-model.js',import.meta.url),'utf8'));
   assert.ok(fs.readFileSync(path.join(root,'server.mjs'),'utf8').endsWith('// custom runtime retained'));assert.equal(fs.readFileSync(path.join(root,'ledger.json'),'utf8'),'open position and receipts');
