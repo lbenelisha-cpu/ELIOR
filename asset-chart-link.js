@@ -7,7 +7,7 @@
   return root.LEVI_TRADINGVIEW_URL?.(chart)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(chart)+'&interval=5';
  }
  function actions(symbol,market='SPOT'){
-  if(typeof root.LEVI_QUICK_TRADE!=='function'||!url(symbol,market)||!['SPOT','FUTURES','STOCK'].includes(market))return '';
+  if(root.LEVI_QUICK_TRADING_PAGE!==true||!url(symbol,market)||!['SPOT','FUTURES','STOCK'].includes(market))return '';
   return ['BUY','SELL'].map(side=>'<button type="button" class="asset-quick-trade '+side.toLowerCase()+'" data-quick-symbol="'+esc(symbol)+'" data-quick-market="'+market+'" data-quick-side="'+side+'" aria-label="'+esc((market==='FUTURES'?(side==='BUY'?'פתיחת שורט ':'סגירת שורט '):(side==='BUY'?'קנייה מהירה ':'מכירה מהירה '))+symbol)+'">'+(market==='FUTURES'?(side==='BUY'?'פתיחת שורט':'סגירת שורט'):(side==='BUY'?'קנייה':market==='STOCK'?'מכירת LONG':'מכירה'))+'</button>').join('');
  }
  function html(symbol,market){const href=url(symbol,market);return href?'<a class="asset-chart-link" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף '+esc(symbol)+' ב־TradingView">גרף ↗</a>'+actions(symbol,market):'';}
