@@ -878,7 +878,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     if(channelPrimary.requested||meta.wyckoffTrade?.entryMode==='channel_breakout'){
       const actions=liveActionLog.filter(a=>a.symbol===symbol);
       const entryAfter=Math.max(Date.parse(tradeControl.resumedAt)||0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite));
-      assertChannelSubmission({bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.channelBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);
+      assertChannelSubmission({pocResetAfter:Math.max(0,...actions.filter(a=>a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust)).map(a=>Date.parse(a.at)).filter(Number.isFinite)),bars:executionBars,price:requireLivePrice(streams[symbol],Date.now(),15000),priceAsOf:streams[symbol]?.lastEventAt,now:Date.now(),liveBar:streams[symbol]?.channelBar,entryAfter,usedPatternIds:actions.filter(a=>a.type==='BUY').map(a=>a.wyckoffTrade?.patternId),settings:tradeSettings.values},channelPrimary,meta.wyckoffTrade);
     }
     if(meta.wyckoffTrade?.entryMode==='independent_breakout'){
       const actions=liveActionLog.filter(a=>a.symbol===symbol);
@@ -1580,7 +1580,7 @@ async function evaluateSymbolOnce(s){
     const entryActions=mode==='live'?liveActionLog:DEMO_TRADING&&mode==='demo'?demoTrader.state.actionLog:paper.actionLog;
     const latestSaleAt=Math.max(0,...(entryActions||[]).filter(a=>a.symbol===s&&(a.type==='SELL'||a.type==='POSITION_RECONCILIATION'&&(a.qty===0||a.archiveAsDust))).map(a=>Date.parse(a.at)).filter(Number.isFinite));
     const entryBoundary=Math.max(latestSaleAt,Date.parse(tradeControl.resumedAt)||0);
-    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:mode==='live'&&channelPrimary.requested?streams[s]?.channelBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
+    const ev=evaluateDailyTrade({symbol:s,allowEarlyWave:true,entryAfter:entryBoundary,pocResetAfter:latestSaleAt,searchAfter:Math.max(latestSaleAt,rsiSearchBoundaries.get(mode+':'+s)),bars:entryBars,price:livePrice,priceAsOf:streams[s]?.lastEventAt,position:p,usedPatternIds:used,timeframe:'5m',exitEvaluator:wyckoffExit,entryMode:'confirmed_quality',exitSettings:tradeSettings.values,independentEntry:mode==='live'?independentEntry:{},channelPrimary:mode==='live'?channelPrimary:{},liveBar:mode==='live'&&channelPrimary.requested?streams[s]?.channelBar:streams[s]?.liveBar,priorLiveConfirmation:(decisionHistory[s]||[]).find(r=>r.mode===mode&&r.setup?.confirmation?.live===true)?.setup});
 
     if(mode==='live'&&!p)spotPocWatch.observe(s,ev.entryDecisions?.channel);else spotPocWatch.remove(s);
     if(!p&&ev.strategy?.wyckoff?.entryReason==='SPRING_REJECTED_RSI_HIGH')rsiSearchBoundaries.advance(mode+':'+s,ev.strategy.wyckoff.searchAfter);
@@ -2279,7 +2279,7 @@ futuresShort.config.sharedWatchPolicy=SHARED_WATCH_POLICY;
 const futuresWatch=new SharedMarketWatch({
  read:(route,params)=>futuresShort.api.get(route,params),symbols:()=>SYMBOLS,
  config:()=>futuresShort.config,entryBlocker:()=>futuresShort.watchEntryBlocker(),
- boundary:symbol=>({entryAfter:Math.max(Date.parse(tradeControl.resumedAt)||0,futuresShort.state.resumedAt||0,futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0),used:futuresShort.state.used.filter(p=>p.symbol===symbol).map(p=>p.patternId)})
+ boundary:symbol=>({pocResetAfter:futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0,entryAfter:Math.max(Date.parse(tradeControl.resumedAt)||0,futuresShort.state.resumedAt||0,futuresShort.state.closed.filter(p=>p.symbol===symbol).at(-1)?.closedAt||0),used:futuresShort.state.used.filter(p=>p.symbol===symbol).map(p=>p.patternId)})
 });
 futuresShort.watchSnapshot=()=>futuresWatch.snapshot();
 setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();

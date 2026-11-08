@@ -1,3 +1,4 @@
+import {preLifecycleSource} from './pre-lifecycle-source.mjs';
 // Immutable 05eedc48 sources for historical installers. Those installers must keep
 // recognizing their original releases even after the current entry policy changes.
 import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';
@@ -15,7 +16,7 @@ export function readPrePocSource(file,...args){
  const patches=JSON.parse(fs.readFileSync(new URL('../../scripts/poc-fast-watch-patches.json',import.meta.url),'utf8'));
  // Reverse only exact reviewed additions for legacy installer fixtures, including
  // their temporary copies. Current trading tests use node:fs directly.
- let text=data;
+ let text=preLifecycleSource(data,basename);
  for(const p of [...patches].reverse())if(p.before&&path.basename(p.file)===basename){
   if(p.scope&&text.split(p.installedMarker).length===2)text=text.replace(p.installedMarker,'');
   else if(text.split(p.after).length===2)text=text.replace(p.after,p.before);
