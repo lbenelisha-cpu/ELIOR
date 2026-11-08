@@ -1,0 +1,37 @@
+[
+  {
+    "file": "server.mjs",
+    "before": "  if(u.pathname==='/api/market-news'){if(req.method!=='GET')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);return send(res,{ok:true,...newsChannelSnapshot()});}\n  if(u.pathname==='/api/binance-live/poc'){\n",
+    "after": "  if(u.pathname==='/api/market-news'){if(req.method!=='GET')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);return send(res,{ok:true,...newsChannelSnapshot()});}\n  if(u.pathname==='/api/binance-live/futures-manual'&&req.method==='POST'){\n   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy();});\n   req.on('end',async()=>{try{\n    const input=JSON.parse(body);\n    if(mode!=='live'&&!input.statusOnly)throw Error('LIVE_MODE_REQUIRED');\n    const result=await futuresShort.manualTrade(input);return send(res,result,result.ok?200:result.uncertain?202:400);\n   }catch(e){return send(res,{ok:false,error:e.message},400);}});return;\n  }\n  if(u.pathname==='/api/binance-live/poc'){\n"
+  },
+  {
+    "file": "server.mjs",
+    "before": "      allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},\n      manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},\n",
+    "after": "      allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},\n      futuresManualTrading:{version:1,maxOrderUsdt:35},\n      manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "  }\n  this.state.pending=null;this.save();\n",
+    "after": "  }\n  const manualId=pending.manualRequestId||pending.setup?.manualRequestId;\n  if(manualId&&this.state.manualRequests?.[manualId])this.state.manualRequests[manualId].result={ok:true,requestId:manualId,order:{orderId:order.orderId,status:order.status,executedQty:String(qty),symbol:order.symbol}};\n  this.state.pending=null;this.save();\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": " }\n async close(p,reason){\n  const a=await this.snapshot();if(a.hedgeMode)throw Error('FUTURES_ONE_WAY_REQUIRED');\n",
+    "after": " }\n async close(p,reason,manualRequestId=null){\n  const a=await this.snapshot();if(a.hedgeMode)throw Error('FUTURES_ONE_WAY_REQUIRED');\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "  p.closeReason=reason;this.save();\n  await this.submit('EXIT',{symbol:p.symbol,side:'BUY',positionSide:'BOTH',type:'MARKET',quantity:String(qty),reduceOnly:'true',newOrderRespType:'RESULT'});\n }\n",
+    "after": "  p.closeReason=reason;this.save();\n  await this.submit('EXIT',{symbol:p.symbol,side:'BUY',positionSide:'BOTH',type:'MARKET',quantity:String(qty),reduceOnly:'true',newOrderRespType:'RESULT'},manualRequestId?{manualRequestId}:{});\n }\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": " }\n async enterPoc(intent,guard){\n  if(this.busy)return {deferred:true,error:'POC_EXECUTION_BUSY'};\n",
+    "after": " }\n async manualTrade(input){\n  const {requestId,symbol,side}=input||{},opening=side==='OPEN_SHORT',amount=opening?Number(input.quoteUsdt):null;\n  if(input?.mode!=='live'||!/^[-a-zA-Z0-9_]{16,64}$/.test(requestId||'')||!/^[A-Z0-9]+USDT$/.test(symbol||'')||!['OPEN_SHORT','CLOSE_SHORT'].includes(side)||opening&&!(amount>=5&&amount<=35)||!opening&&input.all!==true)throw Error('INVALID_FUTURES_MANUAL_REQUEST');\n  const fingerprint=JSON.stringify([symbol,side,amount,input.all===true]),old=this.state.manualRequests?.[requestId];\n  if(old){if(old.fingerprint!==fingerprint)throw Error('MANUAL_REQUEST_ID_CONFLICT');return old.result||{ok:false,uncertain:true,requestId,error:'FUTURES_MANUAL_OUTCOME_UNKNOWN'};}\n  if(input.statusOnly)return {ok:false,uncertain:true,requestId,error:'MANUAL_REQUEST_NOT_FOUND'};\n  if(this.busy||this.state.pending||this.fatal)return {ok:false,error:'FUTURES_EXECUTION_BUSY',requestId};\n  this.state.manualRequests??={};this.state.manualRequests[requestId]={fingerprint,at:this.now()};this.save();\n  let result;\n  if(opening){\n   result=await this.enterPoc({symbol,side:'SHORT',quoteUsdt:amount,requestId,expiresAt:this.now()+30000},async()=>{\n    if(this.reserved(symbol))throw Error('POC_PENDING_FOR_SYMBOL');\n   },'MANUAL');\n  }else{\n   this.busy=true;\n   try{\n    const p=this.state.positions[symbol];if(!p)throw Error('FUTURES_NO_OWNED_SHORT');\n    const account=await this.snapshot();this.assertAccount(account);\n    if(!account.positions.some(x=>x.symbol===symbol&&Number(x.positionAmt)<0))throw Error('FUTURES_NO_OWNED_SHORT');\n    await this.close(p,'MANUAL_CLOSE',requestId);\n    await this.manage(await this.snapshot());\n    result=this.state.manualRequests[requestId].result||{ok:false,uncertain:true,error:'FUTURES_MANUAL_OUTCOME_UNKNOWN'};\n   }catch(e){result=this.state.manualRequests[requestId].result||{ok:false,uncertain:!!this.state.pending||!!this.fatal,error:e.message};}\n   finally{this.busy=false;}\n  }\n  result={...result,requestId};\n  if(!result.uncertain){this.state.manualRequests[requestId].result=result;this.save();}\n  return result;\n }\n async enterPoc(intent,guard,entryMode='POC'){\n  if(this.busy)return {deferred:true,error:'POC_EXECUTION_BUSY'};\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "before": "   const q=await this.quote(intent.symbol);\n   const setup={entryMode:'POC',pocId:intent.requestId,poc:intent.poc,expiresAt:intent.expiresAt,targetPrice:Number(q.bidPrice)*(1-settings.takeProfitPct/100)};\n   const plan=shortOrderPlan(info,q,setup,intent.quoteUsdt);\n",
+    "after": "   const q=await this.quote(intent.symbol);\n   const setup={entryMode,...(entryMode==='MANUAL'?{manualRequestId:intent.requestId}:{}),pocId:intent.requestId,poc:intent.poc,expiresAt:intent.expiresAt,targetPrice:Number(q.bidPrice)*(1-settings.takeProfitPct/100)};\n   const plan=shortOrderPlan(info,q,setup,intent.quoteUsdt);\n"
+  }
+]

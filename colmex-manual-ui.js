@@ -35,10 +35,12 @@ $('colmexDisconnect').addEventListener('click',async()=>{
  if(busy)return;try{const {response}=await api('colmex-device-access',{action:'disconnect'});if(!response.ok)throw Error();token=null;localStorage.removeItem(TOKEN_KEY);say('המכשיר נותק.');}catch{say('לא ניתן להשלים ניתוק כעת.');}renderAccess();
 });
 function selected(){return $('selectedSymbol').textContent.trim();}
-function open(side){
- if(!token||busy||pending)return;
+function open(side,symbol=selected()){
+ if(!token){say('יש לחבר את המכשיר למסחר לפני הפעולה.');if($('colmexManualDetails'))$('colmexManualDetails').open=true;return;}
+ if(busy||pending)return;
  diagnosticReviewId=null;reviewReleaseId=null;$('colmexTradeAmount').max='800';$('colmexTradeSubmit').textContent='אני מאשר עסקה בכסף אמיתי';
- const symbol=selected();$('colmexTradeSide').value=side;$('colmexTradeSymbol').value=symbol;
+ if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))return;
+ $('colmexTradeSide').value=side;$('colmexTradeSymbol').value=symbol;
  $('colmexTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+symbol+' · LIVE';
  $('colmexAmountLabel').hidden=side!=='BUY';
  $('colmexTradeAmount').disabled=side!=='BUY';
@@ -125,3 +127,6 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkPendi
 globalThis.addEventListener?.('trade-device-connected',()=>{try{token=localStorage.getItem(TOKEN_KEY);}catch{}renderAccess();});
 
 globalThis.addEventListener?.('trade-device-expired',()=>{token=null;renderAccess();});
+
+globalThis.LEVI_QUICK_TRADE=(side,symbol,market)=>{if(market==='STOCK')open(side,symbol);};
+for(const [id,side] of [['colmexQuickBuy','BUY'],['colmexQuickSell','SELL']])$(id)?.addEventListener('click',()=>open(side));

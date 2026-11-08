@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="/news-summary.css?v=20261106-he-brief">
   <link rel="stylesheet" href="/binance-terminal.css?v=20261103-terminal">
   <link rel="stylesheet" href="/binance-live-monitor.css?v=20261104-live-monitor">
-<link rel="stylesheet" href="/asset-chart-link.css?v=20261108-all-charts"><script src="/asset-chart-link.js?v=20261108-all-charts"></script><script src="/binance-mode-refresh.js?v=20261108-independent"></script></head>
+<link rel="stylesheet" href="/asset-chart-link.css?v=20261108-quick-chart"><script src="/asset-chart-link.js?v=20261108-quick-chart"></script><script src="/binance-mode-refresh.js?v=20261108-independent"></script></head>
 <body class="portfolio-terminal">
   <main class="app-shell">
     <header class="topbar">
@@ -246,7 +246,7 @@
         </div>
 
         <div id="binanceExitSnapshot" aria-label="ספי המכירה של הבוט"></div>
-        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה ידנית</button><button id="manualSellBtn" type="button" disabled aria-label="מכירה ידנית מיידית">מכירה ידנית מיידית</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
+        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה מהירה · Spot</button><button id="manualSellBtn" type="button" disabled aria-label="מכירה ידנית מיידית">מכירה מהירה · Spot</button><button id="manualShortOpenBtn" type="button" disabled>פתיחת שורט · Futures</button><button id="manualShortCloseBtn" type="button" disabled>סגירת שורט · Futures</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
         <details id="pocPanel" class="poc-panel">
           <summary>POC · כניסה אוטומטית במחיר שתבחר</summary>
           <p class="mini">בחר נכס בגרף, הזן מחיר כניסה וקבע LONG או SHORT. זו הוראה ידנית מתוזמנת לפי מחיר, ללא המתנה לאיתות התעלות. לאחר המילוי הבוט מנהל את הפוזיציה.</p>
@@ -513,15 +513,15 @@
   <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
-  <script src="/binance-futures-positions.js?v=20261108-all-charts"></script>
-  <script src="/binance-agent.js?poc=1&v=20261107-poc-v2"></script>
+  <script src="/binance-futures-positions.js?v=20261108-quick-chart"></script>
+  <script src="/binance-agent.js?v=20261108-quick-chart"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261103-poc"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>
   <script src="/channel-entry-checklist.js?v=20261107-rollover"></script>
   <script type="module" src="/poc-signal-chart.js?v=20261107-poc-v2"></script>
   <script src="/market-attention.js?v=20261107-poc-v2"></script>
-  <script src="/binance-manual-trades.js?v=20261104-manual-sell"></script>
+  <script src="/binance-manual-trades.js?v=20261108-quick-chart"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>

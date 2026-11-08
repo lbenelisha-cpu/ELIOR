@@ -2340,6 +2340,14 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/market-news'){if(req.method!=='GET')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);return send(res,{ok:true,...newsChannelSnapshot()});}
+  if(u.pathname==='/api/binance-live/futures-manual'&&req.method==='POST'){
+   let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy();});
+   req.on('end',async()=>{try{
+    const input=JSON.parse(body);
+    if(mode!=='live'&&!input.statusOnly)throw Error('LIVE_MODE_REQUIRED');
+    const result=await futuresShort.manualTrade(input);return send(res,result,result.ok?200:result.uncertain?202:400);
+   }catch(e){return send(res,{ok:false,error:e.message},400);}});return;
+  }
   if(u.pathname==='/api/binance-live/poc'){
    if(req.method==='GET')return send(res,pocEntries.snapshot(),pocEntries.fatal?503:200);
    if(req.method!=='POST')return send(res,{ok:false,error:'METHOD_NOT_ALLOWED'},405);
@@ -2517,6 +2525,7 @@ const server=http.createServer((req,res)=>{
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
       allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
+      futuresManualTrading:{version:1,maxOrderUsdt:35},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
