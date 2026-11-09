@@ -25,5 +25,25 @@ button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,s
 @media(max-width:440px){main{padding:16px 12px 35px}.colmex-brand b{font-size:16px}.brand-monogram{width:36px;height:36px;font-size:21px}.colmex-brand{gap:9px}.colmex-brand small{font-size:10px}.header-actions{gap:6px}.header-actions button,.colmex-menu>summary{padding:9px;font-size:11px}.overview-heading{align-items:flex-start}.overview-heading h1{font-size:25px}.overview-heading .live-badge{font-size:9px;padding:7px 9px}.overview-heading p{font-size:11px}.colmex-health{gap:6px}.colmex-health span{font-size:10px;padding:7px 9px}.overview-metrics{gap:9px}.metric{padding:15px 12px;min-height:137px}.metric>span{font-size:11px;line-height:1.5}.metric>strong{font-size:26px}.metric>small{font-size:10px}.position-map{padding:19px 15px}.position-map .position-prices{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.position-prices{grid-template-columns:repeat(2,minmax(0,1fr))}.visual-heading h2{font-size:17px}.overview-actions button{flex:1 1 140px;font-size:11px;padding:11px 9px}.colmex-disclosure>summary{padding:17px 15px;font-size:15px}.disclosure-content{padding:17px 13px}.market-hours p{display:block;margin-inline-end:0}.scenario-form{gap:13px 10px}.scenario-form label{font-size:11px;line-height:1.6}.scenario-form input{padding:10px}.scenario-output{padding:15px 12px}.scenario-output h3{font-size:15px}.scenario-results article{padding:12px 10px}.scenario-results strong{font-size:19px}.scenario-bar-row{grid-template-columns:60px minmax(0,1fr) 75px;gap:8px}.simulation-tag{font-size:9px;padding:6px 8px}.scan-copy p{font-size:11px}.scan-copy small{font-size:10px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}.disclosure-symbol{transition:none}}
 
+/* Phone watchlist: keep the quote and trading actions on separate lines. */
+@media(max-width:760px){
+ #colmexChartPanel .disclosure-content{padding:12px 8px}
+ #colmexChartPanel .watch{padding:14px 12px}
+ #colmexChartPanel #watchList{grid-template-columns:minmax(0,1fr);gap:12px;max-height:65vh;max-height:65svh;padding:3px;scroll-padding-block:8px}
+ #colmexChartPanel .watch-chart-row{display:grid;grid-template-columns:minmax(70px,.8fr) minmax(0,2fr);gap:10px;min-width:0;padding:12px;border:1px solid #34515c;border-radius:14px;background:#10232e}
+ #colmexChartPanel .watch-chart-row:has(.watch-row.active){border-color:#79dfc8;background:#15352f}
+ #colmexChartPanel .watch-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-column:1/-1;gap:8px 12px;align-items:center;min-height:64px;padding:10px;margin:0;border-radius:9px}
+ #colmexChartPanel .watch-row>b{font-size:19px;direction:ltr;text-align:right;overflow-wrap:anywhere}
+ #colmexChartPanel .watch-row>span{max-width:none;min-width:0;font-size:16px;direction:ltr;unicode-bidi:plaintext;text-align:left;font-variant-numeric:tabular-nums}
+ #colmexChartPanel .watch-row .watch-scan{grid-column:1/-1;max-width:none;font-size:12px;line-height:1.65;text-align:right}
+ #colmexChartPanel .watch-chart-row>.asset-chart-link{min-width:0;min-height:46px;margin:0;padding:10px 6px;font-size:14px}
+ #colmexChartPanel .watch-chart-row>span{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;min-width:0}
+ #colmexChartPanel .watch-chart-row .asset-quick-trade{width:100%;min-width:0;min-height:46px;margin:0;padding:10px 4px;font-size:13px;line-height:1.4;white-space:normal}
+ #colmexChartPanel #watchForm{flex-wrap:wrap}
+ #colmexChartPanel #watchForm input{flex:1 1 150px;font-size:16px;min-height:46px}
+ #colmexChartPanel #watchForm button{flex:1 1 110px;min-height:46px}
+ #colmexChartPanel #refreshWatchQuotes{width:100%;min-height:46px;font-size:14px}
+}
+
 /* Keep the news channel visible alongside the trading platforms. */
 .platform-tabs{flex-wrap:wrap}.platform-tabs .news-channel-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;background:#173c48;border-color:#447d8c;color:#bef1ff;direction:rtl;font-weight:700;text-decoration:none}.platform-tabs .news-channel-link:hover{background:#235463;color:#fff}.platform-tabs .news-channel-link:focus-visible{outline:2px solid #8bd5ee;outline-offset:3px}
