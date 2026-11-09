@@ -50,7 +50,7 @@ import('./fixed-range-volume-profile.js?v=20261107-poc-v2').then(({createFixedRa
 }).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
 let chartTimeNavigation=null;
 let chartTerminal=null;
-import('./chart-terminal.js?v=20261101-chart-terminal').then(({createChartTerminal})=>{
+import('./chart-terminal.js?v=20261109-indicators').then(({createChartTerminal})=>{
  chartTerminal=createChartTerminal({host:$('#priceChart').parentElement,toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),navigation:()=>chartTimeNavigation,onChange:()=>drawCandles(chartCandles)});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTerminalTools','כלי הגרף לא נטענו · רענן את העמוד.'));
@@ -1069,17 +1069,6 @@ function drawCandles(candles){
     ctx.fillRect(x-body/2,y1,body,Math.max(1,y2-y1));
   });
 
-  ctx.strokeStyle='#397dff';
-  ctx.lineWidth=2;
-  ctx.beginPath();
-  let began=false;
-  viewMas.forEach((m,i)=>{
-    if(m==null)return;
-    const x=left+step*i+step/2,yy=y(m);
-    if(!began){ctx.moveTo(x,yy);began=true}else ctx.lineTo(x,yy);
-  });
-  ctx.stroke();
-
   const priceLevels=[
     {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
@@ -1128,7 +1117,7 @@ function drawCandles(candles){
     ctx.fillText(parts[0],labelX,axisY+18);ctx.fillText(parts[1]||'',labelX,axisY+33);
   }
   chartWorkbench?.update({symbol:selectedSymbol,bars:view.map(b=>({...b,time:Number(b.openTime)})),low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
-  chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
+  chartTerminal?.update({symbol:selectedSymbol,interval:selectedInterval,sourceBars:candles,bars:view,low:min,high:max,width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch}});
   fixedRangeProfile?.update({onModeChange:()=>drawCandles(chartCandles),models:selectedInterval==='5m'?{LONG:(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.entryDecisions?.channel?.conditions?.model}:null,sourceBars:candles,symbol:selectedSymbol,interval:selectedInterval,bars:view.map(b=>({...b,time:Number(b.openTime)})),width:W,height:H,bounds:{left,right:W-right,top,bottom:top+ch},x:i=>left+step*(i+.5),y});
 }
 

@@ -1,6 +1,6 @@
 import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-labels-pnl';
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
-import {createChartTerminal} from './chart-terminal.js?v=20261101-chart-terminal';
+import {createChartTerminal} from './chart-terminal.js?v=20261109-indicators';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
 import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261107-poc-v2';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
@@ -131,7 +131,7 @@ function renderChart(){
  }
  svg.append(channelLabels);root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
  workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:W,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · '+bars.length+' נרות בחלון הזמן הנבחר.');
- chartTerminal.update({symbol:selected,interval,bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
+ chartTerminal.update({symbol:selected,interval,sourceBars:chartBars(),preserveAspectRatio:'xMidYMid meet',bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
  fixedRangeProfile.update({onModeChange:()=>renderChart(),models:!manualCharts.has(selected)&&['5m','5min'].includes(interval)?Object.fromEntries(['LONG','SHORT'].map(side=>[side,liveSearchState?.checks?.[selected]?.entryDecisions?.channel?.conditionReports?.[side]?.model])):null,sourceBars:chartBars().map(b=>({...b,time:Date.parse(b.date)})),symbol:selected,interval,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom},x,y});
 }
 $('#watchForm').onsubmit=e=>{e.preventDefault();const s=$('#newSymbol').value.trim().toUpperCase();if(!validSymbol(s))return message('הזן סימול תקין באותיות אנגליות.');if(state.symbols.length>=100&&!state.symbols.includes(s))return message('ניתן לשמור עד 100 מניות במעקב.');if(!state.symbols.includes(s))state.symbols.push(s);selected=s;$('#newSymbol').value='';message('');save();render();loadMarket(false);};
