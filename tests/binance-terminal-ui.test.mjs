@@ -19,3 +19,16 @@ test('quote expiration or report error clears prior totals instead of retaining 
  const u=fixture();u.ui.setSnapshot(snapshot);u.ui.setReport({ok:true,asOf:now,issues:[],rows:[{symbol:'ETHUSDT',direction:'LONG',closedAt:now-1,netPnlUsdt:2}]});assert.equal(u.text('terminalRealized'),'+2.00');
  u.ui.setReport(null);assert.equal(u.text('terminalRealized'),'—');u.ui.setSnapshot({...snapshot,receivedAt:now-61000});assert.doesNotMatch(u.text('terminalHoldingsBody'),/ETHUSDT/);
 });
+
+test('current LONG holdings display recorded entry and signed percentage, preserving unknown cost',()=>{
+ const u=fixture();
+ for(const pct of [5,-5,0]){
+  u.ui.setSnapshot({...snapshot,account:{...snapshot.account,balances:[{asset:'ETH',qty:1,entryPrice:100,usdtPrice:100+pct,valueUsdt:100+pct,pnlIls:pct,pnlPct:pct}]}});
+  const cells=u.get('terminalHoldingsBody').children[0].children;
+  assert.equal(cells.length,8);assert.equal(cells[2].textContent,'100');
+  assert.equal(cells[6].textContent,(pct>0?'+':'')+pct.toFixed(2)+'%');
+  assert.equal(cells[6].className,'terminal-number '+(pct>0?'positive':pct<0?'negative':'neutral'));
+ }
+ u.ui.setSnapshot(snapshot);const cells=u.get('terminalHoldingsBody').children[0].children;
+ assert.equal(cells[2].textContent,'—');assert.equal(cells[6].textContent,'—');
+});

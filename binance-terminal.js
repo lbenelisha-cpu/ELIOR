@@ -22,13 +22,13 @@ export function createTerminalDashboard(doc=document,{now=Date.now}={}) {
     text('terminalHoldingsCount',v.summary?String(v.positions.length):'—');
     text('terminalHoldingsNote',!v.summary?'נתוני ההחזקות יופיעו לאחר חיבור ועדכון החשבון.':snapshot.mode==='demo'?'סימולציה · '+v.summary.currency+' · אינה חשבון LIVE':v.summary.partial?'שווי חלקי · חסרים מחירים; משקל בתיק אינו מחושב.':'Spot · החזקות בשווי 5 USDT ומעלה · רווח פתוח לפני עמלת מכירה.');
     if(positions){positions.replaceChildren();
-      if(!v.summary)empty(positions,'ממתין לנתוני חשבון עדכניים',6);
-      else if(!v.positions.length)empty(positions,'אין החזקות פעילות בתצוגה זו',6);
+      if(!v.summary)empty(positions,'ממתין לנתוני חשבון עדכניים',8);
+      else if(!v.positions.length)empty(positions,'אין החזקות פעילות בתצוגה זו',8);
       else for(const p of v.positions){const row=make('tr');
         const asset=cell(row,null,'terminal-asset');asset.append(make('b',p.symbol),make('small','LONG · '+(snapshot.mode==='live'?'SPOT':'DEMO')));
         globalThis.LEVI_ASSET_CHART?.append(asset,p.symbol,'SPOT');
-        cell(row,num(p.qty,8),'terminal-number');cell(row,num(p.price,8),'terminal-number');cell(row,num(p.value),'terminal-number');
-        cell(row,signed(p.pnl),'terminal-number '+tone(p.pnl));cell(row,p.weight==null?'—':num(p.weight,1)+'%','terminal-number');positions.append(row);
+        cell(row,num(p.qty,8),'terminal-number');cell(row,num(p.entry,8),'terminal-number');cell(row,num(p.price,8),'terminal-number');cell(row,num(p.value),'terminal-number');
+        cell(row,signed(p.pnl),'terminal-number '+tone(p.pnl));cell(row,p.pct==null?'—':signed(p.pct)+'%','terminal-number '+tone(p.pct));cell(row,p.weight==null?'—':num(p.weight,1)+'%','terminal-number');positions.append(row);
       }
     }
     if(closed){closed.replaceChildren();
