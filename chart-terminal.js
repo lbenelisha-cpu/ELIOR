@@ -1,3 +1,4 @@
+import {createIndicatorControls} from './chart-indicator-controls.js?v=20261109';
 // Presentation only. Receives displayed candles; never fetches or submits an order.
 import {candleTime} from './lib/chart-viewport.mjs?v=20261101-chart-terminal';
 const NS='http://www.w3.org/2000/svg';
@@ -24,6 +25,7 @@ export function createChartTerminal({host,toolbarHost,shell,navigation,onChange=
  const fields=new Map();for(const [key,label]of [['time','נר'],['open','פתיחה'],['high','גבוה'],['low','נמוך'],['close','סגירה'],['change','שינוי'],['volume','מחזור']]){
   const item=document.createElement('span'),name=document.createElement('small'),value=document.createElement('bdi');name.textContent=label;value.textContent='—';item.append(name,value);readout.append(item);fields.set(key,value);
  }
+ const indicators=createIndicatorControls({host,toolbar:toolbarHost,shell});
  const svg=(tag,attrs={},text)=>{const n=document.createElementNS(NS,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!==undefined)n.textContent=text;return n;};
  function setExpanded(next){
   expanded=next;shell.classList.toggle('terminal-expanded',expanded);
@@ -78,5 +80,5 @@ export function createChartTerminal({host,toolbarHost,shell,navigation,onChange=
  host.addEventListener('pointerleave',()=>{if(!pinned&&!pointers.size){cursor=null;paint();}});
  host.addEventListener('dblclick',e=>{if(ignored(e))return;pinned=false;cursor=null;navigation()?.reset();});
  host.addEventListener('keydown',e=>{if(e.target!==host||!config)return;const actions={ArrowLeft:()=>navigation()?.move(-Math.max(1,Math.floor(config.bars.length/5))),ArrowRight:()=>navigation()?.move(Math.max(1,Math.floor(config.bars.length/5))),'+':()=>navigation()?.zoom(.75),'-':()=>navigation()?.zoom(1.35),End:()=>navigation()?.latest(),Escape:()=>{pinned=false;cursor=null;paint();}};if(actions[e.key]){e.preventDefault();actions[e.key]();}});
- return {get fitCandles(){return fitCandles;},clear(){config=null;cursor=null;pinned=false;pointers.clear();overlay?.remove();overlay=null;title.textContent='גרף נרות';for(const value of fields.values())value.textContent='—';},update(next){if(!next?.bars?.length)return;const key=next.symbol+':'+next.interval;if(key!==context){context=key;cursor=null;pinned=false;pointers.clear();}config=next;title.textContent=next.symbol+' · '+(next.interval||'');if(cursor&&!next.bars.some(b=>candleTime(b)===cursor.time)){cursor=null;pinned=false;}paint();}};
+ return {get fitCandles(){return fitCandles;},clear(){indicators.clear();config=null;cursor=null;pinned=false;pointers.clear();overlay?.remove();overlay=null;title.textContent='גרף נרות';for(const value of fields.values())value.textContent='—';},update(next){if(!next?.bars?.length)return;const key=next.symbol+':'+next.interval;if(key!==context){context=key;cursor=null;pinned=false;pointers.clear();}config=next;indicators.update(next);title.textContent=next.symbol+' · '+(next.interval||'');if(cursor&&!next.bars.some(b=>candleTime(b)===cursor.time)){cursor=null;pinned=false;}paint();}};
 }
