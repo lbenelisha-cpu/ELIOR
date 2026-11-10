@@ -52,3 +52,11 @@ test('renderer replaces closed/changed positions, labels all four levels and fit
  api.render(host,{...m,stale:true});assert.ok(all(host).some(x=>x.textContent?.includes('נתונים ישנים')));
  api.render(host,null);assert.equal(host.hidden,true);assert.equal(host.children.length,0);
 });
+test('Colmex imported and paper charts do not attach live position barriers',()=>{
+ const source=fs.readFileSync(new URL('../colmex-pro.js',import.meta.url),'utf8');
+ const start=source.indexOf(' const actualPosition='),end=source.indexOf("\n add('rect'",start),expression=source.slice(start,end)+'\n result=barrierModel;';
+ for(const [paper,manual,expected] of [[false,false,true],[true,false,false],[false,true,false]]){
+  let called=0;const ctx={PAPER_MODE:paper,manualCharts:new Set(manual?['AAPL']:[]),selected:'AAPL',liveSearchState:{positions:[{symbol:'AAPL'}]},LEVI_POSITION_BARRIERS:{fromSnapshot(){called++;return {side:'SHORT'};}}};
+  vm.runInNewContext(expression,ctx);assert.equal(called,expected?1:0);assert.equal(!!ctx.result,expected);
+ }
+});
