@@ -17,16 +17,17 @@ test('scanner quote refresh preserves rows, cells, click handlers and scroll; no
  window.LEVI_SCANNER_VIEW.update(body,[row('A')],()=>{});assert.equal(body.children.length,1);assert.equal(body.children[0],a);
 });
 function loader(){
- const renders=[],labels={};let account={connected:true},failAgent=false,selectedMode='live';
+ const renders=[],labels={},chartReads=[];let account={connected:true},failAgent=false,selectedMode='live';
  const context=vm.createContext({document:{hidden:false},window:{dispatchEvent(){}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},activeView:"trade",Date,currentMode:'live',currentLiveAccount:null,MODE:'/mode',AGENT:'/agent',LIVEACC:'/account',console:{error(){}},
   J:async(url,options)=>{if(url==='/mode')return {mode:selectedMode};if(url==='/agent'){if(failAgent)throw Error('network');return {agents:[]};}assert.equal(options.timeoutMs,35000);return account?{connected:true,account}:{connected:false};},
   mode:m=>{context.currentMode=m.mode;},
   loadLiveAccount:async data=>data.connected?data.account:null,
   render:(agent,mode,account,options)=>{context.currentLiveAccount=account;renders.push({mode,account,options});},
+  chartCandles:[],drawCandles:()=>chartReads.push(context.currentLiveAccount),
   put:(key,text)=>{labels[key]=text;},tradeExecutionTime:()=> 'last-confirmed',loadActionJournal:async()=>{},$:()=>null});
  vm.runInContext(fs.readFileSync(new URL('../binance-mode-refresh.js',import.meta.url),'utf8'),context);vm.runInContext('window.LEVI_MODE_REFRESH=LEVI_MODE_REFRESH',context);
  vm.runInContext(src.slice(src.indexOf('const modeRefresh='),src.indexOf('\nasync function authenticatedControl(')),context);
- return {context,renders,labels,setAccount:a=>{account=a;},failAgent:()=>{failAgent=true;},setMode:m=>{selectedMode=m;}};
+ return {context,renders,labels,chartReads,setAccount:a=>{account=a;},failAgent:()=>{failAgent=true;},setMode:m=>{selectedMode=m;}};
 }
 test('first paint shows market data while later refreshes render verified account only',async()=>{
  const u=loader();await u.context.load();assert.equal(u.renders.length,2);assert.equal(u.renders[0].account,null);assert.equal(u.renders[1].account.connected,true);assert.equal(u.renders[1].options.preserveScanner,false);await u.context.load();assert.equal(u.renders.length,3);
@@ -40,5 +41,5 @@ test('initial failure and mode switching cannot preserve positions from another 
  u.setAccount({connected:true});await u.context.load();u.setMode('demo');await u.context.load();u.setMode('live');u.setAccount(null);await u.context.load();assert.equal(u.renders.at(-1).options.preserveScanner,false);
 });
 test('outer network failure also invalidates current account while marking the retained scanner stale',async()=>{
- const u=loader();await u.context.load();u.failAgent();await u.context.load();assert.equal(u.context.currentLiveAccount,null);assert.match(u.labels['#scannerFreshness'],/לא אומת מחדש/);
+ const u=loader();await u.context.load();u.failAgent();await u.context.load();assert.equal(u.context.currentLiveAccount,null);assert.match(u.labels['#scannerFreshness'],/לא אומת מחדש/);assert.deepEqual(u.chartReads,[null]);
 });

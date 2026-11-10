@@ -502,7 +502,7 @@
 
   <dialog id="deviceConnectionDialog" aria-labelledby="deviceConnectionTitle"><h2 id="deviceConnectionTitle">חיבור מכשיר למסחר</h2><p>הזן את הקוד הקבוע שהוגדר בשרת. אותו קוד מתאים גם למכשיר נוסף. החיבור נשמר עד שנה; אין קוד בכל פעולה.</p><label>קוד חיבור — שש ספרות<input id="devicePairCode" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" dir="ltr"></label><p id="devicePairResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="devicePairSubmit" type="button">חבר מכשיר</button><button id="devicePairCancel" type="button">סגור</button></div></dialog>
   <dialog id="manualTradeDialog" aria-labelledby="manualTradeTitle"><h2 id="manualTradeTitle"></h2><p id="manualTradeSummary"></p><label id="manualAmountRow">סכום קנייה ב־USDT<input id="manualQuoteAmount" type="number" inputmode="decimal" min="5" step="0.01" autocomplete="off"></label><p id="manualTradePolicy" class="mini"></p><p id="manualTradeResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="manualTradeSubmit" type="button">אשר</button><button id="manualTradeCheck" type="button" hidden>בדוק מצב בקשה</button><button id="manualTradeCancel" type="button">סגור / ביטול</button></div></dialog>
-  <script src="/tradingview-exit-snapshot.js?v=20261110-position-copy"></script>
+  <link rel="stylesheet" href="/position-barriers.css?v=20261111-barriers"><script src="/position-barriers.js?v=20261111-barriers"></script><script src="/tradingview-exit-snapshot.js?v=20261111-barriers"></script>
   <script src="/tradingview-link.js?v=20261107-poc"></script>
 <script src="/binance-chart-decisions.js?v=20261029-higher-recovery"></script>
   <script src="/binance-indicators.js?v=20261031-channel"></script>
@@ -514,7 +514,7 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
   <script src="/binance-futures-positions.js?v=20261110-position-copy"></script>
-  <script src="/binance-agent.js?v=20261110-position-copy"></script>
+  <script src="/binance-agent.js?v=20261111-barriers"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261103-poc"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>
