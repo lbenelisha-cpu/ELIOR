@@ -7,7 +7,7 @@ const number=v=>v!==null&&v!==''&&v!==undefined&&Number.isFinite(Number(v));
 const fmt=v=>number(v)?Number(v).toLocaleString('en-US',{maximumSignificantDigits:8}):'—';
 const clock=new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 export function createChartTerminal({host,toolbarHost,shell,navigation,onChange=()=>{}}){
- let config=null,overlay=null,cursor=null,pinned=false,context='',fitCandles=true,expanded=false,previousOverflow='',pinchDistance=0;
+ let config=null,overlay=null,cursor=null,pinned=false,context='',fitCandles=false,expanded=false,previousOverflow='',pinchDistance=0;
  const pointers=new Map();
  host.classList.add('chart-interactive');host.tabIndex=0;
  host.setAttribute('aria-description','גרירה להזזת הזמן, גלגלת לזום, חצים להזזה. הקשה מציגה נתוני נר, Escape משחרר.');
@@ -17,7 +17,7 @@ export function createChartTerminal({host,toolbarHost,shell,navigation,onChange=
  const button=(label,description,action)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.title=description;b.setAttribute('aria-label',description);b.onclick=action;controls.append(b);return b;};
  button('+','הגדלת נרות',()=>navigation()?.zoom(.75));button('−','הקטנת נרות',()=>navigation()?.zoom(1.35));
  button('אחרון ›','חזרה לנר האחרון',()=>{pinned=false;cursor=null;navigation()?.latest();});
- const fit=button('גובה: נרות','התאם גובה לנרות או לכל רמות העסקה',()=>{fitCandles=!fitCandles;fit.textContent=fitCandles?'גובה: נרות':'גובה: כל הרמות';fit.setAttribute('aria-pressed',String(fitCandles));onChange();});fit.setAttribute('aria-pressed','true');
+ const fit=button('גובה: כל הרמות','התאם גובה לנרות או לכל רמות העסקה',()=>{fitCandles=!fitCandles;fit.textContent=fitCandles?'גובה: נרות':'גובה: כל הרמות';fit.setAttribute('aria-pressed',String(fitCandles));onChange();});fit.setAttribute('aria-pressed','false');
  const full=button('⛶','הרחבת הגרף למסך מלא',()=>setExpanded(!expanded));
  const readout=document.createElement('div');readout.className='terminal-ohlc';readout.dir='rtl';
  const help=document.createElement('small');help.className='terminal-help';help.textContent='גרירה: תנועה בזמן · גלגלת / שתי אצבעות: זום · הקשה: נתוני נר · שעות ישראל';

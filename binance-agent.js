@@ -50,7 +50,7 @@ import('./fixed-range-volume-profile.js?v=20261107-poc-v2').then(({createFixedRa
 }).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
 let chartTimeNavigation=null;
 let chartTerminal=null;
-import('./chart-terminal.js?v=20261109-indicators').then(({createChartTerminal})=>{
+import('./chart-terminal.js?v=20261111-barriers').then(({createChartTerminal})=>{
  chartTerminal=createChartTerminal({host:$('#priceChart').parentElement,toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),navigation:()=>chartTimeNavigation,onChange:()=>drawCandles(chartCandles)});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTerminalTools','כלי הגרף לא נטענו · רענן את העמוד.'));
@@ -989,8 +989,12 @@ function drawCandles(candles){
   const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
   const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(selectedPosition.exitPolicy);
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
-  const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
-  globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=!tradeRisk;
+  const barrierModel=globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot({mode:currentMode,agent:currentAgentData,account:currentLiveAccount},selectedSymbol);
+  const tradeRisk=currentMode==='live'?null:globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
+  if(currentMode==='live')globalThis.LEVI_POSITION_BARRIERS?.render($('#binanceTradeRisk'),barrierModel);
+  else globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
+  if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=!(barrierModel||tradeRisk);
+  if(barrierModel)vals.push(...barrierModel.lines.map(line=>line.price));
   if(tradeRisk)vals.push(tradeRisk.target,tradeRisk.stop);
   const priceText=value=>Number.isFinite(Number(value))&&Number(value)>0?fmt(value,12)+' USDT':'—';
   put('#positionEntryPrice',heldNow?priceText(riskPosition?.entryPrice??selectedPosition.entryPrice):'—');
@@ -1070,7 +1074,7 @@ function drawCandles(candles){
     ctx.fillRect(x-body/2,y1,body,Math.max(1,y2-y1));
   });
 
-  const priceLevels=[
+  const priceLevels=barrierModel?barrierModel.lines.map(line=>({...line,label:line.label+(barrierModel.stale?' · נתונים ישנים':'')})):currentMode==='live'?[]:[
     {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
@@ -1181,6 +1185,7 @@ async function load(){
   }catch(e){
     put('#status','שגיאת טעינה · '+(e.message||'החיבור לא הצליח'));
     currentLiveAccount=null;
+    drawCandles(chartCandles);
     globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),{mode:currentMode,error:true},selectedSymbol);
     if(scannerVerifiedMode==='live')put('#scannerFreshness','נתוני הטבלה מהעדכון האחרון · '+tradeExecutionTime(scannerVerifiedAt)+' · החיבור לא אומת מחדש');
     const control=$('#tradeControlStatus');

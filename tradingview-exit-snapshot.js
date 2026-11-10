@@ -82,6 +82,10 @@
     if (!host) return;
     hosts.set(host, {snapshot, symbol});
     const level = build(snapshot, symbol, now);
+    if (global.LEVI_POSITION_BARRIERS) {
+      if (!host._barriersHost) {host._barriersHost=document.createElement('section');host.append(host._barriersHost);}
+      global.LEVI_POSITION_BARRIERS.render(host._barriersHost,global.LEVI_POSITION_BARRIERS.fromSnapshot(snapshot,symbol,now));
+    }
     if (!host._exitUI) {
       const make = (tag, text) => {const e = document.createElement(tag); e.textContent = text || ''; return e;};
       host.classList.add('exit-snapshot');

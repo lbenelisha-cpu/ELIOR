@@ -1,6 +1,6 @@
 import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-labels-pnl';
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261110-direction-confirmation';
-import {createChartTerminal} from './chart-terminal.js?v=20261109-indicators';
+import {createChartTerminal} from './chart-terminal.js?v=20261111-barriers';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
 import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261110-direction-confirmation';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
@@ -80,7 +80,7 @@ function renderChart(){
  const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+W+' 315');const add=(tag,attrs,text)=>{const el=document.createElementNS(ns,tag);for(const [k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text)el.textContent=text;svg.append(el);return el;};
  const chartName=STOCK_NAMES[selected]||markets[selected]?.name||quotes[selected]?.name||selected;
  const actualPosition=!PAPER_MODE&&!manualCharts.has(selected)?liveSearchState.positions?.find(p=>p.symbol===selected):null;
- const tradeRisk=globalThis.LEVI_TRADE_RISK?.levels(actualPosition);
+ const barrierModel=actualPosition?globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot({venue:'COLMEX',status:liveSearchState,error:liveSearchState.unavailable},selected):null;
  add('rect',{x:15,y:2,width:plotRight-15,height:22,rx:4,fill:'#08111f'});
  add('text',{x:25,y:18,fill:'#edf5ff','font-size':16,'font-weight':'bold','data-chart-symbol':selected},chartName===selected?selected:selected+' · '+chartName);
  const sim=manualCharts.has(selected)?{points:[],lines:[],cards:[]}:(PAPER_MODE?simulationMarks(selected):colmexLiveTradeMarks(actualPosition));const interval=markets[selected]?.interval||$('#marketInterval').value;const history=!PAPER_MODE||manualCharts.has(selected)?[]:mergeWyckoffOccurrences(simulationWyckoffHistory(selected),wyckoffHistories[selected]||[]);const occurrences=PAPER_MODE&&$('#showWyckoffHistory')?.checked?numberedWyckoffOccurrences(history,bars,interval):[];const arrowPoints=wyckoffArrowPoints(sim.points,occurrences,bars,interval).map(point=>PAPER_MODE?point:{...point,name:point.name.replace('מדומה','בחשבון')});const visiblePoints=[...sim.points.filter(p=>!arrowPoints.some(a=>a.id===p.id)).map(point=>({...point,index:markBarIndex(point,bars,interval)})).filter(point=>point.index>=0),...arrowPoints];const channels=colmexChartChannels(chartBars().slice(0,visibleWindow.end),{interval});
@@ -88,7 +88,7 @@ function renderChart(){
  const segments=channelSegments(channels,bars).filter(s=>s.kind==='swing'?$('#showColmexSwing')?.checked!==false&&!hasPoc:$('#showColmexRegression')?.checked!==false);
  renderColmexChannelConditions($('#colmexChannelConditions'),{channels,status:liveSearchState,symbol:selected,manual:manualCharts.has(selected),historical:visibleWindow.end<chartBars().length});
  const channelStatus=$('#colmexChannelStatus');if(channelStatus)channelStatus.textContent=channels.regression.reason==='FIVE_MINUTE_CHART_REQUIRED'?'בחר נרות 5 דקות להצגת שתי התעלות על 50 נרות.':globalThis.LEVI_PARALLEL.describe(channels.swing)+' · '+(channels.regression.ready?'רגרסיה · 50 נרות סגורים · '+(channels.regression.slope>0?'עולה':channels.regression.slope<0?'יורדת':'שטוחה'):'רגרסיה · נדרשים 50 נרות סגורים ורציפים');
- const entry=PAPER_MODE?state.positions[selected]?.entry:null,values=bars.flatMap(b=>[b.high,b.low]);for(const s of segments)values.push(s.start.upper,s.start.lower,s.end.upper,s.end.lower);if(tradeRisk)values.push(tradeRisk.target,tradeRisk.stop,tradeRisk.entry);for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);const scaleValues=chartTerminal.fitCandles?bars.flatMap(b=>[b.high,b.low]):values;let lo=Math.min(...scaleValues),hi=Math.max(...scaleValues),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const x=i=>20+(i+.5)*plotWidth/bars.length,bounds=wyckoffEdgeBands(arrowPoints,x,{left:16,right:plotRight}),y=p=>bounds.bottom-(p-lo)/(hi-lo)*250;svg.setAttribute('viewBox','0 0 '+W+' '+bounds.height);root.style.aspectRatio=W+' / '+bounds.height;
+ const entry=PAPER_MODE?state.positions[selected]?.entry:null,values=bars.flatMap(b=>[b.high,b.low]);for(const s of segments)values.push(s.start.upper,s.start.lower,s.end.upper,s.end.lower);if(barrierModel)values.push(...barrierModel.lines.map(line=>line.price));for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);const scaleValues=chartTerminal.fitCandles?bars.flatMap(b=>[b.high,b.low]):values;let lo=Math.min(...scaleValues),hi=Math.max(...scaleValues),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const x=i=>20+(i+.5)*plotWidth/bars.length,bounds=wyckoffEdgeBands(arrowPoints,x,{left:16,right:plotRight}),y=p=>bounds.bottom-(p-lo)/(hi-lo)*250;svg.setAttribute('viewBox','0 0 '+W+' '+bounds.height);root.style.aspectRatio=W+' / '+bounds.height;
  for(let i=0;i<5;i++){const price=lo+(hi-lo)*i/4;add('line',{x1:15,y1:y(price),x2:plotRight,y2:y(price),stroke:'#21364b'});add('text',{x:plotRight+15,y:y(price)+4,fill:'#93a8bf','font-size':11},price.toFixed(price<10?4:2));}
 
  if(PAPER_MODE){
@@ -123,13 +123,14 @@ function renderChart(){
  const axisY=bounds.height-43;add('line',{x1:15,x2:plotRight,y1:axisY,y2:axisY,stroke:'#607b96','data-time-axis':'Asia/Jerusalem'});
  const timeFormat=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
  const tickCount=Math.min(bars.length,Math.max(2,Math.min(5,Math.floor(plotWidth/150))));for(let tick=0;tick<tickCount;tick++){const i=tickCount===1?0:Math.round(tick*(bars.length-1)/(tickCount-1)),px=x(i),labelX=Math.max(56,Math.min(plotRight-50,px)),parts=timeFormat.format(new Date(bars[i].date)).split(', ');add('line',{x1:px,x2:px,y1:axisY,y2:axisY+5,stroke:'#607b96'});add('text',{x:labelX,y:axisY+17,fill:'#a9bdd1','font-size':11,'text-anchor':'middle'},parts[0]);add('text',{x:labelX,y:axisY+31,fill:'#a9bdd1','font-size':11,'text-anchor':'middle'},parts[1]||'');}
- if(tradeRisk){
-  for(const [price,color]of [[tradeRisk.target,'#64e1ae'],[tradeRisk.stop,'#ff8494']])if(price>=lo&&price<=hi)add('line',{x1:15,x2:plotRight,y1:y(price),y2:y(price),stroke:color,'stroke-dasharray':'6 4','data-fixed-exit':true});
-  for(const [a,b,color]of [[tradeRisk.entry,tradeRisk.target,'#26c581'],[tradeRisk.stop,tradeRisk.entry,'#f44b66']]){
-   const top=Math.max(bounds.top,y(b)),bottom=Math.min(bounds.bottom,y(a));if(bottom>top)add('rect',{x:20+plotWidth*.74,y:top,width:plotWidth*.26,height:bottom-top,fill:color,opacity:.13,'pointer-events':'none'});
+ if(barrierModel){
+  for(const line of barrierModel.lines){
+   const inside=line.price>=lo&&line.price<=hi;
+   if(inside)add('line',{x1:15,x2:plotRight,y1:y(line.price),y2:y(line.price),stroke:line.color,'stroke-width':1.5,'stroke-dasharray':'6 4','data-fixed-exit':line.kind});
+   const row=document.createElement('div');row.style.color=line.color;row.textContent=line.label+' · '+line.price.toLocaleString('en-US',{maximumSignificantDigits:10})+(inside?'':' · מחוץ לטווח')+(barrierModel.stale?' · נתונים ישנים':'');$('#chartMarkLegend').append(row);
   }
  }
- svg.append(channelLabels);root.append(svg);globalThis.LEVI_TRADE_RISK?.render($('#colmexChartRisk'),actualPosition,'USD');
+ svg.append(channelLabels);root.append(svg);globalThis.LEVI_POSITION_BARRIERS?.render($('#colmexChartRisk'),barrierModel);
  workbench.update({symbol:selected,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),low:lo,high:hi,width:W,height:bounds.height,preserveAspectRatio:'xMidYMid meet',bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});root.setAttribute('aria-label','גרף נרות '+selected+' · '+bars.length+' נרות בחלון הזמן הנבחר.');
  chartTerminal.update({symbol:selected,interval,sourceBars:chartBars(),preserveAspectRatio:'xMidYMid meet',bars,low:lo,high:hi,width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom}});
  fixedRangeProfile.update({onModeChange:()=>renderChart(),models:!manualCharts.has(selected)&&['5m','5min'].includes(interval)?Object.fromEntries(['LONG','SHORT'].map(side=>[side,liveSearchState?.checks?.[selected]?.entryDecisions?.channel?.conditionReports?.[side]?.model])):null,sourceBars:chartBars().map(b=>({...b,time:Date.parse(b.date)})),symbol:selected,interval,bars:bars.map(b=>({...b,time:Date.parse(b.date)})),width:W,height:bounds.height,bounds:{left:20,right:plotRight,top:bounds.top,bottom:bounds.bottom},x,y});
