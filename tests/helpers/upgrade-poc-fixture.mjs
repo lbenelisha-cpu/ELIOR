@@ -1,3 +1,4 @@
+import {rewindDirectionFixture} from './pre-direction-source.mjs';
 import fs from 'node:fs';
 import {patchParallelChecks} from '../../scripts/patch-parallel-entry-checks.mjs';
 import {patchChannelPoc} from '../../scripts/patch-channel-poc.mjs';
@@ -10,6 +11,7 @@ export function upgradePocFixture(root){
 }
 
 export function prepareLegacyPocHelpers(root,patches,{installedRisk=false}={}){
+ rewindDirectionFixture(root);
  // Fixture-only: today's support files are copied beside historical policies.
  // Restore each original helper from that installer's immutable manifest.
  for(const p of patches.filter(p=>p.before===null))fs.writeFileSync(root+'/'+p.file,p.after);

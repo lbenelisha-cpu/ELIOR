@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
-import {pocFixture} from './helpers/poc-channel-fixture.mjs';import {POC_MODEL} from '../lib/channel-poc-entry.mjs';
+import {pocFixture as sourcePocFixture} from './helpers/poc-channel-fixture.mjs';
+const pocFixture=options=>sourcePocFixture({...options,legacy:true});import {POC_MODEL} from '../lib/channel-poc-entry.mjs';
 import {drawSignalChart} from '../poc-signal-chart.js';import {createFixedRangeVolumeProfile} from '../fixed-range-volume-profile.js';
 function dom(){const doc={createElement:tag=>element(tag),createElementNS:(_,tag)=>element(tag)};function element(tag){return {tag,ownerDocument:doc,attributes:{},dataset:{},style:{},children:[],textContent:'',isConnected:true,classList:{add(){}},setAttribute(k,v){this.attributes[k]=v;},append(...nodes){this.children.push(...nodes);},replaceChildren(...nodes){this.children=nodes;},addEventListener(){}};}return {doc,element};}
 const flatten=n=>[n,...n.children.flatMap(flatten)];

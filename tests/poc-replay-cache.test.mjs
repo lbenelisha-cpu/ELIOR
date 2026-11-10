@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {pocFixture} from './helpers/poc-channel-fixture.mjs';
+import {pocFixture as sourcePocFixture} from './helpers/poc-channel-fixture.mjs';
+const pocFixture=options=>sourcePocFixture({...options,legacy:true});
 function model(file){
  const ctx=vm.createContext({structuredClone});
  for(const name of ['regression-trend.js','parallel-channel.js',file])vm.runInContext(fs.readFileSync(new URL('../'+name,import.meta.url),'utf8'),ctx);

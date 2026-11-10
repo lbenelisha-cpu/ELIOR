@@ -1,4 +1,4 @@
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261027-review-recovery';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261110-direction-confirmation';
 const $=id=>document.getElementById(id),TOKEN_KEY='levi-colmex-device-v1',PENDING_KEY='levi-colmex-manual-pending-v1';
 let token=null,pending=null,busy=false,diagnosticReviewId=null,reviewReleaseId=null;
 try{token=localStorage.getItem(TOKEN_KEY);pending=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}catch{}

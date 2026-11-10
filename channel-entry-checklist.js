@@ -34,11 +34,11 @@
   // Policy selects the labels even when a scan/report is unavailable. Labels
   // are not evidence: POC checks can pass only from a valid matching report.
   const reportVersion=schemaVersion??conditions?.version;
-  const pocPolicy=reportVersion==='CHANNEL_POC_CONDITIONS_V1';
+  const directional=reportVersion==='CHANNEL_POC_DIRECTION_CONDITIONS_V1',pocPolicy=directional||reportVersion==='CHANNEL_POC_CONDITIONS_V1';
   const definitions=pocPolicy?[
    ['channel','1 · תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
    ['break',sell?'3 · שבירה מתחת לתעלה וקיבוע הטווח':'3 · פריצה מעל התעלה וקיבוע הטווח',['break']],
-   ['poc',sell?'4 · חזרה מלמטה אל POC':'4 · חזרה מלמעלה אל POC',['poc']],
+   ['poc',directional?(sell?'4 · חזרה ל־POC וסגירת נר 5 דקות מתחתיו':'4 · חזרה ל־POC וסגירת נר 5 דקות מעליו'):(sell?'4 · חזרה מלמטה אל POC':'4 · חזרה מלמעלה אל POC'),['poc']],
    ['range',sell?'8 · דשדוש בתחילת התעלה · עליון או אמצעי':'8 · דשדוש בתחילת התעלה · תחתון או אמצעי',['range']]
   ]:[
    ['channel','תעלה מאושרת · 2 נגיעות בכל גבול',['channel']],
@@ -52,12 +52,13 @@
    ['rangeBreak',sell?'יציאה מתחת לטווח הדשדוש':'יציאה מעל טווח הדשדוש',['rangeBreak']],
    ['plan','תקינות האיתות ויעד שטרם הושג',sell?['price','plan']:['atr','plan']]
   ];
+  if(directional)definitions.push(['trend',sell?'מגמת שעה: EMA50 יורד ומחיר מתחתיו':'מגמת שעה: EMA50 עולה ומחיר מעליו',['trend']]);
   const validSide=side==='LONG'||sell;
   const recent=transport&&Number.isFinite(at)&&at>0&&Number.isFinite(now)&&at<=now&&now-at<(sell?180000:90000);
   const success=reason===(sell?'SHORT_CHANNEL_READY':'CHANNEL_BREAKOUT_READY');
   const stop=stages.findIndex(([,reasons])=>reasons.includes(reason));
   const parallel=conditions!=null;
-  const validReport=parallel&&conditions.version===(pocPolicy?'CHANNEL_POC_CONDITIONS_V1':'CHANNEL_CONDITIONS_PARALLEL_V1')&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at>0&&conditions.at<=at&&at-conditions.at<15000&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
+  const validReport=parallel&&conditions.version===(pocPolicy?reportVersion:'CHANNEL_CONDITIONS_PARALLEL_V1')&&conditions.side===side&&Number.isFinite(conditions.at)&&conditions.at>0&&conditions.at<=at&&at-conditions.at<15000&&conditions.expiresAt===(Math.floor(conditions.at/STEP)+1)*STEP&&Array.isArray(conditions.rows)&&conditions.rows.length===definitions.length&&definitions.every(([id])=>conditions.rows.filter(r=>r?.id===id&&['passed','waiting','unknown'].includes(r.state)).length===1);
   // An envelope may be recorded just after a candle ends. The report's own
   // expiry remains authoritative; a later delivery time never renews it.
   const timely=recent&&now<(Math.floor(at/STEP)+1)*STEP&&(!sell||Number.isFinite(expiresAt)&&expiresAt>now)&&(!validReport||now<conditions.expiresAt&&now-conditions.at<(sell?180000:90000));

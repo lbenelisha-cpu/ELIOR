@@ -8,7 +8,7 @@ const config=(side,platform='BINANCE')=>side==='LONG'?channelEntryConfig({[platf
 const D=300000;
 
 for(const side of ['LONG','SHORT'])for(const platform of ['BINANCE','COLMEX'])test(side+' '+platform+' cannot reuse a cached pre-close wave on a fresh return candle',()=>{
- const input=pocFixture({side}),cfg=config(side,platform),evaluate=side==='LONG'?channelEntry:shortSignal;
+ const input=pocFixture({side,platform}),cfg=config(side,platform),evaluate=side==='LONG'?channelEntry:shortSignal;
  const before=evaluate(input,cfg);assert.equal(before.ready,true);
  const entryAfter=input.bars.at(-1).openTime+1;
  assert.ok(input.liveBar.openTime>entryAfter,'new return candle passes the old receipt-only check');
@@ -31,7 +31,7 @@ for(const side of ['LONG','SHORT'])test(side+' rebuilds a new wave after closing
 });
 
 for(const side of ['LONG','SHORT'])test(side+' reuses channel history but requires fresh consolidation, breakout and POC after closure',()=>{
- const input=pocFixture({side}),cutoff=input.bars[20].closeTime;
+ const input=pocFixture({side,legacy:true}),cutoff=input.bars[20].closeTime;
  const old=POC_MODEL.analyze({...input,side});assert.equal(old.ready,true);
  const result=POC_MODEL.analyze({...input,side,pocResetAfter:cutoff});
  assert.equal(result.ready,true,result.reason);
@@ -39,7 +39,7 @@ for(const side of ['LONG','SHORT'])test(side+' reuses channel history but requir
  assert.ok(input.bars.filter(b=>b.openTime>cutoff).length<50);
  const staleRange=POC_MODEL.analyze({...input,side,pocResetAfter:input.bars[46].closeTime});
  assert.equal(staleRange.ready,false);assert.notEqual(staleRange.conditions.rows.find(r=>r.id==='range').state,'passed');
- const next=pocFixture({side}),shift=input.bars.at(-1).closeTime+D-next.bars[0].openTime;
+ const next=pocFixture({side,legacy:true}),shift=input.bars.at(-1).closeTime+D-next.bars[0].openTime;
  const fresh=next.bars.map(b=>({...b,openTime:b.openTime+shift,closeTime:b.closeTime+shift}));
  const liveBar={...next.liveBar,openTime:next.liveBar.openTime+shift,closeTime:next.liveBar.closeTime+shift};
  const r=POC_MODEL.analyze({bars:[...input.bars,...fresh],side,pocResetAfter:cutoff,now:next.now+shift,liveBar,price:next.price});

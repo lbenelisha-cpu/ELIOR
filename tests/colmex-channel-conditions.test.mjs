@@ -100,24 +100,25 @@ test('a declared POC policy cannot borrow approvals or old labels from a legacy 
  }
 });
 
-test('actual Colmex POC evaluation renders its own four rows for each side and clears stale or unrelated evidence',()=>{
+test('actual Colmex POC evaluation renders its own five rows for each side and clears stale or unrelated evidence',()=>{
  for(const side of ['LONG','SHORT']){
-  const input=pocFixture({side}),at=input.now;
+  const input=pocFixture({platform:'COLMEX',side}),at=input.now;
   const channelPrimary=channelEntryConfig({COLMEX_CHANNEL_PRIMARY_ENABLED:'true',COLMEX_CHANNEL_PRIMARY_AFTER:new Date(at-600000).toISOString()},'COLMEX');
   const result=colmexChannelSignal({...input,symbol:'AAPL',ask:input.price},channelPrimary);
   assert.equal(result.ready,true,result.reason);assert.equal(result.side,side);
   const s={enabled:true,channelPrimary,checks:{AAPL:{at,reason:result.reason,entryDecisions:{primary:'channel_long_short',channel:result}}}};
   const v=colmexChannelConditions({channels,status:s,symbol:'AAPL',now:at});
+  assert.match(v.rules.join(' '),/EMA50/);assert.match(v.rules.join(' '),/סגירת נר 5 דקות/);
   for(const c of v.conditionViews){
-   assert.equal(c.current,true);assert.deepEqual(c.rows.map(r=>r.id),pocIds);
-   assert.deepEqual(c.rows.slice(0,4).map(r=>[r.id,r.state]),result.conditionReports[c.side].rows.map(r=>[r.id,r.state]));
+   assert.equal(c.current,true);assert.deepEqual(c.rows.map(r=>r.id),['channel','break','poc','range','trend','execution']);
+   assert.deepEqual(c.rows.slice(0,5).map(r=>[r.id,r.state]),result.conditionReports[c.side].rows.map(r=>[r.id,r.state]));
    assert.equal(c.rows.at(-1).state,'unknown');
   }
-  assert.equal(v.conditionViews.find(c=>c.side===side).count,4);
-  assert.ok(v.conditionViews.find(c=>c.side!==side).count<4);
+  assert.equal(v.conditionViews.find(c=>c.side===side).count,5);
+  assert.ok(v.conditionViews.find(c=>c.side!==side).count<5);
   for(const patch of [{manual:true},{historical:true},{now:at+300000},{now:at-1},{symbol:'MSFT'},{status:{...s,unavailable:true}}]){
    const unavailable=colmexChannelConditions({channels,status:s,symbol:'AAPL',now:at,...patch});
-   assert.ok(unavailable.conditionViews.every(c=>c.total===4&&c.count===0&&!c.current));
+   assert.ok(unavailable.conditionViews.every(c=>c.total===5&&c.count===0&&!c.current));
   }
  }
 });

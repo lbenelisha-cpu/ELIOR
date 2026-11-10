@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {pocFixture} from './helpers/poc-channel-fixture.mjs';
+import {pocFixture as sourcePocFixture} from './helpers/poc-channel-fixture.mjs';
+const pocFixture=options=>sourcePocFixture({...options,legacy:true});
 import {POC_MODEL} from '../lib/channel-poc-entry.mjs';
 const D=300000;
 function waves(side){
@@ -53,7 +54,7 @@ for(const side of ['LONG','SHORT'])test(side+' does not enter against an obsolet
 
 test('final submission guard rejects a changed open-bar extreme before any entry write',async()=>{
  const {channelEntry,channelEntryConfig,assertChannelSubmission}=await import('../lib/channel-primary-entry.mjs');
- const f=pocFixture(),c=channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_CHANNEL_PRIMARY_AFTER:'2026-11-06T16:55Z'},'BINANCE'),r=channelEntry(f,c);
+ const f=sourcePocFixture(),c=channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_CHANNEL_PRIMARY_AFTER:'2026-11-06T16:55Z'},'BINANCE'),r=channelEntry(f,c);
  const trade={entryMode:'channel_breakout',patternId:r.setup.patternId,setup:r.setup};f.liveBar.high=r.setup.pocModel.anchorB.price+1;
  assert.throws(()=>assertChannelSubmission(f,c,trade),/WAIT_POC_WAVE_CLOSE/);
  const {assertPocEntry}=await import('../lib/channel-poc-entry.mjs');

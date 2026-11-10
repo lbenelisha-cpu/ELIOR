@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {compactChartResponse} from '../lib/binance-chart-response.mjs';
 import {createReadProxy} from '../netlify/functions/binance-read-proxy.mjs';
 import {channelEntry,channelEntryConfig} from '../lib/channel-primary-entry.mjs';
-import {pocFixture} from './helpers/poc-channel-fixture.mjs';
+import {pocFixture as sourcePocFixture} from './helpers/poc-channel-fixture.mjs';
+const pocFixture=options=>sourcePocFixture({...options,legacy:true});
 import {mergeBinanceRecorded} from '../lib/binance-wyckoff-history.mjs';
 
 const event=path=>({httpMethod:'GET',queryStringParameters:{path},headers:{authorization:'Bearer '+'a'.repeat(40)}});

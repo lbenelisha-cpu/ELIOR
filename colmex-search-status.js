@@ -1,4 +1,4 @@
-import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261106-consolidation';
+import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261110-direction-confirmation';
 const reasons={INITIAL_PEAK_REACHED:'המחיר חזר לשיא הראשוני לפני השלמת התבנית',LOW_BROKEN_BEFORE_TEST:'השפל הראשון נשבר לפני שאושרה בדיקה חוזרת',LOW_BROKEN_BEFORE_CONSOLIDATION:'השפל הראשון נשבר לפני שלב הדשדוש',LOW_BROKEN_TOO_EARLY:'השפל הראשון נשבר לפני שהושלמו שלושה נרות דשדוש',NEWER_PEAK:'זוהה שיא מקומי חדש והחיפוש עבר לתבנית עדכנית',SPRING_EXPIRED:'חלון ה־Spring הסתיים בלי כניסה',SETUP_EXPIRED:'התבנית לא הושלמה בתוך חלון החיפוש',CONFIRMATION_ENDED:'אישור התבנית הקודמת פג או נפסל'};
 const time=at=>Number.isFinite(at)?new Date(at).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):'—';
 const price=n=>Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:6}):'—';
