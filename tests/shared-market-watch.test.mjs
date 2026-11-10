@@ -6,7 +6,7 @@ import {shortConfig} from '../lib/futures-short-policy.mjs';
 import {attentionSnapshot} from '../lib/market-attention.mjs';
 const D=300000,end=Date.parse('2026-11-06T10:00Z'),now=end+1000;
 const contract=base=>({symbol:base+'USDT',baseAsset:base,status:'TRADING',contractType:'PERPETUAL',marginAsset:'USDT',quoteAsset:'USDT'});
-function bars(){const i=pocFixture({side:'SHORT',end,entryPrice:104});return [...i.bars,i.liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);}
+function bars(){const i=pocFixture({side:'SHORT',end,entryPrice:104});return [...(i.trendBars||i.bars),i.liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);}
 function harness(){
  const h={clock:now,source:['GOOGLBUSDT','BTCUSDT','NVDABUSDT'],catalog:[contract('GOOGL'),contract('BTC')],calls:[],blocker:'FUTURES_TWO_SLOTS_FULL',failure:null};
  h.watch=new SharedMarketWatch({now:()=>h.clock,symbols:()=>h.source,config:()=>shortConfig({}),entryBlocker:()=>h.blocker,read:async(route,params)=>{
@@ -59,7 +59,7 @@ test('attention board joins stock-token and Futures checks only through verified
 
 test('parallel reports survive the public SHORT snapshot and expire with their original scan',async()=>{
  const h=harness();await h.watch.tick();const row=h.watch.snapshot().rows[0];
- assert.equal(row.conditions.version,'CHANNEL_POC_CONDITIONS_V1');assert.equal(row.conditions.side,'SHORT');assert.equal(row.conditions.rows.filter(r=>r.state==='passed').length,4);
+ assert.equal(row.conditions.version,'CHANNEL_POC_DIRECTION_CONDITIONS_V1');assert.equal(row.conditions.side,'SHORT');assert.equal(row.conditions.rows.filter(r=>r.state==='passed').length,5);
  const board=attentionSnapshot({state:{},news:{},symbols:h.source,now:h.clock,sharedWatch:h.watch.snapshot()});
  assert.deepEqual(board.rows.find(r=>r.symbol===row.spotSymbol).shortObservation.conditions,row.conditions);
  h.clock=end+D;assert.equal(h.watch.snapshot().rows[0].conditions,null);

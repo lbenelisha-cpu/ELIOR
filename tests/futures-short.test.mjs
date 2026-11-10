@@ -31,7 +31,7 @@ function harness(options={}){
   if(p==='/fapi/v1/ticker/price')return {symbol:q.symbol,price:quote.bidPrice,time:quote.time};
   if(p==='/fapi/v1/exchangeInfo')return {symbols:[info]};
   if(p==='/fapi/v1/ticker/24hr')return [{symbol:'ABCUSDT',quoteVolume:'10000000'}];
-  if(p==='/fapi/v1/klines')return [...input().bars,input().liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);
+  if(p==='/fapi/v1/klines')return [...(input().trendBars||input().bars),input().liveBar].map(b=>[b.openTime,b.open,b.high,b.low,b.close,b.volume,b.closeTime-1]);
   if(p==='/fapi/v1/algoOrder'){const o=q.algoId?[...algos.values()].find(o=>o.algoId===q.algoId):algos.get(q.clientAlgoId);if(!o)throw Error('ALGO_UNKNOWN');return structuredClone(o);}
   if(p==='/fapi/v1/order'){const o=orders.get(q.origClientOrderId);if(!o)throw Error('ORDER_UNKNOWN');return structuredClone(o);}
   throw Error('Unexpected read '+p);
@@ -125,13 +125,13 @@ test('contract-price test replies follow quote changes and retain strict endpoin
 test('SHORT records initial upper consolidation and changed initial evidence blocks final SELL',async()=>{
  const first=shortSignal(input(),config);assert.equal(first.setup.consolidation.zone,'UPPER');
  const h=harness(),get=h.api.get;
- h.api.get=async(p,q)=>{const rows=await get(p,q);if(p==='/fapi/v1/klines')for(let k=24;k<30;k++)rows[k][3]-=4;return rows;};
+ h.api.get=async(p,q)=>{const rows=await get(p,q);if(p==='/fapi/v1/klines')for(let k=24;k<30;k++)rows[rows.length-53+k][3]-=4;return rows;};
  await assert.rejects(h.runner.enter('ABCUSDT',first));assert.equal(h.writes.some(w=>w.q.side==='SELL'),false);
 });
 
-test('SHORT requires the four POC conditions plus fresh authoritative data and durable order deduplication',()=>{
- const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.equal(good.conditions.rows.length,4);
- for(const mutate of [i=>i.priceAsOf=now-16000,i=>i.bars.splice(15,1),i=>i.bars.at(-1).high=1,i=>i.liveBar.high=NaN,i=>i.price=103,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
+test('SHORT requires the five entry conditions plus fresh authoritative data and durable order deduplication',()=>{
+ const good=shortSignal(input(),config);assert.equal(good.ready,true,good.reason);assert.ok(good.setup.lowTouches>=2&&good.setup.highTouches>=2);assert.ok(good.setup.targetPrice<104);assert.equal(good.conditions.rows.length,5);
+ for(const mutate of [i=>i.priceAsOf=now-16000,i=>i.bars.splice(15,1),i=>i.bars.at(-1).high=1,i=>i.liveBar.high=NaN,i=>i.price=105,i=>i.now=end+D,i=>i.entryAfter=end,i=>i.used=[good.setup.patternId],i=>i.bars.at(-1).closed=false,i=>i.liveBar=null]){const i=input();mutate(i);assert.equal(shortSignal(i,config).ready,false);}
  for(const volume of [0,.0001,1,100000]){const i=input();i.liveBar.volume=volume;assert.equal(shortSignal(i,config).ready,true);}
  assert.equal(shortSignal(input(),shortConfig({})).ready,false);assert.equal(shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true'}).enabled,false);
 });
@@ -278,7 +278,7 @@ test('empty disabled stop-all leaves Spot-only deployments entirely untouched',a
 test('candidate is configured only to Isolated 1x and price invalidation during the final read prevents entry',async()=>{
  const h=harness();h.symbolConfig.marginType='CROSSED';h.symbolConfig.leverage=20;await h.runner.enter('ABCUSDT',shortSignal(input(),config));
  assert.deepEqual(h.writes.filter(x=>x.p.endsWith('/leverage')).map(x=>x.q.leverage),[1]);assert.deepEqual(h.writes.filter(x=>x.p.endsWith('/marginType')).map(x=>x.q.marginType),['ISOLATED']);
- let histories=0;const k=harness({onGet(p){if(p.endsWith('/klines')&&++histories===2)k.setQuote({bidPrice:'103',askPrice:'103.01'});}});await assert.rejects(k.runner.enter('ABCUSDT',shortSignal(input(),config)));assert.equal(k.writes.some(x=>x.q.side==='SELL'),false);
+ let histories=0;const k=harness({onGet(p){if(p.endsWith('/klines')&&++histories===2)k.setQuote({bidPrice:'105',askPrice:'105.01'});}});await assert.rejects(k.runner.enter('ABCUSDT',shortSignal(input(),config)));assert.equal(k.writes.some(x=>x.q.side==='SELL'),false);
 });
 test('unknown protection reply is not retried as another algo, and stop-all reports confirmed closures',async()=>{
  const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));const p=h.runner.state.positions.ABCUSDT,ref=p.algos[0],before=h.writes.length;
@@ -289,7 +289,7 @@ test('SHORT needs 50 pre-breakout bars and retains its fixed POC across the retu
  const i=input(),good=shortSignal(i,config);assert.equal(good.ready,true,good.reason);
  assert.equal(good.setup.pocModel.channel.barTimes.length,50);assert.ok(good.setup.pocModel.frozenAt<i.liveBar.openTime);
  const early=structuredClone(i);early.bars=early.bars.slice(-50);assert.equal(shortSignal(early,config).ready,false);
- assert.equal(shortSignal({...i,price:103},config).ready,false);
+ assert.equal(shortSignal({...i,price:105},config).ready,false);
  assert.equal(shortSignal({...i,now:end+D},config).ready,false);
 });
 
@@ -382,7 +382,7 @@ test('POC SHORT preserves the halt, account guards and two slot budget and prote
  const h=harness({fillFraction:.5});assert.equal((await h.runner.enterPoc(intent,async()=>{})).ok,true);assert.ok(h.runner.state.positions.ABCUSDT.protectedAt);assert.ok(h.runner.state.positions.ABCUSDT.qty<.2);
 });
 
-test('SHORT enters on the open return candle without a volume multiplier and rejects stale data or old policy',async()=>{
+test('SHORT enters after the closed reclaim candle without a volume multiplier and rejects stale data or old policy',async()=>{
  const i=input();i.now=end+120000;i.priceAsOf=i.now;i.liveBar.receivedAt=i.now;
  const r=shortSignal(i,config);assert.equal(r.ready,true,r.reason);assert.ok(i.now<r.setup.expiresAt);assert.equal(i.liveBar.volume,0);
  for(const patch of [{volume:undefined},{volume:-1},{closed:true},{receivedAt:i.now-16001},{receivedAt:i.now+1}])assert.equal(shortSignal({...i,liveBar:{...i.liveBar,...patch}},config).ready,false);

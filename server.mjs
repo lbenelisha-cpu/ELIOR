@@ -2172,7 +2172,7 @@ async function refreshUniverse(){
 setInterval(()=>evalAll().catch(e=>console.error('Evaluation failed',e.message)),DECISION_INTERVAL_MS).unref();
 const spotPocFastLane=createPocFastLane({watch:spotPocWatch,symbols:()=>SYMBOLS.filter(s=>!liveManagedPositions()[s]),
  enabled:()=>mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused&&liveStateHealth.journalReady,
- eligible:row=>{try{const price=requireLivePrice(streams[row.symbol],Date.now(),15000);return row.sides.some(s=>s.side==='LONG'&&price<=s.poc);}catch{return false;}},
+ eligible:row=>{try{const price=requireLivePrice(streams[row.symbol],Date.now(),15000);return row.sides.some(s=>s.side==='LONG'&&price>s.poc);}catch{return false;}},
  evaluate:evaluateSymbol,execute:maybeExecuteLive});
 setInterval(()=>spotPocFastLane.tick().catch(error=>console.error('POC fast watch',error.message)),1000).unref();
 

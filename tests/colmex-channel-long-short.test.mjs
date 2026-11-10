@@ -12,7 +12,7 @@ import {regularSession} from '../lib/colmex-market-hours.mjs';
 const D=300000,end=Date.parse('2026-11-06T20:00:00Z'),now=end+1000;
 const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123',COLMEX_CHANNEL_PRIMARY_ENABLED:'true',COLMEX_CHANNEL_PRIMARY_AFTER:new Date(end-D).toISOString()};
 const config=channelEntryConfig(env,'COLMEX');
-function input(short=true){const i=pocFixture({side:short?'SHORT':'LONG',end,entryPrice:short?104:106});return {...i,symbol:'AAPL',ask:i.price+.01};}
+function input(short=true){const i=pocFixture({platform:'COLMEX',side:short?'SHORT':'LONG',end,entryPrice:short?104:106});return {...i,symbol:'AAPL',ask:i.price+.01};}
 
 const details={quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000};
 function fixture(){
@@ -20,12 +20,12 @@ function fixture(){
  const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:2000},positions:[],orders:[],history:[],historyAvailable:true});
  let historyReads=0,quoteReads=0;
  const broker={writes:[],snapshot:async()=>snapshot(),instruments:async()=>[{name:'AAPL',type:'EQUITY',tradableInstrumentId:1}],details:async()=>details,
- quote:async()=>{quoteReads++;return {bp:i.price,ap:i.ask};},history:async()=>{historyReads++;return {barDetails:[...i.bars,i.liveBar].map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume}))};},
+ quote:async()=>{quoteReads++;return {bp:i.price,ap:i.ask};},history:async()=>{historyReads++;return {barDetails:[...(i.trendBars||i.bars),i.liveBar].map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume}))};},
  write:async(a,intent)=>{broker.writes.push(structuredClone(intent));return {orderId:'offline'};}};
  const args={state,broker,env:{...env},now:()=>now,deadline:now+27000,save:async()=>{}};
  return {i,state,broker,args,snapshot,reads:()=>({historyReads,quoteReads})};
 }
-test('Colmex shares the four POC conditions with Binance',()=>{
+test('Colmex shares the five entry conditions with Binance',()=>{
  for(const short of [false,true]){
   const i=input(short),r=colmexChannelSignal(i,config),b=short?shortSignal({...i,price:i.ask},config):channelEntry(i,config);
   assert.equal(r.ready,true,r.reason);assert.equal(r.side,short?'SHORT':'LONG');
@@ -35,7 +35,7 @@ test('Colmex shares the four POC conditions with Binance',()=>{
   assert.equal(colmexChannelSignal({...i,liveBar:{...i.liveBar,volume:1}},config).ready,true);
   assert.equal(colmexChannelSignal({...i,priceAsOf:now-11000},config).ready,false);
  }
- const i=input();assert.equal(colmexChannelSignal({...i,ask:103},config).ready,false,'the short Ask must reach POC from below');
+ const i=input();assert.equal(colmexChannelSignal({...i,ask:105},config).ready,false,'the short Ask must remain below the reclaimed POC');
  assert.equal(colmexChannelSignal(i,{...config,enabled:false}).ready,false);
 });
 test('protected SHORT is rechecked, durably reserved once and not duplicated after restart',async()=>{
@@ -49,7 +49,7 @@ test('Colmex blocks a stale candidate when consolidation changes before the brok
  const f=fixture(),history=f.broker.history;let calls=0;
  f.broker.history=async()=>{
   const h=await history();
-  if(++calls===2)for(let k=24;k<30;k++)h.barDetails[k].l-=4;
+  if(++calls===2)for(let k=24;k<30;k++)h.barDetails[h.barDetails.length-53+k].l-=4;
   return h;
  };
  await runCycle(f.args);assert.equal(f.broker.writes.length,0);
@@ -59,7 +59,7 @@ test('SHORT final recheck blocks changed geometry, price, low volume, expired da
  for(const kind of ['price','volume','expiry','cash','slots','permission','save']){
   const f=fixture(),history=f.broker.history,quote=f.broker.quote;let reads=0;
   if(kind==='volume')f.broker.history=async()=>{const h=await history();if(++reads===2)h.barDetails.at(-1).v=undefined;return h;};
-  if(kind==='price')f.broker.quote=async()=>++reads===2?{bp:103,ap:103.01}:quote();
+  if(kind==='price')f.broker.quote=async()=>++reads===2?{bp:105,ap:105.01}:quote();
   if(kind==='expiry'){let at=now;f.args.now=()=>at;f.args.save=async s=>{if(s.pending)at=end+D;};}
   if(kind==='cash')f.broker.snapshot=async()=>({...f.snapshot(),state:{availableCash:1}});
   if(kind==='slots')f.broker.snapshot=async()=>({...f.snapshot(),orders:[1,2,3].map(n=>({id:n,tradableInstrumentId:n+10,side:'sell'}))});
@@ -98,7 +98,7 @@ test('existing SHORT is managed at Ask even when entry route is disabled',async(
 test('Colmex evaluates and records both directions even when the first direction is ready',async()=>{
  const result=colmexChannelSignal(input(false),config);
  assert.equal(result.side,'LONG');assert.equal(result.conditionReports.LONG.rows.every(r=>r.state==='passed'),true);
- assert.deepEqual(result.conditionReports.SHORT.rows.map(r=>r.id),['channel','break','poc','range']);assert.equal(result.conditionReports.SHORT.rows.every(r=>r.state==='passed'),false);
+ assert.deepEqual(result.conditionReports.SHORT.rows.map(r=>r.id),['channel','break','poc','range','trend']);assert.equal(result.conditionReports.SHORT.rows.every(r=>r.state==='passed'),false);
  const f=fixture();await runCycle(f.args);
  assert.equal(f.state.checks.AAPL.entryDecisions.channel.conditionReports.SHORT.rows.every(r=>r.state==='passed'),true);
 });

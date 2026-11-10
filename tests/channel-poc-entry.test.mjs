@@ -5,17 +5,17 @@ import {channelEntry,channelEntryConfig,assertChannelSubmission} from '../lib/ch
 import {shortSignal,shortConfig,assertSameShortSignal} from '../lib/futures-short-policy.mjs';
 import {POC_MODEL} from '../lib/channel-poc-entry.mjs';
 const config=(side,platform='BINANCE')=>side==='LONG'?channelEntryConfig({[platform+'_CHANNEL_PRIMARY_ENABLED']:'true',[platform+'_CHANNEL_PRIMARY_AFTER']:'2026-11-06T16:55Z'},platform):{...shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true',BINANCE_FUTURES_SHORT_AFTER:'2026-11-06T16:55Z'}),platform};
-for(const side of ['LONG','SHORT'])for(const platform of ['BINANCE','COLMEX'])test(side+' '+platform+' has exactly four gates and enters at POC after a completed breakout',()=>{
- const i=pocFixture({side}),r=(side==='LONG'?channelEntry:shortSignal)(i,config(side,platform));
- assert.equal(r.ready,true,r.reason);assert.deepEqual(r.conditions.rows.map(r=>r.id),['channel','break','poc','range']);
+for(const side of ['LONG','SHORT'])for(const platform of ['BINANCE','COLMEX'])test(side+' '+platform+' has five gates and enters after a closed POC reclaim after a completed breakout',()=>{
+ const i=pocFixture({side,platform}),r=(side==='LONG'?channelEntry:shortSignal)(i,config(side,platform));
+ assert.equal(r.ready,true,r.reason);assert.deepEqual(r.conditions.rows.map(r=>r.id),['channel','break','poc','range','trend']);
  assert.ok(r.conditions.rows.every(r=>r.state==='passed'));assert.equal(r.setup.pocModel.consolidation.zone,side==='LONG'?'LOWER':'UPPER');
  assert.ok(r.setup.pocModel.consolidation.startAt<=r.setup.pocModel.consolidation.anchorAt);
- assert.equal(r.setup.pocModel.anchorB.time,i.bars.at(-2).openTime);assert.ok(side==='LONG'?i.price<=r.setup.poc&&i.liveBar.low<=r.setup.poc:i.price>=r.setup.poc&&i.liveBar.high>=r.setup.poc);
+ assert.equal(r.setup.pocModel.anchorB.time,i.bars.at(-2).openTime);assert.ok(side==='LONG'?i.price>r.setup.poc&&i.bars.at(-1).low<=r.setup.poc:i.price<r.setup.poc&&i.bars.at(-1).high>=r.setup.poc);
  assert.equal(i.liveBar.volume,0);assert.ok(r.setup.pocModel.profile.totalVolume<1);
 });
 test('breakout is preparation only; no purchase before a later return',()=>{
- const i=pocFixture(),c=config('LONG');i.price+=.1;i.liveBar.low=i.price;i.liveBar.close=i.price;
- const r=channelEntry(i,c);assert.equal(r.ready,false);assert.equal(r.reason,'WAIT_POC_RETEST');assert.equal(r.conditions.rows.find(r=>r.id==='break').state,'passed');
+ const i=pocFixture(),c=config('LONG');i.bars.at(-1).low=i.price;i.trendBars.at(-1).low=i.price;
+ const r=channelEntry(i,c);assert.equal(r.ready,false);assert.equal(r.reason,'WAIT_POC_CLOSED_RECLAIM');assert.equal(r.conditions.rows.find(r=>r.id==='break').state,'passed');
 });
 test('profile is frozen at B and excludes return candles',()=>{
  const i=pocFixture(),c=config('LONG'),a=channelEntry(i,c);i.bars.at(-1).volume=1e9;i.liveBar.volume=1e9;

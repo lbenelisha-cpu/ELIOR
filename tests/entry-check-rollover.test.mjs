@@ -11,7 +11,7 @@ function scan(side){
  const input=pocFixture({side,end});input.now=at;input.priceAsOf=at;input.liveBar.receivedAt=at;
  const config=side==='LONG'?channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_CHANNEL_PRIMARY_AFTER:new Date(end-STEP).toISOString()}):shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true',BINANCE_FUTURES_SHORT_AFTER:new Date(end-STEP).toISOString()});
  const result=(side==='LONG'?channelEntry:shortSignal)(input,config);assert.equal(result.ready,true,result.reason);
- return {side,symbol:'ABCUSDT',marketSymbol:'ABCUSDT',schemaVersion:'CHANNEL_POC_CONDITIONS_V1',reason:result.reason,conditions:result.conditions,at,now:at,expiresAt:end+STEP,transport:true,supported:true};
+ return {side,symbol:'ABCUSDT',marketSymbol:'ABCUSDT',schemaVersion:'CHANNEL_POC_DIRECTION_CONDITIONS_V1',reason:result.reason,conditions:result.conditions,at,now:at,expiresAt:end+STEP,transport:true,supported:true};
 }
 test('both POC sides retain the actual previous scan through missing-report quote waits and empty-report candle rollover',()=>{
  for(const side of ['LONG','SHORT']){
@@ -19,13 +19,13 @@ test('both POC sides retain the actual previous scan through missing-report quot
   const now=end+STEP+1000;
   const pending={...seed,at:now,now,expiresAt:end+2*STEP,reason:side==='SHORT'?'WAIT_FRESH_FUTURES_PRICE':'WAIT_FRESH_PRICE',conditions:null,blocker:'NO_FREE_SLOT'};
   const view=tracker.update(pending);
-  assert.equal(view.status,'refreshing');assert.equal(view.previousCount,4);assert.equal(view.current,false);assert.equal(view.count,0);
+  assert.equal(view.status,'refreshing');assert.equal(view.previousCount,5);assert.equal(view.current,false);assert.equal(view.count,0);
   assert.equal(state(view,'channel'),'previous_passed');assert.equal(state(view,'execution'),'blocked');
   const conditions={...seed.conditions,at:now+1,expiresAt:end+2*STEP,model:null,rows:seed.conditions.rows.map(r=>({...r,state:'unknown'}))};
   const next=tracker.update({...pending,reason:'WAIT_CHANNEL_LIVE_BAR',at:now+1,now:now+1,conditions});
-  assert.equal(next.previousAt,at);assert.equal(next.previousCount,4);
+  assert.equal(next.previousAt,at);assert.equal(next.previousCount,5);
   const recovered={...seed,at:now+2,now:now+2,expiresAt:end+2*STEP,conditions:{...seed.conditions,at:now+2,expiresAt:end+2*STEP}};
-  assert.equal(tracker.update(recovered).count,4);
+  assert.equal(tracker.update(recovered).count,5);
   recovered.conditions.rows=recovered.conditions.rows.map(r=>({...r,state:r.id==='range'?'waiting':r.state}));
   assert.equal(state(tracker.update(recovered),'range'),'waiting');
  }
@@ -55,14 +55,14 @@ function host(){const doc={createElement:tag=>({tag,dataset:{},children:[],textC
 const nodes=n=>[n,...n.children.flatMap(nodes)];
 const text=n=>nodes(n).map(n=>n.textContent).join(' ');
 test('Colmex keeps labelled LONG and SHORT results during a new candle, and clears them for CSV, another stock or invalid data',()=>{
- const h=host(),s={channelPrimary:{version:'CHANNEL_POC_RETEST_V1',requested:true,enabled:true},checks:{AAPL:{at,reason:'CHANNEL_POC_READY',entryDecisions:{primary:'channel_long_short',channel:{conditionReports:Object.fromEntries(['LONG','SHORT'].map(side=>[side,scan(side).conditions]))}}}}};
+ const h=host(),s={channelPrimary:{version:'CHANNEL_POC_RETEST_V2',conditionReportVersion:'CHANNEL_POC_DIRECTION_CONDITIONS_V1',requested:true,enabled:true},checks:{AAPL:{at,reason:'CHANNEL_POC_READY',entryDecisions:{primary:'channel_long_short',channel:{conditionReports:Object.fromEntries(['LONG','SHORT'].map(side=>[side,scan(side).conditions]))}}}}};
  renderColmexChannelConditions(h,{status:s,symbol:'AAPL',now:at});
- assert.equal(nodes(h).filter(n=>n.dataset.state==='passed').length,8);
+ assert.equal(nodes(h).filter(n=>n.dataset.state==='passed').length,10);
  renderColmexChannelConditions(h,{status:s,symbol:'AAPL',now:end+STEP+1000});
- assert.equal(nodes(h).filter(n=>n.dataset.state==='previous_passed').length,8);assert.match(text(h),/מתעדכן/);assert.match(text(h),/אינם אישור כניסה/);
+ assert.equal(nodes(h).filter(n=>n.dataset.state==='previous_passed').length,10);assert.match(text(h),/מתעדכן/);assert.match(text(h),/אינם אישור כניסה/);
  s.checks.AAPL={at:end+STEP+2000,reason:'WAIT_FRESH_PRICE',entryDecisions:{primary:'channel_long_short',channel:{}}};
  renderColmexChannelConditions(h,{status:s,symbol:'AAPL',now:end+STEP+2000});
- assert.equal(nodes(h).filter(n=>n.dataset.state==='previous_passed').length,8);
+ assert.equal(nodes(h).filter(n=>n.dataset.state==='previous_passed').length,10);
  renderColmexChannelConditions(h,{status:s,symbol:'AAPL',manual:true,now:end+STEP+3000});
  assert.equal(nodes(h).some(n=>n.dataset.state?.startsWith('previous_')),false);
  renderColmexChannelConditions(h,{status:s,symbol:'MSFT',now:end+STEP+3000});

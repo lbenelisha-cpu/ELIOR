@@ -8,7 +8,7 @@ test('Futures scheduling revisits prepared candidates, keeps discovery turns and
  // separately exercised by every unchanged futures-short execution test.
  runner.recover=async()=>{};runner.snapshot=async()=>({availableUsdt:70});runner.manage=async()=>{};runner.assertAccount=()=>{};
  runner.universe=['DEFUSDT','GHIUSDT','ABCUSDT'];runner.marketAt=now;
- const wait=structuredClone(i);wait.price-=.1;wait.liveBar.high=wait.liveBar.close=wait.price;
+ const wait=structuredClone(i);wait.price+=.3;wait.liveBar.high=wait.liveBar.close=wait.price;
  const seen=[],calls=[];let ready=false;
  runner.input=async symbol=>{seen.push(symbol);const data=structuredClone(ready&&symbol==='ABCUSDT'?i:wait);data.now=data.priceAsOf=data.liveBar.receivedAt=now;return data;};
  runner.enter=async(symbol,result)=>{assert.equal(result.ready,true);calls.push(symbol);runner.state.positions[symbol]={symbol};};

@@ -25,19 +25,19 @@ test('declared policy rejects an incompatible report rather than rendering retir
  const v=view('SHORT','SHORT_CHANNEL_READY',{schemaVersion:'CHANNEL_POC_CONDITIONS_V1',conditions:old});
  assert.equal(v.total,4);assert.equal(v.current,false);assert.equal(v.count,0);assert.equal(v.status,'invalid-report');
 });
-test('both actual entry reports contain only four technical checks and never infer account approval',()=>{
- for(const side of ['LONG','SHORT']){const i=input(side),r=evaluate(side,i),v=report(side,i);assert.equal(r.ready,true,r.reason);assert.deepEqual(v.rows.map(r=>r.id),['channel','break','poc','range','execution']);assert.equal(v.count,4);assert.equal(v.total,4);assert.equal(state(v,'execution'),'unknown');
- i.price=side==='LONG'?r.model.profile.poc+1:r.model.profile.poc-1;
- const waiting=report(side,i);assert.equal(waiting.count,3);assert.equal(state(waiting,'poc'),'waiting');assert.equal(state(waiting,'range'),'passed');}
+test('both actual entry reports contain five technical checks and never infer account approval',()=>{
+ for(const side of ['LONG','SHORT']){const i=input(side),r=evaluate(side,i),v=report(side,i);assert.equal(r.ready,true,r.reason);assert.deepEqual(v.rows.map(r=>r.id),['channel','break','poc','range','trend','execution']);assert.equal(v.count,5);assert.equal(v.total,5);assert.equal(state(v,'execution'),'unknown');
+ i.price=side==='LONG'?r.model.profile.poc-1:r.model.profile.poc+1;
+ const waiting=report(side,i);assert.equal(waiting.count,4);assert.equal(state(waiting,'poc'),'waiting');assert.equal(state(waiting,'range'),'passed');}
 });
 test('low volumes no longer block, while duplicate return receipts are an execution restriction',()=>{
- for(const side of ['LONG','SHORT']){const i=input(side);i.liveBar.volume=0;const good=evaluate(side,i);assert.equal(good.ready,true);i.used=[good.patternId];i.usedPatternIds=i.used;const used=evaluate(side,i);assert.equal(used.ready,false);assert.equal(used.executionBlock,'DUPLICATE_RETURN_RECEIPT');const v=report(side,i,{blocker:used.executionBlock});assert.equal(v.count,4);assert.equal(state(v,'execution'),'blocked');}
+ for(const side of ['LONG','SHORT']){const i=input(side);i.liveBar.volume=0;const good=evaluate(side,i);assert.equal(good.ready,true);i.used=[good.patternId];i.usedPatternIds=i.used;const used=evaluate(side,i);assert.equal(used.ready,false);assert.equal(used.executionBlock,'DUPLICATE_RETURN_RECEIPT');const v=report(side,i,{blocker:used.executionBlock});assert.equal(v.count,5);assert.equal(state(v,'execution'),'blocked');}
 });
 test('new reports require current transport, correct side and complete typed rows',()=>{
  for(const side of ['LONG','SHORT']){const good=evaluate(side,input(side));
  for(const extra of [{transport:false},{supported:false},{at:null},{at:NaN},{at:now+1},{now:now+(side==='SHORT'?180000:90000)},{at:end+D-1,now:end+D},{side:'OTHER'}])assert.equal(view(side,good.reason,{conditions:good.conditions,...extra}).count,0);
  for(const mutate of [c=>c.version='OTHER',c=>c.side=side==='SHORT'?'LONG':'SHORT',c=>c.at=now+1,c=>c.at-=300000,c=>c.expiresAt++,c=>c.rows.pop(),c=>c.rows.push(c.rows[0]),c=>c.rows[0].state='approved',c=>c.rows[0]=c.rows[1]]){const c=structuredClone(good.conditions);mutate(c);assert.equal(view(side,good.reason,{conditions:c}).count,0);}
- const blocked=report(side,input(side),{blocker:'NO_FREE_SLOT'});assert.equal(blocked.count,4);assert.equal(state(blocked,'execution'),'blocked');}
+ const blocked=report(side,input(side),{blocker:'NO_FREE_SLOT'});assert.equal(blocked.count,5);assert.equal(state(blocked,'execution'),'blocked');}
 });
 test('unavailable data never creates a pass and missing geometry leaves dependent checks unknown',()=>{
  for(const side of ['LONG','SHORT']){const stale=input(side);stale.priceAsOf=now-20000;const v=report(side,stale);assert.equal(v.count,0);assert.equal(v.dataPending,true);
@@ -90,15 +90,15 @@ test('previous checks never cross asset, market or side and are cleared on remov
 test('report policy transitions cannot reuse previous condition rows',()=>{
  const tracker=globalThis.LEVI_ENTRY_CHECKLIST.createTracker(),base={side:'LONG',symbol:'ABCUSDT',marketSymbol:'ABCUSDT',at:now,now,transport:true,supported:true};
  tracker.update({...base,reason:'CHANNEL_VOLUME_LOW'});
- const r=evaluate('LONG',input('LONG'));const v=tracker.update({...base,reason:r.reason,conditions:r.conditions});assert.equal(v.total,4);assert.equal(v.count,4);
- const stale=tracker.update({...base,reason:r.reason,conditions:r.conditions,now:end+D});assert.equal(stale.total,4);assert.equal(stale.current,false);assert.equal(stale.previousCount,undefined);
+ const r=evaluate('LONG',input('LONG'));const v=tracker.update({...base,reason:r.reason,conditions:r.conditions});assert.equal(v.total,5);assert.equal(v.count,5);
+ const stale=tracker.update({...base,reason:r.reason,conditions:r.conditions,now:end+D});assert.equal(stale.total,5);assert.equal(stale.current,false);assert.equal(stale.previousCount,undefined);
 });
 test('LONG report and exact frozen model reach the attention board without inventing account approval',async()=>{
  const {evaluateDailyTrade}=await import('../lib/wyckoff-evaluation.mjs');const {recordEntryBlocker}=await import('../lib/entry-method-comparison.mjs');const {attentionSnapshot}=await import('../lib/market-attention.mjs');
- const i=input('LONG'),ev=evaluateDailyTrade({...i,symbol:'ABCUSDT',priceAsOf:new Date(now).toISOString(),timeframe:'5m',entryMode:'confirmed_quality',channelPrimary:configs.LONG});
- const conditions=ev.entryDecisions.channel.conditions;assert.equal(conditions.rows.length,4);assert.ok(conditions.model.profile.poc>0);
+ const i=input('LONG');i.bars=i.trendBars;const ev=evaluateDailyTrade({...i,symbol:'ABCUSDT',priceAsOf:new Date(now).toISOString(),timeframe:'5m',entryMode:'confirmed_quality',channelPrimary:configs.LONG});
+ const conditions=ev.entryDecisions.channel.conditions;assert.equal(conditions.rows.length,5);assert.ok(conditions.model.profile.poc>0);
  const ledger={};recordEntryBlocker(ledger,{symbol:'ABCUSDT',at:now+10,reason:ev.buyReason,conditions});
  const row=attentionSnapshot({state:ledger,news:{},symbols:['ABCUSDT'],now:now+10,diagnostics:ledger.entryComparison.diagnostics}).rows[0];assert.deepEqual(row.longDecision.conditions,conditions);
- const v=view('LONG',row.longDecision.reason,{conditions:row.longDecision.conditions,at:row.longDecision.at,now:now+10});assert.equal(v.count,4);assert.equal(state(v,'execution'),'unknown');
+ const v=view('LONG',row.longDecision.reason,{conditions:row.longDecision.conditions,at:row.longDecision.at,now:now+10});assert.equal(v.count,5);assert.equal(state(v,'execution'),'unknown');
  recordEntryBlocker(ledger,{symbol:'ABCUSDT',at:now+20,reason:'EVALUATION_DATA_UNAVAILABLE'});assert.equal(ledger.entryComparison.diagnostics.ABCUSDT.conditions,null);
 });

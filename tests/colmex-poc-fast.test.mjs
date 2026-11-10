@@ -10,17 +10,17 @@ import {dispatchColmexFast,claimColmexFastTicket} from '../lib/colmex-fast-dispa
 const D=300000,end=Date.parse('2026-11-06T20:00Z');
 const env={CONTEXT:'production',COLMEX_AUTO_LIVE_ENABLED:'true',COLMEX_AUTO_LIVE_ACK:LIVE_ACK,COLMEX_AUTO_ACCOUNT_ID:'123',COLMEX_CHANNEL_PRIMARY_ENABLED:'true',COLMEX_CHANNEL_PRIMARY_AFTER:new Date(end-D).toISOString()};
 function fixture(side='LONG'){
- let at=end+1000;const i=pocFixture({side,end,entryPrice:side==='LONG'?106:104});i.symbol='AAPL';i.ask=i.price+.01;
+ let at=end+1000;const i=pocFixture({platform:'COLMEX',side,end,entryPrice:side==='LONG'?106:104});i.symbol='AAPL';i.ask=i.price+.01;
  const state=initialState(end-D);state.cursor=AUTO_POLICY.symbols.indexOf('AAPL');
  const snapshot=()=>({account:{tradingRules:{supportSelfTrading:true,supportBrackets:true}},state:{availableCash:2000},positions:[],orders:[],history:[],historyAvailable:true});
  let quoteReads=0,historyReads=0;const broker={writes:[],snapshot:async()=>snapshot(),instruments:async()=>[{name:'AAPL',type:'EQUITY',tradableInstrumentId:1}],details:async()=>({quotingCurrency:'USD',symbolStatus:'FULLY_OPEN',tickSize:[{leftRangeLimit:0,tickSize:.01}],lotStep:1,lotSize:1,minLot:1,maxLot:1000}),
- quote:async()=>{quoteReads++;return {bp:i.price,ap:i.ask};},history:async()=>{historyReads++;return {barDetails:[...i.bars,i.liveBar].map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume}))};},write:async(a,intent)=>{broker.writes.push(structuredClone(intent));return {orderId:'offline'};}};
+ quote:async()=>{quoteReads++;return {bp:i.price,ap:i.ask};},history:async()=>{historyReads++;return {barDetails:[...(i.trendBars||i.bars),i.liveBar].map(b=>({t:b.openTime,o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume}))};},write:async(a,intent)=>{broker.writes.push(structuredClone(intent));return {orderId:'offline'};}};
  const args={state,broker,env:{...env},now:()=>at,deadline:at+27000,save:async()=>{}};
  const seed=()=>{const w=new PocFastWatch({},()=>at);w.observe('AAPL',colmexChannelSignal({...i,priceAsOf:at,now:at},channelEntryConfig(env,'COLMEX')));state.pocFastWatch=w.state;state.lastCycleAt=at;};
  return {i,state,broker,args,snapshot,seed,setTime:v=>at=v,reads:()=>({quoteReads,historyReads})};
 }
 for(const side of ['LONG','SHORT'])test('Colmex '+side+' scans normally, then acts on a POC return between scheduled scans with one durable protected intent',async()=>{
- const f=fixture(side),price=f.i.price,ask=f.i.ask;f.i.price+=side==='LONG'?.1:-.1;f.i.ask=f.i.price+.01;
+ const f=fixture(side),price=f.i.price,ask=f.i.ask;f.i.price+=side==='LONG'?-.3:.3;f.i.ask=f.i.price+.01;
  f.i.liveBar.close=f.i.price;if(side==='LONG')f.i.liveBar.low=f.i.price;else f.i.liveBar.high=f.i.ask;
  await runCycle(f.args);assert.equal(f.broker.writes.length,0);assert.equal(colmexFastCandidates(f.state,env,f.args.now()).length,1);
  const cursor=f.state.cursor;f.setTime(end+3000);f.i.price=price;f.i.ask=ask;f.i.liveBar.close=price;if(side==='LONG')f.i.liveBar.low=price;else f.i.liveBar.high=ask;
@@ -30,10 +30,10 @@ for(const side of ['LONG','SHORT'])test('Colmex '+side+' scans normally, then ac
 test('a cached candidate cannot bypass changed evidence, broker permissions, funds or final prices',async()=>{
  for(const kind of ['consolidation','cash','permission','price','expired-bar','halt','disabled','closed']){
   const f=fixture();f.seed();let count=0;const history=f.broker.history,quote=f.broker.quote;
-  if(kind==='consolidation')f.broker.history=async()=>{const h=await history();for(let k=24;k<30;k++)h.barDetails[k].h+=4;return h;};
+  if(kind==='consolidation')f.broker.history=async()=>{const h=await history();for(let k=24;k<30;k++)h.barDetails[h.barDetails.length-53+k].h+=4;return h;};
   if(kind==='cash')f.broker.snapshot=async()=>({...f.snapshot(),state:{availableCash:1}});
   if(kind==='permission')f.broker.snapshot=async()=>({...f.snapshot(),account:{tradingRules:{}}});
-  if(kind==='price')f.broker.quote=async()=>++count>=3?{bp:107,ap:107.01}:quote();
+  if(kind==='price')f.broker.quote=async()=>++count>=3?{bp:105,ap:105.01}:quote();
   if(kind==='expired-bar')f.setTime(end+D);
   if(kind==='halt')f.state.halt='UNRESOLVED';
   if(kind==='disabled')f.args.env.COLMEX_AUTO_LIVE_ENABLED='false';

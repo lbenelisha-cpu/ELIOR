@@ -9,6 +9,7 @@
  let snapshot=null,longPolicy=null,entryPolicies=window.LEVI_ENTRY_POLICY_SNAPSHOT||null,receivedAt=0,query='',all=false;
  const schema=(side,policy,conditions)=>{
   const version=side==='SHORT'?policy?.entryPolicyVersion:policy?.version;
+  if(policy?.conditionReportVersion==='CHANNEL_POC_DIRECTION_CONDITIONS_V1'||conditions?.version==='CHANNEL_POC_DIRECTION_CONDITIONS_V1')return 'CHANNEL_POC_DIRECTION_CONDITIONS_V1';
   if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(version))return 'CHANNEL_POC_CONDITIONS_V1';
   if(version===(side==='SHORT'?'FUTURES_CHANNEL_SHORT_INTRABAR_V2':'CHANNEL_PRIMARY_INTRABAR_V2'))return 'CHANNEL_CONDITIONS_PARALLEL_V1';
   // With no server policy/report, display the current requested rules as

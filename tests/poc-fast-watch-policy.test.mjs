@@ -10,12 +10,12 @@ const config=channelEntryConfig({BINANCE_CHANNEL_PRIMARY_ENABLED:'true',BINANCE_
 const prepare=(side='LONG')=>{
  const input=pocFixture({side,end}),c=side==='LONG'?config:shortConfig({BINANCE_FUTURES_SHORT_ENABLED:'true',BINANCE_FUTURES_SHORT_AFTER:new Date(end-D).toISOString()});
  const evaluate=i=>(side==='LONG'?channelEntry:shortSignal)(i,c);
- const ready=evaluate(input),waiting=structuredClone(input);waiting.price+=side==='LONG'?.1:-.1;waiting.liveBar.close=waiting.price;
+ const ready=evaluate(input),waiting=structuredClone(input);waiting.price+=side==='LONG'?-.3:.3;waiting.liveBar.close=waiting.price;
  if(side==='LONG')waiting.liveBar.low=waiting.price;else waiting.liveBar.high=waiting.price;
  return {input,waiting,ready,result:evaluate(waiting),evaluate};
 };
 for(const side of ['LONG','SHORT'])test(side+' arms on the three completed structural gates; invalidation and stale/future evidence cannot arm',()=>{
- const f=prepare(side),w=new PocFastWatch({},()=>f.input.now);assert.equal(f.result.reason,'WAIT_POC_RETEST');w.observe('ABCUSDT',f.result);assert.equal(w.list(['ABCUSDT']).length,1);
+ const f=prepare(side),w=new PocFastWatch({},()=>f.input.now);assert.equal(f.result.reason,'POC_RECLAIM_PRICE_INVALIDATED');w.observe('ABCUSDT',f.result);assert.equal(w.list(['ABCUSDT']).length,1);
  for(const id of ['channel','break','range']){const bad=structuredClone(f.result);bad.conditions.rows.find(r=>r.id===id).state='waiting';w.observe('ABCUSDT',bad);assert.equal(w.list(['ABCUSDT']).length,0,id);}
  for(const at of [f.input.now+1,f.input.now-15000]){const bad=structuredClone(f.result);bad.conditions.at=at;w.observe('ABCUSDT',bad);assert.equal(w.list(['ABCUSDT']).length,0);}
  w.observe('ABCUSDT',f.result);w.observe('ABCUSDT',{reason:'WAIT_CHANNEL_LIVE_BAR'});assert.equal(w.list(['ABCUSDT']).length,1);
@@ -40,7 +40,7 @@ test('pause during an evaluation and a bounced POC quote prevent dispatch',async
  const lane=createPocFastLane({watch:w,symbols:()=>['ABCUSDT'],enabled:()=>enabled,evaluate:async()=>{enabled=false;return {ok:true,entryConfirmed:true};},execute:()=>execute++});
  await lane.tick();assert.equal(execute,0);
  const trade={entryMode:'channel_breakout',patternId:f.ready.setup.patternId,setup:f.ready.setup};
- assert.throws(()=>assertChannelSubmission(f.waiting,config,trade),/WAIT_POC_RETEST/);
+ assert.throws(()=>assertChannelSubmission(f.waiting,config,trade),/POC_RECLAIM_PRICE_INVALIDATED/);
 });
 test('authoritative closed WebSocket bars bridge rollover; gaps, duplicates and malformed data require REST',()=>{
  const row={openTime:end-D,closeTime:end-1,open:100,close:101,low:99,high:102,volume:10,closed:true};

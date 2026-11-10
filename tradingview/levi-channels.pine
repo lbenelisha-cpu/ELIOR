@@ -1,5 +1,5 @@
 //@version=6
-indicator("LEVI · Channel + Fixed Range POC", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=160, max_bars_back=500)
+indicator("LEVI · Direction + POC + Position Barriers", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=160, max_bars_back=500)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
 int n = input.int(50, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
@@ -131,7 +131,7 @@ var array<float> vpPriceMass = array.new<float>(128,0)
 var array<box> vpBoxes = array.new<box>()
 var array<line> vpLines = array.new<line>()
 var array<label> vpLabels = array.new<label>()
-var table pocTable = table.new(position.top_right,1,5,bgcolor=color.new(color.black,15))
+var table pocTable = table.new(position.top_right,1,6,bgcolor=color.new(color.black,15))
 
 // Rebuild the last valid geometry on reload from a bounded 200-bar history.
 // Only closed candles update the snapshot; no bot entry state is inferred.
@@ -314,6 +314,24 @@ if bar_index >= n and bar_index >= last_bar_index - 200
             string missing = geometryFound ? "Swing · waiting for two touches on each boundary" : "Swing · no valid pivot channel in " + str.tostring(n) + " closed bars"
             array.push(captions,label.new(last,low[offset],missing,style=label.style_label_left,color=color.new(color.orange,65),textcolor=color.white,tooltip="Strict pivots must exceed the two bars on each side. Equal highs/lows do not qualify. A candidate also needs valid width and closes inside its boundaries."))
 
+// Same bounded SMA-seeded EMA50 calculation as the app; only completed 1h bars.
+f_hourDirection() =>
+    int count = math.min(100, bar_index + 1)
+    float average = na
+    float previous = na
+    if count >= 51
+        average := 0.0
+        for i = count - 1 to count - 50
+            average += close[i] / 50
+        for i = count - 51 to 0
+            previous := average
+            average += (close[i] - average) * 2 / 51
+    [average[1], previous[1], close[1]]
+string trendTicker = syminfo.type == "stock" or syminfo.type == "fund" ? ticker.new(syminfo.prefix, syminfo.ticker, session.regular) : syminfo.tickerid
+[hourEma, hourPreviousEma, hourClose] = request.security(trendTicker, "60", f_hourDirection(), lookahead=barmerge.lookahead_on)
+bool showHourEma = input.bool(true, "Show closed-hour EMA50", group="Entry confirmation")
+plot(showHourEma ? hourEma : na, "Closed-hour EMA50", color=color.fuchsia, linewidth=2)
+
 // One combined indicator keeps the regression optional and the frozen POC visible.
 // This 128-bin OHLC range-weighted estimate is approximate; it is not trade-by-trade POC.
 if barstate.islast
@@ -326,7 +344,7 @@ if barstate.islast
     for item in vpLabels
         label.delete(item)
     array.clear(vpLabels)
-    table.clear(pocTable,0,0,0,4)
+    table.clear(pocTable,0,0,0,5)
     if timeframe.in_seconds() != 300
         table.cell(pocTable,0,0,"Select 5-minute candles for LEVI entry geometry",text_color=color.orange)
     else if showPoc and not na(vpPoc) and not na(vpB)
@@ -347,19 +365,31 @@ if barstate.islast
         array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=vpSide == 1 ? label.style_label_down : label.style_label_up,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate · 128 bins "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
         bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
-        bool returned = bar_index > vpB and (vpSide == 1 ? high <= vpPriceB : low >= vpPriceB) and (vpSide == 1 ? close[1] > vpPoc and close <= vpPoc : close[1] < vpPoc and close >= vpPoc)
-        table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" · Recent wave A–B · POC estimate",text_color=color.yellow)
+        // The current 5m bar cannot confirm its own reclaim.
+        bool touched = false
+        int confirmedBar = na
+        if bar_index - vpB > 1
+            for k = math.min(200, bar_index-vpB-1) to 1
+                if vpSide == 1 ? low[k] <= vpPoc : high[k] >= vpPoc
+                    touched := true
+                if touched and (vpSide == 1 ? close[k] > vpPoc : close[k] < vpPoc)
+                    confirmedBar := bar_index-k
+                    touched := false
+        bool returned = confirmedBar == bar_index-1 and (vpSide == 1 ? close > vpPoc and high <= vpPriceB : close < vpPoc and low >= vpPriceB)
+        bool trendOK = not na(hourPreviousEma) and (vpSide == 1 ? hourEma > hourPreviousEma and hourClose > hourEma and close > hourEma : hourEma < hourPreviousEma and hourClose < hourEma and close < hourEma)
+        table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" SETUP · not an open position",text_color=color.yellow)
         table.cell(pocTable,0,1,"1 ✓ Confirmed channel · 3 ✓ Breakout",text_color=color.white)
         table.cell(pocTable,0,2,rangeOK ? "8 ✓ Initial consolidation" : "8 ○ Initial consolidation does not match",text_color=rangeOK ? color.lime : color.orange)
-        table.cell(pocTable,0,3,returned ? "4 ✓ Return to POC" : "4 ○ Waiting for return to POC",text_color=returned ? color.lime : color.orange)
-        table.cell(pocTable,0,4,"Chart data only · not broker execution approval",text_color=color.silver,text_size=size.small)
+        table.cell(pocTable,0,3,returned ? "4 ✓ Closed 5m POC reclaim" : "4 ○ Waiting for closed 5m POC reclaim",text_color=returned ? color.lime : color.orange)
+        table.cell(pocTable,0,4,trendOK ? "✓ Closed-hour EMA50 direction" : "○ Hourly direction not confirmed",text_color=trendOK ? color.lime : color.orange)
+        table.cell(pocTable,0,5,"Chart data only · not broker execution approval",text_color=color.silver,text_size=size.small)
     else if showPoc
         table.cell(pocTable,0,0,"Waiting for confirmed channel and breakout to fix A–B",text_color=color.orange)
 
 // Broker exit thresholds are imported explicitly. Pine does not read the bot account.
 // No trading logic, reconstructed peak, alerts or assumed fills are used here.
 string exitSnapshot = input.text_area("", "Bot exit snapshot", group="Bot exit levels", tooltip="Copy from LEVI app. One-time price snapshot; not a live connection. Refresh after two minutes or any position/settings change.")
-bool showExitTarget = input.bool(false, "Show Take Profit line", group="Bot exit levels", tooltip="A distant target can compress the chart. Its value is always shown in the table.")
+bool showExitTarget = input.bool(true, "Show Take Profit line", group="Bot exit levels", tooltip="A distant target can compress the chart. Its value is always shown in the table.")
 bool showExitActivation = input.bool(false, "Show profit activation line", group="Bot exit levels")
 var array<line> exitLines = array.new<line>()
 var array<label> exitLabels = array.new<label>()
@@ -410,17 +440,17 @@ if barstate.islast
             if valid
                 int at = int(atValue)
                 string stamp = str.format_time(at, "HH:mm:ss", "Asia/Jerusalem")
-                array.push(exitLines, line.new(at, entryValue, at + 60000, entryValue, xloc=xloc.bar_time, extend=extend.right, color=color.silver, style=line.style_dotted))
-                array.push(exitLabels, label.new(at, entryValue, side + " entry " + str.tostring(entryValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.gray, 35), textcolor=color.white, size=size.small))
+                array.push(exitLines, line.new(int(entryAtValue), entryValue, at + 60000, entryValue, xloc=xloc.bar_time, extend=extend.right, color=color.silver, style=line.style_dotted))
+                array.push(exitLabels, label.new(int(entryAtValue), entryValue, side + " entry " + str.tostring(entryValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.gray, 35), textcolor=color.white, size=size.small))
                 array.push(exitLines, line.new(at, stopValue, at + 60000, stopValue, xloc=xloc.bar_time, extend=extend.right, color=color.red, style=line.style_dashed, width=2))
-                array.push(exitLabels, label.new(at, stopValue, (armedValue == 1 ? "Bot trailing stop " : "Bot stop ") + str.tostring(stopValue, format.mintick) + " · snapshot " + stamp, xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.red, 25), textcolor=color.white, size=size.small))
+                array.push(exitLabels, label.new(at, stopValue, (side == "SHORT" ? "Upper barrier · stop " : "Lower barrier · stop ") + str.tostring(stopValue, format.mintick) + " · snapshot " + stamp, xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.red, 25), textcolor=color.white, size=size.small))
                 if showExitTarget
                     array.push(exitLines, line.new(at, targetValue, at + 60000, targetValue, xloc=xloc.bar_time, extend=extend.right, color=color.lime, style=line.style_dotted))
-                    array.push(exitLabels, label.new(at, targetValue, "Bot Take Profit " + str.tostring(targetValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.green, 25), textcolor=color.white, size=size.small))
+                    array.push(exitLabels, label.new(at, targetValue, (side == "SHORT" ? "Lower barrier · TP " : "Upper barrier · TP ") + str.tostring(targetValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.green, 25), textcolor=color.white, size=size.small))
                 if showExitActivation and activationValue > 0
                     array.push(exitLines, line.new(at, activationValue, at + 60000, activationValue, xloc=xloc.bar_time, extend=extend.right, color=color.yellow, style=line.style_dotted))
                     array.push(exitLabels, label.new(at, activationValue, "Protection activation (not a sale) " + str.tostring(activationValue, format.mintick), xloc=xloc.bar_time, style=label.style_label_right, color=color.new(color.orange, 25), textcolor=color.white, size=size.small))
-                table.cell(exitTable, 0, 0, side + " · BOT SNAPSHOT · " + stamp + " Israel · NOT LIVE", text_color=color.orange, text_size=size.small)
+                table.cell(exitTable, 0, 0, side + " POSITION · BOT SNAPSHOT · " + stamp + " Israel · NOT LIVE", text_color=color.orange, text_size=size.small)
                 table.cell(exitTable, 0, 1, "Stop " + str.tostring(stopValue, format.mintick) + " · TP " + str.tostring(targetValue, format.mintick), text_color=color.white, text_size=size.small)
                 table.cell(exitTable, 0, 2, activationValue > 0 ? "Activation " + str.tostring(activationValue, format.mintick) + (armedValue == 1 ? " · armed" : " · waiting") : "Fixed exit policy", text_color=color.white, text_size=size.small)
                 table.cell(exitTable, 0, 4, "Entry " + str.tostring(entryValue, format.mintick) + " · stop P/L " + str.tostring(direction*(stopValue/entryValue-1)*100,"#.##") + "% · target " + str.tostring(direction*(targetValue/entryValue-1)*100,"#.##") + "%", text_color=color.white, text_size=size.small)
