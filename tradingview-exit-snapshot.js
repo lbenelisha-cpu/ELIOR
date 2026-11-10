@@ -92,7 +92,8 @@
       const copied = make('p'), field = make('textarea'); field.readOnly = true; field.dir = 'ltr'; field.rows = 3;
       field.setAttribute('aria-label', 'תמונת מצב של רמות היציאה להדבקה באינדיקטור'); field.hidden = true;
       copied.setAttribute('role', 'status');
-      button.onclick = async () => {
+      button.onclick = async event => {
+        event?.stopPropagation();
         const context = hosts.get(host), current = build(context?.snapshot, context?.symbol);
         if (!current.ok) {render(host, context?.snapshot, context?.symbol); return;}
         field.value = current.data; field.hidden = false; field.focus(); field.select();
@@ -107,6 +108,7 @@
     const ui = host._exitUI;
     const positionKey = level.ok ? [symbol,level.entryAt,level.entry,level.stop,level.target,level.activation,level.armed].join('|') : null;
     if (ui.positionKey !== positionKey || !level.ok) {ui.field.value = ''; ui.field.hidden = true; ui.copied.textContent = '';}
+    ui.button.setAttribute('aria-label', 'העתק הגנות ורווח ל־TradingView · '+symbol+' · '+(level.side || (snapshot?.venue==='BINANCE_FUTURES'?'SHORT':'פוזיציה')));
     ui.positionKey = positionKey; ui.symbol = symbol; ui.button.disabled = !level.ok;
     ui.title.textContent = level.ok ? (level.armed ? 'סטופ נגרר' : 'סטופ הפסד') + ' · ' + fmt(level.stop) + (level.side==='SHORT'?' · SHORT':' · LONG') : 'רמות יציאה · לא אומתו';
     ui.status.textContent = level.ok ? 'כניסה: '+fmt(level.entry)+' · יעד Take Profit: ' + fmt(level.target) + (level.activation ? ' · הפעלת הגנת רווח: ' + fmt(level.activation) : '') + ' · נתונים מ־' + time(level.at) : level.reason;
@@ -114,7 +116,15 @@
       (level.brokerStop ? 'סטופ שאומת בבורסה: ' + fmt(level.brokerStop) + '. ' : 'פקודת ההגנה בבורסה לא אומתה בעדכון זה. ') +
       'הגדרות: סטופ '+settingText(level.stopLossPct)+'% · יעד '+settingText(level.takeProfitPct)+'% · הפעלה '+settingText(level.profitActivationPct)+'% · מרווח נגרר '+settingText(level.trailingGapPp)+' נקודות אחוז. הסף באפליקציה מתעדכן עם נתוני הבוט. העתקה ל־TradingView אינה מתעדכנת אוטומטית. שיפוע רגרסיה שלילי אינו תנאי מכירה.' : '';
   }
-  global.LEVI_EXIT_SNAPSHOT = {build, render, VERSION, MAX_AGE};
+  function append(host, snapshot, symbol, now = Date.now()) {
+    if (!host) return;
+    const box = document.createElement('div');
+    box.classList.add('exit-snapshot-inline');
+    host.append(box);
+    render(box, snapshot, symbol, now);
+    return box;
+  }
+  global.LEVI_EXIT_SNAPSHOT = {build, render, append, VERSION, MAX_AGE};
   global.setInterval?.(() => {
     for (const [host, context] of hosts) {
       if (!host.isConnected) {hosts.delete(host); continue;}

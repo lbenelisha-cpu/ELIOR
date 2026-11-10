@@ -471,6 +471,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
     $('#positions').innerHTML=liveBalances.length
       ? liveBalances.map(x=>{const pnl=positionPnlDisplay(x,'USDT');return `<div><b>${x.asset}USDT</b> · כמות ${fmt(x.qty,8)} · שווי ${fmt(x.valueUsdt)} USDT<div class="${pnl.className}">${pnl.text}</div><div class="mini">לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר</div></div>`;}).join('')
       : liveAccount?'<div class="mini">אין פוזיציות LIVE פעילות.</div>':'<div class="mini">לא ניתן לאמת כעת את הפוזיציות בחשבון LIVE.</div>';
+    Array.from($('#positions').children).forEach((host,i)=>{const balance=liveBalances[i];if(balance)globalThis.LEVI_EXIT_SNAPSHOT?.append(host,{agent:d,account:liveAccount,mode:currentMode,receivedAt:Date.now()},balance.asset+'USDT');});
   }else{
     const ps=Object.values(paperPos);
     $('#positions').innerHTML=ps.length

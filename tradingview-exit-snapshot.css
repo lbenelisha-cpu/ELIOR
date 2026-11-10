@@ -5,3 +5,7 @@
 .exit-snapshot a{color:#83dfd5;font-size:.9rem}
 .exit-snapshot textarea{box-sizing:border-box;width:100%;max-width:100%;background:#091723;color:#e8f5ff;border:1px solid #416178;border-radius:8px;padding:10px;font:13px/1.5 monospace;overflow-wrap:anywhere}
 .exit-snapshot [hidden]{display:none}
+
+.exit-snapshot-inline{width:min(320px,100%);box-sizing:border-box;padding:10px;font-size:.85rem}
+.exit-snapshot-inline>strong,.exit-snapshot-inline>p:nth-of-type(2),.exit-snapshot-inline>a{display:none}
+.exit-snapshot-inline button{width:100%;font-size:.85rem}

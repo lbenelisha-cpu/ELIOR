@@ -48,7 +48,7 @@
    const cls=!live?'pnl-unknown':pnl>0?'pnl-profit':pnl<0?'pnl-loss':'pnl-flat';
    const signed=n=>number(n)?(n>0?'+':'')+format(n,2):'—';
    const protectedNow=fresh(p.protectedAt,now,30000)&&['STOP_MARKET','TAKE_PROFIT_MARKET'].every(kind=>p.algos?.some(a=>a.kind===kind&&a.status==='NEW'));
-   html+='<tr><td><b>'+esc(p.symbol)+'</b><br>SHORT'+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+format(p.qty,8)+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+format(p.currentPrice,8)+'<br><small>'+(live?'עודכן: ':'מחיר לא עדכני: ')+esc(time(p.priceAt))+'</small></td><td>'+format(valid?Number(p.entryPrice)*Number(p.qty):null,2)+'</td><td class="'+cls+'">'+signed(pnl)+'</td><td class="'+cls+'">'+signed(pct)+(live?'%':'')+'</td><td>'+format(p.targetPrice,8)+'</td><td>'+format(p.stopPrice,8)+'</td><td>'+(protectedNow?'אומתו בבורסה':'לא אומתו לאחרונה')+'<br><small>'+esc(time(p.protectedAt))+'</small></td></tr>';
+   html+='<tr><td data-exit-symbol="'+esc(p.symbol)+'"><b>'+esc(p.symbol)+'</b><br>SHORT'+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+format(p.qty,8)+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+format(p.currentPrice,8)+'<br><small>'+(live?'עודכן: ':'מחיר לא עדכני: ')+esc(time(p.priceAt))+'</small></td><td>'+format(valid?Number(p.entryPrice)*Number(p.qty):null,2)+'</td><td class="'+cls+'">'+signed(pnl)+'</td><td class="'+cls+'">'+signed(pct)+(live?'%':'')+'</td><td>'+format(p.targetPrice,8)+'</td><td>'+format(p.stopPrice,8)+'</td><td>'+(protectedNow?'אומתו בבורסה':'לא אומתו לאחרונה')+'<br><small>'+esc(time(p.protectedAt))+'</small></td></tr>';
   }
   if(!rows.length)html+='<tr><td colspan="11">אין כרגע פוזיציות SHORT מתועדות פתוחות.</td></tr>';
   html+='</tbody></table></div><p class="mini">רווח / הפסד לא ממומש מחושב לפי מחיר הקנייה החוזרת (Ask), לפני עמלות ומימון. מחיר חסר או ישן לא מוצג כרווח אפס. זמני התצוגה בשעון ישראל.</p>';
@@ -77,7 +77,7 @@
   return html;
  }
  let snapshot=null;
- function paint(){const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const host=root.document.createElement('div');panel.append(host);root.LEVI_EXIT_SNAPSHOT?.render(host,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
+ function paint(){const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
  function update(s){
   if(s?.mode==='demo'){snapshot={mode:'demo'};paint();return;}
   // Agent fallback snapshots have no Futures data; do not erase an authenticated mode response.
