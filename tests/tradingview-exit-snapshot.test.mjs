@@ -112,3 +112,19 @@ test('Futures SHORT targets the perpetual chart, retains its tighter stop and ne
  p.protectedAt=now-MAX_AGE-1;assert.equal(build(s,'ABCUSDT',now).brokerStop,0);
  p.targetPrice=120;assert.equal(build(s,'ABCUSDT',now).ok,false);
 });
+
+test('per-position buttons copy independently and reject stale data without selecting a different position',async()=>{
+ let clock=now,stopped=0;const copies=[];
+ const node=()=>({children:[],attributes:{},classList:{add(){}},append(...items){this.children.push(...items);},setAttribute(k,v){this.attributes[k]=v;},focus(){},select(){},isConnected:true});
+ class Clock extends Date{static now(){return clock;}}
+ const ctx={Date:Clock,document:{createElement:node},navigator:{clipboard:{async writeText(value){copies.push(value);}}}};
+ vm.runInNewContext(source,ctx);const api=ctx.LEVI_EXIT_SNAPSHOT,s=fixture();
+ const second=structuredClone(s.agent.agents[0]);second.symbol='ETHUSDT';second.strategy.entryPrice=200;second.strategy.targetPrice=300;
+ s.agent.agents.push(second);s.account.balances.push({asset:'ETH',qty:2,valueUsdt:400});
+ const a=api.append(node(),s,'TAOUSDT'),b=api.append(node(),s,'ETHUSDT');
+ await b._exitUI.button.onclick({stopPropagation(){stopped++;}});
+ await a._exitUI.button.onclick({stopPropagation(){stopped++;}});
+ assert.match(copies[0],/\|BINANCE:ETHUSDT\|/);assert.match(copies[1],/\|BINANCE:TAOUSDT\|/);assert.equal(stopped,2);
+ assert.match(b._exitUI.button.attributes['aria-label'],/ETHUSDT/);
+ clock+=MAX_AGE;await b._exitUI.button.onclick();assert.equal(copies.length,2);assert.equal(b._exitUI.button.disabled,true);
+});

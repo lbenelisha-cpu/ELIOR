@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#0c1726">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="/binance-agent.css?v=20261108-short-chart">
-<link rel="stylesheet" href="/tradingview-exit-snapshot.css?v=20261107-wave-exit"><link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
+<link rel="stylesheet" href="/tradingview-exit-snapshot.css?v=20261110-position-copy"><link rel="stylesheet" href="/chart-workbench.css?v=20261022-tools"><link rel="stylesheet" href="/rsi-screener.css?v=20261023-rsi-filter">  <link rel="stylesheet" href="/trade-risk.css?v=20261024-settings">
   <link rel="stylesheet" href="/binance-dashboard.css?v=20261030-news-nav">
   <link rel="stylesheet" href="/ma-slope-panel.css?v=20261026-entry-alpha">
 <link rel="stylesheet" href="/position-map-change.css?v=20261026-position-side"><link rel="stylesheet" href="/binance-trade-history.css?v=20261026-history">
@@ -502,7 +502,7 @@
 
   <dialog id="deviceConnectionDialog" aria-labelledby="deviceConnectionTitle"><h2 id="deviceConnectionTitle">חיבור מכשיר למסחר</h2><p>הזן את הקוד הקבוע שהוגדר בשרת. אותו קוד מתאים גם למכשיר נוסף. החיבור נשמר עד שנה; אין קוד בכל פעולה.</p><label>קוד חיבור — שש ספרות<input id="devicePairCode" type="text" inputmode="numeric" autocomplete="off" maxlength="6" pattern="[0-9]{6}" dir="ltr"></label><p id="devicePairResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="devicePairSubmit" type="button">חבר מכשיר</button><button id="devicePairCancel" type="button">סגור</button></div></dialog>
   <dialog id="manualTradeDialog" aria-labelledby="manualTradeTitle"><h2 id="manualTradeTitle"></h2><p id="manualTradeSummary"></p><label id="manualAmountRow">סכום קנייה ב־USDT<input id="manualQuoteAmount" type="number" inputmode="decimal" min="5" step="0.01" autocomplete="off"></label><p id="manualTradePolicy" class="mini"></p><p id="manualTradeResult" role="status" aria-live="polite"></p><div class="manual-trade-actions"><button id="manualTradeSubmit" type="button">אשר</button><button id="manualTradeCheck" type="button" hidden>בדוק מצב בקשה</button><button id="manualTradeCancel" type="button">סגור / ביטול</button></div></dialog>
-  <script src="/tradingview-exit-snapshot.js?v=20261107-quote-time"></script>
+  <script src="/tradingview-exit-snapshot.js?v=20261110-position-copy"></script>
   <script src="/tradingview-link.js?v=20261107-poc"></script>
 <script src="/binance-chart-decisions.js?v=20261029-higher-recovery"></script>
   <script src="/binance-indicators.js?v=20261031-channel"></script>
@@ -513,8 +513,8 @@
   <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
-  <script src="/binance-futures-positions.js?v=20261108-quick-chart"></script>
-  <script src="/binance-agent.js?v=20261109-indicators"></script>
+  <script src="/binance-futures-positions.js?v=20261110-position-copy"></script>
+  <script src="/binance-agent.js?v=20261110-position-copy"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261103-poc"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>
@@ -526,5 +526,5 @@
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>
 <script src="/binance-kelly.js?v=20261025-stability"></script>
-<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261106-short-settings"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261107-wave-exit"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261108-all-charts"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261106-consolidation"></script><script type="module" src="/binance-terminal.js?v=20261109-entry-pnl"></script><script type="module" src="/binance-trading-pnl.js?v=20261108-all-charts"></script><script type="module" src="/binance-live-monitor.js?v=20261108-all-charts"></script></body>
+<script type="module" src="/rsi-screener-init.js?v=20261023-rsi-filter"></script><script src="/app-settings.js?v=20261106-short-settings"></script><script src="/market-power-panel.js?v=20261024-settings"></script><script type="module" src="/rsi-current-badge.js?v=20261026-rsi40"></script><script type="module" src="/binance-dashboard.js?v=20261107-wave-exit"></script><script type="module" src="/ma-slope-panel.js?v=20261026-entry-alpha"></script><script type="module" src="/binance-trade-history.js?v=20261108-all-charts"></script><script type="module" src="/binance-equity-history.js?v=20261026-equity"></script><script type="module" src="/ma-decision-journal.js?v=20261026-entry-alpha"></script><script type="module" src="/strategy-followup-ui.js?v=20261106-consolidation"></script><script type="module" src="/binance-terminal.js?v=20261110-position-copy"></script><script type="module" src="/binance-trading-pnl.js?v=20261108-all-charts"></script><script type="module" src="/binance-live-monitor.js?v=20261108-all-charts"></script></body>
 </html>

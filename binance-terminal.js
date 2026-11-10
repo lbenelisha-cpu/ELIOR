@@ -27,6 +27,7 @@ export function createTerminalDashboard(doc=document,{now=Date.now}={}) {
       else for(const p of v.positions){const row=make('tr');
         const asset=cell(row,null,'terminal-asset');asset.append(make('b',p.symbol),make('small','LONG · '+(snapshot.mode==='live'?'SPOT':'DEMO')));
         globalThis.LEVI_ASSET_CHART?.append(asset,p.symbol,'SPOT');
+        globalThis.LEVI_EXIT_SNAPSHOT?.append(asset,snapshot,p.symbol);
         cell(row,num(p.qty,8),'terminal-number');cell(row,num(p.entry,8),'terminal-number');cell(row,num(p.price,8),'terminal-number');cell(row,num(p.value),'terminal-number');
         cell(row,signed(p.pnl),'terminal-number '+tone(p.pnl));cell(row,p.pct==null?'—':signed(p.pct)+'%','terminal-number '+tone(p.pct));cell(row,p.weight==null?'—':num(p.weight,1)+'%','terminal-number');positions.append(row);
       }
