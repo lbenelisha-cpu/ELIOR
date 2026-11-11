@@ -106,7 +106,12 @@
   }
  }
  let snapshot=null;
- function paint(){const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
+ function paint(){
+  const counter=root.document?.getElementById?.('overviewShortSlots'),note=root.document?.getElementById?.('overviewShortSlotsNote'),f=snapshot?.shortTrading;
+  const valid=snapshot?.mode==='live'&&Array.isArray(f?.positions)&&fresh(f.checkedAt,Date.now(),60000);
+  if(counter)counter.textContent=valid?f.positions.length+' / 2':'— / 2';
+  if(note)note.textContent=valid?'עד 2 פוזיציות · תקרה למקום: '+format(f.allocation?.maxOrderUsdt,2)+' USDT':snapshot?.mode==='demo'?'זמין בחשבון LIVE בלבד':'ממתין לאימות נתוני SHORT';
+  const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
  function update(s){
   if(s?.mode==='demo'){snapshot={mode:'demo'};paint();return;}
   // Agent fallback snapshots have no Futures data; do not erase an authenticated mode response.
