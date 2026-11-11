@@ -1,3 +1,4 @@
+import {preDynamicSource} from './pre-dynamic-source.mjs';
 import {preLifecycleSource} from './pre-lifecycle-source.mjs';
 // Immutable 05eedc48 sources for historical installers. Those installers must keep
 // recognizing their original releases even after the current entry policy changes.
@@ -9,7 +10,8 @@ export function readPrePocSource(file,...args){
   const relative=path.relative(root,path.resolve(original)),candidate=path.join(fixtures,relative);
   if(relative.startsWith('lib/')&&fs.existsSync(candidate))return fs.readFileSync(candidate,...args);
  }
- const data=fs.readFileSync(file,...args);
+ let data=fs.readFileSync(file,...args);
+ if(typeof data==='string')data=preDynamicSource(data,typeof original==='string'?original:'');
  if(typeof data!=='string')return data;
  const basename=typeof original==='string'?path.basename(original):'';
  if(!['server.mjs','futures-short-runner.mjs','wyckoff-five-minute-data.mjs'].includes(basename))return data;

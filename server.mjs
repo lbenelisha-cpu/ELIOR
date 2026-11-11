@@ -2287,13 +2287,14 @@ setInterval(()=>futuresWatch.tick().catch(()=>{}),2000).unref();
 const pocControl=()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,paused:tradeControl.paused,mode});
 const pocManualInput=row=>({requestId:row.requestId,mode:'live',side:'BUY',symbol:row.symbol,quoteUsdt:row.quoteUsdt});
 const pocEntries=new BinancePoc({
- file:process.env.BINANCE_POC_FILE||LIVE_LOG_FILE+'.poc',maxLongUsdt:LIVE_MAX_USDT,
+ file:process.env.BINANCE_POC_FILE||LIVE_LOG_FILE+'.poc',maxLongUsdt:LIVE_MAX_USDT,shortAllocation:()=>futuresShort.allocation(),
  control:pocControl,settings:()=>tradeSettings.values,
  validate:async row=>{
   if(row.side==='SHORT'){
    if(!futuresShort.config.enabled)throw Error('FUTURES_SHORT_DISABLED');
    if(tradeSettings.values.takeProfitPct>=100)throw Error('POC_SHORT_TP_BELOW_100_REQUIRED');
    await futuresShort.info(row.symbol);
+   const account=await futuresShort.snapshot();futuresShort.assertAccount(account);futuresShort.assertAllocation(row.quoteUsdt,account);
   }else{
    if(!SYMBOLS.includes(row.symbol))throw Error('POC_SELECT_SCANNED_SYMBOL');
    const info=await symbolExchangeInfo(row.symbol);
@@ -2525,7 +2526,7 @@ const server=http.createServer((req,res)=>{
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
       allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
-      futuresManualTrading:{version:1,maxOrderUsdt:35},
+      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:2,allocationPolicy:'FUTURES_WALLET_HALF_V1'},
       manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,

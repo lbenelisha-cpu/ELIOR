@@ -12,8 +12,9 @@ function harness(t,patch={}){
  h.runner=new BinancePoc(h.options);return h;
 }
 test('POC is explicit, bounded and cannot accept bad numbers or arbitrary sides',()=>{
- for(const patch of [{confirmed:false},{mode:'demo'},{side:'BUY'},{poc:'100'},{poc:Infinity},{quoteUsdt:401},{side:'SHORT',quoteUsdt:36},{expiresHours:0},{symbol:'<script>'},{requestId:'../etc'}])assert.throws(()=>pocInput({...input,...patch}));
- assert.equal(pocInput({...input,side:'SHORT',quoteUsdt:35}).quoteUsdt,35);
+ for(const patch of [{confirmed:false},{mode:'demo'},{side:'BUY'},{poc:'100'},{poc:Infinity},{quoteUsdt:401},{side:'SHORT',quoteUsdt:Infinity},{expiresHours:0},{symbol:'<script>'},{requestId:'../etc'}])assert.throws(()=>pocInput({...input,...patch}));
+ assert.equal(pocInput({...input,side:'SHORT',quoteUsdt:100}).quoteUsdt,100);
+ assert.throws(()=>pocInput({...input,side:'SHORT',quoteUsdt:101},{maxShortUsdt:100}));
 });
 test('durable waiting survives restart, crosses once, and repeated creates cannot trade again',async t=>{
  const h=harness(t);await h.runner.create(input);assert.equal(h.posts,0);assert.equal(h.runner.reserved('ETHUSDT','LONG'),true);

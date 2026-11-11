@@ -11,7 +11,7 @@
  function ready(){for(const field of el('pocForm').querySelectorAll('input,select'))field.disabled=sending||unknownCreate;el('pocCreate').disabled=sending||unknownCreate||!data?.ok||!data.control?.allowEntries||context().mode!=='live';}
  function syncFields(){
   if(!request&&!el('pocPrice').value&&!el('pocAmount').value)el('pocSymbol').value=context().symbol||'';
-  el('pocAmount').max=el('pocSide').value==='SHORT'?35:data?.maxLongUsdt||400;
+  el('pocAmount').max=el('pocSide').value==='SHORT'?(data?.maxShortUsdt||0):data?.maxLongUsdt||400;
   const s=data?.settings;
   el('pocPolicy').textContent=s?`לאחר הכניסה: סטופ ${s.stopLossPct}% · יעד רווח ${s.takeProfitPct}% · הפעלת הגנת רווח ${s.profitActivationPct}% · מרחק נגרר ${s.trailingGapPp} נקודות אחוז. ההגדרות הפעילות בזמן הכניסה קובעות; שינויים בהמשך חלים לפי מנגנון ניהול הפוזיציה.`:'טוען הגדרות ניהול…';
   ready();

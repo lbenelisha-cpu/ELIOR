@@ -1,3 +1,4 @@
+import {rewindDynamicFixture,preDynamicSource} from './helpers/pre-dynamic-source.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,6 +11,7 @@ function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'direction-install-'));
  for(const name of ['lib','scripts','tests'])fs.cpSync(new URL(name,source),path.join(root,name),{recursive:true});
  for(const name of fs.readdirSync(source).filter(n=>/\.(m?js|json)$/.test(n)))fs.copyFileSync(new URL(name,source),path.join(root,name));
+ rewindDynamicFixture(root);
  for(const file of new Set(directionPatches.map(p=>p.file))){
   const target=path.join(root,file),patches=directionPatches.filter(p=>p.file===file);
   if(patches.some(p=>p.before===null)){fs.rmSync(target);continue;}
@@ -29,7 +31,7 @@ test('direction installer upgrades the prior runtime, retains local exit checks,
   patchDirectionConfirmation(root);const once=snapshot(root);patchDirectionConfirmation(root);assert.deepEqual(snapshot(root),once);
   assert.match(fs.readFileSync(file,'utf8'),/await this.api.get\('\/fapi\/v1\/ticker\/price'/);
   assert.match(fs.readFileSync(path.join(root,'server.mjs'),'utf8'),/local monitoring integration/);
-  for(const [name,text]of once)if(!['server.mjs','lib/futures-short-runner.mjs'].includes(name))assert.equal(text,fs.readFileSync(new URL(name,source),'utf8'),name);
+  for(const [name,text]of once)if(!['server.mjs','lib/futures-short-runner.mjs'].includes(name))assert.equal(text,preDynamicSource(fs.readFileSync(new URL(name,source),'utf8'),name),name);
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const tests=['poc-direction-confirmation','futures-trend-history','channel-poc-entry','channel-primary-entry','futures-short','futures-short-recovery','futures-short-fill'];
   const run=spawnSync(process.execPath,['--test',...tests.map(n=>path.join(root,'tests',n+'.test.mjs'))],{env,encoding:'utf8',timeout:60000,maxBuffer:2000000});

@@ -1,3 +1,4 @@
+import {rewindDynamicFixture} from './helpers/pre-dynamic-source.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {spawnSync} from 'node:child_process';
 import {patchCurrentEquityAllocation,equityAllocationFiles} from '../scripts/patch-current-equity-allocation.mjs';
 import {assertNoPendingEntry} from '../scripts/assert-no-pending-entry.mjs';
@@ -21,6 +22,7 @@ function fixture(quoteFixed=false){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'equity-installer-test-'));
  for(const dir of ['lib','scripts','tests'])fs.cpSync(new URL('../'+dir,import.meta.url),path.join(root,dir),{recursive:true});
  for(const file of ['server.mjs','binance-agent.js','tradingview-exit-snapshot.js','channel-poc-model.js','parallel-channel.js','regression-trend.js'])fs.copyFileSync(new URL('../'+file,import.meta.url),path.join(root,file));
+ rewindDynamicFixture(root);
  const server=path.join(root,'server.mjs');fs.writeFileSync(server,fs.readFileSync(server,'utf8').replace('      futuresManualTrading:{version:1,maxOrderUsdt:35},\n',''));
  for(const p of [...patches].reverse()){
   if(quoteFixed&&p.before.includes('positionQuoteAt:'))continue;

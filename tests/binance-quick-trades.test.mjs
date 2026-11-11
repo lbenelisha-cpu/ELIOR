@@ -46,3 +46,11 @@ test('row quick action freezes its own asset and Futures action uses explicit sh
  const close=f.get('manualTradeSubmit').onclick();assert.equal(f.calls[0].side,'CLOSE_SHORT');assert.equal(f.calls[0].market,'FUTURES');assert.equal(f.calls[0].symbol,'HYPEUSDT');assert.equal(f.calls[0].all,true);
  f.resolve({ok:true,order:{status:'FILLED',executedQty:.43}});await close;
 });
+
+test('SHORT modal shows dynamic allocation above 35 and rechecks reduced capability before sending',async()=>{
+ const h=ui();h.state.futuresCapabilities={version:1,maxOrderUsdt:100,maxPositions:2};h.state.futures={positions:[],account:{availableUsdt:200}};
+ h.quick('BUY','BTCUSDT','FUTURES');assert.equal(h.get('manualQuoteAmount').value,'100');assert.match(h.get('manualTradeSummary').textContent,/100/);assert.doesNotMatch(h.get('manualTradeSummary').textContent,/35 USDT/);assert.equal(h.calls.length,0);
+ h.state.futuresCapabilities.maxOrderUsdt=40;await h.get('manualTradeSubmit').onclick();assert.equal(h.calls.length,0);
+ h.get('manualQuoteAmount').value='40';const sent=h.get('manualTradeSubmit').onclick();assert.equal(h.calls[0].quoteUsdt,40);assert.equal(h.calls[0].side,'OPEN_SHORT');
+ h.resolve({ok:false,error:'FUTURES_MIN_NOTIONAL_OR_QUANTITY'});await sent;assert.match(h.get('manualTradeResult').textContent,/מינימום/);
+});
