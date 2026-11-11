@@ -32,7 +32,16 @@
  body.append(details);
  const connection=make('div',null,'unified-connection');connection.append($('manualConnectBtn'),$('manualForgetBtn'));details.append(connection);
  fold([...metrics.children].slice(4),'תוצאות המסחר היום','unified-daily app-view trade-view portfolio-view');
- fold([document.querySelector('.terminal-analytics')],'שווי התיק לאורך היום · חלוקה ומפת פוזיציות','app-view trade-view portfolio-view');
+ // Integrate existing live account widgets into the trading workspace itself.
+ // Move the original nodes so their subscriptions and controls remain intact.
+ const analytics=document.querySelector('.terminal-analytics');
+ if(analytics){
+  analytics.classList.add('unified-account-context');
+  analytics.classList.remove('app-view','trade-view','portfolio-view');
+  analytics.querySelectorAll('.app-view').forEach(node=>node.classList.remove('app-view','trade-view','portfolio-view'));
+  analytics.hidden=false;
+  body.insertBefore(analytics,details);
+ }
  fold([$('terminalLedgers')],'החזקות ויציאות אחרונות','app-view trade-view portfolio-view');
  for(const [id,title,classes] of [
   ['futuresPositionsPanel','חשבון Futures · פוזיציות SHORT והגנות','app-view trade-view portfolio-view'],
