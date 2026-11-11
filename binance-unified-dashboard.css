@@ -89,3 +89,10 @@ body.unified-dashboard #pocLiveMonitor.live-monitor-integrated{padding:12px 16px
 .live-monitor-integrated .live-monitor-table-card>summary{padding:10px;cursor:pointer;font-size:13px}
 .live-monitor-integrated .live-monitor-tables:empty{display:none}
 @media(max-width:700px){.live-account-summary th,.live-account-summary td{padding:10px 7px}.live-account-summary td{font-size:14px}.live-monitor-integrated .live-monitor-heading{float:none}.live-monitor-integrated .live-monitor-refresh{font-size:12px;padding:6px 10px}}
+
+/* Compact browsing for shared watch, SHORT checks and recorded closures. */
+.short-pager{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:14px 0;min-width:0}
+.short-pager input{flex:1;min-width:120px;max-width:240px;padding:10px;background:#0b1d29;color:#e8f4fc;border:1px solid #325365;border-radius:9px;font:inherit}
+.short-pager>button{padding:10px;min-height:44px}
+.short-pager>.unified-asset-strip{flex-basis:100%;width:100%}
+#futuresPositionsPanel [hidden]{display:none!important}

@@ -76,8 +76,37 @@
   html+='</tbody></table></div></details>';
   return html;
  }
+ const pagerState={};
+ function addPagers(panel){
+  if(!root.document?.createElement)return;
+  for(const detail of panel.querySelectorAll('details[data-short-detail]')){
+   const kind=detail.dataset.shortDetail;
+   const table=detail.querySelector('table'),rows=Array.from(table?.querySelectorAll('tbody tr')||[]).filter(row=>row.cells.length>1);
+   if(!rows.length)continue;
+   const state=pagerState[kind]||(pagerState[kind]={key:'',query:'',scroll:0});
+   const items=rows.map(row=>{const symbol=(row.cells[0].firstChild?.textContent||row.cells[0].textContent).trim();const date=kind==='closed'?row.cells[2].textContent.trim():'';return {row,label:symbol+(date?' · '+date:''),key:symbol+'|'+date};});
+   const nav=root.document.createElement('div');nav.className='short-pager';nav.setAttribute('aria-label','דפדוף '+detail.querySelector('summary').textContent);
+   const input=root.document.createElement('input');input.type='search';input.placeholder='חיפוש נכס';input.setAttribute('aria-label','חיפוש נכס ברשימה');input.value=state.query;
+   const strip=root.document.createElement('div');strip.className='unified-asset-strip';
+   const prev=root.document.createElement('button'),next=root.document.createElement('button'),count=root.document.createElement('span');
+   prev.type=next.type='button';prev.textContent='הקודם';next.textContent='הבא';count.className='mini';count.setAttribute('aria-live','polite');
+   const empty=root.document.createElement('p');empty.className='mini';empty.textContent='לא נמצאו נכסים התואמים לחיפוש';
+   nav.append(input,prev,count,next,strip);table.parentElement.before(nav);table.parentElement.after(empty);
+   function display(){
+    const matches=items.filter(item=>item.label.toLowerCase().includes(state.query.toLowerCase().trim()));
+    let selected=matches.find(item=>item.key===state.key)||matches[0];state.key=selected?.key||'';
+    for(const item of items){item.row.hidden=item!==selected;item.button.hidden=!matches.includes(item);item.button.setAttribute('aria-pressed',String(item===selected));}
+    const index=matches.indexOf(selected);prev.disabled=index<=0;next.disabled=index<0||index>=matches.length-1;count.textContent=matches.length?(index+1)+' / '+matches.length:'0 / '+items.length;
+    table.parentElement.hidden=!selected;empty.hidden=!!selected;
+   }
+   for(const item of items){const button=root.document.createElement('button');button.type='button';button.className='unified-asset';button.textContent=item.label;item.button=button;button.addEventListener('click',()=>{state.key=item.key;display();});strip.append(button);}
+   const step=delta=>{const matches=items.filter(item=>!item.button.hidden);const index=matches.findIndex(item=>item.key===state.key);const selected=matches[index+delta];if(selected){state.key=selected.key;display();selected.button.scrollIntoView({block:'nearest',inline:'nearest'});}};
+   prev.addEventListener('click',()=>step(-1));next.addEventListener('click',()=>step(1));input.addEventListener('input',()=>{state.query=input.value;display();});
+   strip.addEventListener('scroll',()=>{state.scroll=strip.scrollLeft;});display();strip.scrollLeft=state.scroll;
+  }
+ }
  let snapshot=null;
- function paint(){const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
+ function paint(){const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
  function update(s){
   if(s?.mode==='demo'){snapshot={mode:'demo'};paint();return;}
   // Agent fallback snapshots have no Futures data; do not erase an authenticated mode response.
@@ -86,5 +115,5 @@
  }
  root.LEVI_FUTURES_TABLE={update,view,reason};
  root.addEventListener?.('trade-device-expired',()=>{snapshot=null;paint();});
- if(root.document){paint();root.setInterval(()=>{if(!root.document.hidden)paint();},15000);}
+ if(root.document){paint();root.setInterval(()=>{if(!root.document.hidden&&!root.document.activeElement?.closest?.('.short-pager'))paint();},15000);}
 })(typeof window==='undefined'?globalThis:window);
