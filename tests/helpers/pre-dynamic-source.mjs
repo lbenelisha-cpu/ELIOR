@@ -2,6 +2,7 @@
 import fs from 'node:fs';import path from 'node:path';
 const patches=[...JSON.parse(fs.readFileSync(new URL('../../scripts/dynamic-short-patches.json',import.meta.url),'utf8')),...JSON.parse(fs.readFileSync(new URL('../fixtures/pre-dynamic/ui-patches.json',import.meta.url),'utf8'))];
 export function preDynamicSource(source,file){
+ if(path.basename(file)==='binance-agent.html')source=source.replace('/binance-agent.js?v=20261111-unified','/binance-agent.js?v=20261111-dynamic-short');
  for(const p of [...patches].reverse())if(path.basename(p.file)===path.basename(file)&&source.split(p.after).length===2)source=source.replace(p.after,p.before);
  return source;
 }

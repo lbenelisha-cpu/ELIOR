@@ -1,0 +1,59 @@
+/* Compact, single-chart trading workspace. Scoped to Binance only. */
+.unified-dashboard .overview-metrics{gap:8px;margin-bottom:14px}
+.unified-dashboard .metric-card{min-height:105px;padding:14px 16px}
+.unified-dashboard .metric-card strong{font-size:clamp(22px,2.4vw,32px)}
+.unified-dashboard .metric-art,.unified-dashboard .slot-dots{display:none}
+.unified-dashboard #chartSection{margin:14px 0 20px;width:100%;min-width:0}
+.unified-dashboard #chartSection>.fold-body{padding:16px}
+.unified-dashboard #chartSection>summary{padding:12px 16px}
+.unified-assets{display:flex;gap:12px;align-items:center;margin-bottom:18px;min-width:0}
+.unified-assets input{width:210px;flex:0 0 210px;border:1px solid #325365;background:#0b1d29;color:#e8f4fc;border-radius:10px;padding:12px;font:inherit}
+.unified-asset-strip{display:flex;gap:8px;overflow-x:auto;min-width:0;padding:3px 0 9px;scrollbar-width:thin}
+.unified-asset{white-space:nowrap;border:1px solid #325365;border-radius:9px;background:#102630;color:#c6dce8;padding:11px 15px;cursor:pointer;font:inherit;font-weight:600}
+.unified-asset[aria-pressed=true]{background:#104650;border-color:#2bd5e3;color:#fff;box-shadow:inset 0 -2px #2bd5e3}
+.unified-asset:focus-visible,.unified-assets input:focus-visible{outline:2px solid #54deef;outline-offset:2px}
+.unified-dashboard .selected-asset-head{margin-bottom:8px}
+.unified-dashboard #chartMeta,.unified-dashboard #chartScore{display:none}
+.unified-dashboard .manual-trade-actions{display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;margin:0}
+.unified-dashboard .manual-trade-actions button{min-height:44px}
+.unified-dashboard #hourlyTrendStatus{display:none}
+.unified-dashboard #manualTradeHint,.unified-dashboard #deviceAccessStatus{margin:0;font-size:12px}
+.unified-dashboard .manual-trade-actions p{flex-basis:100%}
+.unified-dashboard .chart-terminal{margin-top:4px}
+.unified-dashboard .chart-price-legend{gap:8px}
+.unified-dashboard .chart-price-legend-item{padding:10px;min-height:58px}
+.unified-source{font-size:12px;color:#9ab3c3;margin:4px 0 10px}
+.unified-details{border:1px solid #274455;border-radius:12px;background:#091b26;margin:12px 0;min-width:0}
+.unified-details>summary{cursor:pointer;padding:16px;color:#cfe4f1;font-weight:600;min-height:48px}
+.unified-details[open]>:not(summary){margin:12px}
+.unified-dashboard .unified-analysis #binanceExitSnapshot .position-barriers{display:none}
+.unified-dashboard .unified-analysis #binanceSlope{max-width:100%}
+.unified-dashboard .trading-grid{display:block}
+.unified-dashboard .terminal-help{display:none}
+@media(max-width:700px){
+ .unified-dashboard .overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .unified-dashboard .metric-card{min-height:95px;padding:12px}
+ .unified-dashboard #chartSection>.fold-body{padding:9px}
+ .unified-assets{display:block}.unified-assets input{width:100%;margin-bottom:9px}
+ .unified-dashboard .manual-trade-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .unified-dashboard .manual-trade-actions p{grid-column:1/-1}
+ .unified-dashboard .manual-trade-actions button{font-size:13px;padding:10px 5px;min-width:0}
+ .unified-dashboard .chart-price-legend{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .unified-dashboard .selected-asset-head{gap:8px}.unified-dashboard #chartSymbol{font-size:24px}
+ .unified-dashboard .selected-price strong{font-size:22px}
+ .unified-details>summary{font-size:14px}
+}
+.unified-dashboard .overview-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+.unified-dashboard .overview-heading{margin-bottom:12px}
+.unified-dashboard .overview-heading h1{font-size:28px;margin:4px 0}
+.unified-dashboard .overview-heading .eyebrow{display:none}
+.unified-dashboard .overview-heading .overview-sub{margin:5px 0}
+.unified-market{font:inherit;color:#d5edf7;background:#102c39;border:1px solid #366173;border-radius:9px;padding:10px;min-height:44px}
+.unified-dashboard .unified-daily{grid-column:1/-1;margin:0;background:transparent}
+.unified-dashboard .unified-daily>summary{padding:8px 12px;min-height:35px;font-size:12px}
+.unified-dashboard .unified-daily[open]{display:grid;grid-template-columns:1fr 1fr}
+.unified-dashboard .unified-daily>summary{grid-column:1/-1}
+.unified-connection{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-width:700px){.unified-dashboard .overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.unified-market{width:100%}.unified-dashboard .selected-asset-head{flex-wrap:wrap}}
+body.portfolio-terminal.unified-dashboard .overview-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:700px){body.portfolio-terminal.unified-dashboard .overview-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}

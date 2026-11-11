@@ -27,6 +27,8 @@ const fmt=(v,d=2)=>Number.isFinite(+v)?(+v).toLocaleString('he-IL',{maximumFract
 const put=(s,v)=>{const e=$(s);if(e)e.textContent=v};
 
 let selectedSymbol='BTCUSDT';
+let selectedChartMarket='SPOT';
+function chartPositionSnapshot(){return selectedChartMarket==='FUTURES'?{venue:'BINANCE_FUTURES',shortTrading:futuresManualStatus,mode:currentMode}:{agent:currentAgentData,account:currentLiveAccount,mode:currentMode,receivedAt:Date.now()};}
 let currentAgentData=null;
 let currentMode='demo';
 let currentLiveAccount=null;
@@ -50,8 +52,8 @@ import('./fixed-range-volume-profile.js?v=20261107-poc-v2').then(({createFixedRa
 }).catch(()=>put('#chartTools','Fixed Range Volume Profile לא נטען · רענן את העמוד.'));
 let chartTimeNavigation=null;
 let chartTerminal=null;
-import('./chart-terminal.js?v=20261111-barriers').then(({createChartTerminal})=>{
- chartTerminal=createChartTerminal({host:$('#priceChart').parentElement,toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),navigation:()=>chartTimeNavigation,onChange:()=>drawCandles(chartCandles)});
+import('./chart-terminal.js?v=20261111-unified').then(({createChartTerminal})=>{
+ chartTerminal=createChartTerminal({host:$('#priceChart').parentElement,toolbarHost:$('#chartTerminalTools'),shell:$('#chartTerminal'),fitToCandles:true,navigation:()=>chartTimeNavigation,onChange:()=>drawCandles(chartCandles)});
  drawCandles(chartCandles);
 }).catch(()=>put('#chartTerminalTools','כלי הגרף לא נטענו · רענן את העמוד.'));
 import('./chart-time-navigation.js?v=20261101-chart-terminal').then(({createChartTimeNavigation})=>{
@@ -509,9 +511,9 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   const s=a.strategy||{};
 
   put('#chartSymbol',a.symbol);
-  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),{agent:d,account:liveAccount,mode:currentModeArg,receivedAt:Date.now()},a.symbol);
+  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),chartPositionSnapshot(),a.symbol);
   put('#chartSectionLabel',a.symbol+' · נרות, RSI ותעלות');
-  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol);
+  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol+(selectedChartMarket==='FUTURES'?'.P':''));
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
   put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');
@@ -989,7 +991,7 @@ function drawCandles(candles){
   const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
   const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(selectedPosition.exitPolicy);
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
-  const barrierModel=globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot({mode:currentMode,agent:currentAgentData,account:currentLiveAccount},selectedSymbol);
+  const barrierModel=globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot(chartPositionSnapshot(),selectedSymbol);
   const tradeRisk=currentMode==='live'?null:globalThis.LEVI_TRADE_RISK?.levels(riskPosition);
   if(currentMode==='live')globalThis.LEVI_POSITION_BARRIERS?.render($('#binanceTradeRisk'),barrierModel);
   else globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),riskPosition,'USDT');
@@ -1376,3 +1378,5 @@ window.addEventListener('levi-dashboard-select',event=>{
 for(const id of ['showParallel','showRegression','regressionPeriod','regressionDeviation'])document.getElementById(id)?.addEventListener('change',()=>drawCandles(chartCandles));
 
 document.getElementById('channelStudyLink')?.addEventListener('click',()=>{const panel=document.getElementById('strategyReviewPanel');if(panel)panel.open=true;});
+
+window.addEventListener('levi-chart-market',event=>{if(!['SPOT','FUTURES'].includes(event.detail))return;selectedChartMarket=event.detail;updateSelectedAsset();drawCandles(chartCandles);});
