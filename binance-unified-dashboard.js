@@ -42,10 +42,10 @@
   analytics.hidden=false;
   body.insertBefore(analytics,details);
  }
+ const monitor=$('pocLiveMonitor');if(monitor){monitor.dataset.compact='true';metrics.after(monitor);}
  fold([$('terminalLedgers')],'החזקות ויציאות אחרונות','app-view trade-view portfolio-view');
  for(const [id,title,classes] of [
   ['futuresPositionsPanel','חשבון Futures · פוזיציות SHORT והגנות','app-view trade-view portfolio-view'],
-  ['pocLiveMonitor','מעקב מסחר LIVE','app-view trade-view portfolio-view pnl-view'],
   ['marketAttentionPanel','איתותים ותצפיתנים','app-view trade-view scans-view'],
   ['maDecisionJournal','יומן השוואת החלטות','app-view trade-view portfolio-view']
  ])fold([$(id)],title,classes);
