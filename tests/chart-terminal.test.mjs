@@ -42,3 +42,12 @@ test('pan moves by candle distance; pinch zoom anchors at the fingers and drawin
   const count=f.calls.length;f.emit('wheel',200,150,{deltaY:100,target:{closest:()=>({})}});assert.equal(f.calls.length,count);
  }finally{f.restore();}
 });
+test('candle-fit option starts enabled without removing the all-levels toggle',()=>{
+ const f=fixture();try{
+  const host=new Element(),tools=new Element();
+  const t=createChartTerminal({host,toolbarHost:tools,shell:new Element(),navigation:()=>null,fitToCandles:true});
+  assert.equal(t.fitCandles,true);
+  const button=tools.children[0].children[1].children.find(x=>x.textContent==='גובה: נרות');
+  assert.equal(button.attrs['aria-pressed'],'true');button.onclick();assert.equal(t.fitCandles,false);assert.equal(button.textContent,'גובה: כל הרמות');
+ }finally{f.restore();}
+});
