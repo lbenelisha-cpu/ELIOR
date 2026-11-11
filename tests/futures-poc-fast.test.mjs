@@ -6,7 +6,7 @@ test('Futures scheduling revisits prepared candidates, keeps discovery turns and
  const runner=new FuturesShortRunner({api:{},file:'/unused',config,now:()=>now,save:()=>{},control:()=>({allowEntries:true})});
  // Exercise the actual cycle scheduler; normal account/protection behavior is
  // separately exercised by every unchanged futures-short execution test.
- runner.recover=async()=>{};runner.snapshot=async()=>({availableUsdt:70});runner.manage=async()=>{};runner.assertAccount=()=>{};
+ runner.recover=async()=>{};runner.snapshot=async()=>runner.accountSummary=({availableUsdt:70,walletUsdt:70});runner.manage=async()=>{};runner.assertAccount=()=>{};
  runner.universe=['DEFUSDT','GHIUSDT','ABCUSDT'];runner.marketAt=now;
  const wait=structuredClone(i);wait.price+=.3;wait.liveBar.high=wait.liveBar.close=wait.price;
  const seen=[],calls=[];let ready=false;

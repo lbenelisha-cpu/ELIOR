@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import test from 'node:test';import assert from 'node:assert/strict';import {preDynamicFs as fs} from './helpers/pre-dynamic-source.mjs';import os from 'node:os';import path from 'node:path';
 import {patchQuickTrades} from '../scripts/patch-quick-chart-trades.mjs';
 test('quick trade installer preserves unrelated installed guards and fails atomically',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'quick-install-'));fs.mkdirSync(path.join(dir,'lib'));

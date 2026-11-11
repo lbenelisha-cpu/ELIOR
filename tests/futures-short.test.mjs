@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {shortConfig,shortSignal,shortExit,validateShortSettings,FUTURES_SHORT_EXIT_POLICY,shortOrderPlan} from '../lib/futures-short-policy.mjs';
+import {shortConfig,shortSignal,shortExit,validateShortSettings,FUTURES_SHORT_EXIT_POLICY,shortOrderPlan,shortAllocation} from '../lib/futures-short-policy.mjs';
 import {FuturesShortAPI} from '../lib/futures-short-api.mjs';
 import {FuturesShortRunner,atomicFuturesSave} from '../lib/futures-short-runner.mjs';
 import {validateTradeSettings} from '../lib/trade-settings.mjs';
@@ -257,7 +257,7 @@ test('pause or settings changes after durable intent prevent the final entry wri
 });
 test('zero-balance and disabled cycles never mutate the exchange; open positions retain exits with entries disabled',async()=>{
  const h=harness({config:shortConfig({})});await h.runner.cycle();assert.equal(h.writes.length,0);
- const k=harness();k.a.assets[0].availableBalance='0';await k.runner.cycle();assert.equal(k.writes.length,0);assert.match(k.runner.status().reason,/35_USDT/);
+ const k=harness();k.a.assets[0].availableBalance='0';await k.runner.cycle();assert.equal(k.writes.length,0);assert.match(k.runner.status().reason,/ALLOCATION_INSUFFICIENT/);
  const j=harness();await j.runner.enter('ABCUSDT',shortSignal(input(),config));j.control.allowEntries=false;j.setQuote({bidPrice:'106',askPrice:'106.01'});await j.runner.cycle();assert.ok(j.writes.some(x=>x.q.side==='BUY'));
 });
 test('durable journal is private and survives restart; malformed journals block every write',async()=>{
@@ -270,7 +270,7 @@ test('durable journal is private and survives restart; malformed journals block 
 test('two equal slots enforce capacity while ordinary entry commission does not consume the second slot',async()=>{
  const h=harness({income:[{asset:'USDT',incomeType:'COMMISSION',income:'-0.02'}]});await h.runner.enter('ABCUSDT',shortSignal(input(),config));await h.runner.entryGate();
  h.runner.state.positions.DEFUSDT={...structuredClone(h.runner.state.positions.ABCUSDT),symbol:'DEFUSDT'};await assert.rejects(h.runner.entryGate(),/TWO_SLOTS_FULL/);
- const k=harness({income:[{asset:'USDT',incomeType:'REALIZED_PNL',income:'-40'}]});await assert.rejects(k.runner.entryGate(),/BUDGET_INSUFFICIENT/);
+ const k=harness();k.a.assets[0].walletBalance='30';k.a.assets[0].availableBalance='30';await k.runner.entryGate();assert.equal(k.runner.allocation().maxOrderUsdt,15);
 });
 test('empty disabled stop-all leaves Spot-only deployments entirely untouched',async()=>{
  const h=harness({config:shortConfig({}),onGet(){throw Error('UNEXPECTED_FUTURES_CALL');}});assert.deepEqual(await h.runner.closeAll(),{sold:[],failed:[]});assert.equal(h.writes.length,0);
@@ -437,6 +437,56 @@ test('manual Futures entry retains halt, budget, reservation and permission guar
  for(const modify of [h=>h.runner.state.halt='REVIEW',h=>h.runner.reserved=()=>true,h=>h.control.allowEntries=false]){
   const h=harness();modify(h);assert.equal((await h.runner.manualTrade(manual())).ok,false);assert.equal(h.writes.filter(x=>x.p==='/fapi/v1/order').length,0);
  }
- const h=harness();await assert.rejects(()=>h.runner.manualTrade({...manual(),quoteUsdt:36}),/INVALID/);
- assert.equal((await h.runner.manualTrade(manual('CLOSE_SHORT'))).ok,false);assert.equal(h.writes.length,0);
+ const h=harness();assert.equal((await h.runner.manualTrade({...manual(),quoteUsdt:36})).error,'FUTURES_AMOUNT_EXCEEDS_ALLOCATION');
+ assert.equal((await h.runner.manualTrade(manual('CLOSE_SHORT','manual-close-missing1'))).ok,false);assert.equal(h.writes.length,0);
+});
+
+
+test('dynamic slots follow wallet deposits, realized losses and free margin, never unrealized gains',()=>{
+ for(const [wallet,free,count,expected] of [[200,200,0,100],[84.27,84.27,0,42.13],[30,30,0,15],[200,40,1,40],[200,200,2,0],[200,0,0,0]]){
+  assert.equal(shortAllocation({walletUsdt:wallet,availableUsdt:free,unrealizedUsdt:1000},count).maxOrderUsdt,expected);
+ }
+ for(const bad of [null,{}, {walletUsdt:NaN,availableUsdt:100},{walletUsdt:100,availableUsdt:-1}])assert.equal(shortAllocation(bad).maxOrderUsdt,0);
+});
+test('manual and automatic entries above 35 use dynamic budget, reserve, actual fill and native protections',async()=>{
+ for(const mode of ['manual','auto']){
+  const h=harness();h.a.assets[0].walletBalance='200';h.a.assets[0].availableBalance='200';
+  if(mode==='manual')assert.equal((await h.runner.manualTrade({...manual(),quoteUsdt:100})).ok,true);
+  else await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+  const p=h.runner.state.positions.ABCUSDT;
+  assert.ok(p.qty*p.entryPrice>35&&p.qty*p.entryPrice<100);assert.equal(p.slotBudgetUsdt,100);
+  assert.equal(p.closeReason,undefined);assert.equal(p.algos.filter(x=>x.status==='NEW').length,2);
+ }
+});
+test('balance shrink at final dispatch prevents SELL and clears pending intent',async()=>{
+ const options={},h=harness(options);h.a.assets[0].walletBalance='200';h.a.assets[0].availableBalance='200';
+ options.onSave=s=>{if(s.pending?.kind==='ENTRY')h.a.assets[0].walletBalance='60';};
+ const r=await h.runner.manualTrade({...manual(),quoteUsdt:100});
+ assert.equal(r.error,'FUTURES_AMOUNT_EXCEEDS_ALLOCATION');assert.equal(h.runner.state.pending,null);
+ assert.equal(h.writes.filter(x=>x.p==='/fapi/v1/order').length,0);
+});
+test('dynamic sizing never increases allocation to meet exchange minimum',()=>{
+ const btc={...info,filters:info.filters.map(f=>f.filterType==='MIN_NOTIONAL'?{...f,notional:'100'}:f)};
+ assert.throws(()=>shortOrderPlan(btc,input().quote,{targetPrice:90},42),/MIN_NOTIONAL/);
+});
+test('cancel -2011 accepts only identity-verified terminal orders, without a second cancel',async()=>{
+ for(const status of ['CANCELED','FINISHED','EXPIRED','NEW','TRIGGERING','BAD_ID','MISSING']){
+  const h=harness();await h.runner.enter('ABCUSDT',shortSignal(input(),config));
+  const p=h.runner.state.positions.ABCUSDT,ref=p.algos[0];let cancels=0;
+  h.api.del=async()=>{cancels++;const o=h.algos.get(ref.clientAlgoId);o.algoStatus=status;if(status==='BAD_ID')o.symbol='OTHERUSDT';if(status==='MISSING')h.algos.delete(ref.clientAlgoId);throw Object.assign(Error('FUTURES_API_-2011'),{code:-2011,status:400});};
+  if(['CANCELED','FINISHED','EXPIRED'].includes(status))await h.runner.cancelAlgo(p,ref);
+  else await assert.rejects(()=>h.runner.cancelAlgo(p,ref));
+  assert.equal(cancels,1);
+ }
+});
+test('persisted -2011 halt clears only after fresh empty exchange reconciliation and never writes a trade',async()=>{
+ for(const fault of ['none','externalPosition','externalOrder','externalAlgo','unknown','pending','otherHalt']){
+  const h=harness();h.runner.state.halt=fault==='otherHalt'?'REVIEW':'FUTURES_API_-2011';
+  if(fault==='pending')h.runner.state.pending={kind:'ENTRY'};
+  if(fault==='externalPosition')h.setPositions([{symbol:'ABCUSDT',positionSide:'BOTH',positionAmt:'-1',entryPrice:'100'}]);
+  const get=h.api.get;h.api.get=async(p,q)=>{if(fault==='unknown'&&p==='/fapi/v1/openOrders')throw Error('NETWORK');if(fault==='externalOrder'&&p==='/fapi/v1/openOrders')return [{symbol:'ABCUSDT'}];if(fault==='externalAlgo'&&p==='/fapi/v1/openAlgoOrders')return [{symbol:'ABCUSDT',clientAlgoId:'external'}];return get(p,q);};
+  try{await h.runner.recoverProtectionConflictHalt(now);}catch{}
+  assert.equal(h.runner.state.halt===null,fault==='none');assert.equal(h.writes.length,0);
+  if(fault==='none')assert.equal(h.runner.state.resumedAt,now);
+ }
 });

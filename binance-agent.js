@@ -186,7 +186,7 @@ function renderFuturesShortStatus(s){
  const f=s.shortTrading;
  if(f?.policy?.version!=='FUTURES_CHANNEL_SHORT_V1'){panel.textContent='SHORT Futures: העדכון עדיין לא מותקן בשרת';return;}
  const p=f.policy;
- let text='SHORT · USDⓈ-M Perpetual · Isolated · 1x\nתקציב 70 USDT · עד 2 פוזיציות · 35 USDT לכל מקום, כולל רזרבה לעמלות';
+ let text='SHORT · USDⓈ-M Perpetual · Isolated · 1x\nעד 2 פוזיציות · מחצית ארנק Futures לכל מקום, בכפוף למזומן הפנוי וכולל רזרבה לעמלות';
  text+='\n'+(f.enabled?'מסלול מופעל; כל כניסה כפופה לבדיקה חדשה':'כניסות SHORT כבויות');
  if(f.account)text+=' · יתרה פנויה: '+Number(f.account.availableUsdt).toFixed(2)+' USDT';
  if(f.reason)text+='\nמצב: '+f.reason;
@@ -214,7 +214,7 @@ function tradingRuleLines(s){
  else lines.push('ממתין לאימות כללי הכניסה מהשרת.');
  lines.push('הגדרות יציאה לכניסות חדשות: סטופ '+(n(e.stopLossPct)??'—')+'% · הפעלת הגנה '+(n(e.profitActivationPct)??'—')+'% · מרחק נגרר '+(n(e.trailingGapPp)??'—')+' נקודות אחוז ממחיר הכניסה. לפוזיציה קיימת יש לבדוק את הסטופ והיעד המתועדים שלה. המחירים לפני עמלות.');
  const f=s?.shortTrading?.policy;
- if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. תקציב '+(n(f.budgetUsdt)??'—')+' USDT · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. '+(f.allocationPolicy==='FUTURES_WALLET_HALF_V1'?'הקצאה דינמית לפי מחצית ארנק Futures':'תקציב '+(n(f.budgetUsdt)??'—')+' USDT')+' · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
  if(f&&!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f.entryPolicyVersion))lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');
  return lines;
 }

@@ -260,7 +260,7 @@
               <label>תוקף ההמתנה<select id="pocExpiry"><option value="1">שעה</option><option value="4">4 שעות</option><option value="12">12 שעות</option><option value="24" selected>24 שעות</option></select></label>
             </div>
             <p id="pocPolicy" class="mini"></p>
-            <p class="mini">LONG: עד תקרת הפעולה והמקומות הפנויים ב־Spot. SHORT: עד 35 USDT כולל רזרבה של 1 USDT לעמלות, במסגרת שתי הפוזיציות הקיימת. הכסף אינו נשמר בצד בזמן ההמתנה. כניסה אוטומטית רגילה לאותו נכס ובאותו מסלול ממתינה לסיום הוראת POC.</p>
+            <p class="mini">LONG: עד תקרת הפעולה והמקומות הפנויים ב־Spot. SHORT: עד מחצית יתרת ארנק Futures לכל פוזיציה, בכפוף למזומן הפנוי ובניכוי רזרבה לעמלות. עד שתי פוזיציות. הכסף אינו נשמר בצד בזמן ההמתנה. כניסה אוטומטית רגילה לאותו נכס ובאותו מסלול ממתינה לסיום הוראת POC.</p>
             <p class="mini">POC הוא מחיר הפעלה, לא מחיר מילוי מובטח. הבדיקה משתמשת ב־Ask ל־LONG וב־Bid ל־SHORT. סטייה של יותר מ־0.15% מה־POC בזמן ההפעלה מבטלת את ההזדמנות. אין כניסה חוזרת אוטומטית. ההמתנה פועלת בשרת גם כשהמסך סגור; עצירת המסחר מבטלת הוראות ממתינות.</p>
             <label class="poc-confirm"><input id="pocConfirm" type="checkbox" required><span>אני מאשר כניסה אוטומטית בכסף אמיתי לפי הפרטים שהזנתי, וניהול ההגנות לפי SETTINGS.</span></label>
             <div class="poc-toolbar"><button id="pocCreate" type="submit" disabled>שמור והפעל המתנה ל־POC</button><button id="pocUseSelected" type="button">השתמש בנכס שנבחר בגרף</button><button id="pocRefresh" type="button">רענן הוראות</button><button id="pocRetry" type="button" hidden>בדוק / שמור את אותה בקשה</button></div>
@@ -513,15 +513,15 @@
   <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
-  <script src="/binance-futures-positions.js?v=20261110-position-copy"></script>
-  <script src="/binance-agent.js?v=20261111-barriers"></script>
+  <script src="/binance-futures-positions.js?v=20261111-dynamic-short"></script>
+  <script src="/binance-agent.js?v=20261111-dynamic-short"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
-  <script src="/binance-poc.js?v=20261103-poc"></script>
+  <script src="/binance-poc.js?v=20261111-dynamic-short"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>
   <script src="/channel-entry-checklist.js?v=20261110-direction-confirmation"></script>
   <script type="module" src="/poc-signal-chart.js?v=20261107-poc-v2"></script>
   <script src="/market-attention.js?v=20261110-direction-confirmation"></script>
-  <script src="/binance-manual-trades.js?v=20261108-quick-chart"></script>
+  <script src="/binance-manual-trades.js?v=20261111-dynamic-short"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>
 <script src="/binance-market-watch.js?v=20261025-stability"></script>

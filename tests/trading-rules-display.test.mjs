@@ -16,3 +16,7 @@ test('mode changes clear cached rules and missing or old versions cannot claim P
  assert.match(ctx.tradingRuleLines({mode:'live'}).join(' '),/ממתין לאימות/);
  const old=structuredClone(live);delete old.channelPrimary.version;delete old.shortTrading.policy.entryPolicyVersion;assert.match(ctx.tradingRuleLines(old).join(' '),/טרם אומת|לא אומת/);assert.doesNotMatch(ctx.tradingRuleLines(old).join(' '),/ארבעה תנאים/);
 });
+test('dynamic allocation is shown when the running server reports the new policy',()=>{
+ const current=structuredClone(live);current.shortTrading.policy.allocationPolicy='FUTURES_WALLET_HALF_V1';delete current.shortTrading.policy.budgetUsdt;
+ const text=ctx.tradingRuleLines(current).join(' ');assert.match(text,/מחצית ארנק Futures/);assert.doesNotMatch(text,/תקציב 70/);
+});
