@@ -96,3 +96,12 @@ body.unified-dashboard #pocLiveMonitor.live-monitor-integrated{padding:12px 16px
 .short-pager>button{padding:10px;min-height:44px}
 .short-pager>.unified-asset-strip{flex-basis:100%;width:100%}
 #futuresPositionsPanel [hidden]{display:none!important}
+
+.live-total-equity{display:flex;align-items:center;flex-wrap:wrap;gap:8px 28px;padding:12px 0;color:#dceef8}
+.live-total-equity>div:first-child{display:flex;flex-direction:column;gap:5px}
+.live-total-equity strong{font-size:clamp(26px,4vw,38px);color:#2bd5e3;direction:ltr;text-align:right;font-variant-numeric:tabular-nums}
+.live-total-breakdown{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14px}
+.live-total-equity>small{flex-basis:100%;font-size:11px;color:#a5c9d9}
+.live-account-details>summary{cursor:pointer;padding:8px 0;font-size:13px}
+.live-account-details[open]{overflow-x:auto}
+.live-account-details>small{display:block;font-size:11px;color:#a5c9d9;padding-top:8px}

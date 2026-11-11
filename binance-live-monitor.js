@@ -8,7 +8,7 @@ const signClass=x=>finite(x)?x>0?'gain':x<0?'loss':'flat':'unknown';
 const statusLabel=x=>({WAITING:'ממתין לחציית POC',EXECUTING:'בביצוע',UNKNOWN:'ממתין לאימות ביצוע',FILLED:'בוצעה',CLOSED:'נסגרה',NO_FILL:'לא מולאה',FAILED:'נכשלה'}[x]||x||'—');
 
 export function createLiveMonitor(host,{read,now=Date.now}){
- let data=null,busy=false,connected=false,generation=0;
+ let data=null,busy=false,connected=false,generation=0,accountDetailsOpen=false;
  const compact=host.dataset?.compact==='true';
  if(compact)host.classList.add('live-monitor-integrated');
  const heading=el('div',null,'live-monitor-heading'),intro=el('div');
@@ -34,16 +34,27 @@ export function createLiveMonitor(host,{read,now=Date.now}){
   setSummaryReady(!!data);
   if(!data)return;
   const s=data.spot||{},f=data.futures||{},realized=data.realized||{};
-  const shortOpen=f.ok&&(f.positions||[]).every(p=>finite(p.unrealizedPnlUsdt))?(f.positions||[]).reduce((n,p)=>n+p.unrealizedPnlUsdt,0):null;
+  const shortOpen=f.ok&&Array.isArray(f.positions)&&f.positions.every(p=>finite(p.unrealizedPnlUsdt))?(f.positions||[]).reduce((n,p)=>n+p.unrealizedPnlUsdt,0):null;
   if(compact){
+   const spotValue=finite(s.equityUsdt)?s.equityUsdt:null;
+   const futuresValue=f.ok&&finite(f.walletUsdt)&&finite(shortOpen)?f.walletUsdt+shortOpen:null;
+   const complete=finite(spotValue)&&!s.unpricedAssets?.length&&finite(futuresValue);
+   const known=finite(spotValue)||finite(futuresValue)?(spotValue??0)+(futuresValue??0):null;
+   const hero=el('section',null,'live-total-equity');
+   const amount=el('div');amount.append(el('span',complete?'שווי התיק הכולל · לונג + שורט':'שווי ידוע · נתונים חלקיים'),el('strong',money(known)+' USDT'));
+   const breakdown=el('div',null,'live-total-breakdown');
+   breakdown.append(el('span','לונג · Spot: '+money(spotValue)+' USDT'),el('span','שורט · Futures: '+money(futuresValue)+' USDT'));
+   hero.append(amount,breakdown,el('small',complete?'כולל מזומן, נכסי Spot ורווח / הפסד פתוח ב־Futures.':'השווי הכולל אינו מאומת · חסרים נתונים או מחירים באחד החשבונות.'));
+   metrics.append(hero);
+   const details=el('details',null,'live-account-details');details.append(el('summary','פירוט יתרות ורווח / הפסד · לונג ושורט'));details.open=accountDetailsOpen;details.addEventListener('toggle',()=>{accountDetailsOpen=details.open;});
    const grid=el('table',null,'live-account-summary');grid.setAttribute('aria-label','יתרות ותוצאות LONG ו-SHORT');
    const head=el('thead'),hr=el('tr');for(const label of ['מסלול','שווי / ארנק','זמין','רווח פתוח','ממומש · היסטוריה'])hr.append(el('th',label));head.append(hr);grid.append(head);
    const body=el('tbody');
    for(const [label,value,cash,pnl,result] of [['LONG · Spot',s.equityUsdt,s.availableUsdt,s.openPnlUsdt,realized.long],['SHORT · Futures',f.ok?f.walletUsdt:null,f.ok?f.availableUsdt:null,shortOpen,realized.short]]){
     const row=el('tr');row.append(el('th',label));
     for(const [i,n] of [value,cash,pnl,result?.net].entries()){const cell=el('td',i>1?signed(n):money(n),i>1?signClass(n):'');if(i===3)cell.append(el('small',(result?.known||0)+' מחושבות · '+(result?.unknown||0)+' ללא אימות'));row.append(cell);}body.append(row);
-   }grid.append(body);metrics.append(grid);
-   metrics.append(el('small','כל הסכומים ב־USDT · שווי Spot וארנק Futures נפרדים · רווח ממומש מכל ההיסטוריה הזמינה, לא רק היום.'));
+   }grid.append(body);details.append(grid);metrics.append(details);
+   details.append(el('small','כל הסכומים ב־USDT · שווי Spot וארנק Futures נפרדים · רווח ממומש מכל ההיסטוריה הזמינה, לא רק היום.'));
   }else{
   metric('LONG · שווי Spot',money(s.equityUsdt)+' USDT','כולל מזומן ונכסים בחשבון');
   metric('LONG · מזומן זמין',money(s.availableUsdt)+' USDT','יתרת USDT חופשית');

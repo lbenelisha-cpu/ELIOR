@@ -20,3 +20,14 @@ test('compact LIVE summary replaces duplicate rows and preserves unavailable Fut
  assert.equal(all(host).filter(n=>n.tag==='table').length,1);assert.doesNotMatch(text(host),/נכסים מוחזקים|אין כרגע הוראות/);
  fail=true;await api.load();assert.equal(doc.body.attrs['integrated-live-ready'],false);assert.equal(all(host).filter(n=>n.tag==='table').length,0);assert.match(text(host),/נתונים קודמים הוסתרו/);
 });
+test('combined equity counts Spot once and Futures wallet plus open PnL, with partial coverage explicit',async()=>{
+ const host=new Element('section');host.dataset.compact='true';
+ const payload={ok:true,mode:'live',asOf:Date.now(),spot:{equityUsdt:300,availableUsdt:250,openPnlUsdt:10,unpricedAssets:[]},futures:{ok:true,walletUsdt:80,positions:[{unrealizedPnlUsdt:-5,managed:true}]}};
+ const api=createLiveMonitor(host,{read:async()=>payload});api.setConnected(true);await new Promise(setImmediate);
+ const hero=()=>all(host).find(n=>n.className==='live-total-equity');
+ assert.match(text(hero()),/375.00 USDT/);assert.match(text(hero()),/75.00 USDT/);assert.match(text(hero()),/שווי התיק הכולל/);
+ assert.equal(all(host).find(n=>n.className==='live-account-details').open,false);
+ payload.futures.positions[0].unrealizedPnlUsdt=null;await api.load();assert.match(text(hero()),/נתונים חלקיים/);assert.match(text(hero()),/300.00 USDT/);assert.doesNotMatch(text(hero()),/שווי התיק הכולל/);
+ payload.futures.positions=[];payload.spot.unpricedAssets=['UNKNOWN'];await api.load();assert.match(text(hero()),/נתונים חלקיים/);
+ payload.spot.unpricedAssets=[];await api.load();assert.match(text(hero()),/380.00 USDT/);assert.match(text(hero()),/שווי התיק הכולל/);
+});
