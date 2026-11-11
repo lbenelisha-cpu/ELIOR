@@ -62,3 +62,27 @@ test('targeted review discloses every isolated symbol, combined cash reservation
  assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');
  u.nodes.get('colmexTradeCancel').click();assert.equal(u.calls.length,1);assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);
 });
+
+test('broker error stays visible in the open dialog and next to quick actions; resubmission stays disabled',async()=>{
+ const u=setup();u.nodes.set('colmexQuickTradeStatus',{textContent:''});
+ u.setResponse({ok:true,status:202,json:async()=>({status:'PENDING',requestId:'request-1',failure:{code:'WRITE_BROKER_ERROR',httpStatus:200}})});
+ u.nodes.get('colmexManualBuy').click();await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
+ assert.equal(u.nodes.get('colmexTradeDialog').open,true);
+ assert.match(u.nodes.get('colmexTradeResult').textContent,/הברוקר החזיר שגיאה/);
+ assert.equal(u.nodes.get('colmexTradeResult').textContent,u.nodes.get('colmexQuickTradeStatus').textContent);
+ assert.equal(u.nodes.get('colmexTradeSubmit').disabled,true);
+ await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});assert.equal(u.calls.filter(c=>c.options.method==='POST').length,1);
+ u.nodes.get('colmexTradeCancel').click();u.nodes.get('colmexQuickBuy').click();
+ assert.match(u.nodes.get('colmexQuickTradeStatus').textContent,/בקשה קודמת/);
+ assert.equal(u.nodes.get('colmexManualDetails').open,true);
+ assert.equal(u.calls.filter(c=>c.options.method==='POST').length,1);
+});
+test('a non-JSON gateway error stays visible with its HTTP code and preserves the request identity',async()=>{
+ const u=setup();u.setResponse({ok:false,status:502,json:async()=>{throw new SyntaxError('Unexpected token <');}});
+ u.nodes.get('colmexManualBuy').click();await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
+ assert.match(u.nodes.get('colmexTradeResult').textContent,/HTTP 502/);assert.equal(u.nodes.get('colmexTradeDialog').open,true);assert.ok(u.saved.has('levi-colmex-manual-pending-v1'));assert.equal(u.nodes.get('colmexTradeSubmit').disabled,true);
+});
+test('unpaired and invalid-symbol quick actions explain the blockage without sending an order',()=>{
+ const u=setup({connected:false});u.nodes.set('colmexQuickTradeStatus',{textContent:''});u.nodes.get('colmexQuickBuy').click();assert.match(u.nodes.get('colmexQuickTradeStatus').textContent,/לחבר את המכשיר/);assert.equal(u.calls.length,0);
+ const v=setup();v.nodes.set('colmexQuickTradeStatus',{textContent:''});v.nodes.get('selectedSymbol').textContent='—';v.nodes.get('colmexQuickBuy').click();assert.match(v.nodes.get('colmexQuickTradeStatus').textContent,/מניה תקינה/);assert.equal(v.calls.length,0);
+});

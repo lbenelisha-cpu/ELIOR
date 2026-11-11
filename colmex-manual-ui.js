@@ -7,17 +7,24 @@ Object.assign(messages,{INVALID_DIAGNOSTIC_REQUEST:'בדיקת קנייה מות
 const explain=code=>messages[code]||entryReasonLabel(code);
 const failureText=data=>data.failure?' · '+explain(data.failure.code)+(data.failure.httpStatus?' · HTTP '+data.failure.httpStatus:'')+(data.requestId?' · מזהה בקשה: '+data.requestId:''):'';
 Object.assign(messages,{REVIEW_STATE_CHANGED:'מצב ההוראה השתנה; רענן מצב לפני הסרת החסימה.',REVIEW_ACCOUNT_NOT_EMPTY:'לא ניתן להסיר את החסימה: קיימת הוראה או פוזיציה, או שהיסטוריית הברוקר אינה זמינה.'});
-function say(text){$('colmexManualStatus').textContent=text;}
+function say(text){
+ $('colmexManualStatus').textContent=text;
+ if($('colmexQuickTradeStatus'))$('colmexQuickTradeStatus').textContent=text;
+ if($('colmexTradeDialog').open)$('colmexTradeResult').textContent=text;
+}
+Object.assign(messages,{WRITE_BROKER_ERROR:'הברוקר החזיר שגיאה ולא אישר ביצוע. הבקשה נשארת בבירור; אין לשלוח קנייה נוספת.',TRADE_RESULT_UNCERTAIN:'לא ניתן לאמת את תוצאת הבקשה. אין לשלוח שוב; יש לבדוק את מצב ההוראה.',INVALID_SYMBOL:'לא נבחרה מניה תקינה. בחר מניה בגרף ונסה שוב.'});
+const errorText=error=>['TimeoutError','AbortError'].includes(error?.name)?'השרת לא השיב בזמן. תוצאת הפעולה אינה ידועה; אין לשלוח שוב.':error?.message||'לא ניתן להשלים את הבקשה כעת.';
 function renderAccess(){
  $('colmexDeviceState').textContent=token?'המכשיר מחובר · ללא סיסמה בכל פעולה':'חיבור מכשיר חד־פעמי נדרש למסחר ידני';
  $('colmexPairForm').hidden=!!token;$('colmexDisconnect').hidden=!token;
  for(const id of ['colmexManualBuy','colmexManualSell','colmexDiagnosticBuy','colmexReleaseReview'])$(id).disabled=!token||busy||!!pending;
  $('colmexRetryTrade').disabled=true;
+ $('colmexTradeSubmit').disabled=busy||!!pending||!token;
 }
 function rememberPending(value){pending=value;if(value)localStorage.setItem(PENDING_KEY,JSON.stringify(value));else localStorage.removeItem(PENDING_KEY);renderAccess();}
 async function api(path,body){
  const response=await fetch('/.netlify/functions/'+path,{method:body?'POST':'GET',cache:'no-store',signal:AbortSignal.timeout(35000),headers:{...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
- const data=await response.json();
+ let data;try{data=await response.json();}catch{throw Error('השרת החזיר תגובה לא תקינה (HTTP '+response.status+'). לא ניתן לאמת את התוצאה; אין לשלוח שוב.');}
  if(response.status===401&&data.error==='DEVICE_REQUIRED'){token=null;try{localStorage.removeItem(TOKEN_KEY);}catch{}renderAccess();}
  return {response,data};
 }
@@ -37,9 +44,10 @@ $('colmexDisconnect').addEventListener('click',async()=>{
 function selected(){return $('selectedSymbol').textContent.trim();}
 function open(side,symbol=selected()){
  if(!token){say('יש לחבר את המכשיר למסחר לפני הפעולה.');if($('colmexManualDetails'))$('colmexManualDetails').open=true;return;}
- if(busy||pending)return;
+ if(busy){say('בקשה מתבצעת כעת. המתן לתוצאה.');return;}
+ if(pending){say('קיימת בקשה קודמת שטרם הושלם בירורה'+(pending.symbol?' · '+pending.symbol:'')+'. אין לשלוח שוב. מזהה בקשה: '+pending.requestId);if($('colmexManualDetails'))$('colmexManualDetails').open=true;checkPending();return;}
  diagnosticReviewId=null;reviewReleaseId=null;$('colmexTradeAmount').max='800';$('colmexTradeSubmit').textContent='אני מאשר עסקה בכסף אמיתי';
- if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol))return;
+ if(!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol)){say(explain('INVALID_SYMBOL'));return;}
  $('colmexTradeSide').value=side;$('colmexTradeSymbol').value=symbol;
  $('colmexTradeTitle').textContent=(side==='BUY'?'קנייה ידנית · ':'מכירת כל הכמות · ')+symbol+' · LIVE';
  $('colmexAmountLabel').hidden=side!=='BUY';
@@ -100,15 +108,16 @@ async function checkPending(){
 $('colmexCheckTrade').addEventListener('click',checkPending);
 async function send(input,retry=false){
  busy=true;renderAccess();$('colmexTradeSubmit').disabled=true;
+ say('הבקשה נשלחת לבדיקה · '+(input.symbol||'בירור הוראה')+' · נא להמתין.');
  try{
   const {response,data}=await api('colmex-manual-trade',input);
   if(!response.ok){
    if(response.status<500&&!retry)rememberPending(null);
    throw Error(explain(data.error));
   }
-  if(!finishUnexecuted(data))say((data.acknowledged?'הברוקר אישר קבלת הוראה · ממתין לאימות ביצוע.':'תוצאת שליחת ההוראה אינה ודאית. אין לשלוח שוב.')+failureText(data));$('colmexTradeDialog').close();
- }catch(error){$('colmexTradeResult').textContent=error.message;say(error.message+' · אם התוצאה אינה ודאית, אין לשלוח שוב.');}
- finally{busy=false;renderAccess();$('colmexTradeSubmit').disabled=false;}
+  if(!finishUnexecuted(data))say((data.acknowledged?'הברוקר אישר קבלת הוראה · ממתין לאימות ביצוע.':'תוצאת שליחת ההוראה אינה ודאית. אין לשלוח שוב.')+failureText(data));
+ }catch(error){say(errorText(error));}
+ finally{busy=false;renderAccess();}
 }
 $('colmexRetryTrade').addEventListener('click',async()=>{if(pending&&!busy)await send(pending,true);});
 $('colmexTradeForm').addEventListener('submit',async event=>{
