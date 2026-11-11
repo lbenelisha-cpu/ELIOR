@@ -41,10 +41,12 @@ export function createLiveMonitor(host,{read,now=Date.now}){
    const complete=finite(spotValue)&&!s.unpricedAssets?.length&&finite(futuresValue);
    const known=finite(spotValue)||finite(futuresValue)?(spotValue??0)+(futuresValue??0):null;
    const hero=el('section',null,'live-total-equity');
-   const amount=el('div');amount.append(el('span',complete?'שווי התיק הכולל · לונג + שורט':'שווי ידוע · נתונים חלקיים'),el('strong',money(known)+' USDT'));
+   const amount=el('div',null,'live-equity-total-line');amount.append(el('span',complete?'שווי התיק הכולל · לונג + שורט':'שווי ידוע · נתונים חלקיים'),el('strong',money(known)+' USDT'));
    const breakdown=el('div',null,'live-total-breakdown');
-   breakdown.append(el('span','לונג · Spot: '+money(spotValue)+' USDT'),el('span','שורט · Futures: '+money(futuresValue)+' USDT'));
-   hero.append(amount,breakdown,el('small',complete?'כולל מזומן, נכסי Spot ורווח / הפסד פתוח ב־Futures.':'השווי הכולל אינו מאומת · חסרים נתונים או מחירים באחד החשבונות.'));
+   for(const [label,value,note] of [['שווי תיק · LONG Spot',spotValue,s.unpricedAssets?.length?'חסרים מחירים לחלק מהנכסים':'מזומן ונכסי Spot'],['שווי תיק · SHORT Futures',futuresValue,finite(futuresValue)?'ארנק ורווח / הפסד פתוח':'נתוני Futures אינם מאומתים']]){
+    const half=el('div',null,'live-equity-half');half.append(el('span',label),el('strong',money(value)+' USDT'),el('small',note));breakdown.append(half);
+   }
+   hero.append(breakdown,amount,el('small',complete?'כולל מזומן, נכסי Spot ורווח / הפסד פתוח ב־Futures.':'השווי הכולל אינו מאומת · חסרים נתונים או מחירים באחד החשבונות.'));
    metrics.append(hero);
    const details=el('details',null,'live-account-details');details.append(el('summary','פירוט יתרות ורווח / הפסד · לונג ושורט'));details.open=accountDetailsOpen;details.addEventListener('toggle',()=>{accountDetailsOpen=details.open;});
    const grid=el('table',null,'live-account-summary');grid.setAttribute('aria-label','יתרות ותוצאות LONG ו-SHORT');
