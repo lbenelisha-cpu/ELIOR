@@ -83,3 +83,14 @@ test('public diagnostics omit raw error bodies and identify legacy missing failu
  const d=pendingDiagnostic(p);assert.equal(d.failure,null);assert.equal(d.requestId,p.id);assert.equal(d.acknowledged,false);assert.equal(JSON.stringify(d).includes('private'),false);
  assert.equal(failureDiagnostic({code:'private',outcome:'private',httpStatus:'private',responseStatus:'private',errmsg:'private'}).code,'WRITE_OUTCOME_UNKNOWN');
 });
+
+test('HTTP 200 broker errors retain only a diagnostic topic and never release or retry the order',async()=>{
+ for(const [errmsg,brokerHint] of [['Session expired for secret-account-data','SESSION'],['Trading permission denied secret-account-data','PERMISSION'],['Insufficient funds secret-account-data','FUNDS'],['Invalid quantity secret-account-data','ORDER_PARAMETERS'],['Market is closed secret-account-data','MARKET_CLOSED'],['secret-account-data','UNCLASSIFIED']]){
+  let writes=0;const b=adapter(async()=>{writes++;return {ok:true,status:200,json:async()=>({s:'error',errmsg,access_token:'private-token'})};});
+  const s=initialState(now);s.pending=intent();
+  try{await b.write('123',s.pending);assert.fail('must throw');}catch(e){const r=recordWriteFailure(s,s.pending,e,now);assert.equal(r.resolved,false);assert.equal(r.failure.brokerHint,brokerHint);assert.equal(r.failure.outcome,'UNKNOWN');}
+  assert.equal(writes,1);assert.ok(s.pending);assert.equal(failureDiagnostic(s.pending.writeFailure).brokerHint,brokerHint);
+  assert.doesNotMatch(JSON.stringify(s),/secret-account-data|private-token/);
+ }
+ assert.equal(failureDiagnostic({code:'WRITE_BROKER_ERROR',brokerHint:'arbitrary-secret'}).brokerHint,undefined);
+});

@@ -86,3 +86,10 @@ test('unpaired and invalid-symbol quick actions explain the blockage without sen
  const u=setup({connected:false});u.nodes.set('colmexQuickTradeStatus',{textContent:''});u.nodes.get('colmexQuickBuy').click();assert.match(u.nodes.get('colmexQuickTradeStatus').textContent,/לחבר את המכשיר/);assert.equal(u.calls.length,0);
  const v=setup();v.nodes.set('colmexQuickTradeStatus',{textContent:''});v.nodes.get('selectedSymbol').textContent='—';v.nodes.get('colmexQuickBuy').click();assert.match(v.nodes.get('colmexQuickTradeStatus').textContent,/מניה תקינה/);assert.equal(v.calls.length,0);
 });
+
+test('broker message topic is visible without implying execution or allowing a duplicate',async()=>{
+ const u=setup();u.setResponse({ok:true,status:202,json:async()=>({status:'PENDING',requestId:'11111111-1111-4111-8111-111111111111',failure:{code:'WRITE_BROKER_ERROR',httpStatus:200,brokerHint:'SESSION'}})});
+ u.nodes.get('colmexManualBuy').click();await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});
+ assert.match(u.nodes.get('colmexTradeResult').textContent,/חיבור או סשן/);assert.match(u.nodes.get('colmexTradeResult').textContent,/אינו אישור לתוצאת ההוראה/);
+ await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});assert.equal(u.calls.length,1);
+});
