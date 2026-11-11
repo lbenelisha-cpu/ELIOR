@@ -5,14 +5,17 @@ import {configuredLive,runtimeEnvironment} from '../../lib/colmex-auto-policy.mj
 import {autoStore,lease} from '../../lib/colmex-auto-store.mjs';
 import {AutoBroker} from '../../lib/colmex-auto-broker.mjs';
 import {runCycle} from '../../lib/colmex-auto-runner.mjs';
+import {ColmexConnectionControl} from '../../lib/colmex-connection-control.mjs';
 export function cycleError(error,stage){
  const allowed=new Set(['READ_ONLY','AUTH_DENIED','AUTH_RESPONSE','TOKEN_EXPIRED','ACCESS_DENIED','RATE_LIMIT','NETWORK','UPSTREAM_HTTP','RESPONSE_SCHEMA','COLUMN_SCHEMA','ROW_SCHEMA','ACCOUNT_SCHEMA','POSITION_SCHEMA','ORDER_SCHEMA','INSTRUMENT_SCHEMA','HISTORY_SCHEMA','CYCLE_DEADLINE','LIVE_ACCOUNT_MISMATCH','SESSION_CHANGED','WAIT_BROKER_QUOTE','WAIT_DAILY_BARS','INVALID_DAILY_BARS','FIVE_MINUTE_TIMEFRAME_REQUIRED','DAILY_HIGH_LOW_REQUIRED','INVALID_DAILY_OHLC','FIVE_MINUTE_CLOSE_TIME_REQUIRED','LEASE_LOST','LEASE_EXPIRED','STATE_SCHEMA','STATE_VERSION']);
- for(const code of ['BROKER_NOT_READY','BROKER_ERROR_RESPONSE','SESSION_BUSY','SESSION_STORE_UNAVAILABLE'])allowed.add(code);
+ for(const code of ['CONNECTION_PAUSED','CONNECTION_STATE_UNAVAILABLE','BROKER_NOT_READY','BROKER_ERROR_RESPONSE','SESSION_BUSY','SESSION_STORE_UNAVAILABLE'])allowed.add(code);
  const code=error?.code||error?.message;return {at:Date.now(),reason:allowed.has(code)?code:'CYCLE_FAILED_NO_AUTOMATIC_RETRY_OF_ORDERS',stage:stage||null,...(typeof error.endpoint==='string'&&/^\/[a-zA-Z/:]+$/.test(error.endpoint)?{endpoint:error.endpoint}:{})};
 }
 export default async function(request,context){
  const env=runtimeEnvironment(process.env,context);
  if(!configuredLive(env))return new Response(null,{status:204});
+ try{await new ColmexConnectionControl({login:env.COLMEX_API_LOGIN,password:env.COLMEX_API_PASSWORD}).assertEnabled();}
+ catch(e){return new Response(null,{status:e.code==='CONNECTION_PAUSED'?204:503});}
  // Leave room inside the scheduled function's 30-second limit for lease release and dispatch.
  const deadline=Date.now()+26000;
  const contextRead=Promise.resolve().then(()=>maAuditStore().get(colmexAuditPrefix(env.COLMEX_AUTO_ACCOUNT_ID)+'/contexts',{type:'json'})).catch(()=>null);
