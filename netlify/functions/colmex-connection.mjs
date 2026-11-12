@@ -15,10 +15,10 @@ export function makeConnectionHandler({env=process.env,deviceStoreFactory=()=>ge
     await requireDevice(deviceStoreFactory(),vars,request.headers.get('authorization'));
     const raw=await request.text();if(raw.length>100)throw accessError('INVALID_REQUEST');
     let input;try{input=JSON.parse(raw);}catch{throw accessError('INVALID_REQUEST');}
-    if(!['connect','disconnect'].includes(input?.action)||Object.keys(input).length!==1)throw accessError('INVALID_REQUEST');
-    state=await control.setEnabled(input.action==='connect');
+    if(!['connect','disconnect','inspect'].includes(input?.action)||Object.keys(input).length!==1)throw accessError('INVALID_REQUEST');
+    state=await control.setEnabled(input.action!=='disconnect',{readOnly:input.action==='inspect'});
    }
-   return reply(200,{ok:true,enabled:state.enabled,updatedAt:state.updatedAt,settledAt:state.settledAt,brokerLogout:false});
+   return reply(200,{ok:true,enabled:state.enabled,readOnly:!!state.readOnly,updatedAt:state.updatedAt,settledAt:state.settledAt,brokerLogout:false});
   }catch(e){return reply(e.status||503,{ok:false,error:e.code||'CONNECTION_STATE_UNAVAILABLE'});}
  };
 }

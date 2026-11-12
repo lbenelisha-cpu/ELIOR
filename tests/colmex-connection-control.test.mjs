@@ -41,3 +41,22 @@ test('connection endpoint GET is read-only; writes require a paired device, same
  const off=await (await send({action:'disconnect'},token)).json();assert.equal(off.enabled,false);assert.equal(off.brokerLogout,false);assert.equal(off.revision,undefined);
  assert.equal((await (await send({action:'connect'},token)).json()).enabled,true);
 });
+test('diagnostic connection permits reads but rejects every financial write before authentication',async()=>{
+ const {control,session}=setup();await control.setEnabled(true,{readOnly:true});let calls=0;
+ const fetchImpl=async()=>{calls++;return new Response(JSON.stringify({s:'ok',d:{access_token:'read-token',expiration:Date.now()/1000+3600,accounts:[]}}));};
+ const c=new ColmexClient({sessionStore:session,fetchImpl});await c.get('/accounts');assert.equal(calls,2);
+ const b=new AutoBroker({env,sessionStore:session,deadline:Date.now()+20000,fetchImpl});
+ for(const kind of ['BUY','STOP','PROTECTION','CLOSE'])await assert.rejects(b.write('123',{kind,id:'example',order:{},positionId:'1'}),e=>e.outcome==='NOT_SENT'&&e.code==='WRITE_READ_ONLY');
+ assert.equal(calls,2);await assert.rejects(control.assertTradingEnabled(),{code:'CONNECTION_READ_ONLY'});
+});
+test('switch to diagnostic during authentication blocks mutation at final dispatch guard',async()=>{
+ const {control,session}=setup();let writes=0;
+ const b=new AutoBroker({env,sessionStore:session,deadline:Date.now()+20000,fetchImpl:async url=>{if(url.endsWith('/authorize')){await control.setEnabled(true,{readOnly:true});return new Response(JSON.stringify({s:'ok',d:{access_token:'late',expiration:Date.now()/1000+3600}}));}writes++;throw Error('not allowed');}});
+ await assert.rejects(b.write('123',{kind:'BUY',id:'example',order:{}}),e=>e.outcome==='NOT_SENT');assert.equal(writes,0);
+});
+test('paired diagnostic action persists read-only mode; GET cannot switch it to trading',async()=>{
+ const {control}=setup(),devices=memory();await control.setEnabled(false);const {token}=await pairDevice(devices,env,'123456');
+ const h=makeConnectionHandler({env,deviceStoreFactory:()=>devices,controlFactory:()=>control}),url='https://example.test/.netlify/functions/colmex-connection';
+ const r=await h(new Request(url,{method:'POST',headers:{'Content-Type':'application/json',origin:'https://example.test',authorization:'Bearer '+token},body:JSON.stringify({action:'inspect'})}),{deploy:{context:'production'}});assert.equal(r.status,200);assert.equal((await r.json()).readOnly,true);
+ const d=await (await h(new Request(url),{deploy:{context:'production'}})).json();assert.equal(d.enabled,true);assert.equal(d.readOnly,true);await assert.rejects(control.assertTradingEnabled(),{code:'CONNECTION_READ_ONLY'});
+});

@@ -14,8 +14,8 @@ export function cycleError(error,stage){
 export default async function(request,context){
  const env=runtimeEnvironment(process.env,context);
  if(!configuredLive(env))return new Response(null,{status:204});
- try{await new ColmexConnectionControl({login:env.COLMEX_API_LOGIN,password:env.COLMEX_API_PASSWORD}).assertEnabled();}
- catch(e){return new Response(null,{status:e.code==='CONNECTION_PAUSED'?204:503});}
+ try{await new ColmexConnectionControl({login:env.COLMEX_API_LOGIN,password:env.COLMEX_API_PASSWORD}).assertTradingEnabled();}
+ catch(e){return new Response(null,{status:['CONNECTION_PAUSED','CONNECTION_READ_ONLY'].includes(e.code)?204:503});}
  // Leave room inside the scheduled function's 30-second limit for lease release and dispatch.
  const deadline=Date.now()+26000;
  const contextRead=Promise.resolve().then(()=>maAuditStore().get(colmexAuditPrefix(env.COLMEX_AUTO_ACCOUNT_ID)+'/contexts',{type:'json'})).catch(()=>null);
