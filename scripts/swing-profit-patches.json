@@ -14,8 +14,8 @@
   {
     "file": "server.mjs",
     "id": "2",
-    "before": "      earlyWave:EARLY_WAVE_POLICY,\n      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n",
-    "after": "      earlyWave:EARLY_WAVE_POLICY,\n      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      swingProtectionPolicy:'FIVE_CONFIRMED_SWINGS_V1',\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n"
+    "before": "      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n",
+    "after": "      swingProtectionPolicy:'FIVE_CONFIRMED_SWINGS_V1',\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n"
   },
   {
     "file": "lib/trailing-profit-exit.mjs",
