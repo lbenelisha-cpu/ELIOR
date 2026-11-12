@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 
 export function patch(source){
  const old="strategyStopOnly?{...plan.params,newClientOrderId:identity('lv-s-')}";
- const fixed="strategyStopOnly?{symbol,side:'SELL',type:'STOP_LOSS',quantity:plan.quantity,stopPrice:plan.params.belowStopPrice,newClientOrderId:identity('lv-s-'),newOrderRespType:'FULL'}";
+ const fixed="strategyStopOnly?{symbol,side:'SELL',type:'STOP_LOSS',quantity:plan.quantity,stopPrice:plan.params.stopPrice??plan.params.belowStopPrice,newClientOrderId:identity('lv-s-'),newOrderRespType:'FULL'}";
  if(source.split(old).length!==2)throw Error('Unrecognized native stop payload; no changes');
  return source.replace(old,fixed);
 }
