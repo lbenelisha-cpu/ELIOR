@@ -1,3 +1,4 @@
+import {swingProtection} from './lib/swing-profit-protection.mjs';
 import {PocPaperService} from './lib/poc-paper-service.mjs';
 import {BinancePoc} from './lib/binance-poc.mjs';
 import {createTradingPnlReader} from './lib/binance-trading-pnl-reader.mjs';
@@ -848,6 +849,7 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
   // Snapshot the current settings for every fill, including manual purchases.
   // Historical riskPlan percentages describe entry risk, never an exit override.
   if(meta.wyckoffTrade)meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:{...tradeSettings.values}}};
+  if(meta.wyckoffTrade){let history=[];try{history=await candles(symbol);}catch{}meta.wyckoffTrade.swingProtection=swingProtection(history,{side:'LONG',timeframe:'5m',at:Date.now()});}
   if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');
   if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');
   if(!Number.isFinite(quoteUsdt)||quoteUsdt<5)throw Error('Fixed LIVE allocation below dust safety minimum; no small buy will be placed');
@@ -2521,6 +2523,7 @@ const server=http.createServer((req,res)=>{
       entryPolicyVersion:ENTRY_POLICY_VERSION,confirmedQuality:BINANCE_CONFIRMED_POLICY,channelPrimary,independentEntry,marketNews:marketNewsConfig,marketAttention:ATTENTION_POLICY,researchMonitoring:RESEARCH_PROTOCOL,entryComparison:ENTRY_COMPARISON_POLICY,
       earlyWave:EARLY_WAVE_POLICY,
       shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},
+      swingProtectionPolicy:'FIVE_CONFIRMED_SWINGS_V1',
       exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},
       pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},
       pocTrading:{version:1},

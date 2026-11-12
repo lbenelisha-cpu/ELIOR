@@ -1,7 +1,10 @@
+import {swingProtection} from '../../lib/swing-profit-protection.mjs';
 // Unit-test dependencies for source-isolated functions. Integration tests use
 // the real reconciliation, journal and protection implementations separately.
 import {validateTradeSettings} from '../../lib/trade-settings.mjs';
 export function withLiveSafety(context){
+ context.swingProtection??=swingProtection;
+ context.candles??=async()=>[];
  context.pocEntries??={reserved:()=>false};
  context.channelPrimary??={requested:false,enabled:false};
  context.newsEntryAssessment??=()=>({action:'NONE',priority:0,reason:'OBSERVATION_ONLY'});

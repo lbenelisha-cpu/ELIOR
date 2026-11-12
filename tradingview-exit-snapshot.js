@@ -41,7 +41,7 @@
     const bp = p.brokerProtection;
     const brokerStop = bp?.status === 'ACTIVE' && bp.hasUnsettledFill !== true &&
       fresh(timestamp(bp.verifiedAt), now) && positive(bp.stopPrice) ? Number(bp.stopPrice) : 0;
-    return pack({symbol, chartSymbol:'BINANCE:'+symbol, side:'LONG', at, entryAt, entry, stop, target, activation, armed, brokerStop, price:Number(p.price), settings:p.exitSettings||p});
+    return pack({symbol, chartSymbol:'BINANCE:'+symbol, side:'LONG', at, entryAt, entry, stop, target, activation, armed, brokerStop, price:Number(p.price), settings:p.exitSettings||p,swingProtection:p.swingProtection||p.setup?.swingProtection});
   }
   function pack(v){
     // Display the actual execution prices; settings describe the original risk,
@@ -51,8 +51,9 @@
     if(![entry,stop,target,price].every(positive)||direction*(target-entry)<=0||!Number.isFinite(entryAt)||entryAt<=0||entryAt>at||!Number.isFinite(activation)||activation<0)
       return {ok:false,reason:'חסרות רמות יציאה מתועדות מהשרת.'};
     const setting=k=>positive(settings[k])?Number(settings[k]):-1;
-    const stopLossPct=setting('stopLossPct'),takeProfitPct=setting('takeProfitPct'),profitActivationPct=setting('profitActivationPct'),trailingGapPp=setting('trailingGapPp');
-    const data=[VERSION,chartSymbol,at,entryAt,entry,stop,target,activation,armed?1:0,brokerStop,side,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp]
+    const swing=v.swingProtection?.status==='ACTIVE'&&positive(v.swingProtection.gapPct)?v.swingProtection:null;
+    const stopLossPct=setting('stopLossPct'),takeProfitPct=setting('takeProfitPct'),profitActivationPct=setting('profitActivationPct'),trailingGapPp=swing?swing.gapPct:setting('trailingGapPp');
+    const data=[swing?'LEVI_EXIT_V3':VERSION,chartSymbol,at,entryAt,entry,stop,target,activation,armed?1:0,brokerStop,side,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp,...(swing?['EXTREME_PCT']:[])]
       .map(value=>typeof value==='number'?value.toLocaleString('en-US',{useGrouping:false,maximumSignificantDigits:21}):value).join('|');
     return {...v,ok:true,data,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp,
       stopGainPct:direction*(stop/entry-1)*100,targetGainPct:direction*(target/entry-1)*100,
@@ -64,7 +65,7 @@
     if(snapshot.mode!=='live'||snapshot.error||!/^[A-Z0-9]{2,24}USDT$/.test(symbol||'')||!p||!positive(p.qty)||p.exitPolicy!=='FUTURES_SHORT_SETTINGS_V2'||!f.account||f.halt||f.pending||f.account.hedgeMode||f.account.multiAssetsMargin)return fail();
     const times=[timestamp(f.checkedAt),timestamp(p.priceAt)];if(times.some(t=>!fresh(t,now)))return fail();
     const verified=fresh(timestamp(p.protectedAt),now)&&p.algos?.filter(a=>a.kind==='STOP_MARKET'&&a.status==='NEW'&&positive(a.price));
-    return pack({symbol,chartSymbol:'BINANCE:'+symbol+'.P',side:'SHORT',at:Math.min(...times),entryAt:timestamp(p.entryAt),entry:Number(p.entryPrice),stop:Number(p.stopPrice),target:Number(p.targetPrice),activation:Number(p.activationPrice),armed:p.armed===true,brokerStop:verified?.length===1?Number(verified[0].price):0,price:Number(p.currentPrice),settings:p.settings});
+    return pack({symbol,chartSymbol:'BINANCE:'+symbol+'.P',side:'SHORT',at:Math.min(...times),entryAt:timestamp(p.entryAt),entry:Number(p.entryPrice),stop:Number(p.stopPrice),target:Number(p.targetPrice),activation:Number(p.activationPrice),armed:p.armed===true,brokerStop:verified?.length===1?Number(verified[0].price):0,price:Number(p.currentPrice),settings:p.settings,swingProtection:p.swingProtection||p.setup?.swingProtection});
   }
   function buildColmex(snapshot,symbol,now){
     const d=snapshot.status,p=d?.positions?.find(p=>p.symbol===symbol),side=p?.side||'LONG';
@@ -72,7 +73,7 @@
     if(snapshot.error||d?.live!==true||!p||!/^[A-Z][A-Z0-9.-]{0,14}$/.test(symbol||'')||!['LONG','SHORT'].includes(side)||!positive(p.qty)||![...policies,'COLMEX_CHANNEL_SHORT_EXIT_V1'].includes(p.exitPolicy)||d.pendingActions?.some(x=>x.symbol===symbol&&!x.quarantined))return fail();
     const times=[timestamp(d.lastBrokerSnapshotAt),timestamp(p.lastQuoteAt)];if(times.some(t=>!fresh(t,now)))return fail();
     const bp=p.brokerProtection,brokerStop=fresh(timestamp(bp?.verifiedAt),now)&&positive(bp?.stopLoss)?Number(bp.stopLoss):0;
-    return pack({symbol,chartSymbol:'US:'+symbol,side,at:Math.min(...times),entryAt:timestamp(p.entryAt),entry:Number(p.entryPrice),stop:Number(p.effectiveStopPrice),target:Number(p.targetPrice),activation:p.exitPolicy==='FIXED_TP4_SL1_V1'?0:Number(p.activationPrice),armed:p.profitFloorArmed===true,brokerStop,price:Number(p.lastBid),settings:p.exitSettings||p});
+    return pack({symbol,chartSymbol:'US:'+symbol,side,at:Math.min(...times),entryAt:timestamp(p.entryAt),entry:Number(p.entryPrice),stop:Number(p.effectiveStopPrice),target:Number(p.targetPrice),activation:p.exitPolicy==='FIXED_TP4_SL1_V1'?0:Number(p.activationPrice),armed:p.profitFloorArmed===true,brokerStop,price:Number(p.lastBid),settings:p.exitSettings||p,swingProtection:p.swingProtection||p.setup?.swingProtection});
   }
   const hosts = new Map();
   const fmt = n => Number(n).toLocaleString('en-US', {maximumSignificantDigits:10});
@@ -118,7 +119,7 @@
     ui.status.textContent = level.ok ? 'כניסה: '+fmt(level.entry)+' · יעד Take Profit: ' + fmt(level.target) + (level.activation ? ' · הפעלת הגנת רווח: ' + fmt(level.activation) : '') + ' · נתונים מ־' + time(level.at) : level.reason;
     ui.detail.textContent = level.ok ? (level.reached ? 'לפי העדכון האחרון המחיר הגיע לסף; זו אינה אסמכתה שהמכירה בוצעה. ' : '') +
       (level.brokerStop ? 'סטופ שאומת בבורסה: ' + fmt(level.brokerStop) + '. ' : 'פקודת ההגנה בבורסה לא אומתה בעדכון זה. ') +
-      'הגדרות: סטופ '+settingText(level.stopLossPct)+'% · יעד '+settingText(level.takeProfitPct)+'% · הפעלה '+settingText(level.profitActivationPct)+'% · מרווח נגרר '+settingText(level.trailingGapPp)+' נקודות אחוז. הסף באפליקציה מתעדכן עם נתוני הבוט. העתקה ל־TradingView אינה מתעדכנת אוטומטית. שיפוע רגרסיה שלילי אינו תנאי מכירה.' : '';
+      'הגדרות: סטופ '+settingText(level.stopLossPct)+'% · יעד '+settingText(level.takeProfitPct)+'% · הפעלה '+settingText(level.profitActivationPct)+'% · מרווח נגרר '+settingText(level.trailingGapPp)+(level.swingProtection?.status==='ACTIVE'?'% מהשיא/שפל · ממוצע 5 גלים':' נקודות אחוז')+'. הסף באפליקציה מתעדכן עם נתוני הבוט. העתקה ל־TradingView אינה מתעדכנת אוטומטית. שיפוע רגרסיה שלילי אינו תנאי מכירה.' : '';
   }
   function append(host, snapshot, symbol, now = Date.now()) {
     if (!host) return;
@@ -128,7 +129,14 @@
     render(box, snapshot, symbol, now);
     return box;
   }
-  global.LEVI_EXIT_SNAPSHOT = {build, render, append, VERSION, MAX_AGE};
+  function protectionLabel(p){
+    if(!p)return 'הגנת רווח: לא מנוהלת בבוט';
+    const w=p.swingProtection||p.setup?.swingProtection;
+    if(w?.status==='ACTIVE'&&positive(w.gapPct))return 'הגנת רווח: '+fmt(w.gapPct)+'% · ממוצע 5 גלים · מהשיא/שפל';
+    const gap=p.exitSettings?.trailingGapPp??p.settings?.trailingGapPp??p.trailingGapPp;
+    return 'הגנת רווח: '+(positive(gap)?fmt(gap)+' נקודות אחוז ממחיר הכניסה':'לפי ההגדרה הקיימת')+(w?.status==='FALLBACK'?' · אין 5 גלים מאושרים':' · פוזיציה קודמת');
+  }
+  global.LEVI_EXIT_SNAPSHOT = {build, render, append, protectionLabel, VERSION, MAX_AGE};
   global.setInterval?.(() => {
     for (const [host, context] of hosts) {
       if (!host.isConnected) {hosts.delete(host); continue;}

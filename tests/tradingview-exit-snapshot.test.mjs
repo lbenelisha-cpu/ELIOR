@@ -128,3 +128,9 @@ test('per-position buttons copy independently and reject stale data without sele
  assert.match(b._exitUI.button.attributes['aria-label'],/ETHUSDT/);
  clock+=MAX_AGE;await b._exitUI.button.onclick();assert.equal(copies.length,2);assert.equal(b._exitUI.button.disabled,true);
 });
+test('five-wave protection exports an explicit peak/trough percent unit and displays it per holding',()=>{
+ const s=fixture(),p=s.agent.agents[0].strategy;p.swingProtection={version:'FIVE_CONFIRMED_SWINGS_V1',side:'LONG',status:'ACTIVE',gapPct:3,waves:Array(5).fill({pct:3})};
+ const r=build(s,'TAOUSDT',now);assert.equal(r.ok,true);assert.equal(r.data.split('|')[0],'LEVI_EXIT_V3');assert.equal(r.data.split('|')[14],'3');assert.equal(r.data.split('|')[15],'EXTREME_PCT');
+ assert.match(context.LEVI_EXIT_SNAPSHOT.protectionLabel(p),/3%/);assert.match(context.LEVI_EXIT_SNAPSHOT.protectionLabel(p),/5 גלים/);
+ assert.match(context.LEVI_EXIT_SNAPSHOT.protectionLabel({...p,swingProtection:{status:'FALLBACK'}}),/אין 5 גלים/);
+});

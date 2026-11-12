@@ -406,7 +406,7 @@ if barstate.islast
     string raw = str.trim(exitSnapshot)
     if str.length(raw) > 0
         array<string> fields = str.split(raw, "|")
-        bool valid = (array.size(fields) == 10 or array.size(fields) == 15) and str.length(raw) <= 800
+        bool valid = (array.size(fields) == 10 or array.size(fields) == 15 or array.size(fields) == 16) and str.length(raw) <= 800
         string status = "Invalid bot snapshot - copy again from LEVI"
         if valid
             string version = array.get(fields, 0)
@@ -419,7 +419,8 @@ if barstate.islast
             float activationValue = str.tonumber(array.get(fields, 7))
             float armedValue = str.tonumber(array.get(fields, 8))
             float brokerStopValue = str.tonumber(array.get(fields, 9))
-            bool v2 = version == "LEVI_EXIT_V2" and array.size(fields) == 15
+            bool v3 = version == "LEVI_EXIT_V3" and array.size(fields) == 16
+            bool v2 = (version == "LEVI_EXIT_V2" and array.size(fields) == 15) or v3
             string side = v2 ? array.get(fields, 10) : "LONG"
             float direction = side == "SHORT" ? -1 : 1
             float stopPct = v2 ? str.tonumber(array.get(fields, 11)) : na
@@ -455,7 +456,7 @@ if barstate.islast
                 table.cell(exitTable, 0, 2, activationValue > 0 ? "Activation " + str.tostring(activationValue, format.mintick) + (armedValue == 1 ? " · armed" : " · waiting") : "Fixed exit policy", text_color=color.white, text_size=size.small)
                 table.cell(exitTable, 0, 4, "Entry " + str.tostring(entryValue, format.mintick) + " · stop P/L " + str.tostring(direction*(stopValue/entryValue-1)*100,"#.##") + "% · target " + str.tostring(direction*(targetValue/entryValue-1)*100,"#.##") + "%", text_color=color.white, text_size=size.small)
                 if v2
-                    table.cell(exitTable, 0, 5, "Settings: SL " + (stopPct < 0 ? "unknown" : str.tostring(stopPct,"#.##")) + "% · TP " + (targetPct < 0 ? "unknown" : str.tostring(targetPct,"#.##")) + "% · activation " + (activationPct < 0 ? "unknown" : str.tostring(activationPct,"#.##")) + "% · trail gap " + (gapPp < 0 ? "unknown" : str.tostring(gapPp,"#.##")) + " pp", text_color=color.aqua, text_size=size.small)
+                    table.cell(exitTable, 0, 5, "Settings: SL " + (stopPct < 0 ? "unknown" : str.tostring(stopPct,"#.##")) + "% · TP " + (targetPct < 0 ? "unknown" : str.tostring(targetPct,"#.##")) + "% · activation " + (activationPct < 0 ? "unknown" : str.tostring(activationPct,"#.##")) + "% · trail gap " + (gapPp < 0 ? "unknown" : str.tostring(gapPp,"#.##")) + (v3 ? "% of peak/trough (5 waves)" : " pp"), text_color=color.aqua, text_size=size.small)
                 table.cell(exitTable, 0, 3, brokerStopValue > 0 ? "Exchange stop at snapshot: " + str.tostring(brokerStopValue, format.mintick) : "Exchange stop not verified", text_color=brokerStopValue > 0 ? color.silver : color.orange, text_size=size.small)
         if not valid
             table.cell(exitTable, 0, 0, status, text_color=color.orange, text_size=size.small)

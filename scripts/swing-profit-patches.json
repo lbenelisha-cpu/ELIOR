@@ -1,0 +1,68 @@
+[
+  {
+    "file": "server.mjs",
+    "id": "0",
+    "before": "import {PocPaperService} from './lib/poc-paper-service.mjs';\nimport {BinancePoc} from './lib/binance-poc.mjs';\n",
+    "after": "import {swingProtection} from './lib/swing-profit-protection.mjs';\nimport {PocPaperService} from './lib/poc-paper-service.mjs';\nimport {BinancePoc} from './lib/binance-poc.mjs';\n"
+  },
+  {
+    "file": "server.mjs",
+    "id": "1",
+    "before": "  // Historical riskPlan percentages describe entry risk, never an exit override.\n  if(meta.wyckoffTrade)meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:{...tradeSettings.values}}};\n  if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');\n  if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');\n",
+    "after": "  // Historical riskPlan percentages describe entry risk, never an exit override.\n  if(meta.wyckoffTrade)meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:{...tradeSettings.values}}};\n  if(meta.wyckoffTrade){let history=[];try{history=await candles(symbol);}catch{}meta.wyckoffTrade.swingProtection=swingProtection(history,{side:'LONG',timeframe:'5m',at:Date.now()});}\n  if(quoteUsdt>LIVE_MAX_USDT)throw Error('Fixed position exceeds LIVE safety limit');\n  if(Number(funding.usdtFree||0)<quoteUsdt*1.002)throw Error('Insufficient cash for fixed position and fees');\n"
+  },
+  {
+    "file": "server.mjs",
+    "id": "2",
+    "before": "      earlyWave:EARLY_WAVE_POLICY,\n      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n",
+    "after": "      earlyWave:EARLY_WAVE_POLICY,\n      shortTrading:authorized?futuresShort.status():{policy:futuresShort.config,enabled:futuresShort.config.enabled,checkedAt:futuresShort.checkedAt},\n      swingProtectionPolicy:'FIVE_CONFIRMED_SWINGS_V1',\n      exitSettings:{...tradeSettings.values,policyVersion:tradeSettings.policyVersion,exitPolicy:TRAILING_EXIT_POLICY},\n      pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},\n"
+  },
+  {
+    "file": "lib/trailing-profit-exit.mjs",
+    "id": "0",
+    "before": "import {channelProfitLevels} from './channel-profit-protection.mjs';\nimport {validateTradeSettings} from './trade-settings.mjs';\n",
+    "after": "import {frozenSwingGap} from './swing-profit-protection.mjs';\nimport {channelProfitLevels} from './channel-profit-protection.mjs';\nimport {validateTradeSettings} from './trade-settings.mjs';\n"
+  },
+  {
+    "file": "lib/trailing-profit-exit.mjs",
+    "id": "1",
+    "before": " // Activation is a trigger, not a floor. Entry 100 -> peak 105 -> stop 104.\n // Retain already saved protection, including positions migrated from V1.\n const effectiveStopPrice=armed?Math.max(stopPrice,peak-entry*settings.trailingGapPp/100,saved):Math.max(stopPrice,saved);\n return {entryPrice:entry,peakPrice:peak,activationPrice,stopPrice,effectiveStopPrice,profitFloorArmed:armed,\n  protectedGainPct:(effectiveStopPrice/entry-1)*100};\n",
+    "after": " // Activation is a trigger, not a floor. Entry 100 -> peak 105 -> stop 104.\n // Retain already saved protection, including positions migrated from V1.\n const swingGap=frozenSwingGap(position),trail=swingGap===null?peak-entry*settings.trailingGapPp/100:peak*(1-swingGap/100);\n const effectiveStopPrice=armed?Math.max(stopPrice,trail,saved):Math.max(stopPrice,saved);\n return {entryPrice:entry,peakPrice:peak,activationPrice,stopPrice,effectiveStopPrice,profitFloorArmed:armed,\n  protectedGainPct:(effectiveStopPrice/entry-1)*100};\n"
+  },
+  {
+    "file": "lib/futures-short-policy.mjs",
+    "id": "0",
+    "before": "import {POC_ENTRY_POLICY,pocEntry,assertSamePoc} from './channel-poc-entry.mjs';\nimport {validateTradeSettings} from './trade-settings.mjs';\n",
+    "after": "import {frozenSwingGap} from './swing-profit-protection.mjs';\nimport {POC_ENTRY_POLICY,pocEntry,assertSamePoc} from './channel-poc-entry.mjs';\nimport {validateTradeSettings} from './trade-settings.mjs';\n"
+  },
+  {
+    "file": "lib/futures-short-policy.mjs",
+    "id": "1",
+    "before": " const activation=entry*(1-settings.profitActivationPct/100);\n const armed=position.armed===true||low<=activation;\n const stop=Math.min(entry*(1+settings.stopLossPct/100),position.stopPrice??Infinity,armed?low+entry*settings.trailingGapPp/100:Infinity);\n return {...position,targetPrice,targetSource:fromSettings?'SETTINGS':'CHANNEL',lowPrice:low,armed,stopPrice:stop,activationPrice:activation,settings,\n  exit:price<=targetPrice?(fromSettings?'SETTINGS_TAKE_PROFIT':'CHANNEL_TAKE_PROFIT'):price>=stop?(armed?'TRAILING_STOP':'STOP_LOSS'):null};\n",
+    "after": " const activation=entry*(1-settings.profitActivationPct/100);\n const armed=position.armed===true||low<=activation;\n const swingGap=frozenSwingGap({...position,side:'SHORT'});\n const stop=Math.min(entry*(1+settings.stopLossPct/100),position.stopPrice??Infinity,armed?(swingGap===null?low+entry*settings.trailingGapPp/100:low*(1+swingGap/100)):Infinity);\n return {...position,targetPrice,targetSource:fromSettings?'SETTINGS':'CHANNEL',lowPrice:low,armed,stopPrice:stop,activationPrice:activation,settings,\n  exit:price<=targetPrice?(fromSettings?'SETTINGS_TAKE_PROFIT':'CHANNEL_TAKE_PROFIT'):price>=stop?(armed?'TRAILING_STOP':'STOP_LOSS'):null};\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "id": "0",
+    "before": "import {futuresTrendHistory} from './futures-trend-history.mjs';\nimport {PocFastWatch} from './poc-fast-watch.mjs';\n",
+    "after": "import {swingProtection} from './swing-profit-protection.mjs';\nimport {futuresTrendHistory} from './futures-trend-history.mjs';\nimport {PocFastWatch} from './poc-fast-watch.mjs';\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "id": "1",
+    "before": "   const entryPrice=futuresFillPrice(order);\n   if(!(entryPrice>0))throw Error('FUTURES_FILL_PRICE_UNVERIFIED');\n   this.state.positions[order.symbol]={symbol:order.symbol,qty,entryPrice,entryAt:this.now(),entryOrderId:order.orderId,entryClientOrderId:order.clientOrderId,entryQuote:Number(order.cumQuote),entryPriceSource:'CUM_QUOTE',targetPrice:pending.setup.targetPrice,setup:pending.setup,settings:pending.settings,lowPrice:entryPrice,algos:[],protectedAt:null};\n   this.state.positions[order.symbol].targetPrice=entryPrice*(1-validateShortSettings(pending.settings).takeProfitPct/100);\n   this.state.positions[order.symbol].exitPolicy=FUTURES_SHORT_EXIT_POLICY;\n",
+    "after": "   const entryPrice=futuresFillPrice(order);\n   if(!(entryPrice>0))throw Error('FUTURES_FILL_PRICE_UNVERIFIED');\n   this.state.positions[order.symbol]={symbol:order.symbol,qty,entryPrice,entryAt:this.now(),entryOrderId:order.orderId,entryClientOrderId:order.clientOrderId,entryQuote:Number(order.cumQuote),entryPriceSource:'CUM_QUOTE',targetPrice:pending.setup.targetPrice,setup:pending.setup,swingProtection:pending.setup.swingProtection,settings:pending.settings,lowPrice:entryPrice,algos:[],protectedAt:null};\n   this.state.positions[order.symbol].targetPrice=entryPrice*(1-validateShortSettings(pending.settings).takeProfitPct/100);\n   this.state.positions[order.symbol].exitPolicy=FUTURES_SHORT_EXIT_POLICY;\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "id": "2",
+    "before": "   const q=await this.quote(intent.symbol);\n   const setup={entryMode,...(entryMode==='MANUAL'?{manualRequestId:intent.requestId}:{}),pocId:intent.requestId,poc:intent.poc,expiresAt:intent.expiresAt,targetPrice:Number(q.bidPrice)*(1-settings.takeProfitPct/100)};\n   this.assertAllocation(intent.quoteUsdt);\n   const plan=shortOrderPlan(info,q,setup,intent.quoteUsdt);\n",
+    "after": "   const q=await this.quote(intent.symbol);\n   const setup={entryMode,...(entryMode==='MANUAL'?{manualRequestId:intent.requestId}:{}),pocId:intent.requestId,poc:intent.poc,expiresAt:intent.expiresAt,targetPrice:Number(q.bidPrice)*(1-settings.takeProfitPct/100)};\n   let waveBars=[];try{waveBars=(await this.input(intent.symbol)).bars;}catch{}\n   setup.swingProtection=swingProtection(waveBars,{side:'SHORT',at:this.now()});\n   this.assertAllocation(intent.quoteUsdt);\n   const plan=shortOrderPlan(info,q,setup,intent.quoteUsdt);\n"
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "id": "3",
+    "before": "  this.state.used.push({symbol,patternId:check.setup.patternId}); // Keep pattern identities across restarts; never replay a consumed entry.\n  this.save();\n  await this.submit('ENTRY',plan,{setup:check.setup,settings,slotBudgetUsdt},()=>{\n   this.assertWatchedSymbol(symbol);\n",
+    "after": "  this.state.used.push({symbol,patternId:check.setup.patternId}); // Keep pattern identities across restarts; never replay a consumed entry.\n  this.save();\n  check.setup.swingProtection=swingProtection(latestInput.bars,{side:'SHORT',at:this.now()});\n  await this.submit('ENTRY',plan,{setup:check.setup,settings,slotBudgetUsdt},()=>{\n   this.assertWatchedSymbol(symbol);\n"
+  }
+]
