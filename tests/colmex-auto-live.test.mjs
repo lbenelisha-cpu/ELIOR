@@ -125,3 +125,5 @@ test('cash filter never prevents exit management of existing positions',async()=
  b.quote=async()=>({bp:109,ap:109.01});b.write=async(a,i)=>{written=i;return {};};
  await runCycle({state:s,broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}});assert.equal(written.kind,'CLOSE');assert.equal(written.positionId,'p');
 });
+
+test('broker adapter uses short wire requestId only when explicitly persisted and leaves comment unchanged',async()=>{let sent;const b=new AutoBroker({env,deadline:now+24000,now:()=>now,fetchImpl:async(url,options)=>{sent={url,body:JSON.parse(options.body)};return {ok:true,status:200,json:async()=>({s:'ok',d:{orderId:'one'}})};}});b.reader.authorize=async()=> 'test';await b.write('123',{kind:'BUY',id:'11111111-1111-4111-8111-111111111111',brokerRequestId:'1234567890abcdef',tag:'levi-auto:11111111-1111-4111-8111-111111111111',order:{qty:1,stopLoss:29}});assert.match(sent.url,/requestId=1234567890abcdef$/);assert.equal(sent.body.userComment,'levi-auto:11111111-1111-4111-8111-111111111111');assert.equal(sent.body.qty,1);assert.equal(sent.body.stopLoss,29);});

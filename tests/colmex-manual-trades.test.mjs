@@ -170,3 +170,22 @@ test('manual recovery requires recorded unknown broker error and never enables g
  assert.equal(manualDiagnosticOffer(s).available,true);assert.equal(orderReviewOffer(s).available,false);
  for(const mutate of [s=>s.pending.acceptedAt=now,s=>s.pending.orderId='known',s=>s.pending.writeFailure.outcome='REJECTED',s=>s.pending.writeFailure.code='WRITE_NETWORK_OR_TIMEOUT',s=>s.manualRequests[priorId].status='FILLED']){const next=structuredClone(s);mutate(next);assert.equal(manualDiagnosticOffer(next).available,false);}
 });
+
+const aaplReview='e9ff564c-8c59-4e22-9ce0-77561044536b';
+function shortIdFixture(){
+ const state=initialState(now-1000000);state.halt='UNRESOLVED_ORDER_REQUIRES_REVIEW';state.pending={id:aaplReview,tag:'levi-auto:'+aaplReview,kind:'BUY',symbol:'AAPL',manual:true,reviewRequired:true,at:now-900000,order:{tradableInstrumentId:1,side:'buy',qty:1,price:355},writeFailure:{code:'WRITE_BROKER_ERROR',outcome:'UNKNOWN'}};state.manualRequests={[aaplReview]:{status:'PENDING',side:'BUY',symbol:'AAPL'}};
+ const b=broker();b.snapshot=async()=>({...snapshot(),historyAvailable:true});
+ const input={...request,amountUsd:undefined,diagnostic:true,singleShare:true,shortRequestId:true,reviewRequestId:aaplReview};
+ return {state,b,args:{input,state,broker:b,env,now:()=>now,deadline:now+24000,save:async s=>validateLiveState(s)}};
+}
+test('AAPL request-id trial preserves old intent, reserves exposure, retains full comment and persists short mapping before one write',async()=>{
+ const f=shortIdFixture();let persisted=false;f.args.save=async s=>{validateLiveState(s);if(s.riskPending?.length){assert.match(s.riskPending[0].brokerRequestId,/^[a-f0-9]{16}$/);persisted=true;}};
+ const write=f.b.write.bind(f.b);f.b.write=async(...a)=>{assert.ok(persisted);return write(...a);};
+ await manualTrade(f.args);assert.equal(f.b.writes.length,1);const i=f.b.writes[0];assert.equal(i.order.qty,1);assert.equal(i.id,request.requestId);assert.equal(i.tag,'levi-auto:'+request.requestId);assert.equal(f.state.pending.id,aaplReview);assert.equal(f.state.halt,'UNRESOLVED_ORDER_REQUIRES_REVIEW');assert.equal(f.state.manualRequests[aaplReview].status,'PENDING');assert.equal(f.state.manualRequests[i.id].brokerRequestId,i.brokerRequestId);
+ await manualTrade(f.args);assert.equal(f.b.writes.length,1);
+ await assert.rejects(manualTrade({...f.args,input:{...f.args.input,requestId:'22222222-2222-4222-8222-222222222222'}}));assert.equal(f.b.writes.length,1);
+});
+test('request-id trial refuses changed scope, insufficient reserved cash, new exposure, unavailable history and failed save',async()=>{
+ for(const kind of ['symbol','review','single','cash','position','history','save']){const f=shortIdFixture();if(kind==='symbol')f.args.input.symbol='MSFT';if(kind==='review')f.args.input.reviewRequestId=request.requestId;if(kind==='single')f.args.input.singleShare=false;
+ if(kind==='cash')f.b.snapshot=async()=>({...snapshot(),state:{availableCash:380},historyAvailable:true});if(kind==='position')f.b.snapshot=async()=>({...snapshot(),positions:[{id:'p',tradableInstrumentId:1,side:'buy',qty:1}],historyAvailable:true});if(kind==='history')f.b.snapshot=async()=>({...snapshot(),historyAvailable:false});if(kind==='save')f.args.save=async s=>{if(s.riskPending?.length)throw Error('LEASE_LOST');};await assert.rejects(manualTrade(f.args),undefined,kind);assert.equal(f.b.writes.length,0,kind);}
+});
