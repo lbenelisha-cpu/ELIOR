@@ -41,7 +41,7 @@ test('unknown write outcome remains pending and a different request cannot place
  await assert.rejects(manualTrade({...args,input:{...request,requestId:'22222222-2222-4222-8222-222222222222'}}),/TRADE_IN_PROGRESS/);
 });
 test('durable save failure prevents broker mutation; invalid amount and exposure are rejected',async()=>{
- assert.equal(manualInput({...request,amountUsd:800}).amountUsd,800);assert.throws(()=>manualInput({...request,amountUsd:800.01}),/INVALID_BUY_AMOUNT/);
+ assert.equal(manualInput({...request,amountUsd:800}).amountUsd,800);assert.equal(manualInput({...request,amountUsd:800.01}).amountUsd,800.01);
  const state=initialState(now),b=broker();await assert.rejects(manualTrade({input:request,state,broker:b,env,now:()=>now,deadline:now+24000,save:async s=>{if(s.pending)throw Error('save failed');}}),/save failed/);assert.equal(b.writes.length,0);
  b.snapshot=async()=>({...snapshot(),positions:[{},{},{}]});await assert.rejects(manualTrade({input:request,state:initialState(now),broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}}),/NO_FREE_SLOT/);
 });
@@ -154,10 +154,9 @@ test('single-share comment experiment preserves UUID, persists short tag before 
  await assert.rejects(manualTrade({...args,input:{...input,requestId:'22222222-2222-4222-8222-222222222222'}}));assert.equal(b.writes.length,1);
 });
 test('single-share trial refuses budget, lot rules and insufficient reserved cash without writing',async()=>{
- for(const change of ['budget','minimum','step','cash']){
+ for(const change of ['minimum','step','cash']){
  const state=diagnosticState(),b=diagnosticBroker();b.quote=async()=>({ap:350,bp:349.99});
  let input={...diagnosticRequest,amountUsd:800,singleShare:true};
- if(change==='budget')input.amountUsd=349;
  if(change==='cash')b.snapshot=async()=>({...snapshot(),historyAvailable:true,state:{availableCash:1000}});
  if(change==='minimum'||change==='step'){const details=await b.details();b.details=async()=>({...details,...(change==='minimum'?{minLot:2}:{lotStep:2})});}
  await assert.rejects(manualTrade({input,state,broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}}));assert.equal(b.writes.length,0);

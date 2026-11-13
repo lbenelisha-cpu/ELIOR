@@ -119,13 +119,13 @@ test('fresh broker evidence for either pending stock prevents blind release',asy
  }
 });
 test('combined reservations still block automatic and manual overspending and both isolated symbols',async()=>{
- const s=secondReview(),b=broker();await releaseOrderReview({...args(s,b),input:secondInput});
+ const s=secondReview(),b=broker();b.quote=async()=>({ap:200,bp:199.99});await releaseOrderReview({...args(s,b),input:secondInput});
  await runCycle({...args(s,b),deadline:now+24000,signal:()=>({ready:true,setup:{patternId:'fixture-multi',targetPrice:100}})});
  assert.equal(b.writes.length,0);assert.ok(Object.values(s.checks).some(c=>c.reason==='INSUFFICIENT_UNLEVERAGED_CASH'));
  for(const symbol of ['AAPL','AMD','TGT']){
   const expected=symbol==='AAPL'?'INSUFFICIENT_UNLEVERAGED_CASH':'SYMBOL_ORDER_UNRESOLVED';
   const realInstruments=b.instruments;b.instruments=async()=>[...(await realInstruments()).filter(i=>i.name!=='TGT'),{name:'TGT',type:'EQUITY',tradableInstrumentId:10}];
-  await assert.rejects(manualTrade({...args(s,b),input:{side:'BUY',symbol,amountUsd:200,requestId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'},deadline:now+24000}),new RegExp(expected));
+  await assert.rejects(manualTrade({...args(s,b),input:{side:'BUY',symbol,amountUsd:300,requestId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'},deadline:now+24000}),new RegExp(expected));
  }
  assert.equal(b.writes.length,0);assert.equal(reservedAccount(s,snapshot()).orders.length,2);
 });

@@ -19,7 +19,7 @@ function fake(){
  return {state,broker,run,get reads(){return reads;},get catalogs(){return catalogs;},get writes(){return writes;},get time(){return t;},advance:ms=>t+=ms};
 }
 test('live scanning covers fifty unique names in bounded batches and continues after corrupt history',async()=>{
- assert.equal(new Set(AUTO_POLICY.symbols).size,50);assert.equal(AUTO_POLICY.maxPositions,3);assert.equal(AUTO_POLICY.notionalUsd,800);
+ assert.equal(new Set(AUTO_POLICY.symbols).size,50);assert.equal(AUTO_POLICY.maxPositions,3);assert.equal(AUTO_POLICY.notionalUsd,null);
  const f=fake(),read=f.broker.history;
  f.broker.history=async id=>{const h=await read(id);return id===13?{barDetails:[{t:at-300000,o:30,h:20,l:29,c:30}]}:h;};
  for(let i=0;i<10;i++){await f.run();f.advance(60000);}

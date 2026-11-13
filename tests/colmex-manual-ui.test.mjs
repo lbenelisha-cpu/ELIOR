@@ -34,12 +34,12 @@ test('explicit rejection and proven not-sent outcomes release local pending with
   assert.equal(u.saved.has('levi-colmex-manual-pending-v1'),false);assert.equal(u.nodes.get('colmexManualBuy').disabled,false);assert.equal(u.calls.length,1);assert.doesNotMatch(u.nodes.get('colmexManualStatus').textContent,/ממתין לאימות/);
  }
 });
-test('diagnostic opening is read-only; actual submission requires user form event and requires one share and an explicit ceiling within 800',async()=>{
+test('diagnostic opening is read-only; actual submission requires user form event and requires one share using server verified available cash',async()=>{
  const u=setup();u.setResponse({ok:true,status:200,json:async()=>({manualDiagnostic:{available:true,reviewRequestId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',blockedSymbol:'AMD',maxAmountUsd:200}})});
- await u.nodes.get('colmexDiagnosticBuy').click();assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');assert.equal(u.nodes.get('colmexTradeAmount').max,'800');assert.match(u.nodes.get('colmexTradeDescription').textContent,/כסף אמיתי/);
- u.nodes.get('colmexTradeAmount').value='801';await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});assert.equal(u.calls.length,1);
+ await u.nodes.get('colmexDiagnosticBuy').click();assert.equal(u.calls.length,1);assert.equal(u.calls[0].options.method,'GET');assert.equal(u.nodes.get('colmexTradeAmount').max,'');assert.match(u.nodes.get('colmexTradeDescription').textContent,/כסף אמיתי/);
+ assert.equal(u.nodes.get('colmexAmountLabel').hidden,true);
  u.nodes.get('colmexTradeAmount').value='200';u.setResponse({ok:true,status:202,json:async()=>({status:'PENDING',failure:{code:'WRITE_HTTP_ERROR',httpStatus:400},requestId:'test-request'})});
- await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});assert.equal(u.calls.length,2);const input=JSON.parse(u.calls[1].options.body);assert.equal(input.diagnostic,true);assert.equal(input.singleShare,true);assert.equal(input.amountUsd,200);assert.equal(input.reviewRequestId,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+ await u.nodes.get('colmexTradeForm').submit({preventDefault(){}});assert.equal(u.calls.length,2);const input=JSON.parse(u.calls[1].options.body);assert.equal(input.diagnostic,true);assert.equal(input.singleShare,true);assert.equal(input.amountUsd,undefined);assert.equal(input.reviewRequestId,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
  assert.match(u.nodes.get('colmexManualStatus').textContent,/HTTP 400/);assert.match(u.nodes.get('colmexManualStatus').textContent,/test-request/);assert.ok(u.saved.has('levi-colmex-manual-pending-v1'));assert.equal(u.nodes.get('colmexDiagnosticBuy').disabled,true);
 });
 test('diagnostic same-symbol and unavailable offer cannot open a live order form',async()=>{
