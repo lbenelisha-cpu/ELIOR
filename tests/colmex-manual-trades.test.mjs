@@ -140,3 +140,34 @@ test('authenticated diagnostic GET returns fixed failure details for this reques
  const r=await h(new Request('https://app.test/manual?requestId='+request.requestId,{headers:{authorization:'Bearer '+device.token}}),{deploy:{context:'production'}}),data=await r.json();
  assert.equal(r.status,200);assert.equal(data.failure.code,'WRITE_VALIDATION_REJECTED');assert.equal(data.failure.httpStatus,400);assert.equal(data.reviewRequired,false);assert.equal(JSON.stringify(data).includes('private-token'),false);
 });
+test('single-share comment experiment preserves UUID, persists short tag before write and reserves old manual exposure',async()=>{
+ const state=diagnosticState(),b=diagnosticBroker();
+ state.pending.manual=true;state.pending.writeFailure={code:'WRITE_BROKER_ERROR',outcome:'UNKNOWN'};
+ state.manualRequests={[priorId]:{status:'PENDING'}};
+ b.quote=async()=>({ap:350,bp:349.99});let saved;
+ const input={...diagnosticRequest,amountUsd:800,singleShare:true};
+ b.write=async(account,i)=>{assert.equal(saved.riskPending[0].tag,i.tag);assert.equal(i.id,request.requestId);assert.equal(i.order.qty,1);assert.match(i.tag,/^[0-9a-f]{16}$/);assert.equal(i.order.stopLoss,1);assert.equal(i.order.takeProfit,50);b.writes.push(i);return {orderId:'one-share'};};
+ const args={input,state,broker:b,env,now:()=>now,deadline:now+24000,save:async s=>{saved=structuredClone(validateLiveState(s));}};
+ await manualTrade(args);assert.equal(b.writes.length,1);assert.equal(state.pending.id,priorId);assert.equal(state.halt,'UNRESOLVED_ORDER_REQUIRES_REVIEW');
+ await manualTrade(args);assert.equal(b.writes.length,1);
+ await assert.rejects(manualTrade({...args,input:{...input,singleShare:false}}));
+ await assert.rejects(manualTrade({...args,input:{...input,requestId:'22222222-2222-4222-8222-222222222222'}}));assert.equal(b.writes.length,1);
+});
+test('single-share trial refuses budget, lot rules and insufficient reserved cash without writing',async()=>{
+ for(const change of ['budget','minimum','step','cash']){
+ const state=diagnosticState(),b=diagnosticBroker();b.quote=async()=>({ap:350,bp:349.99});
+ let input={...diagnosticRequest,amountUsd:800,singleShare:true};
+ if(change==='budget')input.amountUsd=349;
+ if(change==='cash')b.snapshot=async()=>({...snapshot(),historyAvailable:true,state:{availableCash:1000}});
+ if(change==='minimum'||change==='step'){const details=await b.details();b.details=async()=>({...details,...(change==='minimum'?{minLot:2}:{lotStep:2})});}
+ await assert.rejects(manualTrade({input,state,broker:b,env,now:()=>now,deadline:now+24000,save:async()=>{}}));assert.equal(b.writes.length,0);
+ }
+ for(const singleShare of [false,2,'true'])assert.throws(()=>manualInput({...diagnosticRequest,singleShare}));
+ assert.throws(()=>manualInput({...request,singleShare:true}));
+});
+test('manual recovery requires recorded unknown broker error and never enables general release',async()=>{
+ const {orderReviewOffer}=await import('../lib/colmex-manual-diagnostic.mjs');
+ const s=diagnosticState();s.pending.manual=true;s.pending.writeFailure={code:'WRITE_BROKER_ERROR',outcome:'UNKNOWN'};s.manualRequests={[priorId]:{status:'PENDING'}};
+ assert.equal(manualDiagnosticOffer(s).available,true);assert.equal(orderReviewOffer(s).available,false);
+ for(const mutate of [s=>s.pending.acceptedAt=now,s=>s.pending.orderId='known',s=>s.pending.writeFailure.outcome='REJECTED',s=>s.pending.writeFailure.code='WRITE_NETWORK_OR_TIMEOUT',s=>s.manualRequests[priorId].status='FILLED']){const next=structuredClone(s);mutate(next);assert.equal(manualDiagnosticOffer(next).available,false);}
+});

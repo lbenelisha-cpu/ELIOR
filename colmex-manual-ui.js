@@ -4,6 +4,7 @@ let token=null,pending=null,busy=false,diagnosticReviewId=null,reviewReleaseId=n
 try{token=localStorage.getItem(TOKEN_KEY);pending=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}catch{}
 const messages={DEVICE_REQUIRED:'יש לחבר את המכשיר פעם אחת בקוד קצר.',PAIRING_NOT_CONFIGURED:'יש להגדיר ב־Netlify קוד חיבור קבוע COLMEX_DEVICE_PAIR_CODE בן 6 ספרות ולפרסם מחדש.',PAIR_CODE_INVALID:'קוד החיבור אינו נכון.',PAIR_CODE_EXPIRED_OR_USED:'קוד החיבור אינו פעיל. בדוק את הגדרת השרת.',PAIR_CODE_COOLDOWN:'יותר מדי ניסיונות. אפשר להשתמש באותו קוד שוב בעוד 15 דקות.',PAIR_CODE_RETRY:'בקשת חיבור נוספת מתבצעת. נסה שוב.',TRADE_IN_PROGRESS:'פעולת מסחר אחרת מתבצעת. המתן לסיומה.',LIVE_NOT_ENABLED:'מסחר LIVE אינו מופעל בשרת.',INVALID_BUY_AMOUNT:'יש להזין סכום גדול מאפס ועד 800 דולר.',NO_FREE_SLOT:'כל שלוש הפוזיציות תפוסות.',NO_UNIQUE_LONG_POSITION:'לא נמצאה פוזיציית LONG יחידה במניה זו.',MINIMUM_QUANTITY_ABOVE_BUDGET:'הכמות המינימלית יקרה מהסכום שבחרת.',INSUFFICIENT_UNLEVERAGED_CASH:'אין די מזומן לקנייה ולרזרבה של 5 דולר.',OUTSIDE_REGULAR_SESSION:'קנייה זמינה בשעות המסחר הרגילות בארה״ב.',EXISTING_POSITION_OR_ORDER:'קיימת פוזיציה או הוראה במניה שמונעת את הפעולה.',INSTRUMENT_UNAVAILABLE:'המניה אינה זמינה באופן חד־משמעי אצל הברוקר.',REQUIRES_REVIEW:'פעולה קודמת דורשת בדיקה אצל הברוקר.',BROKER_BRACKET_PERMISSION_REQUIRED:'נדרשות הרשאות מסחר וסטופ אצל הברוקר.'};
 Object.assign(messages,{INVALID_DIAGNOSTIC_REQUEST:'בדיקת קנייה מותרת עד 200 דולר בלבד.',DIAGNOSTIC_STATE_CHANGED:'מצב ההוראה שבבירור השתנה או אינו מאפשר בדיקה נפרדת. לא נשלחה קנייה.',DIAGNOSTIC_ALREADY_USED:'כבר תועד ניסיון בדיקה עבור ההוראה שבבירור. אין לשלוח ניסיון נוסף.',DIAGNOSTIC_SAME_INSTRUMENT:'יש לבחור מניה אחרת מזו שההוראה שלה בבירור.',DIAGNOSTIC_ACCOUNT_NOT_EMPTY:'בדיקה נפרדת דורשת חשבון ללא פוזיציות או הוראות פתוחות והיסטוריה זמינה.'});
+Object.assign(messages,{INVALID_DIAGNOSTIC_REQUEST:'נדרשת מניה אחת ותקרת סכום עד 800 דולר.',SINGLE_SHARE_UNAVAILABLE:'כללי הברוקר או התקציב אינם מאפשרים קניית מניה אחת.',BROKER_TAG_COLLISION:'תגית המעקב כבר קיימת. לא נשלחה הוראה.'});
 const explain=code=>messages[code]||entryReasonLabel(code);
 const brokerHints={SESSION:'חיבור או סשן',PERMISSION:'הרשאות',FUNDS:'יתרה או בטחונות',ORDER_PARAMETERS:'פרטי ההוראה',MARKET_CLOSED:'שעות המסחר',UNCLASSIFIED:'סיבה שלא סווגה'};
 const failureText=data=>data.failure?' · '+explain(data.failure.code)+(brokerHints[data.failure.brokerHint]?' · נושא הודעת הברוקר: '+brokerHints[data.failure.brokerHint]+' (אינו אישור לתוצאת ההוראה)':'')+(data.failure.httpStatus?' · HTTP '+data.failure.httpStatus:'')+(data.requestId?' · מזהה בקשה: '+data.requestId:''):'';
@@ -81,9 +82,9 @@ $('colmexReleaseReview').addEventListener('click',async()=>{
    if(!offer.available)throw Error(explain(offer.reason));
    if(selected()===offer.blockedSymbol)throw Error(explain('DIAGNOSTIC_SAME_INSTRUMENT'));
    busy=false;open('BUY');diagnosticReviewId=offer.reviewRequestId;
-   $('colmexTradeAmount').max='200';$('colmexTradeAmount').value='200';
-   $('colmexTradeTitle').textContent='בדיקת קנייה אמיתית · '+$('colmexTradeSymbol').value+' · LIVE';
-   $('colmexTradeDescription').textContent='ניסיון ידני אחד, עד 200 דולר לפני עמלות, במניה שבחרת. זו קנייה בכסף אמיתי. סטופ ויעד רווח לפי SETTINGS יצורפו לבקשה וידרשו אישור ברוקר. בקשת '+offer.blockedSymbol+' נשארת בבירור והקניות האוטומטיות נשארות חסומות. התוצאה תוצג כאן לאחר השליחה.';
+   $('colmexTradeAmount').max='800';$('colmexTradeAmount').value='';
+   $('colmexTradeTitle').textContent='בדיקת קנייה · מניה אחת · '+$('colmexTradeSymbol').value+' · LIVE';
+   $('colmexTradeDescription').textContent='ניסיון ידני אחד לרכישת מניה אחת בלבד. הזן תקרת סכום בדולרים (עד 800); אם מחיר המניה חורג ממנה לא תישלח הוראה. זו קנייה בכסף אמיתי. בניסיון זה רק userComment מקוצר ל־16 תווים; requestId נשאר מלא. סטופ ויעד רווח לפי SETTINGS יצורפו לבקשה וידרשו אישור ברוקר. בקשת '+offer.blockedSymbol+' נשארת בבירור והקניות האוטומטיות נשארות חסומות. התוצאה תוצג כאן לאחר השליחה.';
   }catch(error){say(error.message);}finally{busy=false;renderAccess();}
  });
 $('colmexManualSell').addEventListener('click',()=>open('SELL'));
@@ -126,7 +127,7 @@ $('colmexTradeForm').addEventListener('submit',async event=>{
  const input={requestId:crypto.randomUUID(),symbol:$('colmexTradeSymbol').value,side:$('colmexTradeSide').value};
  if(reviewReleaseId){delete input.symbol;delete input.side;input.action='release_review';input.reviewRequestId=reviewReleaseId;}
  else if(input.side==='BUY')input.amountUsd=Number($('colmexTradeAmount').value);
- if(diagnosticReviewId){input.diagnostic=true;input.reviewRequestId=diagnosticReviewId;if(!(input.amountUsd>0&&input.amountUsd<=200)){$('colmexTradeResult').textContent=explain('INVALID_DIAGNOSTIC_REQUEST');return;}}
+ if(diagnosticReviewId){input.diagnostic=true;input.singleShare=true;input.reviewRequestId=diagnosticReviewId;if(!(input.amountUsd>0&&input.amountUsd<=800)){$('colmexTradeResult').textContent=explain('INVALID_DIAGNOSTIC_REQUEST');return;}}
  // Persist the request identity before network I/O. Never auto-resubmit a financial action.
  try{rememberPending(input);}catch{pending=null;renderAccess();$('colmexTradeResult').textContent='לא ניתן לשמור מזהה בקשה במכשיר. לא נשלחה הוראה.';return;}
  await send(input);
