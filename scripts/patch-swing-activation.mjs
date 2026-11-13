@@ -3,7 +3,9 @@ const root=path.resolve(process.argv[2]||'.'),release=path.resolve(path.dirname(
 const patches=JSON.parse(fs.readFileSync(path.join(release,'scripts/swing-activation-patches.json'),'utf8')),staged=new Map();
 const count=(s,x)=>s.split(x).length-1;
 for(const p of patches){
- const file=path.join(root,p.file),text=staged.get(file)??fs.readFileSync(file,'utf8');
+ const file=path.join(root,p.file);
+ if(p.file==='lib/colmex-position-exit.mjs'&&!fs.existsSync(file))continue;
+ const text=staged.get(file)??fs.readFileSync(file,'utf8');
  if(count(text,p.after)===1){staged.set(file,text);continue;}
  if(count(text,p.before)!==1)throw Error('Unknown runtime '+p.file+' ['+p.id+']; no files changed');
  staged.set(file,text.replace(p.before,p.after));

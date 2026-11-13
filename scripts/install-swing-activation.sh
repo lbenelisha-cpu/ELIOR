@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install frozen five-wave percentage trailing protection for new entries.
+# Install frozen five-wave profit activation; retain configured stop and trailing gap.
 # Preserve settings, exchange orders, journals and all unrelated runtime integrations.
 set -euo pipefail
 revision=${1:?Pass the reviewed full commit SHA}
@@ -17,6 +17,10 @@ cp ./*.js ./*.mjs "$stage/runtime/"
 cp -a "$stage/release/tests" "$stage/release/scripts" "$stage/runtime/"
 cp "$stage/release/tradingview-exit-snapshot.js" "$stage/runtime/"
 node "$stage/release/scripts/patch-swing-activation.mjs" "$stage/runtime"
+# Binance-only deployments omit the Colmex adapter. Stage it only for shared tests.
+if [[ ! -f lib/colmex-position-exit.mjs ]]; then
+ cp "$stage/release/lib/colmex-position-exit.mjs" "$stage/runtime/lib/"
+fi
 node --check "$stage/runtime/lib/swing-profit-protection.mjs"
 echo 'Checking five-wave exits against the actual installed runtime.'
 if ! node --test "$stage/runtime/tests/swing-profit-protection.test.mjs" "$stage/runtime/tests/futures-short.test.mjs" "$stage/runtime/tests/tradingview-exit-snapshot.test.mjs"; then
@@ -46,7 +50,8 @@ assertNoPendingEntry({spotPending,journal});
 fs.writeFileSync(stage+'/preflight.json',JSON.stringify({journal,spotPending,port}),{mode:0o600});
 console.log('SHORT settings validated; configured percentages will be retained.');
 JS
-files=(lib/swing-profit-protection.mjs lib/trailing-profit-exit.mjs lib/futures-short-policy.mjs lib/colmex-position-exit.mjs)
+files=(lib/swing-profit-protection.mjs lib/trailing-profit-exit.mjs lib/futures-short-policy.mjs)
+if [[ -f lib/colmex-position-exit.mjs ]]; then files+=(lib/colmex-position-exit.mjs); fi
 backup="/root/levi-before-swing-activation-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -m 700 "$backup"
 existing=();missing=()
