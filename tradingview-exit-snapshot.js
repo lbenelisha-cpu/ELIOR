@@ -52,8 +52,8 @@
       return {ok:false,reason:'חסרות רמות יציאה מתועדות מהשרת.'};
     const setting=k=>positive(settings[k])?Number(settings[k]):-1;
     const swing=v.swingProtection?.status==='ACTIVE'&&positive(v.swingProtection.gapPct)?v.swingProtection:null;
-    const stopLossPct=setting('stopLossPct'),takeProfitPct=setting('takeProfitPct'),profitActivationPct=setting('profitActivationPct'),trailingGapPp=swing?swing.gapPct:setting('trailingGapPp');
-    const data=[swing?'LEVI_EXIT_V3':VERSION,chartSymbol,at,entryAt,entry,stop,target,activation,armed?1:0,brokerStop,side,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp,...(swing?['EXTREME_PCT']:[])]
+    const stopLossPct=setting('stopLossPct'),takeProfitPct=setting('takeProfitPct'),profitActivationPct=activation>0?direction*(activation/entry-1)*100:setting('profitActivationPct'),trailingGapPp=setting('trailingGapPp');
+    const data=[VERSION,chartSymbol,at,entryAt,entry,stop,target,activation,armed?1:0,brokerStop,side,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp]
       .map(value=>typeof value==='number'?value.toLocaleString('en-US',{useGrouping:false,maximumSignificantDigits:21}):value).join('|');
     return {...v,ok:true,data,stopLossPct,takeProfitPct,profitActivationPct,trailingGapPp,
       stopGainPct:direction*(stop/entry-1)*100,targetGainPct:direction*(target/entry-1)*100,
@@ -119,7 +119,7 @@
     ui.status.textContent = level.ok ? 'כניסה: '+fmt(level.entry)+' · יעד Take Profit: ' + fmt(level.target) + (level.activation ? ' · הפעלת הגנת רווח: ' + fmt(level.activation) : '') + ' · נתונים מ־' + time(level.at) : level.reason;
     ui.detail.textContent = level.ok ? (level.reached ? 'לפי העדכון האחרון המחיר הגיע לסף; זו אינה אסמכתה שהמכירה בוצעה. ' : '') +
       (level.brokerStop ? 'סטופ שאומת בבורסה: ' + fmt(level.brokerStop) + '. ' : 'פקודת ההגנה בבורסה לא אומתה בעדכון זה. ') +
-      'הגדרות: סטופ '+settingText(level.stopLossPct)+'% · יעד '+settingText(level.takeProfitPct)+'% · הפעלה '+settingText(level.profitActivationPct)+'% · מרווח נגרר '+settingText(level.trailingGapPp)+(level.swingProtection?.status==='ACTIVE'?'% מהשיא/שפל · ממוצע 5 גלים':' נקודות אחוז')+'. הסף באפליקציה מתעדכן עם נתוני הבוט. העתקה ל־TradingView אינה מתעדכנת אוטומטית. שיפוע רגרסיה שלילי אינו תנאי מכירה.' : '';
+      'הגדרות: סטופ '+settingText(level.stopLossPct)+'% · יעד '+settingText(level.takeProfitPct)+'% · הפעלה '+settingText(level.profitActivationPct)+'% · מרווח נגרר '+settingText(level.trailingGapPp)+' נקודות אחוז'+'. הסף באפליקציה מתעדכן עם נתוני הבוט. העתקה ל־TradingView אינה מתעדכנת אוטומטית. שיפוע רגרסיה שלילי אינו תנאי מכירה.' : '';
   }
   function append(host, snapshot, symbol, now = Date.now()) {
     if (!host) return;
@@ -132,9 +132,9 @@
   function protectionLabel(p){
     if(!p)return 'הגנת רווח: לא מנוהלת בבוט';
     const w=p.swingProtection||p.setup?.swingProtection;
-    if(w?.status==='ACTIVE'&&positive(w.gapPct))return 'הגנת רווח: '+fmt(w.gapPct)+'% · ממוצע 5 גלים · מהשיא/שפל';
-    const gap=p.exitSettings?.trailingGapPp??p.settings?.trailingGapPp??p.trailingGapPp;
-    return 'הגנת רווח: '+(positive(gap)?fmt(gap)+' נקודות אחוז ממחיר הכניסה':'לפי ההגדרה הקיימת')+(w?.status==='FALLBACK'?' · אין 5 גלים מאושרים':' · פוזיציה קודמת');
+    if(w?.status==='ACTIVE'&&positive(w.gapPct))return 'הגנת רווח: '+fmt(w.gapPct)+'% · סף הפעלה לפי ממוצע 5 גלים';
+    const gap=p.exitSettings?.profitActivationPct??p.settings?.profitActivationPct??p.profitActivationPct;
+    return 'הגנת רווח: '+(positive(gap)?fmt(gap)+'% · סף הפעלה מההגדרות':'לפי ההגדרה הקיימת')+(w?.status==='FALLBACK'?' · אין 5 גלים מאושרים':' · פוזיציה קודמת');
   }
   global.LEVI_EXIT_SNAPSHOT = {build, render, append, protectionLabel, VERSION, MAX_AGE};
   global.setInterval?.(() => {
