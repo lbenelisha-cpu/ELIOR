@@ -1,6 +1,20 @@
 //@version=6
 indicator("LEVI · Direction + POC + Position Barriers", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=160, max_bars_back=500)
 // Visual aid only. Broker data, sessions and candle boundaries can differ.
+// Display-only simple moving averages use the selected chart symbol and timeframe.
+bool showMa20 = input.bool(true, "SMA 20", group="Moving averages")
+bool showMa50 = input.bool(true, "SMA 50", group="Moving averages")
+bool showMa100 = input.bool(true, "SMA 100", group="Moving averages")
+bool showMa200 = input.bool(true, "SMA 200", group="Moving averages")
+float ma20 = ta.sma(close, 20)
+float ma50 = ta.sma(close, 50)
+float ma100 = ta.sma(close, 100)
+float ma200 = ta.sma(close, 200)
+plot(showMa20 ? ma20 : na, "SMA 20", color=#ffc857, linewidth=2)
+plot(showMa50 ? ma50 : na, "SMA 50", color=#48d597, linewidth=2)
+plot(showMa100 ? ma100 : na, "SMA 100", color=#ed86d1, linewidth=2)
+plot(showMa200 ? ma200 : na, "SMA 200", color=#397dff, linewidth=2)
+
 int n = input.int(50, "Closed bars", minval=20, maxval=200)
 float deviations = input.float(2.0, "Regression deviations", minval=0.5, maxval=3)
 bool showRegression = input.bool(true, "Show regression (display only)")
