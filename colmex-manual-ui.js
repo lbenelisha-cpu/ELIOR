@@ -90,6 +90,7 @@ $('colmexReleaseReview').addEventListener('click',async()=>{
 $('colmexManualSell').addEventListener('click',()=>open('SELL'));
 $('colmexTradeCancel').addEventListener('click',()=>$('colmexTradeDialog').close());
 function finishUnexecuted(data){
+ if(data.status==='NOT_RECEIVED_OWNER_CONFIRMED'||data.status==='OWNER_REVIEW_RESOLVED'){say('הבירור נסגר לפי אישור בעל החשבון שהבקשה לא התקבלה אצל הברוקר. ההוראה הישנה לא נשלחה מחדש.');rememberPending(null);return true;}
  if(data.status==='REVIEW_RELEASED'){say('החסימה הגורפת הוסרה · '+(data.excludedSymbols||[data.symbol]).join(', ')+' מוחרגות מקניות · ההוראות נשארות בבירור אצל הברוקר. '+(Number.isFinite(data.availableCashAfterReservations)?'מזומן לאחר הרזרבות: $'+data.availableCashAfterReservations.toFixed(2)+'. ':'')+'קניות נוספות כפופות ליתרה, לאות חדש ולכל בדיקות המסחר.');rememberPending(null);return true;}
  if(!['REJECTED','NOT_SENT'].includes(data.status))return false;
  say((data.status==='NOT_SENT'?'ההוראה לא נשלחה לברוקר.':'הברוקר דחה את פרטי ההוראה; היא לא בוצעה.')+failureText(data));rememberPending(null);return true;
