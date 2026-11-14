@@ -36,6 +36,7 @@ async function main(){
  const stage=fs.mkdtempSync(path.join(os.tmpdir(),'levi-shared-three-'));
  try{
   fs.cpSync(path.join(runtime,'lib'),path.join(stage,'lib'),{recursive:true});
+  for(const entry of fs.readdirSync(runtime,{withFileTypes:true}))if(entry.isFile()&&(/\.m?js$/.test(entry.name)||entry.name==='package.json'))fs.copyFileSync(path.join(runtime,entry.name),path.join(stage,entry.name));
   const manifest=JSON.parse(fs.readFileSync(path.join(release,'scripts/shared-portfolio-patch.json'),'utf8')).filter(p=>p.file==='server.mjs'||p.file.startsWith('lib/'));
   // Browser assets deploy from GitHub to Netlify; the VPS retains its local static copies.
   for(const p of manifest){if(p.newFile&&!fs.existsSync(path.join(runtime,p.file)))continue;fs.mkdirSync(path.dirname(path.join(stage,p.file)),{recursive:true});fs.copyFileSync(path.join(runtime,p.file),path.join(stage,p.file));}
