@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>הגנות במניות · LEVI INVEST</title>
+  <link rel="stylesheet" href="/stock-protection.css">
+</head>
+<body>
+<main>
+  <nav aria-label="ניווט"><a href="/">מרכז המסחר</a><a data-colmex-tradingview href="https://www.tradingview.com/chart/SjakpoXv/?symbol=NASDAQ%3AAAPL&amp;interval=5&amp;trade-now=COLMEX">מניות ב־TradingView ↗</a></nav>
+  <h1>הגנות במניות</h1>
+  <section aria-labelledby="managedHeading">
+    <header><h2 id="managedHeading">פוזיציות הבוט</h2><button type="button" id="refreshManaged">רענן נתונים</button></header>
+    <p id="managedStatus" role="status">טוען את הדיווח האחרון מהבוט…</p>
+    <div id="managedPolicy"></div>
+    <div id="managedPositions"></div>
+  </section>
+  <section id="alerts" aria-labelledby="alertsHeading">
+    <header><h2 id="alertsHeading">איתותים לעסקה ידנית</h2></header>
+    <p id="inboxStatus" role="status"></p>
+    <div id="plans"></div>
+    <details id="setup"><summary>חיבור התראות</summary>
+      <p>כדי לקבל כאן את האיתות הבא, העתק את הכתובת והדבק אותה בשדה <bdi>Webhook URL</bdi> בלשונית ההתראות של התראת LEVI ב־TradingView. נדרש אימות דו־שלבי ב־TradingView.</p>
+      <form id="pairForm" hidden><label>קוד חיבור מכשיר לאפליקציה<input id="pairCode" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="off"></label><button>חבר מכשיר</button></form>
+      <button id="getWebhook" type="button">העתק כתובת להתראת TradingView</button>
+      <input id="webhookValue" type="text" readonly dir="ltr" aria-label="כתובת פרטית להעתקה" hidden>
+      <p id="setupStatus" role="status"></p>
+      <a href="/tradingview-channels.html#manual-alerts">הגדרת התראת LEVI לרשימת המניות</a>
+    </details>
+    <details><summary>הדבקת התראה קיימת</summary>
+      <form id="importForm"><label for="alertText">הודעת LEVI מיומן ההתראות ב־TradingView</label>
+        <textarea id="alertText" rows="4" maxlength="6000" required></textarea><button>הצג ושמור במכשיר</button>
+      </form>
+      <p role="status" id="importStatus"></p>
+    </details>
+  </section>
+</main>
+<script src="/tradingview-link.js?v=20261114-stock-workspace"></script>
+<script type="module" src="/stock-protection.js"></script>
+</body>
+</html>
