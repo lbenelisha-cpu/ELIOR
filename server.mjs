@@ -2280,7 +2280,7 @@ const sharedPortfolioEnabled=process.env.BINANCE_SHARED_PORTFOLIO_ENABLED==='tru
 const sharedPortfolioManager=sharedPortfolioEnabled?installSharedPortfolio({futuresShort,readSpot:getLiveAccountSnapshot,longManaged:liveManagedPositions,spotOrders:liveOrders,maxLongUsdt:LIVE_MAX_USDT}):null;
 if(sharedPortfolioManager){
  const originalBuy=placeLiveMarketBuy,originalAccount=getLiveAccountSnapshot,originalDisplay=getDisplayAccountSnapshot;
- placeLiveMarketBuy=(...args)=>sharedPortfolioManager.runLong(()=>originalBuy(...args));
+ placeLiveMarketBuy=(...args)=>sharedPortfolioManager.runLong(()=>originalBuy(...args),args[2]==='MANUAL_BUY');
  getLiveAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalAccount());
  getDisplayAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalDisplay());
 }
@@ -2540,8 +2540,8 @@ const server=http.createServer((req,res)=>{
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
       allocationPolicy:{version:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,basis:sharedPortfolioEnabled?'COMBINED_SPOT_FUTURES_EQUITY':'CURRENT_SPOT_EQUITY',maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
       sharedPortfolio:authorized?sharedPortfolioManager?.status()??null:null,
-      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:sharedPortfolioEnabled?3:2,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:'FUTURES_WALLET_HALF_V1',allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('SHORT'):null},
-      manualTrading:{version:1,maxOrderUsdt:sharedPortfolioEnabled?(authorized?sharedPortfolioManager.allocation('LONG').maxOrderUsdt:0):LIVE_MAX_USDT,maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('LONG'):null},
+      futuresManualTrading:{version:1,maxOrderUsdt:authorized?(sharedPortfolioEnabled?sharedPortfolioManager.allocation('SHORT',true):futuresShort.allocation()).maxOrderUsdt:0,maxPositions:sharedPortfolioEnabled?3:2,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:'FUTURES_WALLET_HALF_V1',allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('SHORT',true):null},
+      manualTrading:{version:1,maxOrderUsdt:sharedPortfolioEnabled?(authorized?sharedPortfolioManager.allocation('LONG',true).maxOrderUsdt:0):LIVE_MAX_USDT,maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('LONG',true):null},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
       demoTradingError:authorized?demoTrader.error:null,

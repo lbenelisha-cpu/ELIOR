@@ -71,3 +71,26 @@ test('actual futures entry gate allows a third SHORT when no LONG uses its place
  f.state.positions.BTCUSDT={algos:[],protectedAt:at};await manager.refresh(true);
  await assert.rejects(FuturesShortRunner.prototype.entryGate.call(f),/SLOTS_FULL/);
 });
+
+test('manual amounts use available cash under the third while automatic allocation stays full-sized',()=>{
+ const s=state();s.equityUsdt=381.58;s.grossSlotUsdt=127.19;s.futuresAvailableUsdt=86.17;s.spotAvailableUsdt=60;
+ assert.equal(sharedAllocation(s,'SHORT',{now:at}).code,'SHARED_WALLET_FUNDS_REQUIRED');
+ const a=sharedAllocation(s,'SHORT',{now:at,manual:true});assert.equal(a.ok,true);assert.equal(a.maxOrderUsdt,86.17);assert.equal(a.slotBudgetUsdt,127.19);assert.equal(a.missingUsdt,0);
+ const b=sharedAllocation(s,'LONG',{now:at,manual:true});assert.equal(b.maxOrderUsdt,59.88);assert(b.maxOrderUsdt*1.002<=60);
+ for(const side of ['LONG','SHORT']){
+  assert.equal(sharedAllocation({...s,pending:true},side,{now:at,manual:true}).ok,false);
+  assert.equal(sharedAllocation({...s,freeSlots:0},side,{now:at,manual:true}).ok,false);
+  assert.equal(sharedAllocation(s,side,{now:at+15000,manual:true}).ok,false);
+ }
+});
+test('manual entry gate and final submit accept 60 with 86.17 available; decline a later balance drop',async()=>{
+ const {FuturesShortRunner}=await import('../lib/futures-short-runner.mjs');
+ let available=86.17,posts=0;
+ const f={config:{enabled:true},state:{positions:{},pending:null},control:()=>({allowEntries:true}),permission:async()=>({enableFutures:true,ipRestrict:true}),now:()=>at,assertAccount:()=>{},snapshot:async()=>({}),submit:async()=>{posts++;},api:{get:async url=>url==='/fapi/v2/account'?{...futures(),assets:[{asset:'USDT',walletBalance:'86.17',unrealizedProfit:'0',availableBalance:String(available)}]}:[]}};
+ const manager=installSharedPortfolio({futuresShort:f,readSpot:async()=>({...spot(),totalValueUsdt:295.41,balances:[]}),longManaged:()=>({}),spotOrders:{pending:null,submit:async()=>{}},maxLongUsdt:400,now:()=>at});
+ await assert.rejects(FuturesShortRunner.prototype.entryGate.call(f),/WALLET_FUNDS_REQUIRED/);
+ await FuturesShortRunner.prototype.entryGate.call(f,60);
+ await f.submit('ENTRY',{}, {slotBudgetUsdt:60});assert.equal(posts,1);
+ available=59;await assert.rejects(f.submit('ENTRY',{}, {slotBudgetUsdt:60}),/EXCEEDS_THIRD/);assert.equal(posts,1);
+ available=200;await manager.refresh(true);assert.throws(()=>f.assertAllocation(128),/EXCEEDS_THIRD/);
+});
