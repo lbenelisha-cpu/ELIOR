@@ -48,3 +48,16 @@ test('SHORT displays the settings policy only after the server reports it',()=>{
  x.shortTrading.closed=[{symbol:'ABCUSDT',entryAt:now-1000,closedAt:now,entryPrice:100,reason:'SETTINGS_TAKE_PROFIT'}];
  const html=view(x,now);assert.match(html,/יעד התעלה אינו סוגר SHORT/);assert.match(html,/יעד רווח לפי הגדרות האפליקציה/);
 });
+
+test('closed SHORT shows archived prices and order statuses without inferring a fill or using current settings',()=>{
+ const x=structuredClone(snapshot);
+ x.shortTrading.closed=[{symbol:'XYZUSDT',entryPrice:10,entryAt:now-9000,closedAt:now,
+  targetPrice:7.59999,stopPrice:10.12,algos:[
+   {kind:'TAKE_PROFIT_MARKET',price:7.6,status:'CANCELED'},{kind:'STOP_MARKET',price:10.12,status:'FINISHED'}
+  ]}];
+ const section=()=>view(x,now).split('data-short-detail="closed"')[1];
+ assert.match(section(),/תכנון אחרון: 7\.59999<br>טריגר בהוראה: 7\.6 · CANCELED/);
+ assert.match(section(),/תכנון אחרון: 10\.12<br>טריגר בהוראה: 10\.12 · FINISHED/);
+ x.shortTrading.closed=[{symbol:'XYZUSDT',entryPrice:10,entryAt:now-9000,closedAt:now}];
+ assert.match(section(),/תכנון אחרון: לא תועד<br>אין תיעוד הוראה/);
+});

@@ -15,6 +15,17 @@
   const url=root.LEVI_TRADINGVIEW_URL?.(contract)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(contract)+'&interval=5';
   return '<br><a class="tradingview-link short-chart-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף Futures של '+esc(symbol)+' ב־TradingView">גרף ↗</a>'+(globalThis.LEVI_ASSET_CHART?.actions(symbol,'FUTURES')||'');
  }
+ function closedProtection(position,kind,planned){
+  const priceText=value=>number(value)&&Number(value)>0?format(value,10):'לא תועד';
+  const rows=['תכנון אחרון: '+priceText(planned)];
+  const orders=Array.isArray(position.algos)?position.algos.filter(order=>order?.kind===kind):[];
+  for(const order of orders){
+   const status=order.status?esc(order.status):'לא תועד';
+   rows.push('טריגר בהוראה: '+priceText(order.price)+' · '+status);
+  }
+  if(!orders.length)rows.push('אין תיעוד הוראה');
+  return rows.join('<br>');
+ }
  function view(snapshot,now=Date.now()){
   const f=snapshot?.shortTrading;
   const title='<div class="panel-title-row"><h2>פוזיציות פעילות · SHORT Futures</h2></div>';
@@ -71,9 +82,12 @@
   if(!checks.length)html+='<tr><td colspan="3">טרם התקבלו תוצאות סריקה. אין בכך אישור שאין מועמדים.</td></tr>';
   html+='</tbody></table></div></details>';
   const closed=Array.isArray(f.closed)?f.closed:[];
-  html+='<details data-short-detail="closed"><summary>סגירות SHORT אחרונות · '+closed.length+'</summary><p class="mini">מועד הסגירה הוא מועד הזיהוי בשרת. מחיר מילוי הסגירה ורווח ממומש אינם כלולים בנתונים אלה.</p><div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס</th><th>כניסה</th><th>סגירה זוהתה</th><th>מחיר כניסה</th><th>סיבה מתועדת</th></tr></thead><tbody>';
-  for(const p of [...closed].reverse())html+='<tr><td>'+esc(p.symbol)+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+esc(time(p.closedAt))+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+esc(reason(p.reason))+'</td></tr>';
-  if(!closed.length)html+='<tr><td colspan="5">אין סגירות מתועדות בנתונים שהתקבלו.</td></tr>';
+  html+='<details data-short-detail="closed"><summary>סגירות SHORT אחרונות · '+closed.length+'</summary><p class="mini">מועד הסגירה הוא מועד הזיהוי בשרת. מחיר מילוי הסגירה ורווח ממומש אינם כלולים בנתונים אלה. סטטוס ההוראה מתייחס לרישום האחרון. אימות ביצוע מחייב התאמה למילוי בבורסה.</p><div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table"><thead><tr><th>נכס</th><th>כניסה</th><th>סגירה זוהתה</th><th>מחיר כניסה</th><th>סיבה מתועדת</th><th>יעד רווח (TP) · USDT</th><th>סטופ (SL) · USDT</th></tr></thead><tbody>';
+  for(const p of [...closed].reverse()){
+   html+='<tr><td>'+esc(p.symbol)+chartLink(p.symbol)+'</td><td>'+esc(time(p.entryAt))+'</td><td>'+esc(time(p.closedAt))+'</td><td>'+format(p.entryPrice,8)+'</td><td>'+esc(reason(p.reason))+'</td>';
+   html+='<td>'+closedProtection(p,'TAKE_PROFIT_MARKET',p.targetPrice)+'</td><td>'+closedProtection(p,'STOP_MARKET',p.stopPrice)+'</td></tr>';
+  }
+  if(!closed.length)html+='<tr><td colspan="7">אין סגירות מתועדות בנתונים שהתקבלו.</td></tr>';
   html+='</tbody></table></div></details>';
   return html;
  }
