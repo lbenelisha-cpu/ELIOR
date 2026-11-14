@@ -6,10 +6,10 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const release=path.resolve(here,'..');
-export function patchSharedPortfolio(runtime,source=release){
+export function patchSharedPortfolio(runtime,source=release,{backendOnly=false}={}){
  const manifest=JSON.parse(fs.readFileSync(path.join(source,'scripts/shared-portfolio-patch.json'),'utf8'));
  const plan=[];
- for(const item of manifest){
+ for(const item of manifest.filter(p=>!backendOnly||p.file==='server.mjs'||p.file.startsWith('lib/'))){
   const target=path.join(runtime,item.file),present=fs.existsSync(target),original=present?fs.readFileSync(target,'utf8'):null;
   let result=original;
   if(item.newFile){const expected=fs.readFileSync(path.join(source,item.file),'utf8');if(present&&original!==expected)throw Error('Unrecognized existing '+item.file);result=expected;}
@@ -36,9 +36,10 @@ async function main(){
  const stage=fs.mkdtempSync(path.join(os.tmpdir(),'levi-shared-three-'));
  try{
   fs.cpSync(path.join(runtime,'lib'),path.join(stage,'lib'),{recursive:true});
-  const manifest=JSON.parse(fs.readFileSync(path.join(release,'scripts/shared-portfolio-patch.json'),'utf8'));
+  const manifest=JSON.parse(fs.readFileSync(path.join(release,'scripts/shared-portfolio-patch.json'),'utf8')).filter(p=>p.file==='server.mjs'||p.file.startsWith('lib/'));
+  // Browser assets deploy from GitHub to Netlify; the VPS retains its local static copies.
   for(const p of manifest){if(p.newFile&&!fs.existsSync(path.join(runtime,p.file)))continue;fs.mkdirSync(path.dirname(path.join(stage,p.file)),{recursive:true});fs.copyFileSync(path.join(runtime,p.file),path.join(stage,p.file));}
-  const plan=patchSharedPortfolio(stage);
+  const plan=patchSharedPortfolio(stage,release,{backendOnly:true});
   fs.mkdirSync(path.join(stage,'tests'));fs.copyFileSync(path.join(release,'tests/shared-portfolio.test.mjs'),path.join(stage,'tests/shared-portfolio.test.mjs'));
   for(const p of plan)run(process.execPath,['--check',path.join(stage,p.file)]);
   run(process.execPath,['--test',path.join(stage,'tests/shared-portfolio.test.mjs')]);
