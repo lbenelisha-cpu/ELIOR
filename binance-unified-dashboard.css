@@ -122,3 +122,31 @@ body.integrated-live-ready .overview>.overview-metrics>.combined-position-slots:
 .combined-position-slots .position-slot-half>small{font-size:11px;color:#9db6c3}
 body.unified-dashboard #futuresPositionsPanel .overview-metrics>.metric-card:nth-child(4){display:none}
 body.integrated-live-ready #futuresPositionsPanel .overview-metrics{display:none}
+
+
+/* Light, high-contrast controls across the Binance app. */
+body.portfolio-terminal button,
+body.portfolio-terminal input[type="button"],
+body.portfolio-terminal input[type="submit"],
+body.portfolio-terminal [role="button"],
+body.portfolio-terminal .platform-switch {
+  background: #edf3ef !important;
+  border-color: #c9d4cd !important;
+  color: #263b31 !important;
+  box-shadow: none !important;
+}
+body.portfolio-terminal button:hover:not(:disabled),
+body.portfolio-terminal input[type="button"]:hover,
+body.portfolio-terminal input[type="submit"]:hover,
+body.portfolio-terminal [role="button"]:hover,
+body.portfolio-terminal .platform-switch:hover {
+  background: #e2ece5 !important;
+}
+body.portfolio-terminal button:disabled,
+body.portfolio-terminal input:disabled { background: #f0f2f0 !important; color: #87918b !important; }
+body.portfolio-terminal button.active,
+body.portfolio-terminal button[aria-pressed="true"],
+body.portfolio-terminal .nav-pill.active { background: #dfece3 !important; color: #245d43 !important; border-color: #bdd2c3 !important; }
+body.portfolio-terminal :is(#manualBuyBtn,#binanceManualBuy,#colmexQuickBuy,.buy,.buy-btn,.long-buy,[data-side="BUY"]) { background: #e5f3e9 !important; border-color: #bfd9c7 !important; color: #28664d !important; }
+body.portfolio-terminal :is(#manualSellBtn,#binanceManualSell,#colmexQuickSell,.sell,.sell-btn,.short-sell,[data-side="SELL"]) { background: #faeaec !important; border-color: #e5c5ca !important; color: #a34550 !important; }
+body.portfolio-terminal :is(.danger,.danger-btn,.cancel,.cancel-btn) { background: #faeaec !important; border-color: #e5c5ca !important; color: #963d49 !important; }
