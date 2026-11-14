@@ -32,3 +32,15 @@ body[data-mode] .platform-tabs [aria-current] { background: #dfece3 !important; 
 body[data-mode] :is(#colmexQuickBuy,#colmexManualBuy,.buy,.buy-btn,.long-buy,[data-side="BUY"]) { background: #e5f3e9 !important; border-color: #bfd9c7 !important; color: #28664d !important; }
 body[data-mode] :is(#colmexQuickSell,#colmexManualSell,.sell,.sell-btn,.short-sell,[data-side="SELL"]) { background: #faeaec !important; border-color: #e5c5ca !important; color: #a34550 !important; }
 body[data-mode] :is(.danger,.danger-btn,.cancel,.cancel-btn) { background: #faeaec !important; border-color: #e5c5ca !important; color: #963d49 !important; }
+
+
+/* Menu and disclosure headers should not retain the old dark button fill. */
+body[data-mode] summary,
+body[data-mode] .colmex-menu > summary,
+body[data-mode] .colmex-disclosure > summary {
+  background: #f7f8f6 !important;
+  border-color: #dce2de !important;
+  color: #263b31 !important;
+}
+body[data-mode] summary:hover { background: #edf3ef !important; }
+body[data-mode] summary:focus-visible { outline-color: #28664d !important; }
