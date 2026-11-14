@@ -124,46 +124,152 @@ body.unified-dashboard #futuresPositionsPanel .overview-metrics>.metric-card:nth
 body.integrated-live-ready #futuresPositionsPanel .overview-metrics{display:none}
 
 
-/* Light, high-contrast controls across the Binance app. */
-body.portfolio-terminal button,
-body.portfolio-terminal input[type="button"],
-body.portfolio-terminal input[type="submit"],
-body.portfolio-terminal [role="button"],
-body.portfolio-terminal .platform-switch {
-  background: #edf3ef !important;
-  border-color: #c9d4cd !important;
-  color: #263b31 !important;
+/* Shared action controls; chart annotations retain their plot coordinates. */
+body.portfolio-terminal {
+  --action-fill: #e3edf7;
+  --action-hover: #d2e4f4;
+  --action-edge: #50708d;
+  --action-ink: #173d5c;
+}
+
+body.portfolio-terminal :is(
+  button:not(:where(.position-candle-hit, .position-point, .wyckoff-pivot, .wyckoff-occurrence, .chart-rise-label)),
+  input[type="button"], input[type="submit"], input[type="reset"], [role="button"],
+  a.text-action, a.asset-chart-link, a.tradingview-link, a.platform-switch, .platform-tabs a,
+  summary
+) {
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--action-edge) !important;
+  border-radius: 9px;
+  background: var(--action-fill) !important;
+  color: var(--action-ink) !important;
+  box-shadow: 0 1px 2px rgb(22 52 71 / 14%) !important;
+  font-family: inherit;
+  font-size: .875rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+body.portfolio-terminal :is(.platform-tabs a, a.platform-switch, a.tradingview-link, a.text-action):not([hidden]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Selected tools and navigation have a second cue in addition to color. */
+body.portfolio-terminal :is(button.active, button[aria-pressed="true"], .platform-tabs [aria-current="page"]) {
+  --action-fill: #cee4f5;
+  --action-hover: #bfd9ed;
+  --action-edge: #365f80;
+  --action-ink: #143650;
+  box-shadow: inset 0 -3px var(--action-edge) !important;
+}
+
+body.portfolio-terminal :is(#manualBuyBtn, #manualShortOpenBtn, .buy, .buy-btn, .long-buy, [data-side="BUY"]):not(:disabled) {
+  --action-fill: #dbefdf;
+  --action-hover: #cbe5d2;
+  --action-edge: #52755d;
+  --action-ink: #164b32;
+}
+
+body.portfolio-terminal :is(#manualSellBtn, #manualShortCloseBtn, .sell, .sell-btn, .short-sell, [data-side="SELL"], .danger, .danger-btn, .cancel, .cancel-btn):not(:disabled) {
+  --action-fill: #f9e6e8;
+  --action-hover: #f4d6da;
+  --action-edge: #99626a;
+  --action-ink: #792f3c;
+}
+
+/* Keep disclosure arrows and the existing flex or list-item layout. */
+body.portfolio-terminal details > summary {
+  --action-fill: #f0f4f6;
+  --action-hover: #e3ecf1;
+  --action-edge: #778791;
+  --action-ink: #263e49;
+  padding: 10px 12px;
+}
+body.portfolio-terminal .dashboard-fold > summary {
+  padding: 12px 16px;
+}
+body.portfolio-terminal .dashboard-fold > summary .fold-icon {
+  color: #25495f;
+  background: #dce8ef;
+}
+body.portfolio-terminal .dashboard-fold > summary :is(small, .fold-state) {
+  color: #475e69;
+}
+
+@media (hover: hover) {
+  body.portfolio-terminal :is(button:not(:where(.chart-wrap *, .chart-move-lane *)), input:is([type="button"], [type="submit"], [type="reset"]), [role="button"], a.text-action, a.asset-chart-link, a.tradingview-link, a.platform-switch, .platform-tabs a, summary):not(:disabled, [aria-disabled="true"]):hover {
+    background: var(--action-hover) !important;
+  }
+}
+body.portfolio-terminal :is(button, input, [role="button"], a, summary):focus-visible {
+  outline: 3px solid #285d86;
+  outline-offset: 2px;
+}
+body.portfolio-terminal :is(button, input:is([type="button"], [type="submit"], [type="reset"]), [role="button"]):is(:disabled, [aria-disabled="true"]) {
+  --action-fill: #eff2f3;
+  --action-ink: #56636b;
+  --action-edge: #7d8991;
+  box-shadow: none !important;
+  border-style: dashed !important;
+  opacity: 1;
+  cursor: default;
+}
+
+body.portfolio-terminal button.position-candle-hit {
+  background: transparent !important;
+  border: 0 !important;
   box-shadow: none !important;
 }
-body.portfolio-terminal button:hover:not(:disabled),
-body.portfolio-terminal input[type="button"]:hover,
-body.portfolio-terminal input[type="submit"]:hover,
-body.portfolio-terminal [role="button"]:hover,
-body.portfolio-terminal .platform-switch:hover {
-  background: #e2ece5 !important;
-}
-body.portfolio-terminal button:disabled,
-body.portfolio-terminal input:disabled { background: #f0f2f0 !important; color: #87918b !important; }
-body.portfolio-terminal button.active,
-body.portfolio-terminal button[aria-pressed="true"],
-body.portfolio-terminal .nav-pill.active { background: #dfece3 !important; color: #245d43 !important; border-color: #bdd2c3 !important; }
-body.portfolio-terminal :is(#manualBuyBtn,#binanceManualBuy,#colmexQuickBuy,.buy,.buy-btn,.long-buy,[data-side="BUY"]) { background: #e5f3e9 !important; border-color: #bfd9c7 !important; color: #28664d !important; }
-body.portfolio-terminal :is(#manualSellBtn,#binanceManualSell,#colmexQuickSell,.sell,.sell-btn,.short-sell,[data-side="SELL"]) { background: #faeaec !important; border-color: #e5c5ca !important; color: #a34550 !important; }
-body.portfolio-terminal :is(.danger,.danger-btn,.cancel,.cancel-btn) { background: #faeaec !important; border-color: #e5c5ca !important; color: #963d49 !important; }
 
-
-/* Accordion and menu headers are interactive controls too. */
-body.portfolio-terminal summary,
-body.portfolio-terminal .dashboard-menu > summary,
-body.portfolio-terminal .dashboard-fold > summary,
-body.portfolio-terminal .chart-menu > summary,
-body.portfolio-terminal .account-menu > summary {
-  background: #f7f8f6 !important;
-  border-color: #dce2de !important;
-  color: #263b31 !important;
+/* Label and icon share one hit target. Allow the heading to wrap on small screens. */
+#binanceEquityPanel .equity-head {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
-body.portfolio-terminal summary:hover { background: #edf3ef !important; }
-body.portfolio-terminal summary:focus-visible { outline-color: #28664d !important; }
+#binanceEquityPanel .equity-head > div {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+#binanceEquityPanel .equity-refresh {
+  flex: 0 0 auto;
+}
+body.portfolio-terminal :is(.equity-refresh, .live-monitor-refresh):not([hidden]) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+body.portfolio-terminal :is(.equity-refresh, .live-monitor-refresh)::before {
+  content: "";
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  background: currentColor;
+  --refresh-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5'/%3E%3C/svg%3E");
+  -webkit-mask: var(--refresh-icon) center / contain no-repeat;
+  mask: var(--refresh-icon) center / contain no-repeat;
+}
+
+@media (max-width: 700px) {
+  body.portfolio-terminal .topnav .nav-pill {
+    min-width: 0;
+    padding: 6px 2px;
+    white-space: normal;
+    font-size: .8125rem;
+  }
+}
 
 /* Account overview and live balances, including the compact account monitor. */
 .portfolio-terminal #overviewUpdated {

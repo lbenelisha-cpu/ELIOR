@@ -11,7 +11,7 @@ export function equitySegments(points,maxGap=150000){
 export function createEquityPanel(host,{read,now=Date.now}){
  let data=null,mode=null,busy=false,generation=0,lastAttempt=-Infinity,selected=0,valid=[];
  const head=el('div',null,'equity-head'),intro=el('div');intro.append(el('span','BINANCE SPOT · USDT','equity-eyebrow'),el('h2','שווי התיק לאורך היום'),el('p','מזומן, מטבעות ויתרות נעולות · לפי שעון ישראל'));
- const refresh=el('button','רענן','text-action');refresh.type='button';head.append(intro,refresh);
+ const refresh=el('button','רענון שווי התיק','text-action equity-refresh');refresh.type='button';head.append(intro,refresh);
  const status=el('p','חבר את המכשיר כדי לצפות בשווי התיק.','equity-status');status.setAttribute('role','status');
  const stats=el('div',null,'equity-stats'),fold=el('details',null,'equity-fold');fold.open=true;fold.append(el('summary','גרף השווי · פתיחה / סגירה'));
  const chart=el('div',null,'equity-chart'),selection=el('output',null,'equity-selection'),range=el('input');range.type='range';range.min='0';range.step='1';range.setAttribute('aria-label','בחר זמן מדידה בגרף');range.dir='ltr';
