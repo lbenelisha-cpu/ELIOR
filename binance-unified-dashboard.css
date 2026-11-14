@@ -126,6 +126,8 @@ body.integrated-live-ready #futuresPositionsPanel .overview-metrics{display:none
 
 /* Shared action controls; chart annotations retain their plot coordinates. */
 body.portfolio-terminal {
+  --action-label-size: .8125rem;
+  --action-padding-inline: 10px;
   --action-fill: #e3edf7;
   --action-hover: #d2e4f4;
   --action-edge: #50708d;
@@ -141,14 +143,14 @@ body.portfolio-terminal :is(
   box-sizing: border-box;
   min-height: 44px;
   min-width: 44px;
-  padding: 8px 12px;
+  padding: 8px var(--action-padding-inline);
   border: 1px solid var(--action-edge) !important;
   border-radius: 9px;
   background: var(--action-fill) !important;
   color: var(--action-ink) !important;
   box-shadow: 0 1px 2px rgb(22 52 71 / 14%) !important;
   font-family: inherit;
-  font-size: .875rem;
+  font-size: var(--action-label-size);
   font-weight: 650;
   line-height: 1.35;
   text-decoration: none;
@@ -191,6 +193,7 @@ body.portfolio-terminal details > summary {
   --action-edge: #778791;
   --action-ink: #263e49;
   padding: 10px 12px;
+  font-size: .875rem;
 }
 body.portfolio-terminal .dashboard-fold > summary {
   padding: 12px 16px;
@@ -239,17 +242,20 @@ body.portfolio-terminal button.position-candle-hit {
   min-width: 0;
 }
 #binanceEquityPanel .equity-refresh {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 body.portfolio-terminal :is(.equity-refresh, .live-monitor-refresh):not([hidden]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 9px 14px;
-  font-size: 1rem;
+  max-inline-size: 100%;
+  gap: .35em;
+  padding: 6px var(--action-padding-inline);
+  font-size: var(--action-label-size);
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 body.portfolio-terminal :is(.equity-refresh, .live-monitor-refresh)::before {
   content: "";
@@ -263,11 +269,15 @@ body.portfolio-terminal :is(.equity-refresh, .live-monitor-refresh)::before {
 }
 
 @media (max-width: 700px) {
+  body.portfolio-terminal {
+    --action-label-size: .75rem;
+    --action-padding-inline: 6px;
+  }
   body.portfolio-terminal .topnav .nav-pill {
     min-width: 0;
     padding: 6px 2px;
     white-space: normal;
-    font-size: .8125rem;
+    font-size: var(--action-label-size);
   }
 }
 
