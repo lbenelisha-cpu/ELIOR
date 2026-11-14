@@ -150,3 +150,17 @@ body.portfolio-terminal .nav-pill.active { background: #dfece3 !important; color
 body.portfolio-terminal :is(#manualBuyBtn,#binanceManualBuy,#colmexQuickBuy,.buy,.buy-btn,.long-buy,[data-side="BUY"]) { background: #e5f3e9 !important; border-color: #bfd9c7 !important; color: #28664d !important; }
 body.portfolio-terminal :is(#manualSellBtn,#binanceManualSell,#colmexQuickSell,.sell,.sell-btn,.short-sell,[data-side="SELL"]) { background: #faeaec !important; border-color: #e5c5ca !important; color: #a34550 !important; }
 body.portfolio-terminal :is(.danger,.danger-btn,.cancel,.cancel-btn) { background: #faeaec !important; border-color: #e5c5ca !important; color: #963d49 !important; }
+
+
+/* Accordion and menu headers are interactive controls too. */
+body.portfolio-terminal summary,
+body.portfolio-terminal .dashboard-menu > summary,
+body.portfolio-terminal .dashboard-fold > summary,
+body.portfolio-terminal .chart-menu > summary,
+body.portfolio-terminal .account-menu > summary {
+  background: #f7f8f6 !important;
+  border-color: #dce2de !important;
+  color: #263b31 !important;
+}
+body.portfolio-terminal summary:hover { background: #edf3ef !important; }
+body.portfolio-terminal summary:focus-visible { outline-color: #28664d !important; }
