@@ -4,11 +4,25 @@ const POLICY = 'BINANCE_CHANNEL_POC_RETEST_V2';
 const entryKey = (symbol, at) => symbol + '|' + at;
 const isCohort = row => row?.entryMode === 'channel_breakout' && row.entryPolicyVersion === POLICY;
 const positive = n => Number.isFinite(n) && n > 0;
+const trailStopReason = /^TRAIL_STOP_LOSS_\d+(?:\.\d+)?_PERCENT$/;
+const brokerProfitReason = /^BROKER_TAKE_PROFIT_-?\d+(?:\.\d+)?_PERCENT$/;
+const wyckoffExitReason = /^WYCKOFF_(?:STOP_LOSS|TRAILING)_\d+(?:_\d+)?_PERCENT$/;
+const automaticReasons = new Set([
+  'BROKER_STOP_LOSS', 'TRAILING_PROFIT_EXIT', 'FIXED_STOP_LOSS_1_PERCENT', 'FIXED_TAKE_PROFIT_4_PERCENT',
+  'WYCKOFF_SPRING_STOP_LOSS_10_PERCENT', 'WYCKOFF_GAIN_GIVEBACK_20_PERCENT', 'PROFIT_FLOOR4_TRAIL1PP_EXIT'
+]);
 const timeOf = at => typeof at === 'number' ? at : typeof at === 'string' ? Date.parse(at) : NaN;
 const mean = (rows, field) => rows.length ? rows.reduce((sum, row) => sum + row[field], 0) / rows.length : null;
 
 function groupStats(rows) {
   return { count: rows.length, avgCost: mean(rows, 'cost'), avgReturnPct: mean(rows, 'returnPct'), avgNet: mean(rows, 'net') };
+}
+
+function exitHandling(legs) {
+  if (legs.some(({reason}) => reason === 'MANUAL_SELL' || reason === 'MANUAL_STOP_ALL')) return 'manual';
+  const allAutomatic = legs.every(({reason}) => automaticReasons.has(reason) || brokerProfitReason.test(reason)
+    || trailStopReason.test(reason) || wyckoffExitReason.test(reason));
+  return allAutomatic ? 'automatic' : 'unknown';
 }
 
 function waveState(buy, final) {
@@ -29,7 +43,7 @@ function waveState(buy, final) {
     observed.peakPrice = position.peakPrice;
   }
   const crossed = observed.peakPrice !== null && observed.peakPrice >= observed.activationPrice;
-  const explicitUnarmed = /^TRAIL_STOP_LOSS_\d+(?:\.\d+)?_PERCENT$/.test(final.reason);
+  const explicitUnarmed = trailStopReason.test(final.reason);
   if (explicitUnarmed && (crossed || position.profitFloorArmed === true)) {
     return { ...observed, waveEvidence: 'CONFLICTING_EVIDENCE' };
   }
@@ -69,7 +83,7 @@ export function spotPocDiagnostics(log) {
     const cost = verified ? legs.reduce((sum, leg) => sum + leg.costUsdt, 0) : null;
     const net = verified ? legs.reduce((sum, leg) => sum + leg.netPnlUsdt, 0) : null;
     trades.push({
-      symbol: final.symbol, entryAt: final.entryAt, exitAt: final.at,
+      symbol: final.symbol, entryAt: final.entryAt, exitAt: final.at, exitHandling: exitHandling(legs),
       cost, net, returnPct: verified ? 100 * net / cost : null, reason: final.reason || null,
       ...waveState(buys.get(key), final)
     });

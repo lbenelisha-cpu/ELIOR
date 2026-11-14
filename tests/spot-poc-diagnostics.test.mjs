@@ -52,11 +52,26 @@ test('uses fully closed POC V2 Spot positions; weights partial sell costs before
   assert.equal(result.counts.verified, 3);
   assert.deepEqual([result.counts.wins, result.counts.losses, result.counts.flat], [1, 1, 1]);
   const loss = result.trades.find(x => x.symbol === 'SOLUSDT');
+  assert.equal(loss.exitHandling, 'manual');
   assert.equal(loss.reason, 'TRAIL_STOP_LOSS_1_PERCENT');
   assert.equal(loss.cost, 100);
   assert.ok(Math.abs(loss.returnPct + 0.8) < 1e-9);
   assert.equal(result.winners.avgReturnPct, 2);
   assert.equal(result.winners.avgCost, 25);
+});
+
+test('classifies exit handling from all legs, preserving manual intervention and ambiguous provenance', () => {
+  const automatic = ['BROKER_STOP_LOSS', 'TRAILING_PROFIT_EXIT', 'TRAIL_STOP_LOSS_0.5_PERCENT',
+    'BROKER_TAKE_PROFIT_1.25_PERCENT', 'BROKER_TAKE_PROFIT_-0.125_PERCENT', 'WYCKOFF_STOP_LOSS_0_5_PERCENT'];
+  for (const reason of automatic) {
+    assert.equal(report([sell('SOLUSDT', {reason})]).trades[0].exitHandling, 'automatic');
+  }
+  for (const reason of [null, 'SELL', 'BROKER_OR_EXTERNAL_CLOSE', 'BROKER_TAKE_PROFIT_fault_PERCENT']) {
+    const partial = sell('SOLUSDT', {at: peakAt, closed: false, reason});
+    assert.equal(report([sell('SOLUSDT'), partial]).trades[0].exitHandling, 'unknown');
+    assert.equal(report([sell('SOLUSDT', {reason:'MANUAL_SELL'}), partial]).trades[0].exitHandling, 'manual');
+  }
+  assert.equal(report([sell('SOLUSDT', {reason:'MANUAL_STOP_ALL'})]).trades[0].exitHandling, 'manual');
 });
 
 test('incomplete partial-leg fees never contribute to win/loss or normalized returns', () => {

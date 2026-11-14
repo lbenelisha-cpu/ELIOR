@@ -1,6 +1,7 @@
 import { spotPocDiagnostics } from './spot-poc-diagnostics.mjs';
 
-const amount = new Intl.NumberFormat('he-IL', { maximumSignificantDigits: 6 });
+const amount = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 2 });
+const pnl = new Intl.NumberFormat('he-IL', { minimumFractionDigits: 3, maximumFractionDigits: 4 });
 const price = new Intl.NumberFormat('he-IL', { maximumSignificantDigits: 12 });
 const dateTime = new Intl.DateTimeFormat('he-IL', {
   timeZone: 'Asia/Jerusalem', dateStyle: 'short', timeStyle: 'short'
@@ -45,11 +46,14 @@ function makeTable(doc, label, headings, rows) {
 }
 
 function outcomeRow(title, stats) {
-  return [title, stats.count, format(stats.avgCost), format(stats.avgReturnPct, '%'), format(stats.avgNet)];
+  return [title, stats.count, format(stats.avgCost), format(stats.avgReturnPct, '%'), format(stats.avgNet, '', pnl)];
 }
 
 function reasonText(reason, view) {
   if (!reason) return 'לא תועדה';
+  if (reason === 'MANUAL_SELL') return 'מכירה ידנית';
+  const target = /^BROKER_TAKE_PROFIT_(\d+(?:\.\d+)?)_PERCENT$/.exec(reason);
+  if (target) return `מימוש יעד רווח של ${target[1]}% אצל הברוקר`;
   if (typeof view?.decisionReasonLabel === 'function') return view.decisionReasonLabel(reason);
   return reason;
 }
@@ -58,7 +62,7 @@ function tradeRow(trade, view) {
   const threshold = Number.isFinite(trade.activationPrice)
     ? `${format(trade.activationPrice, '', price)} (${format(trade.activationPct, '%')})`
     : 'לא ידוע';
-  return [trade.symbol, dateTime.format(new Date(trade.exitAt)), format(trade.cost), format(trade.net),
+  return [trade.symbol, dateTime.format(new Date(trade.exitAt)), format(trade.cost), format(trade.net, '', pnl),
     format(trade.returnPct, '%'), reasonText(trade.reason, view), waveLabel[trade.wave], threshold];
 }
 
@@ -84,7 +88,15 @@ export function renderSpotPocReview(host, log, mode) {
   const { counts, winners, losers, trades } = report;
   const totals = doc.createElement('p');
   const rate = counts.verified ? `${format(100 * counts.wins / counts.verified, '%')} הצלחה מתוך ${counts.verified} עם נתוני נטו מלאים` : 'אין נתוני נטו מלאים';
-  totals.textContent = `${counts.closed} פוזיציות סגורות · ${rate} · ${counts.flat} באיזון · ${counts.unknown} עם נתוני עלות או עמלות חסרים`;
+  totals.textContent = `כניסות בשיטת הבוט · ${counts.closed} פוזיציות סגורות · ${rate} · ${counts.flat} באיזון · ${counts.unknown} עם נתוני עלות או עמלות חסרים`;
+  const exitTypes = [['automatic', 'יציאות אוטומטיות בלבד'], ['manual', 'כולל יציאה ידנית'], ['unknown', 'אופן יציאה לא ידוע']];
+  const handling = doc.createElement('p');
+  handling.textContent = exitTypes.map(([type, label]) => {
+    const group = trades.filter(t => Number.isFinite(t.net) && (t.exitHandling || 'unknown') === type);
+    if (!group.length) return `${label} — אין עסקאות מאומתות`;
+    const wins = group.filter(t => t.net > 0).length;
+    return `${label} — ${wins} מתוך ${group.length} ברווח (${format(100 * wins / group.length, '%')})`;
+  }).join(' · ');
   const results = makeTable(doc, 'השוואת פוזיציות ברווח ובהפסד לפי תוצאה נטו',
     ['תוצאה נטו', 'פוזיציות', 'עלות ממוצעת של הכמות שנמכרה (USDT)', 'תשואה ממוצעת', 'רווח / הפסד ממוצע (USDT)'],
     [outcomeRow('רווח', winners), outcomeRow('הפסד', losers)]);
@@ -95,7 +107,7 @@ export function renderSpotPocReview(host, log, mode) {
   waves.textContent = losses.length
     ? `הגנת הגלים ב־${losses.length} פוזיציות שנסגרו בהפסד נטו · הופעלה ${waveCounts.armed} · סף הגלים נחצה וההפעלה לא אומתה ${waveCounts.threshold_reached} · לא הופעלה לפי תיעוד הבוט ${waveCounts.not_armed} · לא ידוע ${waveCounts.unknown}`
     : 'אין פוזיציות בהפסד נטו מאומת לבדיקת הגנת הגלים.';
-  summary.replaceChildren(totals, results, waves);
+  summary.replaceChildren(totals, handling, results, waves);
   const table = makeTable(doc, 'פירוט פוזיציות סגורות בשיטת POC V2',
     ['נכס', 'יציאה (שעון ישראל)', 'עלות הכמות שנמכרה (USDT)', 'רווח / הפסד נטו (USDT)', 'תשואה נטו', 'סיבת יציאה', 'הגנת הגלים לפני היציאה', 'מחיר הפעלת ההגנה (USDT) ושיעור העלייה'],
     trades.map(trade => tradeRow(trade, doc.defaultView)));
