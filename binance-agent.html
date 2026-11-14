@@ -105,7 +105,13 @@
       <h2>פוזיציות פעילות · SHORT Futures</h2><p>ממתין לנתוני SHORT מהשרת…</p>
     </section>
 <section id="marketAttentionPanel" class="attention-panel app-view trade-view scans-view" aria-label="איתותי חדשות ותצפיתנים"><h2>איתותים ותצפיתנים</h2><p>ממתין למידע מהשרת. נדרש חיבור המכשיר לצפייה בתצפיות.</p></section>
-<details id="strategyReviewPanel" class="strategy-review"><summary>מעקב שיטת הכניסה · תוצאות והשוואה</summary><div id="strategyReviewBody"></div></details><section id="maDecisionJournal" class="ma-journal app-view trade-view portfolio-view" data-platform="BINANCE" aria-label="יומן השוואת החלטות אוטומטיות לממוצעים"></section>
+<details id="strategyReviewPanel" class="strategy-review"><summary>מעקב שיטת הכניסה · תוצאות והשוואה</summary>
+      <section id="spotPocReview" aria-labelledby="spotPocReviewTitle">
+        <h3 id="spotPocReviewTitle">עסקאות הבוט בבייננס · Spot POC V2</h3>
+        <div data-poc-summary><p>ממתין ליומן העסקאות.</p></div>
+        <details class="research-details" hidden><summary>פירוט העסקאות וסיבות היציאה</summary><div data-poc-rows></div></details>
+      </section>
+      <div id="strategyReviewBody"></div></details><section id="maDecisionJournal" class="ma-journal app-view trade-view portfolio-view" data-platform="BINANCE" aria-label="יומן השוואת החלטות אוטומטיות לממוצעים"></section>
 
     <div class="workspace-heading"><h2>סביבת העבודה</h2><button id="collapseDashboard" type="button" class="text-action">סגור את כל הפירוט</button></div>
     <details id="scenarioSection" class="panel dashboard-fold app-view trade-view portfolio-view">
@@ -514,7 +520,7 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
   <script src="/binance-futures-positions.js?v=20261112-five-swings"></script>
-  <script src="/binance-agent.js?v=20261112-five-swings"></script>
+  <script src="/binance-agent.js?v=20261114-spot-review"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261111-dynamic-short"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>

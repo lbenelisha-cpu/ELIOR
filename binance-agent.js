@@ -248,6 +248,10 @@ function mode(s){
   const isDemo=s.mode==='demo';
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
+  if(currentMode!==s.mode){
+    const report=$('#spotPocReview');
+    if(report)report.hidden=true;
+  }
   currentMode=s.mode;
   manualTradeCapabilities=s.manualTrading||null;futuresManualCapabilities=s.futuresManualTrading||null;futuresManualStatus=s.shortTrading||null;
   renderTradeControlStatus(s);
@@ -618,10 +622,30 @@ function actionLabel(x){
   return ({BUY:'קנייה',SELL:'מכירה',ROTATE_IN:'רוטציה פנימה',ROTATE_OUT:'רוטציה החוצה'})[x]||x||'פעולה';
 }
 
+let spotPocRead=0;
+let spotPocShown=0;
+async function showSpotPocReview(log,mode,sequence){
+  const host=$('#spotPocReview');
+  if(!host)return;
+  try{
+    const {renderSpotPocReview}=await import('./spot-poc-review.mjs');
+    if(mode!==currentMode||sequence<spotPocShown)return;
+    spotPocShown=sequence;
+    renderSpotPocReview(host,log,mode);
+  }catch{
+    if(mode!==currentMode||sequence<spotPocShown)return;
+    spotPocShown=sequence;
+    host.querySelector('[data-poc-summary]').textContent='דוח העסקאות אינו זמין כרגע.';
+    host.querySelector('details').hidden=true;
+  }
+  host.hidden=false;
+}
 $('#strategyReviewPanel')?.addEventListener('toggle',()=>{if($('#strategyReviewPanel').open)loadActionJournal(currentMode);});
 async function loadActionJournal(currentModeArg){
+  const sequence=++spotPocRead;
   try{
     const d=await J(ACTIONLOG);
+    void showSpotPocReview(d,currentModeArg,sequence);
     window.LEVI_STRATEGY_REVIEW_DATA=currentModeArg==='live'?d.strategyReview:null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:window.LEVI_STRATEGY_REVIEW_DATA}));
     const list=currentModeArg==='live'?(d.live||[]):(d.demo||[]);
     window.dispatchEvent(new CustomEvent('levi:binance-history',{detail:{mode:currentModeArg,visible:activeView==='journal',symbols:[...new Set([...list.map(a=>a.symbol),...(currentLiveAccount?.balances||[]).filter(b=>b.asset!=='USDT'&&b.valueUsdt>=5).map(b=>b.asset+'USDT')])].filter(s=>/^[A-Z0-9]+USDT$/.test(s)),selectedSymbol}}));
@@ -637,6 +661,7 @@ async function loadActionJournal(currentModeArg){
       return `<div><b>${actionLabel(x.type)} · ${x.symbol||'—'}</b> · $${fmt(x.price)}${amount}${pnl}${fees}${reason} · ${when}</div>`;
     }).join(''):'<div class="mini">'+(currentModeArg==='live'?'עדיין אין פעולות LIVE.':'עדיין אין פעולות DEMO.')+'</div>';
   }catch(e){
+    void showSpotPocReview(null,currentModeArg,sequence);
     window.LEVI_STRATEGY_REVIEW_DATA=null;window.dispatchEvent(new CustomEvent('levi:strategy-review',{detail:null}));
     $('#actionJournal').innerHTML='<div class="mini">שגיאה בטעינת יומן הפעולות</div>';
   }
@@ -1380,3 +1405,12 @@ for(const id of ['showParallel','showRegression','regressionPeriod','regressionD
 document.getElementById('channelStudyLink')?.addEventListener('click',()=>{const panel=document.getElementById('strategyReviewPanel');if(panel)panel.open=true;});
 
 window.addEventListener('levi-chart-market',event=>{if(!['SPOT','FUTURES'].includes(event.detail))return;selectedChartMarket=event.detail;updateSelectedAsset();drawCandles(chartCandles);});
+
+function openLinkedStrategyReview(){
+  if(location.hash==='#strategyReviewPanel'){
+    const panel=document.getElementById('strategyReviewPanel');
+    if(panel)panel.open=true;
+  }
+}
+window.addEventListener('hashchange',openLinkedStrategyReview);
+openLinkedStrategyReview();
