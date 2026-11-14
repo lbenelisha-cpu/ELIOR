@@ -75,3 +75,140 @@ main>section,main>.panel,.market-hours,.layout>.panel{width:100%;max-width:100%;
 .watch-row .watch-scan[data-scan-state="display"]{color:#d3bcf6}
 .watch-scan-summary{padding:10px;border:1px solid #31445f;border-radius:8px;color:#bdcce1;font-size:12px;line-height:1.7}
 .search-next{color:#d9e5f6}.search-coverage{color:#b4c4dc;font-size:12px}.search-progress{margin-top:10px}.search-progress summary{cursor:pointer;color:#c7d8ef;padding:7px 0}.search-progress ol{padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:6px}.search-progress li{padding:5px 9px;border:1px dashed #46556b;border-radius:7px;font-size:12px;color:#9eacc0}.search-progress li.complete{border-style:solid;color:#c8daed;background:#15273c}
+
+/* Bright, readable shared theme inspired by the supplied portfolio card. */
+/* Shared light presentation for the Binance and Colmex workspaces. */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f3;
+  --panel: #ffffff;
+  --panel2: #f7f8f6;
+  --border: #dce2de;
+  --line: #dce2de;
+  --text: #202723;
+  --muted: #65716a;
+  --blue: #286d92;
+  --green: #28664d;
+  --red: #a34550;
+  --amber: #95601b;
+  --colmex-bg: #f4f6f3;
+  --colmex-panel: #ffffff;
+  --colmex-line: #dce2de;
+  --colmex-muted: #65716a;
+  --colmex-accent: #28664d;
+}
+
+body,
+body.portfolio-terminal {
+  background: #f4f6f3 !important;
+  color: #202723 !important;
+}
+
+main, .app-shell { color: #202723; }
+.topbar, .colmex-topbar { border-color: #dce2de !important; }
+.brand-title, .brand-block, .colmex-brand { color: #202723 !important; }
+.brand-sub, .brand-title span, .colmex-brand em, .colmex-brand small { color: #65716a !important; }
+.brand-mark, .brand-monogram { background: #e8f1eb !important; color: #28664d !important; box-shadow: none !important; }
+
+.panel, .stats article, .metric, .position-map, .scan-card,
+.colmex-overview, .colmex-disclosure, .colmex-disclosure .disclosure-content,
+.broker-account, .market-hours, .notice, .overview-visuals > *,
+.position-card, .position-card-grid > *, .scenario-workspace,
+.live-panel, .chart-footer > div, .live-stats > div, .paper-history > div {
+  background: #fff !important;
+  border-color: #dce2de !important;
+  color: #202723 !important;
+  box-shadow: 0 4px 16px rgba(28, 43, 34, .045) !important;
+}
+.panel, .colmex-disclosure { border-radius: 18px; }
+.colmex-disclosure > summary { color: #202723 !important; background: #f7f8f6 !important; }
+.colmex-disclosure > summary:hover { background: #edf2ee !important; }
+.colmex-disclosure small, .overview-heading p, .panel-title-row p,
+.muted, .small, footer, .chart-meta, .chart-legend, .mini,
+.section-kicker, .eyebrow, .section-title .muted { color: #65716a !important; }
+
+button, .refresh, .platform-link, .platform-switch,
+.overview-actions button, .market-controls button, .file-label {
+  border-color: #c9d4cd !important;
+  background: #edf3ef !important;
+  color: #244f3c !important;
+  box-shadow: none !important;
+}
+button:hover, .platform-link:hover, .platform-switch:hover { background: #e2ece5 !important; }
+button:disabled { color: #87918b !important; }
+.secondary, .overview-actions .secondary { background: #f7f8f6 !important; color: #35443b !important; }
+.danger-btn, .danger { background: #f8e9eb !important; border-color: #e4c4c8 !important; color: #963d49 !important; }
+.nav-pill, .time-pill, .seg button, .platform-tabs a, .brand-links a { color: #53635a !important; }
+.nav-pill.active, .time-pill.active, .platform-tabs [aria-current] {
+  background: #e8f1eb !important; border-color: #bfd2c5 !important; color: #245d43 !important;
+}
+.status, .chip, .decision-badge, .colmex-health span, .simulation-tag,
+.mode-banner, .watch-scan-summary, .scan-status, .scanner-freshness,
+.chart-risk-details, .chart-mark-cards .mark-card, .position-pnl {
+  background: #f6f8f6 !important; border-color: #dce2de !important; color: #53635a !important;
+}
+.colmex-health [data-state=good], .monitor-health[data-health=recent] { background: #eaf4ed !important; color: #28664d !important; border-color: #c6ddce !important; }
+.colmex-health [data-state=warning], .monitor-health { background: #fbf3e6 !important; color: #895e21 !important; border-color: #ead9b8 !important; }
+.colmex-health [data-state=error], .monitor-health[data-health=error], .monitor-health[data-health=stale] { background: #faecee !important; color: #9a4650 !important; border-color: #e8c9cc !important; }
+
+input, select, textarea, .market-controls select, .visual-heading select,
+.broker-actions select, #drawingColor {
+  background: #fff !important; color: #202723 !important; border-color: #cbd5ce !important;
+}
+input::placeholder, textarea::placeholder { color: #89938d !important; }
+input[type=checkbox], input[type=radio] { accent-color: #28664d; }
+
+.asset-table th, .decision-row.header, .sim-table-wrap th,
+.monitor-table th, .wide-table th, .asset-table thead,
+.sim-table-wrap thead, .monitor-table thead {
+  background: #f1f4f1 !important; color: #58655d !important;
+}
+.asset-table th, .asset-table td, .sim-table-wrap th, .sim-table-wrap td,
+.monitor-table th, .monitor-table td, .decision-row, .asset-table tbody tr td {
+  border-color: #e1e6e2 !important;
+}
+.asset-table tbody tr, .decision-row, .watch-row, .paper-history > div { color: #26312b !important; }
+.asset-table tbody tr:hover, .watch-row:hover { background: #f0f5f1 !important; }
+.asset-table tbody tr.selected, .watch-row.active { background: #e7f0ea !important; }
+.asset-table tbody tr.active-position.pnl-unknown td,
+.asset-table tbody tr.active-position.pnl-flat td { background: #f1f4f1 !important; color: #59665e !important; }
+.profit, .positive, .decision.buy, .decision.buy-ready, .good { color: #28664d !important; }
+.loss, .negative, .decision.sell, .bad { color: #a34550 !important; }
+.decision.hold, .warn { color: #95601b !important; }
+
+.chart-wrap, .chart, #chart, #chartVolume, #colmexRsi,
+.indicator-panel, .chart-terminal, .chart-panel #chart {
+  background-color: #fbfcfb !important;
+  border-color: #dce2de !important;
+  color: #65716a !important;
+}
+.chart-wrap {
+  background-image: linear-gradient(rgba(42, 65, 50, .075) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 65, 50, .075) 1px, transparent 1px) !important;
+  background-size: 100% 50px, 80px 100% !important;
+}
+.chart svg text, #chart svg text, #chartVolume svg text, #colmexRsi svg text { fill: #59665e; }
+.scan-ring > div { background: #fff !important; }
+.scan-ring { --scan-track: #e3e9e5; }
+.metric-orbit { opacity: .12; }
+.position-map small, .map-note, .map-distances, .scan-copy p, .scan-copy small { color: #65716a !important; }
+.price-marker { border-color: #fff !important; }
+.map-empty .empty-rail { background: #dfe6e1 !important; }
+
+#manualTradeDialog, #deviceConnectionDialog, #colmexTradeDialog,
+.dashboard-menu[open] > .top-actions, .colmex-menu .platform-nav {
+  background: #fff !important; color: #202723 !important; border-color: #d5ddd7 !important;
+  box-shadow: 0 18px 48px rgba(28, 43, 34, .16) !important;
+}
+#manualTradeDialog input, #deviceConnectionDialog input { background: #fff !important; color: #202723 !important; }
+#manualTradeDialog::backdrop, #deviceConnectionDialog::backdrop, #colmexTradeDialog::backdrop { background: rgba(34, 45, 38, .38) !important; }
+.colmex-menu .platform-nav a:hover { background: #edf3ef !important; }
+.live-badge { background: #eaf4ed !important; color: #28664d !important; border-color: #c6ddce !important; }
+.main-metric, .primary-card { background: #edf4ef !important; border-color: #c9dacd !important; }
+.price-rail { background: linear-gradient(90deg,#dca4aa,#c4d5cc,#8ac4a2) !important; }
+
+@media (max-width: 760px) {
+  .app-shell { padding: 10px !important; }
+  main { padding: 16px 12px 32px !important; }
+  .panel, .stats article { box-shadow: 0 2px 10px rgba(28, 43, 34, .04) !important; }
+}
