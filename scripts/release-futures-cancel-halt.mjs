@@ -16,7 +16,14 @@ export async function verifyCancelRecovery(s,api){
  for(const ref of last.algos){
   if(!ref.clientAlgoId||!['STOP_MARKET','TAKE_PROFIT_MARKET'].includes(ref.kind))throw Error('INVALID_PROTECTION_REFERENCE');
   const query=ref.algoId?{algoId:ref.algoId}:{clientAlgoId:ref.clientAlgoId};
-  const o=await api.get('/fapi/v1/algoOrder',query);
+  let o;
+  try{o=await api.get('/fapi/v1/algoOrder',query);}catch(e){
+   // The runner records REJECTED only after a definitive submission rejection.
+   // Such a never-accepted attempt has no exchange algo id. An accepted or
+   // uncertain identity must never be treated as canceled merely because absent.
+   if(e.code===-2013&&ref.status==='REJECTED'&&ref.algoId==null){verified.push({clientAlgoId:ref.clientAlgoId,status:'REJECTED_NOT_FOUND',source:'DEFINITIVE_JOURNAL_REJECTION_AND_EXCHANGE_ABSENCE'});continue;}
+   throw e;
+  }
   if(o.symbol!==last.symbol||o.clientAlgoId!==ref.clientAlgoId||o.side!=='BUY'||o.positionSide!=='BOTH'||o.orderType!==ref.kind||![true,'true'].includes(o.closePosition)||!['CANCELED','EXPIRED','FINISHED','REJECTED'].includes(o.algoStatus))throw Error('PROTECTION_NOT_TERMINAL');
   verified.push({clientAlgoId:ref.clientAlgoId,status:o.algoStatus});
  }
