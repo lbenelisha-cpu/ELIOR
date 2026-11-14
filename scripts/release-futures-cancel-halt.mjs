@@ -15,7 +15,8 @@ export async function verifyCancelRecovery(s,api){
  const verified=[];
  for(const ref of last.algos){
   if(!ref.clientAlgoId||!['STOP_MARKET','TAKE_PROFIT_MARKET'].includes(ref.kind))throw Error('INVALID_PROTECTION_REFERENCE');
-  const o=await api.get('/fapi/v1/algoOrder',{clientAlgoId:ref.clientAlgoId});
+  const query=ref.algoId?{algoId:ref.algoId}:{clientAlgoId:ref.clientAlgoId};
+  const o=await api.get('/fapi/v1/algoOrder',query);
   if(o.symbol!==last.symbol||o.clientAlgoId!==ref.clientAlgoId||o.side!=='BUY'||o.positionSide!=='BOTH'||o.orderType!==ref.kind||![true,'true'].includes(o.closePosition)||!['CANCELED','EXPIRED','FINISHED','REJECTED'].includes(o.algoStatus))throw Error('PROTECTION_NOT_TERMINAL');
   verified.push({clientAlgoId:ref.clientAlgoId,status:o.algoStatus});
  }
@@ -31,6 +32,7 @@ async function main(){
  const {FuturesShortAPI}=await import(pathToFileURL(path.join(root,'lib/futures-short-api.mjs')));
  const api=new FuturesShortAPI({key:env.BINANCE_API_KEY,secret:env.BINANCE_API_SECRET});
  const before=fs.readFileSync(file,'utf8'),s=JSON.parse(before);
+ console.log(JSON.stringify({stage:'JOURNAL',halt:s.halt,symbol:s.closed?.at(-1)?.symbol,closedAt:s.closed?.at(-1)?.closedAt,algos:s.closed?.at(-1)?.algos}));
  const evidence=await verifyCancelRecovery(s,api);
  console.log(JSON.stringify({check:'PASSED',halt:s.halt,...evidence,openPositions:0,openOrders:0,openAlgoOrders:0,exchangeWrites:0}));
  if(mode==='--check')return;
