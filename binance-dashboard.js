@@ -88,8 +88,9 @@ function render(){
   text('overviewPnl',signed(summary?.pnl));
   $('overviewPnl').dataset.sign=summary?.pnl>0?'positive':summary?.pnl<0?'negative':'unknown';
   text('overviewPnlNote',!summary?'ממתין לנתוני החשבון':summary.pnl===null?'חסרה עלות קנייה מאומתת':snapshot.mode==='live'?'לפני עמלת מכירה · ללא שאריות קטנות':'לפי תיק הסימולציה');
-  text('overviewSlots',summary?summary.count+' / '+summary.max:'—');
-  $('overviewSlotDots').replaceChildren(...Array.from({length:Math.min(12,summary?.max||5)},(_,i)=>node('i',null,summary&&i<summary.count?'used':'')));
+  const shared=snapshot?.account?.allocationMode==='BINANCE_SHARED_THREE_V1'?snapshot.account.sharedPortfolio:null;
+  text('overviewSlots',shared?shared.longPositions+' · סה״כ LONG + SHORT: '+shared.activePositions+'/3':summary?summary.count+' / '+summary.max:'—');
+  $('overviewSlotDots').replaceChildren(...Array.from({length:Math.min(12,summary?.max||5)},(_,i)=>node('i',null,summary&&i<(shared?.activePositions??summary.count)?'used':'')));
   const allocation=summary&&!summary.partial?allocationParts(summary.total,summary.cash):null;
   $('allocationRing').style.setProperty('--cash-angle',allocation?allocation.cashPct*3.6+'deg':'0deg');
   $('allocationRing').classList.toggle('unavailable',!allocation);

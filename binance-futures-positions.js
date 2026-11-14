@@ -34,10 +34,11 @@
   html+=card('יתרת ארנק Futures · USDT',format(account?.walletUsdt,2),'יתרת הארנק · ללא רווח / הפסד פתוח'+art,'featured');
   html+=card('מזומן זמין · Futures',format(account?.availableUsdt,2),'USDT פנויים להקצאה');
   html+=card('רווח / הפסד לא ממומש · USDT',signedTotal,number(totalPnl)?'לפני עמלות ומימון · לפי מחיר Ask':'ממתין למחירים עדכניים','',totalPnl>0?'positive':totalPnl<0?'negative':'');
-  const dots='<div class="slot-dots" aria-hidden="true">'+[0,1].map(i=>'<i'+(i<rows.length?' class="used"':'')+'></i>').join('')+'</div>';
-  html+=card('פוזיציות SHORT פעילות',rows.length+'/2',dots+'מחצית ארנק Futures לכל מקום · תקרה כעת: '+esc(Number(f.allocation?.maxOrderUsdt||0).toFixed(2))+' USDT כולל רזרבה');
+  const sharedBudget=f.policy?.allocationPolicy==='BINANCE_SHARED_THREE_V1';
+  const dots='<div class="slot-dots" aria-hidden="true">'+(sharedBudget?[0,1,2]:[0,1]).map(i=>'<i'+(i<rows.length?' class="used"':'')+'></i>').join('')+'</div>';
+  html+=card('פוזיציות SHORT פעילות',rows.length+(sharedBudget?' מתוך 3 משותפים':'/2'),dots+(sharedBudget?'שליש משווי התיק המשותף · תקציב SHORT זמין: ':'מחצית ארנק Futures לכל מקום · תקרה כעת: ')+esc(Number(f.allocation?.maxOrderUsdt||0).toFixed(2))+' USDT כולל רזרבה');
   html+='</div><div class="workspace-heading"><h2>הפוזיציות שלך · SHORT</h2><span class="mode-tag">USDⓈ-M · Isolated · 1x</span></div>';
-  html+='<details class="mini"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>הקצאה דינמית: יתרת ארנק Futures חלקי 2, בכפוף למזומן פנוי · ארנק נפרד מ־Spot</p><p dir="ltr">'+esc(reason(f.halt||f.reason))+'</p></details>';
+  html+='<details class="mini"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>'+ (sharedBudget?'שלושה מקומות משותפים ל־LONG ול־SHORT · שליש מהשווי הכולל לכל כניסה · נדרשת יתרה בארנק המתאים':'הקצאה דינמית: יתרת ארנק Futures חלקי 2, בכפוף למזומן פנוי · ארנק נפרד מ־Spot') +'</p><p dir="ltr">'+esc(reason(f.halt||f.reason))+'</p></details>';
   html+='<p class="mini">'+(f.policy?.exitPolicy==='FUTURES_SHORT_SETTINGS_V2'?'יעד הרווח וההגנה הנגררת לפי הגדרות האפליקציה · יעד התעלה אינו סוגר SHORT.':'יעד הרווח לפי התעלה · הסטופ וההגנה הנגררת לפי ההגדרות.')+'</p>';
   html+='<div class="asset-table-wrap" style="overflow-x:auto"><table class="asset-table wide-table"><thead><tr><th>נכס / כיוון</th><th>מועד כניסה</th><th>כמות</th><th>מחיר כניסה</th><th>מחיר נוכחי (Ask)</th><th>סכום כניסה USDT</th><th>רווח / הפסד USDT</th><th>רווח / הפסד %</th><th>יעד רווח TP</th><th>סטופ נוכחי</th><th>הגנות</th></tr></thead><tbody>';
   for(const p of rows){
@@ -109,8 +110,9 @@
  function paint(){
   const counter=root.document?.getElementById?.('overviewShortSlots'),note=root.document?.getElementById?.('overviewShortSlotsNote'),f=snapshot?.shortTrading;
   const valid=snapshot?.mode==='live'&&Array.isArray(f?.positions)&&fresh(f.checkedAt,Date.now(),60000);
-  if(counter)counter.textContent=valid?f.positions.length+' / 2':'— / 2';
-  if(note)note.textContent=valid?'עד 2 פוזיציות · תקרה למקום: '+format(f.allocation?.maxOrderUsdt,2)+' USDT':snapshot?.mode==='demo'?'זמין בחשבון LIVE בלבד':'ממתין לאימות נתוני SHORT';
+  const sharedBudget=f?.policy?.allocationPolicy==='BINANCE_SHARED_THREE_V1';
+  if(counter)counter.textContent=sharedBudget?(valid?f.positions.length:'—')+' / 3 משותפים':valid?f.positions.length+' / 2':'— / 2';
+  if(note)note.textContent=sharedBudget?'סה״כ LONG + SHORT: '+(f.allocation?.activePositions??'—')+'/3 · שליש תיק: '+format(f.allocation?.grossSlotUsdt,2)+' USDT':valid?'עד 2 פוזיציות · תקרה למקום: '+format(f.allocation?.maxOrderUsdt,2)+' USDT':snapshot?.mode==='demo'?'זמין בחשבון LIVE בלבד':'ממתין לאימות נתוני SHORT';
   const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}
  function update(s){
   if(s?.mode==='demo'){snapshot={mode:'demo'};paint();return;}

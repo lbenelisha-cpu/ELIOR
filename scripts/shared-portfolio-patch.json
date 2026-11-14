@@ -1,0 +1,118 @@
+[
+  {
+    "file": "binance-dashboard.js",
+    "hunks": [
+      {
+        "before": "  text('overviewPnlNote',!summary?'ממתין לנתוני החשבון':summary.pnl===null?'חסרה עלות קנייה מאומתת':snapshot.mode==='live'?'לפני עמלת מכירה · ללא שאריות קטנות':'לפי תיק הסימולציה');\n  text('overviewSlots',summary?summary.count+' / '+summary.max:'—');\n  $('overviewSlotDots').replaceChildren(...Array.from({length:Math.min(12,summary?.max||5)},(_,i)=>node('i',null,summary&&i<summary.count?'used':'')));\n  const allocation=summary&&!summary.partial?allocationParts(summary.total,summary.cash):null;\n",
+        "after": "  text('overviewPnlNote',!summary?'ממתין לנתוני החשבון':summary.pnl===null?'חסרה עלות קנייה מאומתת':snapshot.mode==='live'?'לפני עמלת מכירה · ללא שאריות קטנות':'לפי תיק הסימולציה');\n  const shared=snapshot?.account?.allocationMode==='BINANCE_SHARED_THREE_V1'?snapshot.account.sharedPortfolio:null;\n  text('overviewSlots',shared?shared.longPositions+' · סה״כ LONG + SHORT: '+shared.activePositions+'/3':summary?summary.count+' / '+summary.max:'—');\n  $('overviewSlotDots').replaceChildren(...Array.from({length:Math.min(12,summary?.max||5)},(_,i)=>node('i',null,summary&&i<(shared?.activePositions??summary.count)?'used':'')));\n  const allocation=summary&&!summary.partial?allocationParts(summary.total,summary.cash):null;\n"
+      }
+    ]
+  },
+  {
+    "file": "binance-futures-positions.js",
+    "hunks": [
+      {
+        "before": "  html+=card('רווח / הפסד לא ממומש · USDT',signedTotal,number(totalPnl)?'לפני עמלות ומימון · לפי מחיר Ask':'ממתין למחירים עדכניים','',totalPnl>0?'positive':totalPnl<0?'negative':'');\n  const dots='<div class=\"slot-dots\" aria-hidden=\"true\">'+[0,1].map(i=>'<i'+(i<rows.length?' class=\"used\"':'')+'></i>').join('')+'</div>';\n  html+=card('פוזיציות SHORT פעילות',rows.length+'/2',dots+'מחצית ארנק Futures לכל מקום · תקרה כעת: '+esc(Number(f.allocation?.maxOrderUsdt||0).toFixed(2))+' USDT כולל רזרבה');\n  html+='</div><div class=\"workspace-heading\"><h2>הפוזיציות שלך · SHORT</h2><span class=\"mode-tag\">USDⓈ-M · Isolated · 1x</span></div>';\n  html+='<details class=\"mini\"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>הקצאה דינמית: יתרת ארנק Futures חלקי 2, בכפוף למזומן פנוי · ארנק נפרד מ־Spot</p><p dir=\"ltr\">'+esc(reason(f.halt||f.reason))+'</p></details>';\n  html+='<p class=\"mini\">'+(f.policy?.exitPolicy==='FUTURES_SHORT_SETTINGS_V2'?'יעד הרווח וההגנה הנגררת לפי הגדרות האפליקציה · יעד התעלה אינו סוגר SHORT.':'יעד הרווח לפי התעלה · הסטופ וההגנה הנגררת לפי ההגדרות.')+'</p>';\n",
+        "after": "  html+=card('רווח / הפסד לא ממומש · USDT',signedTotal,number(totalPnl)?'לפני עמלות ומימון · לפי מחיר Ask':'ממתין למחירים עדכניים','',totalPnl>0?'positive':totalPnl<0?'negative':'');\n  const sharedBudget=f.policy?.allocationPolicy==='BINANCE_SHARED_THREE_V1';\n  const dots='<div class=\"slot-dots\" aria-hidden=\"true\">'+(sharedBudget?[0,1,2]:[0,1]).map(i=>'<i'+(i<rows.length?' class=\"used\"':'')+'></i>').join('')+'</div>';\n  html+=card('פוזיציות SHORT פעילות',rows.length+(sharedBudget?' מתוך 3 משותפים':'/2'),dots+(sharedBudget?'שליש משווי התיק המשותף · תקציב SHORT זמין: ':'מחצית ארנק Futures לכל מקום · תקרה כעת: ')+esc(Number(f.allocation?.maxOrderUsdt||0).toFixed(2))+' USDT כולל רזרבה');\n  html+='</div><div class=\"workspace-heading\"><h2>הפוזיציות שלך · SHORT</h2><span class=\"mode-tag\">USDⓈ-M · Isolated · 1x</span></div>';\n  html+='<details class=\"mini\"><summary>מצב המסלול וזמן העדכון</summary><p>בדיקת מסלול אחרונה: '+esc(time(f.checkedAt))+'</p><p>'+ (sharedBudget?'שלושה מקומות משותפים ל־LONG ול־SHORT · שליש מהשווי הכולל לכל כניסה · נדרשת יתרה בארנק המתאים':'הקצאה דינמית: יתרת ארנק Futures חלקי 2, בכפוף למזומן פנוי · ארנק נפרד מ־Spot') +'</p><p dir=\"ltr\">'+esc(reason(f.halt||f.reason))+'</p></details>';\n  html+='<p class=\"mini\">'+(f.policy?.exitPolicy==='FUTURES_SHORT_SETTINGS_V2'?'יעד הרווח וההגנה הנגררת לפי הגדרות האפליקציה · יעד התעלה אינו סוגר SHORT.':'יעד הרווח לפי התעלה · הסטופ וההגנה הנגררת לפי ההגדרות.')+'</p>';\n"
+      },
+      {
+        "before": "  const valid=snapshot?.mode==='live'&&Array.isArray(f?.positions)&&fresh(f.checkedAt,Date.now(),60000);\n  if(counter)counter.textContent=valid?f.positions.length+' / 2':'— / 2';\n  if(note)note.textContent=valid?'עד 2 פוזיציות · תקרה למקום: '+format(f.allocation?.maxOrderUsdt,2)+' USDT':snapshot?.mode==='demo'?'זמין בחשבון LIVE בלבד':'ממתין לאימות נתוני SHORT';\n  const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}\n",
+        "after": "  const valid=snapshot?.mode==='live'&&Array.isArray(f?.positions)&&fresh(f.checkedAt,Date.now(),60000);\n  const sharedBudget=f?.policy?.allocationPolicy==='BINANCE_SHARED_THREE_V1';\n  if(counter)counter.textContent=sharedBudget?(valid?f.positions.length:'—')+' / 3 משותפים':valid?f.positions.length+' / 2':'— / 2';\n  if(note)note.textContent=sharedBudget?'סה״כ LONG + SHORT: '+(f.allocation?.activePositions??'—')+'/3 · שליש תיק: '+format(f.allocation?.grossSlotUsdt,2)+' USDT':valid?'עד 2 פוזיציות · תקרה למקום: '+format(f.allocation?.maxOrderUsdt,2)+' USDT':snapshot?.mode==='demo'?'זמין בחשבון LIVE בלבד':'ממתין לאימות נתוני SHORT';\n  const panel=root.document?.querySelector('#futuresPositionsPanel');if(panel){const opened=Array.from(panel.querySelectorAll?.('details[open][data-short-detail]')||[],e=>e.dataset.shortDetail);panel.innerHTML=view(snapshot);addPagers(panel);for(const p of root.LEVI_EXIT_SNAPSHOT&&snapshot?.mode==='live'?snapshot?.shortTrading?.positions||[]:[]){const cell=Array.from(panel.querySelectorAll('[data-exit-symbol]')).find(cell=>cell.dataset.exitSymbol===p.symbol);root.LEVI_EXIT_SNAPSHOT?.append(cell,{...snapshot,venue:'BINANCE_FUTURES'},p.symbol);}for(const e of panel.querySelectorAll?.('details[data-short-detail]')||[])e.open=opened.includes(e.dataset.shortDetail);}}\n"
+      }
+    ]
+  },
+  {
+    "file": "binance-manual-trades.js",
+    "hunks": [
+      {
+        "before": "   get('manualTradePolicy').textContent='סטופ ויעד לפי הגדרות האפליקציה. כל מגבלות החשבון וההגנות נשמרות.';get('manualTradeSubmit').textContent=side==='BUY'?'אני מאשר פתיחת שורט בכסף אמיתי':'אני מאשר סגירת שורט בכסף אמיתי';}\n  get('manualTradeCheck').hidden=true;get('manualTradeCancel').disabled=false;dialog.showModal();if(side==='BUY')get('manualQuoteAmount').focus();\n",
+        "after": "   get('manualTradePolicy').textContent='סטופ ויעד לפי הגדרות האפליקציה. כל מגבלות החשבון וההגנות נשמרות.';get('manualTradeSubmit').textContent=side==='BUY'?'אני מאשר פתיחת שורט בכסף אמיתי':'אני מאשר סגירת שורט בכסף אמיתי';}\n  if(side==='BUY'&&c.capabilities.allocationPolicy==='BINANCE_SHARED_THREE_V1'){\n   const a=c.capabilities.allocation||{},money=x=>Number(x||0).toLocaleString('he-IL',{maximumFractionDigits:2});\n   get('manualTradeSummary').textContent='תיק משותף · '+(a.activePositions??'—')+' מתוך 3 מקומות תפוסים · שליש מהתיק: '+money(a.grossSlotUsdt)+' USDT · תקציב לפעולה: '+money(a.maxOrderUsdt)+' USDT. '+(a.missingUsdt>0?'חסרים '+money(a.missingUsdt)+' USDT בארנק '+(futures?'Futures':'Spot')+'. לא תבוצע העברה אוטומטית.':'נדרשת יתרה בארנק המתאים ורזרבת עמלות.');\n   get('manualQuoteAmount').value=String(a.maxOrderUsdt||'');\n   get('manualTradePolicy').textContent='עד שלוש פוזיציות LONG ו־SHORT יחד. התקציב נבדק שוב לפני כניסה; פוזיציות קיימות אינן משנות גודל.';\n  }\n  get('manualTradeCheck').hidden=true;get('manualTradeCancel').disabled=false;dialog.showModal();if(side==='BUY')get('manualQuoteAmount').focus();\n"
+      },
+      {
+        "before": "   if(result.ok){get('manualTradeResult').textContent='בייננס החזירה סטטוס '+result.order.status+' · כמות שבוצעה: '+result.order.executedQty+' · מזהה הזמנה: '+result.order.orderId;get('manualTradeSubmit').hidden=true;get('manualTradeCheck').hidden=true;await window.LEVI_MANUAL_TRADES.refresh().catch(()=>{});}\n   else{get('manualTradeResult').textContent=({'FUTURES_API_-2011':'ביטול הוראת הגנה קודמת דורש התאמה מול בייננס. פתיחת שורט חסומה עד לאימות מצב ההוראות.',FUTURES_AMOUNT_EXCEEDS_ALLOCATION:'היתרה השתנתה או הסכום גדול מההקצאה. סגור ופתח שוב את החלון לקבלת סכום מעודכן.',FUTURES_MIN_NOTIONAL_OR_QUANTITY:'ההקצאה קטנה ממינימום המסחר של החוזה בבייננס. הסכום לא יוגדל מעבר לתקרה.',FUTURES_ALLOCATION_INSUFFICIENT:'אין יתרה זמינה מספקת לפתיחת שורט.'}[result.error]||result.error||'הבקשה לא הושלמה');get('manualTradeCheck').hidden=!uncertain;get('manualTradeSubmit').hidden=uncertain;if(!uncertain)intent.requestId=crypto.randomUUID();}\n  }catch(error){\n",
+        "after": "   if(result.ok){get('manualTradeResult').textContent='בייננס החזירה סטטוס '+result.order.status+' · כמות שבוצעה: '+result.order.executedQty+' · מזהה הזמנה: '+result.order.orderId;get('manualTradeSubmit').hidden=true;get('manualTradeCheck').hidden=true;await window.LEVI_MANUAL_TRADES.refresh().catch(()=>{});}\n   else{get('manualTradeResult').textContent=({SHARED_THREE_SLOTS_FULL:'שלושת המקומות המשותפים ללונג ולשורט תפוסים.',SHARED_ENTRY_BUSY:'כניסה אחרת מתבצעת כרגע. לא נשלחה הוראה זו.',SHARED_ORDER_PENDING:'קיימת הוראה בבירור. כניסה נוספת ממתינה לאימות.',SHARED_ACCOUNT_UNVERIFIED:'נדרש אימות עדכני של שני הארנקים.',SHARED_WALLET_FUNDS_REQUIRED:'אין מספיק כסף בארנק המתאים לשליש מהתיק. פתח שוב את החלון להצגת הסכום החסר.',SHARED_AMOUNT_EXCEEDS_THIRD:'הסכום גבוה משליש התיק לאחר הרזרבה. פתח מחדש לקבלת תקציב עדכני.','FUTURES_API_-2011':'ביטול הוראת הגנה קודמת דורש התאמה מול בייננס. פתיחת שורט חסומה עד לאימות מצב ההוראות.',FUTURES_AMOUNT_EXCEEDS_ALLOCATION:'היתרה השתנתה או הסכום גדול מההקצאה. סגור ופתח שוב את החלון לקבלת סכום מעודכן.',FUTURES_MIN_NOTIONAL_OR_QUANTITY:'ההקצאה קטנה ממינימום המסחר של החוזה בבייננס. הסכום לא יוגדל מעבר לתקרה.',FUTURES_ALLOCATION_INSUFFICIENT:'אין יתרה זמינה מספקת לפתיחת שורט.'}[result.error]||result.error||'הבקשה לא הושלמה');get('manualTradeCheck').hidden=!uncertain;get('manualTradeSubmit').hidden=uncertain;if(!uncertain)intent.requestId=crypto.randomUUID();}\n  }catch(error){\n"
+      }
+    ]
+  },
+  {
+    "file": "binance-agent.js",
+    "hunks": [
+      {
+        "before": " const f=s?.shortTrading?.policy;\n if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. '+(f.allocationPolicy==='FUTURES_WALLET_HALF_V1'?'הקצאה דינמית לפי מחצית ארנק Futures':'תקציב '+(n(f.budgetUsdt)??'—')+' USDT')+' · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');\n if(f&&!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f.entryPolicyVersion))lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');\n",
+        "after": " const f=s?.shortTrading?.policy;\n if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. '+(f.allocationPolicy==='BINANCE_SHARED_THREE_V1'?'שליש משווי Spot ו־Futures יחד · שלושה מקומות משותפים ללונג ולשורט':f.allocationPolicy==='FUTURES_WALLET_HALF_V1'?'הקצאה דינמית לפי מחצית ארנק Futures':'תקציב '+(n(f.budgetUsdt)??'—')+' USDT')+' · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');\n if(f&&!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f.entryPolicyVersion))lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');\n"
+      },
+      {
+        "before": "    put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');\n    put('#slots',((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));\n    put('#slotValue',a.allocationMode==='CURRENT_EQUITY_EQUAL_FIVE_V1'?fmt(a.nextBuyAllocation?.amountUsdt??a.fixedPositionUsdt/1.002)+' USDT · חמישית משווי Spot העדכני, לאחר רזרבת עמלה':a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');\n    put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');\n",
+        "after": "    put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');\n    put('#slots',a.allocationMode==='BINANCE_SHARED_THREE_V1'?(a.sharedPortfolio?.activePositions??'—')+'/3 · LONG + SHORT':((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));\n    put('#slotValue',a.allocationMode==='BINANCE_SHARED_THREE_V1'?fmt(a.sharedPortfolio?.grossSlotUsdt)+' USDT · שליש משווי התיק המשותף, כולל רזרבה':a.allocationMode==='CURRENT_EQUITY_EQUAL_FIVE_V1'?fmt(a.nextBuyAllocation?.amountUsdt??a.fixedPositionUsdt/1.002)+' USDT · חמישית משווי Spot העדכני, לאחר רזרבת עמלה':a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');\n    put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');\n"
+      }
+    ]
+  },
+  {
+    "file": "server.mjs",
+    "hunks": [
+      {
+        "before": "import {swingProtection} from './lib/swing-profit-protection.mjs';\n",
+        "after": "import {installSharedPortfolio,SHARED_PORTFOLIO_POLICY} from './lib/shared-portfolio.mjs';\nimport {swingProtection} from './lib/swing-profit-protection.mjs';\n"
+      },
+      {
+        "before": "  if(reason!=='MANUAL_BUY'&&meta.wyckoffTrade?.riskInput){\n    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,{...meta.wyckoffTrade.riskInput,allocationMode:funding.allocationMode});\n    if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;\n    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};\n",
+        "after": "  if(reason!=='MANUAL_BUY'&&meta.wyckoffTrade?.riskInput){\n    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,{...meta.wyckoffTrade.riskInput,allocationMode:funding.allocationMode==='BINANCE_SHARED_THREE_V1'?LIVE_EQUITY_ALLOCATION:funding.allocationMode});\n    if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;\n    if(funding.allocationMode==='BINANCE_SHARED_THREE_V1')risk.riskPlan.allocationMode=funding.allocationMode;\n    meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};\n"
+      },
+      {
+        "before": "});\nfuturesShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');\n",
+        "after": "});\nconst sharedPortfolioEnabled=process.env.BINANCE_SHARED_PORTFOLIO_ENABLED==='true';\nconst sharedPortfolioManager=sharedPortfolioEnabled?installSharedPortfolio({futuresShort,readSpot:getLiveAccountSnapshot,longManaged:liveManagedPositions,spotOrders:liveOrders,maxLongUsdt:LIVE_MAX_USDT}):null;\nif(sharedPortfolioManager){\n const originalBuy=placeLiveMarketBuy,originalAccount=getLiveAccountSnapshot,originalDisplay=getDisplayAccountSnapshot;\n placeLiveMarketBuy=(...args)=>sharedPortfolioManager.runLong(()=>originalBuy(...args));\n getLiveAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalAccount());\n getDisplayAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalDisplay());\n}\nfuturesShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');\n"
+      },
+      {
+        "before": "      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n      allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},\n      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:2,allocationPolicy:'FUTURES_WALLET_HALF_V1'},\n      manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},\n      tradeControl:authorized?tradeControl:null,\n",
+        "after": "      pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},\n      allocationPolicy:{version:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,basis:sharedPortfolioEnabled?'COMBINED_SPOT_FUTURES_EQUITY':'CURRENT_SPOT_EQUITY',maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},\n      sharedPortfolio:authorized?sharedPortfolioManager?.status()??null:null,\n      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:sharedPortfolioEnabled?3:2,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:'FUTURES_WALLET_HALF_V1',allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('SHORT'):null},\n      manualTrading:{version:1,maxOrderUsdt:sharedPortfolioEnabled?(authorized?sharedPortfolioManager.allocation('LONG').maxOrderUsdt:0):LIVE_MAX_USDT,maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('LONG'):null},\n      tradeControl:authorized?tradeControl:null,\n"
+      }
+    ]
+  },
+  {
+    "file": "lib/binance-manual-trades.mjs",
+    "hunks": [
+      {
+        "before": "import fs from 'node:fs';import path from 'node:path';\n",
+        "after": "import {sharedAllocation} from './shared-portfolio.mjs';\nimport fs from 'node:fs';import path from 'node:path';\n"
+      },
+      {
+        "before": "export function manualBuyAmount(amount,account,info,{maxOrderUsdt=400,maxPositions=5}={}){\n if(!Number.isFinite(amount)||amount<5)throw Error('סכום הקנייה חייב להיות לפחות 5 USDT');\n",
+        "after": "export function manualBuyAmount(amount,account,info,{maxOrderUsdt=400,maxPositions=5}={}){\n if(account.allocationMode==='BINANCE_SHARED_THREE_V1'){const a=sharedAllocation(account.sharedPortfolio,'LONG',{maxOrderUsdt});if(!a.ok)throw Error(a.code);if(amount>a.maxOrderUsdt)throw Error('SHARED_AMOUNT_EXCEEDS_THIRD');}\n if(!Number.isFinite(amount)||amount<5)throw Error('סכום הקנייה חייב להיות לפחות 5 USDT');\n"
+      }
+    ]
+  },
+  {
+    "file": "lib/live-buy-allocation.mjs",
+    "hunks": [
+      {
+        "before": "export const LIVE_BUY_FEE_RESERVE=1.002;\n",
+        "after": "import {sharedAllocation} from './shared-portfolio.mjs';\nexport const LIVE_BUY_FEE_RESERVE=1.002;\n"
+      },
+      {
+        "before": "export function liveNextBuyAllocation(account,{maxPositions=5,maxOrderUsdt=400,minimumUsdt=5}={}){\n  const activePositions=(account.balances||[]).filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;\n",
+        "after": "export function liveNextBuyAllocation(account,{maxPositions=5,maxOrderUsdt=400,minimumUsdt=5}={}){\n  if(account.allocationMode==='BINANCE_SHARED_THREE_V1'){const a=sharedAllocation(account.sharedPortfolio,'LONG',{maxOrderUsdt});return a.ok&&a.amountUsdt<minimumUsdt?{...a,ok:false,code:'BELOW_MINIMUM'}:a;}\n  const activePositions=(account.balances||[]).filter(b=>!['USDT','USDC'].includes(b.asset)&&Number(b.valueUsdt||0)>=5).length;\n"
+      }
+    ]
+  },
+  {
+    "file": "lib/futures-short-runner.mjs",
+    "hunks": [
+      {
+        "before": "  if(!this.control().allowEntries)return 'FUTURES_ENTRIES_PAUSED';\n  if(Object.keys(this.state.positions).length>=2)return 'FUTURES_TWO_SLOTS_FULL';\n  if(this.error)return this.error;\n",
+        "after": "  if(!this.control().allowEntries)return 'FUTURES_ENTRIES_PAUSED';\n  if(Object.keys(this.state.positions).length>=(this.config.maxPositions||2))return 'FUTURES_TWO_SLOTS_FULL';\n  if(this.error)return this.error;\n"
+      },
+      {
+        "before": "  if(this.fatal||this.state.halt||this.state.pending)throw Error(this.fatal||this.state.halt||'FUTURES_ORDER_PENDING');\n  if(Object.keys(this.state.positions).length>=2)throw Error('FUTURES_TWO_SLOTS_FULL');\n  const permissions=await this.permission();\n",
+        "after": "  if(this.fatal||this.state.halt||this.state.pending)throw Error(this.fatal||this.state.halt||'FUTURES_ORDER_PENDING');\n  if(Object.keys(this.state.positions).length>=(this.config.maxPositions||2))throw Error('FUTURES_TWO_SLOTS_FULL');\n  const permissions=await this.permission();\n"
+      },
+      {
+        "before": "   this.assertAllocation();\n   if(Object.keys(this.state.positions).length>=2)throw Error('FUTURES_TWO_SLOTS_FULL');\n   if(this.now()-this.lastScan<2000)return;\n",
+        "after": "   this.assertAllocation();\n   if(Object.keys(this.state.positions).length>=(this.config.maxPositions||2))throw Error('FUTURES_TWO_SLOTS_FULL');\n   if(this.now()-this.lastScan<2000)return;\n"
+      }
+    ]
+  },
+  {
+    "file": "lib/shared-portfolio.mjs",
+    "newFile": true
+  }
+]

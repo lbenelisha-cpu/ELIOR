@@ -216,7 +216,7 @@ function tradingRuleLines(s){
  else lines.push('ממתין לאימות כללי הכניסה מהשרת.');
  lines.push('הגדרות יציאה לכניסות חדשות: סטופ '+(n(e.stopLossPct)??'—')+'% · הפעלת הגנה '+(n(e.profitActivationPct)??'—')+'% · מרחק נגרר '+(n(e.trailingGapPp)??'—')+' נקודות אחוז ממחיר הכניסה. לפוזיציה קיימת יש לבדוק את הסטופ והיעד המתועדים שלה. המחירים לפני עמלות.');
  const f=s?.shortTrading?.policy;
- if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. '+(f.allocationPolicy==='FUTURES_WALLET_HALF_V1'?'הקצאה דינמית לפי מחצית ארנק Futures':'תקציב '+(n(f.budgetUsdt)??'—')+' USDT')+' · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
+ if(['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f?.entryPolicyVersion))lines.push('SHORT Futures · '+(f.enabled?'מופעל':'כבוי')+' · תעלה מאושרת · דשדוש עליון או אמצעי בתחילת התעלה · שבירה מטה מקבעת A–B · כניסה בחזרה מלמטה ל־POC. הגנות לפי ההגדרות. '+(f.allocationPolicy==='BINANCE_SHARED_THREE_V1'?'שליש משווי Spot ו־Futures יחד · שלושה מקומות משותפים ללונג ולשורט':f.allocationPolicy==='FUTURES_WALLET_HALF_V1'?'הקצאה דינמית לפי מחצית ארנק Futures':'תקציב '+(n(f.budgetUsdt)??'—')+' USDT')+' · עד '+(n(f.maxPositions)??'—')+' פוזיציות.');
  if(f&&!['CHANNEL_POC_RETEST_V1','CHANNEL_POC_RETEST_V2'].includes(f.entryPolicyVersion))lines.push('SHORT: עדכון POC עדיין לא אומת בשרת. בדוק את התנאים המדווחים בכרטיס האיתות.');
  return lines;
 }
@@ -660,8 +660,8 @@ async function loadLiveAccount(prefetched=null){
     if(pnlEl)for(const kind of ['profit','loss','flat','unknown'])pnlEl.classList.toggle('pnl-'+kind,pnl.className==='pnl-'+kind);
     put('#accountPnlNote','לפי עלות מתועדת · לפני עמלת מכירה ועמלות במטבע אחר · שאריות מתחת ל־5 USDT אינן כלולות'+(a.profitReinvestmentPaused?' · ההקצאה הקיימת נשמרת; עדכון מרווחים ממתין להמרת עמלה':''));
     put('#holdingsNote','הפוזיציות אינן כוללות מזומן USDT; מספר ההחזקות בבייננס כולל גם מזומן.');
-    put('#slots',((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
-    put('#slotValue',a.allocationMode==='CURRENT_EQUITY_EQUAL_FIVE_V1'?fmt(a.nextBuyAllocation?.amountUsdt??a.fixedPositionUsdt/1.002)+' USDT · חמישית משווי Spot העדכני, לאחר רזרבת עמלה':a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
+    put('#slots',a.allocationMode==='BINANCE_SHARED_THREE_V1'?(a.sharedPortfolio?.activePositions??'—')+'/3 · LONG + SHORT':((a.balances||[]).filter(x=>!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt||0)>=5).length)+'/'+(a.maxPositions||5));
+    put('#slotValue',a.allocationMode==='BINANCE_SHARED_THREE_V1'?fmt(a.sharedPortfolio?.grossSlotUsdt)+' USDT · שליש משווי התיק המשותף, כולל רזרבה':a.allocationMode==='CURRENT_EQUITY_EQUAL_FIVE_V1'?fmt(a.nextBuyAllocation?.amountUsdt??a.fixedPositionUsdt/1.002)+' USDT · חמישית משווי Spot העדכני, לאחר רזרבת עמלה':a.fixedPositionUsdt>0?fmt(a.fixedPositionUsdt)+' USDT · רגיל'+(a.nextBuyAllocation?.lastSlot&&a.nextBuyAllocation.ok?' · אחרונה: '+fmt(a.nextBuyAllocation.amountUsdt)+' USDT מהיתרה':' · אחרונה לפי היתרה'):'—');
     put('#paperTradesCount',currentAgentData?.wyckoffStats?.closed??'—');
     const b=(a.balances||[]).filter(x=>(+x.free)+(+x.locked)>0);
     $('#liveBalances').innerHTML=b.length?b.map(x=>`<div><b>${x.asset}</b> · ${fmt(x.qty,8)} · ${fmt(x.valueUsdt)} USDT${!['USDT','USDC'].includes(x.asset)&&Number(x.valueUsdt)>0&&Number(x.valueUsdt)<5?' <span class="mini">· שארית קטנה — לא נספרת כפוזיציה</span>':''}</div>`).join(''):'<div class="mini">אין יתרות להצגה.</div>';

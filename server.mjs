@@ -1,3 +1,4 @@
+import {installSharedPortfolio,SHARED_PORTFOLIO_POLICY} from './lib/shared-portfolio.mjs';
 import {swingProtection} from './lib/swing-profit-protection.mjs';
 import {PocPaperService} from './lib/poc-paper-service.mjs';
 import {BinancePoc} from './lib/binance-poc.mjs';
@@ -842,8 +843,9 @@ async function placeLiveMarketBuy(symbol,quoteUsdt,reason='BUY',meta={},pocGuard
     quoteUsdt=allocation.amountUsdt;
   }
   if(reason!=='MANUAL_BUY'&&meta.wyckoffTrade?.riskInput){
-    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,{...meta.wyckoffTrade.riskInput,allocationMode:funding.allocationMode});
+    const risk=sizeRisk(requireLivePrice(streams[symbol],Date.now(),15000),quoteUsdt,tradeSettings.values,{...meta.wyckoffTrade.riskInput,allocationMode:funding.allocationMode==='BINANCE_SHARED_THREE_V1'?LIVE_EQUITY_ALLOCATION:funding.allocationMode});
     if(risk.reason!=='READY')throw Error(risk.reason);quoteUsdt=risk.budget;
+    if(funding.allocationMode==='BINANCE_SHARED_THREE_V1')risk.riskPlan.allocationMode=funding.allocationMode;
     meta={...meta,wyckoffTrade:{...meta.wyckoffTrade,exitSettings:risk.settings,riskPlan:{...risk.riskPlan,plannedRiskUsd:quoteUsdt*risk.settings.stopLossPct/100}}};
   }
   // Snapshot the current settings for every fill, including manual purchases.
@@ -2274,6 +2276,14 @@ const futuresShort=new FuturesShortRunner({
  control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
  permission:getApiRestrictions
 });
+const sharedPortfolioEnabled=process.env.BINANCE_SHARED_PORTFOLIO_ENABLED==='true';
+const sharedPortfolioManager=sharedPortfolioEnabled?installSharedPortfolio({futuresShort,readSpot:getLiveAccountSnapshot,longManaged:liveManagedPositions,spotOrders:liveOrders,maxLongUsdt:LIVE_MAX_USDT}):null;
+if(sharedPortfolioManager){
+ const originalBuy=placeLiveMarketBuy,originalAccount=getLiveAccountSnapshot,originalDisplay=getDisplayAccountSnapshot;
+ placeLiveMarketBuy=(...args)=>sharedPortfolioManager.runLong(()=>originalBuy(...args));
+ getLiveAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalAccount());
+ getDisplayAccountSnapshot=async()=>sharedPortfolioManager.decorate(await originalDisplay());
+}
 futuresShort.reserved=symbol=>pocEntries.reserved(symbol,'SHORT');
 // The two directions share asset identities; each reads its own market prices.
 futuresShort.watchSymbols=()=>SYMBOLS;
@@ -2528,9 +2538,10 @@ const server=http.createServer((req,res)=>{
       pocFastWatch:{policy:POC_FAST_WATCH_POLICY,enabled:mode==='live'&&LIVE&&AUTO_EXECUTION&&channelPrimary.enabled&&!tradeControl.paused},
       pocTrading:{version:1},
       pocPaper:{version:'POC_PAPER_V1',executionEnabled:false},
-      allocationPolicy:{version:LIVE_EQUITY_ALLOCATION,basis:'CURRENT_SPOT_EQUITY',maxPositions:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
-      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:2,allocationPolicy:'FUTURES_WALLET_HALF_V1'},
-      manualTrading:{version:1,maxOrderUsdt:LIVE_MAX_USDT,maxPositions:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true},
+      allocationPolicy:{version:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,basis:sharedPortfolioEnabled?'COMBINED_SPOT_FUTURES_EQUITY':'CURRENT_SPOT_EQUITY',maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,feeReserveMultiplier:LIVE_BUY_FEE_RESERVE,lastSlot:'EQUAL'},
+      sharedPortfolio:authorized?sharedPortfolioManager?.status()??null:null,
+      futuresManualTrading:{version:1,maxOrderUsdt:authorized?futuresShort.allocation().maxOrderUsdt:0,maxPositions:sharedPortfolioEnabled?3:2,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:'FUTURES_WALLET_HALF_V1',allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('SHORT'):null},
+      manualTrading:{version:1,maxOrderUsdt:sharedPortfolioEnabled?(authorized?sharedPortfolioManager.allocation('LONG').maxOrderUsdt:0):LIVE_MAX_USDT,maxPositions:sharedPortfolioEnabled?3:LIVE_MAX_POSITIONS,buyNewPositionsOnly:true,allocationPolicy:sharedPortfolioEnabled?SHARED_PORTFOLIO_POLICY:LIVE_EQUITY_ALLOCATION,allocation:authorized&&sharedPortfolioEnabled?sharedPortfolioManager.allocation('LONG'):null},
       tradeControl:authorized?tradeControl:null,
       demoTradingEnabled:DEMO_TRADING,
       demoTradingError:authorized?demoTrader.error:null,
