@@ -1,6 +1,6 @@
 //@version=6
 indicator("LEVI · Direction + POC + Position Barriers", overlay=true, max_lines_count=100, max_labels_count=40, max_boxes_count=160, max_bars_back=500)
-// Visual aid only. Broker data, sessions and candle boundaries can differ.
+// Chart analysis and optional manual entry alerts. Data is from the chart feed.
 // Display-only simple moving averages use the selected chart symbol and timeframe.
 bool showMa20 = input.bool(true, "SMA 20", group="Moving averages")
 bool showMa50 = input.bool(true, "SMA 50", group="Moving averages")
@@ -140,6 +140,8 @@ var float vpLower = na
 var float vpUpper = na
 var int vpFirst = na
 var int vpChannelStart = na
+var int vpBreakoutTime = na
+var int vpHistoryStart = na
 var array<float> vpVolumes = array.new<float>(128,0)
 var array<float> vpPriceMass = array.new<float>(128,0)
 var array<box> vpBoxes = array.new<box>()
@@ -255,6 +257,8 @@ if bar_index >= n and bar_index >= last_bar_index - 200
                     vpUpper := savedUpper
                     vpFirst := savedFirst
                     vpChannelStart := savedStart
+                    vpBreakoutTime := time[offset]
+                    vpHistoryStart := time[bar_index-savedFirst]
                     recalcProfile := true
     if recalcProfile and not na(vpA)
         vpLow := low[bar_index-vpA]
@@ -346,6 +350,158 @@ string trendTicker = syminfo.type == "stock" or syminfo.type == "fund" ? ticker.
 bool showHourEma = input.bool(true, "Show closed-hour EMA50", group="Entry confirmation")
 plot(showHourEma ? hourEma : na, "Closed-hour EMA50", color=color.fuchsia, linewidth=2)
 
+bool usEquity = (syminfo.type == "stock" or syminfo.type == "fund") and syminfo.currency == "USD" and (syminfo.prefix == "NASDAQ" or syminfo.prefix == "NYSE" or syminfo.prefix == "AMEX" or syminfo.prefix == "NYSEARCA" or syminfo.prefix == "CBOE" or syminfo.prefix == "BATS")
+bool manualChart = usEquity and chart.is_standard and timeframe.isminutes and timeframe.multiplier == 5 and syminfo.session == session.regular
+
+// Keep the same regular-session 5m history window as the Colmex entry scanner.
+const int WAVE_BAR_MS = 5 * 60 * 1000
+const int WAVE_DAY_MS = 24 * 60 * 60 * 1000
+const int WAVE_WINDOW_MS = 21 * WAVE_DAY_MS
+const string WAVE_TZ = "America/New_York"
+var array<int> waveTimes = array.new_int()
+var array<float> waveHighs = array.new_float()
+var array<float> waveLows = array.new_float()
+
+f_waveDateKey(int stamp) =>
+    year(stamp, WAVE_TZ) * 10000 + month(stamp, WAVE_TZ) * 100 + dayofmonth(stamp, WAVE_TZ)
+
+// Mirror the supported US equity session calendar in lib/colmex-market-hours.mjs.
+f_waveExchangeDay(int stamp) =>
+    int y = year(stamp, WAVE_TZ)
+    int dow = dayofweek(stamp, WAVE_TZ)
+    int dateKey = f_waveDateKey(stamp)
+    var array<int> holidays = array.from(20260101, 20260119, 20260216, 20260403, 20260525, 20260619, 20260703, 20260907, 20261126, 20261225, 20270101, 20270118, 20270215, 20270326, 20270531, 20270618, 20270705, 20270906, 20271125, 20271224, 20280117, 20280221, 20280414, 20280529, 20280619, 20280704, 20280904, 20281123, 20281225)
+    y >= 2026 and y <= 2028 and dow != dayofweek.saturday and dow != dayofweek.sunday and not array.includes(holidays, dateKey)
+
+f_waveSessionGap(int prevOpen, int curOpen) =>
+    int prevClose = prevOpen + WAVE_BAR_MS
+    var array<int> earlyCloses = array.from(20261127, 20261224, 20271126, 20280703, 20281124)
+    int expectedCloseHour = array.includes(earlyCloses, f_waveDateKey(prevOpen)) ? 13 : 16
+    bool allowed = false
+    if hour(prevClose, WAVE_TZ) == expectedCloseHour and minute(prevClose, WAVE_TZ) == 0 and hour(curOpen, WAVE_TZ) == 9 and minute(curOpen, WAVE_TZ) == 30
+        int noon = timestamp(WAVE_TZ, year(prevOpen, WAVE_TZ), month(prevOpen, WAVE_TZ), dayofmonth(prevOpen, WAVE_TZ), 12, 0)
+        for d = 1 to 15
+            int candidate = noon + d * WAVE_DAY_MS
+            if f_waveExchangeDay(candidate)
+                allowed := f_waveDateKey(candidate) == f_waveDateKey(curOpen)
+                break
+    allowed
+
+if manualChart and barstate.isconfirmed and session.ismarket and f_waveExchangeDay(time)
+    if array.size(waveTimes) > 0
+        int prevOpen = array.last(waveTimes)
+        if time != prevOpen + WAVE_BAR_MS and not f_waveSessionGap(prevOpen, time)
+            array.clear(waveTimes)
+            array.clear(waveHighs)
+            array.clear(waveLows)
+    if time_close == time + WAVE_BAR_MS and time % WAVE_BAR_MS == 0 and low > 0 and high >= math.max(open, close) and low <= math.min(open, close)
+        array.push(waveTimes, time)
+        array.push(waveHighs, high)
+        array.push(waveLows, low)
+    else
+        array.clear(waveTimes)
+        array.clear(waveHighs)
+        array.clear(waveLows)
+    while array.size(waveTimes) > 0 and array.first(waveTimes) < time_close - WAVE_WINDOW_MS
+        array.shift(waveTimes)
+        array.shift(waveHighs)
+        array.shift(waveLows)
+
+// Call on an entry candidate. Returns the mean height in percent, or na.
+f_entryWaveMean(bool isLong, int atTime) =>
+    int first = 0
+    int last = array.size(waveTimes) - 1
+    while first <= last and array.get(waveTimes, first) < atTime - WAVE_WINDOW_MS
+        first += 1
+    while last >= first and array.get(waveTimes, last) + WAVE_BAR_MS > atTime
+        last -= 1
+    float result = na
+    if last - first >= 4
+        int lastKind = 0
+        float lastPrice = na
+        float legStart = na
+        array<float> swings = array.new_float()
+        for i = first + 2 to last - 2
+            float h = array.get(waveHighs, i)
+            float l = array.get(waveLows, i)
+            bool isHigh = true
+            bool isLow = true
+            for offset = 1 to 2
+                isHigh := isHigh and h > array.get(waveHighs, i - offset) and h > array.get(waveHighs, i + offset)
+                isLow := isLow and l < array.get(waveLows, i - offset) and l < array.get(waveLows, i + offset)
+            if isHigh != isLow
+                int kind = isHigh ? 1 : -1
+                float price = isHigh ? h : l
+                if kind == lastKind
+                    lastPrice := isHigh ? math.max(lastPrice, price) : math.min(lastPrice, price)
+                else
+                    // Only finalize a leg after all its consecutive same-kind pivots have been combined.
+                    if not na(legStart) and lastKind == (isLong ? 1 : -1)
+                        float height = (isLong ? lastPrice - legStart : legStart - lastPrice) / legStart * 100
+                        if height > 0
+                            array.push(swings, height)
+                            if array.size(swings) > 5
+                                array.shift(swings)
+                    legStart := lastPrice
+                    lastKind := kind
+                    lastPrice := price
+        // The newest pivot is already confirmed by two closed bars on its right.
+        if not na(legStart) and lastKind == (isLong ? 1 : -1)
+            float height = (isLong ? lastPrice - legStart : legStart - lastPrice) / legStart * 100
+            if height > 0
+                array.push(swings, height)
+                if array.size(swings) > 5
+                    array.shift(swings)
+        if array.size(swings) == 5
+            float meanHeight = array.avg(swings)
+            result := meanHeight > 0 and meanHeight < 100 ? meanHeight : na
+    result
+
+// Chart display and the manual alert use exactly the same entry confirmations.
+bool rangeOK = false
+bool returned = false
+bool trendOK = false
+if barstate.islast and timeframe.in_seconds() == 300 and not na(vpPoc) and not na(vpB)
+    rangeOK := vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
+    // The current 5m bar cannot confirm its own reclaim.
+    bool touched = false
+    int confirmedBar = na
+    if bar_index - vpB > 1
+        for k = math.min(200, bar_index-vpB-1) to 1
+            if vpSide == 1 ? low[k] <= vpPoc : high[k] >= vpPoc
+                touched := true
+            if touched and (vpSide == 1 ? close[k] > vpPoc : close[k] < vpPoc)
+                confirmedBar := bar_index-k
+                touched := false
+    returned := confirmedBar == bar_index-1 and (vpSide == 1 ? close > vpPoc and high <= vpPriceB : close < vpPoc and low >= vpPriceB)
+    trendOK := not na(hourPreviousEma) and (vpSide == 1 ? hourEma > hourPreviousEma and hourClose > hourEma and close > hourEma : hourEma < hourPreviousEma and hourClose < hourEma and close < hourEma)
+
+// Create an alert on "Any alert() function call" to receive a manual entry plan.
+float manualStopPct = input.float(1.0, "Initial stop (%)", minval=0.1, maxval=50, step=0.1, group="Manual alert plan")
+float manualTargetPct = input.float(50.0, "Take profit (%)", minval=0.1, maxval=500, step=0.1, group="Manual alert plan")
+float manualTrailPp = input.float(1.0, "Trailing gap (percentage points of entry)", minval=0.1, maxval=50, step=0.1, group="Manual alert plan")
+var int lastAlertBreakout = na
+bool freshClose = barstate.isrealtime and barstate.isconfirmed and timenow >= time_close and timenow - time_close <= 10000
+bool newBreakout = not na(vpBreakoutTime) and (na(lastAlertBreakout) or vpBreakoutTime != lastAlertBreakout)
+if manualChart and session.ismarket and freshClose and newBreakout and rangeOK and returned and trendOK and close > 0
+    // A known data gap invalidates all geometry built before it, not just the reclaim bar.
+    bool contiguous = array.size(waveTimes) > 0 and array.last(waveTimes) == time and array.first(waveTimes) <= vpHistoryStart
+    float activationPct = contiguous ? f_entryWaveMean(vpSide == 1, time_close) : na
+    if not na(activationPct) and manualTargetPct > activationPct and (vpSide == 1 or manualTargetPct < 100)
+        float stopPrice = close * (1 - vpSide * manualStopPct / 100)
+        float targetPrice = close * (1 + vpSide * manualTargetPct / 100)
+        float activationPrice = close * (1 + vpSide * activationPct / 100)
+        float trailDistance = close * manualTrailPp / 100
+        string message = "LEVI · איתות לבדיקה ידנית · " + syminfo.prefix + ":" + syminfo.ticker + " · " + (vpSide == 1 ? "LONG" : "SHORT")
+        message += "\nסגירת נר 5 דקות: " + str.format_time(time_close, "yyyy-MM-dd HH:mm", "America/New_York") + " (ניו יורק)"
+        message += "\nמחיר ייחוס: " + str.tostring(close, format.mintick) + " USD · סטופ התחלתי: " + str.tostring(stopPrice, format.mintick) + " (" + str.tostring(manualStopPct, "#.##") + "%)"
+        message += "\nיעד מימוש: " + str.tostring(targetPrice, format.mintick) + " (" + str.tostring(manualTargetPct, "#.##") + "%)"
+        message += "\nהפעלת הגנה לפי ממוצע 5 גלים: " + str.tostring(activationPrice, format.mintick) + " (" + str.tostring(activationPct, "#.####") + "% מהכניסה)"
+        message += "\nאחרי ההפעלה: מרחק סטופ של " + str.tostring(trailDistance, "#.####") + " USD " + (vpSide == 1 ? "מתחת לשיא" : "מעל לשפל") + " (" + str.tostring(manualTrailPp, "#.##") + " נקודות אחוז ממחיר הכניסה)"
+        message += "\nהביצוע ועדכון הסטופ ידניים. יש לחשב את הרמות לפי מחיר הביצוע בפועל."
+        alert(message, alert.freq_once_per_bar_close)
+        lastAlertBreakout := vpBreakoutTime
+
 // One combined indicator keeps the regression optional and the frozen POC visible.
 // This 128-bin OHLC range-weighted estimate is approximate; it is not trade-by-trade POC.
 if barstate.islast
@@ -378,19 +534,6 @@ if barstate.islast
         array.push(vpLabels,label.new(vpA,vpPriceA,"A",style=vpSide == 1 ? label.style_label_up : label.style_label_down,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(vpB,vpPriceB,"B",style=vpSide == 1 ? label.style_label_down : label.style_label_up,color=color.new(color.blue,50),textcolor=color.white))
         array.push(vpLabels,label.new(bar_index+2,vpPoc,"POC estimate · 128 bins "+str.tostring(vpPoc,format.mintick),style=label.style_label_left,color=color.new(color.yellow,65),textcolor=color.white))
-        bool rangeOK = vpZone == 2 or (vpSide == 1 ? vpZone == 1 : vpZone == 3)
-        // The current 5m bar cannot confirm its own reclaim.
-        bool touched = false
-        int confirmedBar = na
-        if bar_index - vpB > 1
-            for k = math.min(200, bar_index-vpB-1) to 1
-                if vpSide == 1 ? low[k] <= vpPoc : high[k] >= vpPoc
-                    touched := true
-                if touched and (vpSide == 1 ? close[k] > vpPoc : close[k] < vpPoc)
-                    confirmedBar := bar_index-k
-                    touched := false
-        bool returned = confirmedBar == bar_index-1 and (vpSide == 1 ? close > vpPoc and high <= vpPriceB : close < vpPoc and low >= vpPriceB)
-        bool trendOK = not na(hourPreviousEma) and (vpSide == 1 ? hourEma > hourPreviousEma and hourClose > hourEma and close > hourEma : hourEma < hourPreviousEma and hourClose < hourEma and close < hourEma)
         table.cell(pocTable,0,0,(vpSide==1 ? "LONG" : "SHORT")+" SETUP · not an open position",text_color=color.yellow)
         table.cell(pocTable,0,1,"1 ✓ Confirmed channel · 3 ✓ Breakout",text_color=color.white)
         table.cell(pocTable,0,2,rangeOK ? "8 ✓ Initial consolidation" : "8 ○ Initial consolidation does not match",text_color=rangeOK ? color.lime : color.orange)
