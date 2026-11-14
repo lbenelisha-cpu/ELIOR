@@ -164,3 +164,139 @@ body.portfolio-terminal .account-menu > summary {
 }
 body.portfolio-terminal summary:hover { background: #edf3ef !important; }
 body.portfolio-terminal summary:focus-visible { outline-color: #28664d !important; }
+
+/* Account overview and live balances, including the compact account monitor. */
+.portfolio-terminal #overviewUpdated {
+  color: #53635a;
+}
+
+#overviewMode,
+#overviewHealth,
+#pocLiveMonitor .live-monitor-poc-state.paused {
+  background: #f1f4f1;
+  border-color: #c9d4cd;
+  color: #46574d;
+}
+
+#overviewMode[data-mode="live"],
+#overviewHealth[data-state="good"],
+#pocLiveMonitor .live-monitor-badge,
+#pocLiveMonitor .live-monitor-poc-state.ready {
+  background: #eaf4ed;
+  border-color: #bdd5c5;
+  color: #245d43;
+}
+
+#overviewMode[data-mode="demo"] {
+  background: #f0edf8;
+  border-color: #d7cfe6;
+  color: #5c487b;
+}
+
+#overviewHealth[data-state="warning"],
+#pocLiveMonitor .live-monitor-poc-state.attention {
+  background: #fbf3e6;
+  border-color: #dfcba5;
+  color: #785117;
+}
+
+#overviewHealth .health-dot {
+  background: currentColor;
+}
+
+.portfolio-terminal .overview .metric-card,
+body.unified-dashboard #pocLiveMonitor.live-monitor-integrated,
+#pocLiveMonitor,
+#pocLiveMonitor .live-monitor-card,
+#pocLiveMonitor .live-monitor-table-card {
+  background: #fff;
+  color: #202723;
+  border-color: #dce2de;
+  box-shadow: 0 3px 12px rgba(28, 43, 34, .045);
+}
+
+.portfolio-terminal .overview .metric-card.featured {
+  background: #edf4ef;
+  border-color: #c9dacd;
+}
+
+.portfolio-terminal .overview .unified-daily {
+  background: #f7f8f6;
+  border-color: #dce2de;
+  overflow: hidden;
+}
+
+.portfolio-terminal .overview .metric-card > span,
+.portfolio-terminal .overview .metric-card small,
+#pocLiveMonitor :is(p, small, .live-monitor-card > span) {
+  color: #53635a;
+}
+
+.portfolio-terminal .overview .metric-card.featured strong,
+#pocLiveMonitor .live-equity-half > strong {
+  color: #245d43;
+}
+
+.portfolio-terminal .overview .metric-card strong[data-sign="positive"],
+#pocLiveMonitor .gain {
+  color: #28664d;
+}
+
+.portfolio-terminal .overview .metric-card strong[data-sign="negative"],
+#pocLiveMonitor .loss {
+  color: #a34550;
+}
+
+#pocLiveMonitor .unknown {
+  color: #785117;
+}
+
+#pocLiveMonitor .live-total-equity,
+#pocLiveMonitor .live-equity-total-line > strong {
+  color: #202723;
+}
+
+.portfolio-terminal .combined-position-slots .position-slot-half + .position-slot-half,
+#pocLiveMonitor :is(.live-equity-half, .live-equity-total-line, .live-monitor-poc, th, td) {
+  border-color: #d5dfd8;
+}
+
+#pocLiveMonitor thead th {
+  background: #f1f4f1;
+  color: #46574d;
+}
+
+#pocLiveMonitor .live-monitor-poc-state small {
+  color: inherit;
+}
+
+/* The intraday Spot chart is also mounted inside the selected-asset view. */
+#binanceEquityPanel {
+  background: #fff;
+  border-color: #dce2de;
+  color: #202723;
+  box-shadow: 0 4px 16px rgb(28 43 34 / 5%);
+}
+#binanceEquityPanel .equity-head h2 { color: #202723; }
+#binanceEquityPanel :is(.equity-eyebrow, .equity-selection, .equity-stats strong) { color: #245d43; }
+#binanceEquityPanel :is(.equity-head p, .equity-status, .equity-note, .equity-stats span, .equity-stats small) { color: #53635a; }
+#binanceEquityPanel .equity-stats > div,
+#binanceEquityPanel .equity-note { border-color: #d5dfd8; }
+#binanceEquityPanel .equity-stats .gain { color: #28664d; }
+#binanceEquityPanel .equity-stats .loss { color: #a34550; }
+#binanceEquityPanel .equity-gap { color: #805713; }
+#binanceEquityPanel .equity-grid { stroke: #cbd6cf; }
+#binanceEquityPanel .equity-axis { fill: #53635a; }
+#binanceEquityPanel .equity-line.gain { stroke: #28664d; filter: none; }
+#binanceEquityPanel .equity-line.loss { stroke: #a34550; }
+#binanceEquityPanel :is(.equity-dot, .equity-area).gain { fill: #28664d; }
+#binanceEquityPanel :is(.equity-dot, .equity-area).loss { fill: #a34550; }
+#binanceEquityPanel .equity-cursor { fill: #fff; stroke: #263b31; }
+#binanceEquityPanel input[type="range"] { accent-color: #28664d; }
+
+/* Indicator controls rebuild this SVG and apply inline colors on each chart refresh. */
+#chartTerminal > div:has(> svg[aria-label="RSI 14"]) { background: #fbfcfb !important; }
+#chartTerminal > div:has(> svg[aria-label="RSI 14"]) > div { color: #6b429f !important; }
+#chartTerminal svg[aria-label="RSI 14"] path { stroke: #6b429f; }
+#chartTerminal svg[aria-label="RSI 14"] text { fill: #53635a; }
+#chartTerminal svg[aria-label="RSI 14"] line { stroke: #a5b4aa; }
