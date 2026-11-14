@@ -4,8 +4,8 @@ export function movingAverage(bars,period){
  let sum=0,count=0;return bars.map((b,i)=>{const v=Number(b.close);if(Number.isFinite(v)){sum+=v;count++;}if(i>=period){const old=Number(bars[i-period].close);if(Number.isFinite(old)){sum-=old;count--;}}return i>=period-1&&count===period?sum/period:null;});
 }
 export function createIndicatorControls({host,toolbar,shell}){
- const periods=[20,50,100,200],colors=['#ffc857','#48d597','#ed86d1','#397dff'];
- let settings={20:false,50:false,100:false,200:true,rsi:true},config=null,overlay=null;
+ const periods=[20,50,100,150,200],colors=['#ffc857','#48d597','#ed86d1','#ff914d','#397dff'];
+ let settings={20:false,50:false,100:false,150:true,200:true,rsi:true},config=null,overlay=null;
  try{Object.assign(settings,JSON.parse(localStorage.getItem('levi-chart-indicators-v1')||'{}'));}catch{}
  for(const id of ['rsiPanel','colmexRsi']){const old=document.getElementById?.(id);if(old)old.style.display='none';}
  const controls=document.createElement('div');controls.dir='ltr';controls.style.cssText='display:flex;flex-wrap:wrap;gap:14px;padding:8px;align-items:center';

@@ -1,4 +1,4 @@
-import {createIndicatorControls} from './chart-indicator-controls.js?v=20261109';
+import {createIndicatorControls} from './chart-indicator-controls.js?v=20261114-ma150';
 // Presentation only. Receives displayed candles; never fetches or submits an order.
 import {candleTime} from './lib/chart-viewport.mjs?v=20261101-chart-terminal';
 const NS='http://www.w3.org/2000/svg';
