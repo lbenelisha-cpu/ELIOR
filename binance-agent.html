@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12500)
-Total output lines: 536
-
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
@@ -254,7 +251,17 @@ Total output lines: 536
           </div>
         </div>
 
-        <div id="binance…500 tokens truncated…ption value="ABOVE">כשהמחיר עולה אל ה־POC</option></select></label>
+        <div id="binanceExitSnapshot" aria-label="ספי המכירה של הבוט"></div>
+        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה מהירה · Spot</button><button id="manualSellBtn" type="button" disabled aria-label="מכירה ידנית מיידית">מכירה מהירה · Spot</button><button id="manualShortOpenBtn" type="button" disabled>פתיחת שורט · Futures</button><button id="manualShortCloseBtn" type="button" disabled>סגירת שורט · Futures</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
+        <details id="pocPanel" class="poc-panel">
+          <summary>POC · כניסה אוטומטית במחיר שתבחר</summary>
+          <p class="mini">בחר נכס בגרף, הזן מחיר כניסה וקבע LONG או SHORT. זו הוראה ידנית מתוזמנת לפי מחיר, ללא המתנה לאיתות התעלות. לאחר המילוי הבוט מנהל את הפוזיציה.</p>
+          <form id="pocForm">
+            <div class="poc-fields">
+              <label>הנכס שנבחר בגרף<input id="pocSymbol" readonly dir="ltr" required></label>
+              <label>סוג כניסה<select id="pocSide"><option value="LONG">LONG · קנייה ב־Spot</option><option value="SHORT">SHORT · Futures Isolated 1x</option></select></label>
+              <label>מחיר כניסה POC<input id="pocPrice" type="number" inputmode="decimal" min="0.00000001" step="any" required autocomplete="off"></label>
+              <label>הפעלת הכניסה<select id="pocDirection"><option value="BELOW">כשהמחיר יורד אל ה־POC</option><option value="ABOVE">כשהמחיר עולה אל ה־POC</option></select></label>
               <label>תקציב ב־USDT<input id="pocAmount" type="number" inputmode="decimal" min="5" step="0.01" required autocomplete="off"></label>
               <label>תוקף ההמתנה<select id="pocExpiry"><option value="1">שעה</option><option value="4">4 שעות</option><option value="12">12 שעות</option><option value="24" selected>24 שעות</option></select></label>
             </div>
@@ -509,11 +516,11 @@ Total output lines: 536
   <script src="/binance-scanner-view.js?v=20261021-scanner-stable"></script>
   <script src="/binance-chart-cache.js?v=20261023-fast-start"></script>
   <script src="/trade-risk.js?v=20261112-five-swings"></script>
-  <script src="/regression-trend.js?v=20261030-regression"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
+  <script src="/regression-trend.js?v=20261115-regression20"></script><script src="/parallel-channel.js?v=20261101-channel-touches"></script>
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
   <script src="/binance-futures-positions.js?v=20261114-closed-levels"></script>
-  <script src="/binance-agent.js?v=20261115-channel20"></script>
+  <script src="/binance-agent.js?v=20261115-channel20-repair"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261111-dynamic-short"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>

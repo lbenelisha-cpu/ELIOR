@@ -5,7 +5,7 @@
  const valid=v=>v!==null&&v!==''&&typeof v!=='boolean'&&Number.isFinite(Number(v))&&Number(v)>0;
  function analyze(input,{interval='5m',period=100,deviations=2,now=Date.now()}={}){
   const duration=durations[interval],reject=reason=>({ready:false,reason,period});
-  if(!duration||![50,100,200].includes(period)||![1,2,3].includes(deviations)||!Array.isArray(input))return reject('INVALID_INPUT');
+  if(!duration||![20,50,100,200].includes(period)||![1,2,3].includes(deviations)||!Array.isArray(input))return reject('INVALID_INPUT');
   let bars=[];
   for(const b of input.slice(-600)){
    const at=Number(b.openTime),end=b.closeTime===undefined?at+duration:Number(b.closeTime);
