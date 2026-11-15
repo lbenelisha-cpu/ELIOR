@@ -17,7 +17,7 @@ export function renderSearchStatus(host,diagnostic,{symbol='',check=null,positio
   if(!channelPrimary.enabled)add('p','כניסות חסומות: נדרש זמן הפעלה תקין למסלול התעלות.');
   else if(check?.entryDecisions?.primary==='channel_breakout')add('p','בדיקת שרת אחרונה: '+time(check.at)+' · '+entryReasonLabel(check.reason),'search-server-check');
   else add('p','ממתין לבדיקה מתועדת במסלול התעלות; בדיקות מהמסלול הקודם אינן איתות כניסה.');
-  add('small','50 נרות לפני הפריצה · שתי נגיעות בכל גבול · רגרסיה עולה · '+(channelPrimary.waitForBreakoutClose===false?'פריצה במחיר חי ומחזור מצטבר, ללא המתנה לסגירת הנר':'סגירת פריצה ומחזור')+'. הסימון בגרף הוא תצוגה; ההחלטה נקבעת לפי נתונים עדכניים בשרת.');
+  add('small','20 נרות לפני הפריצה · שתי נגיעות בכל גבול · רגרסיה עולה · '+(channelPrimary.waitForBreakoutClose===false?'פריצה במחיר חי ומחזור מצטבר, ללא המתנה לסגירת הנר':'סגירת פריצה ומחזור')+'. הסימון בגרף הוא תצוגה; ההחלטה נקבעת לפי נתונים עדכניים בשרת.');
   return;
  }
  add('strong',symbol+' · '+(manual?'תצוגה ידנית':position?'פוזיציה פתוחה · מוצגות נקודות העסקה':diagnostic?'חיפוש נוכחי: '+entryReasonLabel(diagnostic.phase):'ממתין לנרות לניתוח'));

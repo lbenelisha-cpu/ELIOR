@@ -1,7 +1,7 @@
 // Shared, deterministic geometry for the server and chart. No account or order access.
 (function(root){
  'use strict';
- const STEP=300000,VERSION='CHANNEL_POC_RETEST_V2',REPORT='CHANNEL_POC_CONDITIONS_V1';
+ const STEP=300000,PERIOD=20,VERSION='CHANNEL_POC_RETEST_V2',REPORT='CHANNEL_POC_CONDITIONS_V1';
  const ANCHOR_POLICY='RECENT_WAVE_POC_V2';
  const consolidationPolicy=Object.freeze({version:'CHANNEL_INITIAL_CONSOLIDATION_V2',minBars:3,maxBars:8,maxRangeFraction:.35,maxDriftFraction:.5,lowerZone:1/3,upperZone:2/3,selection:'CONTAINS_FIRST_CHANNEL_ANCHOR',middle:'ALLOW_BOTH'});
  const positive=n=>Number.isFinite(n)&&n>0;
@@ -42,9 +42,9 @@
   return {version:p.version,side,passed:false,reason:'WAIT_INITIAL_CHANNEL_CONSOLIDATION'};
  }
  function geometry(history){
-  if(history.length!==50||!root.LEVI_PARALLEL)return null;
+  if(history.length!==PERIOD||!root.LEVI_PARALLEL)return null;
   const mapped=history.map((b,i)=>({...b,openTime:STEP*(i+1),closeTime:STEP*(i+2)}));
-  const c=root.LEVI_PARALLEL.analyze(mapped,{period:50,interval:'5m',now:52*STEP,deviations:2,requireConfirmed:true});
+  const c=root.LEVI_PARALLEL.analyze(mapped,{period:PERIOD,interval:'5m',now:(PERIOD+2)*STEP,deviations:2,requireConfirmed:true});
   return c.ready&&!c.provisional?c:null;
  }
  function makeWave(bars,ref,side,breakIndex,startIndex,after=0){
@@ -99,9 +99,9 @@
   let wave=null,reference=null;
   // Replay forward only. A valid channel may remain the reference while its
   // breakout/return unfolds; no future candle identifies the wave's peak.
-  for(let i=Math.max(50,firstFresh);i<closed.length;i++){
-   const history=closed.slice(i-50,i),b=closed[i],c=geometry(history);
-   if(c)reference={history,c,start:i-50};
+  for(let i=Math.max(PERIOD,firstFresh);i<closed.length;i++){
+   const history=closed.slice(i-PERIOD,i),b=closed[i],c=geometry(history);
+   if(c)reference={history,c,start:i-PERIOD};
    if(wave)extendWave(wave,closed,i);
    if(!reference)continue;
    const ref=reference,offset=i-ref.start,upper=ref.c.intercept+ref.c.slope*offset+ref.c.width,lower=ref.c.intercept+ref.c.slope*offset-ref.c.width;
@@ -134,7 +134,7 @@
    states.poc=!model.profile?'unknown':touched?'passed':'waiting';
    reason=!model.consolidation.passed?model.consolidation.reason:!model.profile?'WAIT_POC_VOLUME_DATA':pendingExtreme?'WAIT_POC_WAVE_CLOSE':!touched?'WAIT_POC_RETEST':'CHANNEL_POC_READY';
   }else{
-   const h=closed.slice(-50),c=geometry(h);
+   const h=closed.slice(-PERIOD),c=geometry(h);
    states.channel=c?'passed':'waiting';
    if(c){const range=initialRange(h,c,side,entryAfter);states.range=range.passed?'passed':'waiting';states.break='waiting';reason=range.passed?'WAIT_POC_CHANNEL_BREAKOUT':range.reason;}
    else reason='WAIT_CHANNEL_TWO_TOUCHES';
@@ -142,5 +142,5 @@
   const conditions={version:REPORT,side,at:now,expiresAt:(Math.floor(now/STEP)+1)*STEP,rows:Object.entries(states).map(([id,state])=>({id,state})),model,chart:model?{interval:'5m',bars:[...closed.slice(-79),...(liveBar?[liveBar]:[])].map(({openTime,closeTime,open,high,low,close,volume,closed})=>({openTime,closeTime,open,high,low,close,volume,closed})),price,at:now}:null};
   return {ready:Object.values(states).every(s=>s==='passed'),reason,model,conditions};
  }
- root.LEVI_CHANNEL_POC=Object.freeze({VERSION,REPORT,STEP,ANCHOR_POLICY,consolidationPolicy,profile,initialRange,geometry,freeze,analyze});
+ root.LEVI_CHANNEL_POC=Object.freeze({VERSION,REPORT,STEP,PERIOD,ANCHOR_POLICY,consolidationPolicy,profile,initialRange,geometry,freeze,analyze});
 })(globalThis);

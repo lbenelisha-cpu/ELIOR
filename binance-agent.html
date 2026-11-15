@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 12500)
+Total output lines: 536
+
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
@@ -251,17 +254,7 @@
           </div>
         </div>
 
-        <div id="binanceExitSnapshot" aria-label="ספי המכירה של הבוט"></div>
-        <div class="manual-trade-actions"><button id="manualBuyBtn" type="button" disabled>קנייה מהירה · Spot</button><button id="manualSellBtn" type="button" disabled aria-label="מכירה ידנית מיידית">מכירה מהירה · Spot</button><button id="manualShortOpenBtn" type="button" disabled>פתיחת שורט · Futures</button><button id="manualShortCloseBtn" type="button" disabled>סגירת שורט · Futures</button><button id="manualConnectBtn" type="button">חבר מכשיר למסחר</button><button id="manualForgetBtn" type="button">נתק מסחר מהמכשיר</button><p id="deviceAccessStatus" class="mini" aria-live="polite"></p><p id="hourlyTrendStatus" class="mini" aria-live="polite"></p><p id="manualTradeHint" class="mini" aria-live="polite">בודק זמינות מסחר ידני…</p></div>
-        <details id="pocPanel" class="poc-panel">
-          <summary>POC · כניסה אוטומטית במחיר שתבחר</summary>
-          <p class="mini">בחר נכס בגרף, הזן מחיר כניסה וקבע LONG או SHORT. זו הוראה ידנית מתוזמנת לפי מחיר, ללא המתנה לאיתות התעלות. לאחר המילוי הבוט מנהל את הפוזיציה.</p>
-          <form id="pocForm">
-            <div class="poc-fields">
-              <label>הנכס שנבחר בגרף<input id="pocSymbol" readonly dir="ltr" required></label>
-              <label>סוג כניסה<select id="pocSide"><option value="LONG">LONG · קנייה ב־Spot</option><option value="SHORT">SHORT · Futures Isolated 1x</option></select></label>
-              <label>מחיר כניסה POC<input id="pocPrice" type="number" inputmode="decimal" min="0.00000001" step="any" required autocomplete="off"></label>
-              <label>הפעלת הכניסה<select id="pocDirection"><option value="BELOW">כשהמחיר יורד אל ה־POC</option><option value="ABOVE">כשהמחיר עולה אל ה־POC</option></select></label>
+        <div id="binance…500 tokens truncated…ption value="ABOVE">כשהמחיר עולה אל ה־POC</option></select></label>
               <label>תקציב ב־USDT<input id="pocAmount" type="number" inputmode="decimal" min="5" step="0.01" required autocomplete="off"></label>
               <label>תוקף ההמתנה<select id="pocExpiry"><option value="1">שעה</option><option value="4">4 שעות</option><option value="12">12 שעות</option><option value="24" selected>24 שעות</option></select></label>
             </div>
@@ -306,7 +299,7 @@
         <div id="chartTools"></div><div id="chartTimeNavigation" aria-label="בחירת חלון זמן בגרף"></div>
         <div class="chart-rise-controls"><label><input type="checkbox" id="showRises" checked> הצג עליות וירידות של 1% ומעלה</label><span>עליות מעל הגרף · ירידות מתחתיו · לחץ על אחוז להדגשת המהלך</span></div>
         <div id="chartRises" class="chart-move-lane" aria-label="עליות מעל הגרף"></div>
-        <div class="chart-rise-controls"><label><input id="showRegression" type="checkbox" checked> Regression Trend · רגרסיה · כחול/סגול</label><label>נרות <select id="regressionPeriod"><option selected>50</option><option>100</option><option>200</option></select></label><label>רוחב <select id="regressionDeviation"><option value="1">1σ</option><option value="2" selected>2σ</option><option value="3">3σ</option></select></label></div>
+        <div class="chart-rise-controls"><label><input id="showRegression" type="checkbox" checked> Regression Trend · רגרסיה · כחול/סגול</label><label>נרות <select id="regressionPeriod"><option selected>20</option><option>50</option><option>100</option><option>200</option></select></label><label>רוחב <select id="regressionDeviation"><option value="1">1σ</option><option value="2" selected>2σ</option><option value="3">3σ</option></select></label></div>
         <div class="chart-rise-controls"><label><input id="showParallel" type="checkbox" checked> תעלה מקבילה · נקודות קיצון · כתום מקווקו</label></div>
         <a href="#strategyReviewPanel" id="channelStudyLink">השוואת התעלות · מעקב תוצאות</a>
         <p id="parallelChannelStatus" class="mini" role="status"></p>
@@ -520,13 +513,13 @@
   <script src="/resistance-patterns.js?v=20261031-channel"></script>
   <script src="/channel-watch.js?v=20261103-intrabar"></script>
   <script src="/binance-futures-positions.js?v=20261114-closed-levels"></script>
-  <script src="/binance-agent.js?v=20261114-spot-review"></script>
+  <script src="/binance-agent.js?v=20261115-channel20"></script>
   <script src="/binance-device-access.js?v=20261025-stability"></script>
   <script src="/binance-poc.js?v=20261111-dynamic-short"></script>
   <script src="/news-summary.js?v=20261106-he-brief"></script>
   <script src="/channel-entry-checklist.js?v=20261110-direction-confirmation"></script>
   <script type="module" src="/poc-signal-chart.js?v=20261107-poc-v2"></script>
-  <script src="/market-attention.js?v=20261110-direction-confirmation"></script>
+  <script src="/market-attention.js?v=20261115-channel20"></script>
   <script src="/binance-manual-trades.js?v=20261111-dynamic-short"></script>
   <script src="/binance-agent-portfolio.js?v=20261022-credit-saving"></script>
 <script src="/binance-demo-account.js?v=20261025-stability"></script>

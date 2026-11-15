@@ -1,8 +1,8 @@
-import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261102-labels-pnl';
+import {colmexChartChannels,channelSegments,drawColmexChannels} from './lib/colmex-channel-view.mjs?v=20261115-channel20';
 import {entryReasonLabel} from './lib/colmex-entry-reasons.mjs?v=20261110-direction-confirmation';
 import {createChartTerminal} from './chart-terminal.js?v=20261111-barriers';
 import {scanCoverage,stockScanStatus} from './lib/colmex-scan-coverage.mjs?v=20261029-higher-recovery';
-import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261110-direction-confirmation';
+import {colmexLiveTradeMarks,renderColmexChannelConditions} from './lib/colmex-channel-conditions.mjs?v=20261115-channel20';
 import {renderSlopePanel} from './ma-slope-panel.js?v=20261026-entry-alpha';
 import {renderRsiChart} from './rsi-chart.js?v=20261102-channels';
 import {createMarketLoadGate} from './lib/colmex-market-loading.mjs?v=20261021-chart-quota';
@@ -87,7 +87,7 @@ function renderChart(){
  const hasPoc=!manualCharts.has(selected)&&['5m','5min'].includes(interval)&&fixedRangeProfile.isAutomatic?.()&&Object.values(liveSearchState?.checks?.[selected]?.entryDecisions?.channel?.conditionReports||{}).some(r=>r.model?.profile);
  const segments=channelSegments(channels,bars).filter(s=>s.kind==='swing'?$('#showColmexSwing')?.checked!==false&&!hasPoc:$('#showColmexRegression')?.checked!==false);
  renderColmexChannelConditions($('#colmexChannelConditions'),{channels,status:liveSearchState,symbol:selected,manual:manualCharts.has(selected),historical:visibleWindow.end<chartBars().length});
- const channelStatus=$('#colmexChannelStatus');if(channelStatus)channelStatus.textContent=channels.regression.reason==='FIVE_MINUTE_CHART_REQUIRED'?'בחר נרות 5 דקות להצגת שתי התעלות על 50 נרות.':globalThis.LEVI_PARALLEL.describe(channels.swing)+' · '+(channels.regression.ready?'רגרסיה · 50 נרות סגורים · '+(channels.regression.slope>0?'עולה':channels.regression.slope<0?'יורדת':'שטוחה'):'רגרסיה · נדרשים 50 נרות סגורים ורציפים');
+ const channelStatus=$('#colmexChannelStatus');if(channelStatus)channelStatus.textContent=channels.regression.reason==='FIVE_MINUTE_CHART_REQUIRED'?'בחר נרות 5 דקות להצגת שתי התעלות על 20 נרות.':globalThis.LEVI_PARALLEL.describe(channels.swing)+' · '+(channels.regression.ready?'רגרסיה · 20 נרות סגורים · '+(channels.regression.slope>0?'עולה':channels.regression.slope<0?'יורדת':'שטוחה'):'רגרסיה · נדרשים 20 נרות סגורים ורציפים');
  const entry=PAPER_MODE?state.positions[selected]?.entry:null,values=bars.flatMap(b=>[b.high,b.low]);for(const s of segments)values.push(s.start.upper,s.start.lower,s.end.upper,s.end.lower);if(barrierModel)values.push(...barrierModel.lines.map(line=>line.price));for(const line of sim.lines)values.push(line.price);for(const point of visiblePoints)values.push(point.price);if(entry)values.push(entry);const scaleValues=chartTerminal.fitCandles?bars.flatMap(b=>[b.high,b.low]):values;let lo=Math.min(...scaleValues),hi=Math.max(...scaleValues),pad=(hi-lo)*.08||hi*.01;lo-=pad;hi+=pad;const x=i=>20+(i+.5)*plotWidth/bars.length,bounds=wyckoffEdgeBands(arrowPoints,x,{left:16,right:plotRight}),y=p=>bounds.bottom-(p-lo)/(hi-lo)*250;svg.setAttribute('viewBox','0 0 '+W+' '+bounds.height);root.style.aspectRatio=W+' / '+bounds.height;
  for(let i=0;i<5;i++){const price=lo+(hi-lo)*i/4;add('line',{x1:15,y1:y(price),x2:plotRight,y2:y(price),stroke:'#21364b'});add('text',{x:plotRight+15,y:y(price)+4,fill:'#93a8bf','font-size':11},price.toFixed(price<10?4:2));}
 
