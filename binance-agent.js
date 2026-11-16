@@ -28,7 +28,8 @@ const put=(s,v)=>{const e=$(s);if(e)e.textContent=v};
 
 let selectedSymbol='BTCUSDT';
 let selectedChartMarket='SPOT';
-function chartPositionSnapshot(){return selectedChartMarket==='FUTURES'?{venue:'BINANCE_FUTURES',shortTrading:futuresManualStatus,mode:currentMode}:{agent:currentAgentData,account:currentLiveAccount,mode:currentMode,receivedAt:Date.now()};}
+let chartMarketPreference=null;
+function chartPositionSnapshot(){return selectedChartMarket==='FUTURES'?{venue:'BINANCE_FUTURES',shortTrading:futuresChartStatus,mode:currentMode}:{agent:currentAgentData,account:currentLiveAccount,mode:currentMode,receivedAt:Date.now()};}
 let currentAgentData=null;
 let currentMode='demo';
 let currentLiveAccount=null;
@@ -249,10 +250,13 @@ function mode(s){
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   if(currentMode!==s.mode){
+    if(isDemo)futuresReadGeneration++;
     const report=$('#spotPocReview');
     if(report)report.hidden=true;
   }
   currentMode=s.mode;
+  // The scanner can report just the mode before the independent Futures read completes.
+  if (isDemo || Object.hasOwn(s,'shortTrading')) updateFuturesChartStatus(s);
   manualTradeCapabilities=s.manualTrading||null;futuresManualCapabilities=s.futuresManualTrading||null;futuresManualStatus=s.shortTrading||null;
   renderTradeControlStatus(s);
   const paused=s.tradeControl?.paused===true;
@@ -353,11 +357,18 @@ function activeContext(d,currentMode,liveAccount){
   return {p,agents,isLive,liveBalances,isHeld,activeAgents,weakestActive};
 }
 
-function selectScannerAsset(symbol,tr){
+function selectScannerAsset(symbol,tr,market=null){
+  if(symbol!==selectedSymbol||market)chartMarketPreference=market;
   selectedSymbol=symbol;
   if($('#chartSection'))$('#chartSection').open=true;
   document.querySelectorAll('#assetsBody tr').forEach(x=>x.classList.toggle('selected',x===tr));
   updateSelectedAsset(currentAgentData,currentMode,currentLiveAccount);
+}
+function chartMarketForPosition(preference,shortPosition,hasLong){
+  return preference||(shortPosition&&!hasLong?'FUTURES':'SPOT');
+}
+function chartShortPosition(symbol){
+  return currentMode==='live'?futuresChartStatus?.positions?.find(p=>p.symbol===symbol):null;
 }
 function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
   d={...d,agents:activeContext(d,currentMode,liveAccount).agents};
@@ -444,7 +455,8 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
 
     return Number(b.score||0)-Number(a.score||0);
   });
-  if(!currentVisibleAgents.some(a=>a.symbol===selectedSymbol)){
+  if(!currentVisibleAgents.some(a=>a.symbol===selectedSymbol)&&!(currentMode==='live'&&(chartMarketPreference==='FUTURES'||chartShortPosition(selectedSymbol)))){
+    chartMarketPreference=null;
     selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
   }
 
@@ -505,19 +517,36 @@ function rotationGapText(a,d,currentMode,liveAccount){
   return (gap>=0?'+':'')+fmt(gap,1)+' / נדרש +'+fmt(Number(d.config?.rotationScoreGap||20),0);
 }
 
-async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode,liveAccount=currentLiveAccount){
-  if(!d) return;
-  const a=(d.agents||[]).find(x=>x.symbol===selectedSymbol)||(d.agents||[])[0];
-  if(!a) return;
-  selectedSymbol=a.symbol;
+async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode,liveAccount=currentLiveAccount,{statusOnly=false}={}){
+  const a=d?.agents?.find(x=>x.symbol===selectedSymbol);
+  const short=chartShortPosition(selectedSymbol);
+  if(currentModeArg!=='live')chartMarketPreference=null;
+  const hasLong=a?.position==='LONG'||liveAccount?.balances?.some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5);
+  selectedChartMarket=chartMarketForPosition(chartMarketPreference,short,hasLong);
+  put('#chartSymbol',selectedSymbol);
+  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),chartPositionSnapshot(),selectedSymbol);
+  put('#chartSectionLabel',selectedSymbol+' · נרות, RSI ותעלות');
+  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+selectedSymbol+(selectedChartMarket==='FUTURES'?'.P':''));
+  if(chartCandles.length&&chartAnalysisContext?.split(':')[0]===selectedSymbol)drawCandles(chartCandles);
+  else refreshPositionPriceLegend();
+  window.dispatchEvent(new Event('levi:chart-selection'));
+  if(selectedChartMarket==='FUTURES'||!a){
+    const model=globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot(chartPositionSnapshot(),selectedSymbol);
+    const status=selectedChartMarket==='FUTURES'?(short?'פוזיציית SHORT · Futures':'אין נתוני פוזיציית SHORT'):'אין נתוני סריקה';
+    put('#chartDecisionBadge',status);
+    put('#chartPrice',model?.price&&!model.stale?'$'+fmt(model.price,8):'—');
+    put('#chartMeta',status);
+    put('#actionSelectedSymbol',selectedSymbol);
+    put('#actionSelectedDecision',status);
+    for(const id of ['chartScore','chartMA','chartWave','chartPrevDown','chartQualification','entryRouteDecision','hourlyTrendStatus','actionSelectedPnl','actionSelectedPnlNote','actionRotationGap','actionQualification'])put('#'+id,'—');
+    for(const id of ['chartDecisionBadge','actionSelectedPnl'])$('#'+id)?.classList.remove('pnl-profit','pnl-loss','pnl-flat','pnl-unknown');
+    if(!statusOnly&&(activeView==='trade'||activeView==='scans')&&$('#chartSection')?.open!==false)await loadChart(selectedSymbol);
+    return;
+  }
   const {isHeld,activeAgents,weakestActive,p}=activeContext(d,currentModeArg,liveAccount);
   const dec=decisionFor(a,isHeld(a),activeAgents.length,Number(currentModeArg==='live'?(d.config?.maxPositions||5):(p.maxPositions||6)),weakestActive,Number(d.config?.rotationScoreGap||20),currentModeArg==='live',liveAccount);
   const s=a.strategy||{};
 
-  put('#chartSymbol',a.symbol);
-  globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),chartPositionSnapshot(),a.symbol);
-  put('#chartSectionLabel',a.symbol+' · נרות, RSI ותעלות');
-  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+a.symbol+(selectedChartMarket==='FUTURES'?'.P':''));
   put('#chartPrice',s.price?'$'+fmt(s.price,Math.abs(Number(s.price))<10?8:4):'—');
   put('#chartScore','ציון '+fmt(a.score,1));
   put('#chartMA',s.ma?'$'+fmt(s.ma,Math.abs(Number(s.ma))<10?8:4):'—');
@@ -544,6 +573,7 @@ async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode
   put('#actionRotationGap',rotationGapText(a,d,currentModeArg,liveAccount));
   put('#actionQualification',currentModeArg==='live'&&!isHeld(a)?blockerLabel(liveEntryStatus(a,liveAccount,Number(d.config?.maxPositions||5)).blocker):buyReasonLabel(a.buyReason));
 
+  if(statusOnly)return;
   await Promise.all([...((activeView==='trade'||activeView==='scans')&&$('#chartSection')?.open!==false?[loadChart(a.symbol)]:[]),...(activeView==='journal'?[loadDecisionHistory(a.symbol)]:[])]);
 }
 
@@ -836,6 +866,7 @@ async function loadChartRequest(symbol){
   try{
     if(chartAnalysisContext!==contextKey){
       chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
+      refreshPositionPriceLegend();
       $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');
       const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
       put('#chartEmpty','טוען נתוני גרף…');$('#chartEmpty')?.classList.remove('hidden');
@@ -888,6 +919,7 @@ async function loadChartRequest(symbol){
       put('#chartLegend','לא ניתן לרענן כעת · מוצגים הנרות מהטעינה האחרונה · '+e.message);
     }else{
       chartCandles=[];chartDecisions=[];publishSlopeData(symbol,[]);
+      refreshPositionPriceLegend();
       $('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נתוני עליות');put('#chartRiseDetails','');
       $('#chartDecisionMarkers')?.replaceChildren();
       const canvas=$('#priceChart');if(canvas)canvas.width=canvas.width;
@@ -977,11 +1009,49 @@ setInterval(()=>{
  if(!held||!chartCandles.length)return;
  candleFlashOn=!candleFlashOn;drawCandles(chartCandles);
 },650);
+function positionPriceCards(model){
+  if(!model)return [];
+  const levels=model.venue==='BINANCE_FUTURES'?model.cardLevels:model.lines;
+  return levels.map(level=>({...level,label:level.label+(model.stale?' · נתונים ישנים':'')}));
+}
+
+function renderPriceLegend(levels,{min,max,digits=12}={}){
+  const legend=$('#chartPriceLegend');
+  if(!legend)return;
+  const rows=levels.map(level=>({
+    label:level.label+(level.price!=null&&(level.price<min||level.price>max)?' · מחוץ לטווח':''),
+    value:level.price==null?'ממתין לנתון':fmt(level.price,digits),
+    color:level.color
+  }));
+  legend.hidden=!rows.length;
+  const key=JSON.stringify(rows);
+  if(legend._renderKey===key)return;
+  legend._renderKey=key;
+  legend.replaceChildren();
+  for(const item of rows){
+    const row=document.createElement('div');
+    row.className='chart-price-legend-item';
+    row.style.setProperty('--level-color',item.color);
+    const label=document.createElement('span');
+    label.textContent=item.label;
+    const value=document.createElement('bdi');
+    value.dir='auto';
+    value.textContent=item.value;
+    row.append(label,value);
+    legend.append(row);
+  }
+}
+
+function refreshPositionPriceLegend(){
+  const model=globalThis.LEVI_POSITION_BARRIERS?.fromSnapshot(chartPositionSnapshot(),selectedSymbol);
+  renderPriceLegend(positionPriceCards(model));
+}
+
 function drawCandles(candles){
   const canvas=$('#priceChart');
   const channelBadge=$('#channelTouchBadge');
   if(channelBadge){channelBadge.hidden=true;channelBadge.replaceChildren();}
-  if(!canvas||!candles.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
+  if(!canvas||!candles.length){refreshPositionPriceLegend();put('#resistancePatternStatus','ממתין לנרות לזיהוי תבניות');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש');chartTimeNavigation?.view([],{context:[selectedSymbol,selectedInterval,selectedRange,currentMode].join(':')});drawIndicators([]);$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','ממתין לנרות');put('#chartRiseDetails','');globalThis.LEVI_TRADE_RISK?.render($('#binanceTradeRisk'),null,'USDT');if($('#chartRiskDetails'))$('#chartRiskDetails').hidden=true;chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
   const rect=canvas.getBoundingClientRect();
   const ratio=window.devicePixelRatio||1;
   canvas.width=Math.max(1,Math.round(rect.width*ratio));
@@ -1007,12 +1077,13 @@ function drawCandles(candles){
   const view=visibleWindow.bars;
   const viewMas=mas.slice(start,end);
   drawIndicators(candles,{start,end});
-  if(!view.length){if($('#chartPriceLegend'))$('#chartPriceLegend').hidden=true;put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
+  if(!view.length){refreshPositionPriceLegend();put('#resistancePatternStatus','אין נרות בטווח שנבחר');put('#parallelChannelStatus','ממתין לנרות לתעלה מקבילה');put('#patternScenario','אין נתונים לניתוח תרחיש בטווח שנבחר');$('#chartRises')?.replaceChildren();$('#chartFalls')?.replaceChildren();if($('#chartRises'))$('#chartRises')._renderKey=null;$('#chartRiseList')?.replaceChildren();put('#chartRiseSummary','אין נרות בטווח שנבחר');put('#chartRiseDetails','');chartWorkbench?.clear();chartTerminal?.clear();fixedRangeProfile?.clear();return;}
   const vals=[];
   view.forEach((c,i)=>{vals.push(+c.high,+c.low);if(viewMas[i]!=null)vals.push(viewMas[i])});
-  const sellLevel=chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol);
+  const isSpot=selectedChartMarket==='SPOT';
+  const sellLevel=isSpot?chartSellLevel(currentAgentData,currentLiveAccount,currentMode,selectedSymbol):null;
   const selectedPosition=(currentAgentData?.agents||[]).find(a=>a.symbol===selectedSymbol)?.strategy||{};
-  const heldNow=currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol];
+  const heldNow=isSpot&&(currentMode==='live'?(currentLiveAccount?.balances||[]).some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5):!!currentAgentData?.paper?.positions?.[selectedSymbol]);
   const walletBalance=(currentLiveAccount?.balances||[]).find(b=>b.asset+'USDT'===selectedSymbol);
   const managedPosition=heldNow&&['FIXED_TP4_SL1_V1','PROFIT_FLOOR4_TRAIL1PP_STOP1_V1','PROFIT_ACTIVATE5_TRAIL1PP_STOP1_V2'].includes(selectedPosition.exitPolicy);
   const riskPosition=managedPosition?{...selectedPosition,qty:currentMode==='live'?walletBalance?.qty:currentAgentData?.paper?.positions?.[selectedSymbol]?.qty,currentPrice:selectedPosition.price,pnlIls:currentMode==='live'?walletBalance?.pnlIls:null}:heldNow&&currentMode==='live'&&walletBalance?.costStatus==='VERIFIED_QUANTITY'?{entryPrice:walletBalance.entryPrice,qty:walletBalance.qty,currentPrice:walletBalance.usdtPrice,pnlIls:walletBalance.pnlIls,displayOnly:true}:null;
@@ -1101,38 +1172,24 @@ function drawCandles(candles){
     ctx.fillRect(x-body/2,y1,body,Math.max(1,y2-y1));
   });
 
-  const priceLevels=barrierModel?barrierModel.lines.map(line=>({...line,label:line.label+(barrierModel.stale?' · נתונים ישנים':'')})):currentMode==='live'?[]:[
+  const priceLevels=currentMode==='live'?positionPriceCards(barrierModel):[
     {price:tradeRisk?.target,label:tradeRisk?.displayOnly?'המחשת רווח +4%':tradeRisk?.trailing?'הפעלת הגנה +'+Number(tradeRisk.activation.toFixed(3))+'%':'יעד רווח +4%',color:'#64e1ae'},
     {price:heldNow?Number(riskPosition?.entryPrice??selectedPosition.entryPrice):NaN,label:'מחיר קנייה',color:'#61a9ff'},
     {price:heldNow?Number(selectedPosition.peakPrice):NaN,label:'שיא מאז הקנייה',color:'#a7d0ff'},
     {price:tradeRisk?.stop??sellLevel?.price,label:tradeRisk?.displayOnly?'המחשת הפסד −1%':tradeRisk?.armed?'סף רווח נגרר':tradeRisk?'סטופ −'+tradeRisk.sl+'%':'סף מכירה',color:tradeRisk?.armed?'#64e1ae':tradeRisk?'#ff8494':'#ffbd59'}
   ].filter(level=>Number.isFinite(level.price)&&level.price>0);
   ctx.restore();
-  const legend=$('#chartPriceLegend');
-  const legendRows=priceLevels.map(level=>{
-    const yy=y(level.price),inside=yy>=top&&yy<=top+ch;
-    if(inside){ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();ctx.strokeStyle=level.color;ctx.lineWidth=1.5;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.restore();}
-    return {...level,value:fmt(level.price,priceDigits),outside:!inside};
-  });
-  if(legend){
-    const key=JSON.stringify(legendRows);legend.hidden=!legendRows.length;
-    if(legend._renderKey!==key){
-      legend._renderKey=key;legend.replaceChildren();
-      for(const level of legendRows){
-        const row=document.createElement('div');row.className='chart-price-legend-item';row.style.setProperty('--level-color',level.color);
-        const label=document.createElement('span');label.textContent=level.label+(level.outside?' · מחוץ לטווח':'');
-        const value=document.createElement('bdi');value.dir='ltr';value.textContent=level.value;
-        row.append(label,value);legend.append(row);
-      }
-    }
+  for(const level of priceLevels){
+    if(level.price==null||level.price<min||level.price>max)continue;
+    const yy=y(level.price);
+    ctx.save();ctx.beginPath();ctx.rect(left,top,cw,ch);ctx.clip();ctx.strokeStyle=level.color;ctx.lineWidth=1.5;ctx.setLineDash([7,5]);ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(W-right,yy);ctx.stroke();ctx.restore();
   }
-  ctx.save();
-  ctx.restore();
+  renderPriceLegend(priceLevels,{min,max,digits:priceDigits});
   renderChartRises(ctx,view,{left,right:W-right,top,bottom:top+ch,step,y,digits:priceDigits});
   renderChartDecisionMarkers(ctx,view,candles,chartDecisions,step,left,8,selectedInterval);
   renderWyckoffPivots(view,chartDecisions,step,left,y,priceDigits);
   renderNumberedWyckoff(view,step,left,y,priceDigits);
-  renderPositionPoints(view,step,left,y,priceDigits,{top,bottom:top+ch});
+  if(isSpot)renderPositionPoints(view,step,left,y,priceDigits,{top,bottom:top+ch});
 
   const labelCount=Math.max(2,Math.min(5,Math.floor(cw/150)));
   ctx.textAlign='center';
@@ -1154,10 +1211,28 @@ function drawCandles(candles){
 }
 
 const modeRefresh=window.LEVI_MODE_REFRESH.create({
- read:()=>J(MODE,{timeoutMs:15000}),
- context:()=>window.LEVI_TRADE_AUTH?.read()||'',
- publish:s=>window.LEVI_FUTURES_TABLE?.update(s)
+ read:async()=>{
+   const token=window.LEVI_TRADE_AUTH?.read();
+   try{return await J(MODE,{timeoutMs:15000});}
+   catch(error){
+     if((error.status===401||error.status===403)&&window.LEVI_TRADE_AUTH?.read()===token)updateFuturesChartStatus(null);
+     throw error;
+   }
+ },
+ context:()=>futuresReadGeneration+':'+(window.LEVI_TRADE_AUTH?.read()||''),
+ publish:s=>{
+   window.LEVI_FUTURES_TABLE?.update(s);
+   updateFuturesChartStatus(s);
+ }
 });
+let futuresChartStatus=null,futuresReadGeneration=0;
+function updateFuturesChartStatus(s){
+ const status=window.LEVI_TRADE_AUTH?.read() && s?.mode==='live' && currentMode==='live' && Array.isArray(s.shortTrading?.positions)
+   ? s.shortTrading : null;
+ if(futuresChartStatus===status)return;
+ futuresChartStatus=status;
+ window.dispatchEvent(new Event('levi:chart-position-update'));
+}
 function refreshShortStatus(){
  if(document.hidden||currentMode!=='live')return;
  // Failure retains the original timestamps; stale prices/protection are never
@@ -1218,7 +1293,7 @@ async function load(){
     const control=$('#tradeControlStatus');
     control?.classList.remove('trading-active','trading-paused');
     put('#tradeControlStatus',e.status===401?'נדרש חיבור מכשיר לצפייה בחשבון':'מצב המסחר לא אומת · שרת לא זמין');
-    if(e.status===401&&e.authToken===tradeControlToken){tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();}
+    if(e.status===401&&e.authToken===tradeControlToken){tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.dispatchEvent?.(new Event('trade-device-expired'));}
     if(typeof CustomEvent==='function'){
       const detail={error:true,unauthorized:e.status===401,mode:currentMode,receivedAt:window.LEVI_DASHBOARD_SNAPSHOT?.receivedAt||null};
       window.LEVI_DASHBOARD_SNAPSHOT=detail;
@@ -1242,8 +1317,7 @@ async function authenticatedControl(url,body){
     return result;
   }catch(e){
     if(/401|Authenticated control required/i.test(e.message)){
-      tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();
-      window.LEVI_DEVICE_ACCESS?.refresh();
+      tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.dispatchEvent?.(new Event('trade-device-expired'));
       const error=Error('חיבור המכשיר אינו תקף. לחץ ״חבר מכשיר למסחר״ לחיבור מחדש בקוד קצר.');error.status=401;throw error;
     }
     throw e;
@@ -1368,17 +1442,28 @@ window.LEVI_MANUAL_TRADES={
   return {ok:true,persistent,expiresAt:result.expiresAt};
  },
  forget:async()=>{
-  const token=tradeControlToken;tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.LEVI_DEVICE_ACCESS?.refresh();
+  const token=tradeControlToken;tradeControlToken=null;window.LEVI_TRADE_AUTH?.clear();window.dispatchEvent?.(new Event('trade-device-expired'));
   if(token)await J(B+'/api/binance-control/disconnect',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:'{}'});
  },
- refresh:async()=>{await load();await loadChart(selectedSymbol);}
+ refresh:async filledPosition=>{
+  if(filledPosition){
+   setDashboardView('trade');
+   selectScannerAsset(filledPosition.symbol,null,filledPosition.market);
+  }
+  await load();await loadChart(selectedSymbol);
+ }
 };
 
 window.addEventListener?.('levi-rsi-select',event=>{const symbol=event.detail;if(!currentAgentData?.agents?.some(a=>a.symbol===symbol))return;selectScannerAsset(symbol,null);});
 
 window.addEventListener?.('levi-rsi-history-needed',()=>{if(!document.hidden)loadChart(selectedSymbol);});
 
-window.addEventListener?.('trade-device-expired',()=>{tradeControlToken=null;window.LEVI_DEVICE_ACCESS?.refresh();});
+window.addEventListener?.('trade-device-expired',()=>{
+ tradeControlToken=null;
+ futuresReadGeneration++;
+ updateFuturesChartStatus(null);
+ window.LEVI_DEVICE_ACCESS?.refresh();
+});
 
 // Display-only search; scanner updates and execution continue independently.
 function filterAssetRows(){
@@ -1395,8 +1480,10 @@ document.getElementById('chartSection')?.addEventListener('toggle',event=>{
   if(event.target.open){loadChart(selectedSymbol);requestAnimationFrame(()=>drawCandles(chartCandles));}
 });
 window.addEventListener('levi-dashboard-select',event=>{
-  if(!currentAgentData?.agents?.some(a=>a.symbol===event.detail))return;
-  setDashboardView('trade');selectScannerAsset(event.detail,null);
+  const {symbol,market}=typeof event.detail==='string'?{symbol:event.detail,market:'SPOT'}:event.detail||{};
+  if(![null,'SPOT','FUTURES'].includes(market)||!/^[A-Z0-9]+USDT$/.test(symbol))return;
+  if(!currentAgentData?.agents?.some(a=>a.symbol===symbol)&&!(market==='FUTURES'&&chartShortPosition(symbol)))return;
+  setDashboardView('trade');selectScannerAsset(symbol,null,market);
   document.getElementById('chartSection')?.scrollIntoView({block:'start',behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
 });
 
@@ -1404,7 +1491,19 @@ for(const id of ['showParallel','showRegression','regressionPeriod','regressionD
 
 document.getElementById('channelStudyLink')?.addEventListener('click',()=>{const panel=document.getElementById('strategyReviewPanel');if(panel)panel.open=true;});
 
-window.addEventListener('levi-chart-market',event=>{if(!['SPOT','FUTURES'].includes(event.detail))return;selectedChartMarket=event.detail;updateSelectedAsset();drawCandles(chartCandles);});
+window.LEVI_CHART_SELECTION=()=>({
+  symbol:selectedSymbol,market:selectedChartMarket,
+  shortSymbols:currentMode==='live'?(futuresChartStatus?.positions||[]).map(p=>p.symbol):[]
+});
+window.addEventListener('levi-chart-market',event=>{
+  if(!['SPOT','FUTURES'].includes(event.detail))return;
+  chartMarketPreference=event.detail;
+  updateSelectedAsset();
+});
+window.addEventListener('levi:chart-position-update',()=>{
+  if(selectedChartMarket==='FUTURES'||chartShortPosition(selectedSymbol))updateSelectedAsset(currentAgentData,currentMode,currentLiveAccount,{statusOnly:true});
+  else window.dispatchEvent(new Event('levi:chart-selection'));
+});
 
 function openLinkedStrategyReview(){
   if(location.hash==='#strategyReviewPanel'){

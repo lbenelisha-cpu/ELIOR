@@ -7,6 +7,7 @@ function harness(){
  const ctx=vm.createContext({window:{},selectedSymbol:'BTCUSDT',selectedInterval:'5m',selectedRange:'1W',currentMode:'live',chartRequestId:0,chartAnalysisContext:null,selectedWyckoffId:null,chartWyckoffHistory:[],chartWyckoffError:null,chartVisibleStartTime:0,chartCandles:[],chartDecisions:[],currentAgentData:{agents:[]},wyckoffHistoryCache:new Map(),CHART:'/chart',
   wyckoffHistoryEngine:{mergeBinanceRecorded:history=>history},
   J:async(url,options)=>{requests++;assert.equal(options.timeoutMs,35000);return data;},
+  refreshPositionPriceLegend:()=>{labels.legendSymbol=ctx.selectedSymbol;},
   runBinanceWyckoffScan:()=>scan.promise,
   drawCandles:bars=>events.push({kind:'draw',count:bars.length}),renderCandlePower:()=>events.push({kind:'power'}),
   put:(id,value)=>{labels[id]=value;},$:id=>id==='#chartEmpty'?{classList:{add(){empty.hidden=true;},remove(){empty.hidden=false;}}}:id==='#chartDecisionMarkers'?{replaceChildren(){}}:id==='#priceChart'?{width:600}:null,
@@ -23,6 +24,7 @@ test('changing asset starts its own load and an older completion cannot overwrit
  const h=harness(),firstData=deferred(),secondData=deferred();let calls=0;
  h.ctx.J=()=>++calls===1?firstData.promise:secondData.promise;
  const a=h.ctx.loadChart('BTCUSDT');h.ctx.selectedSymbol='ETHUSDT';const b=h.ctx.loadChart('ETHUSDT');
+ assert.equal(h.labels.legendSymbol,'ETHUSDT');
  secondData.resolve({...h.data,candles:[{closeTime:2,closed:true,close:100}]});h.scan.resolve({history:[],error:null});await b;
  firstData.resolve(h.data);await a;assert.equal(h.ctx.chartCandles[0].close,100);assert.equal(calls,2);assert.equal(h.ctx.window.LEVI_MA_SLOPE_DATA.symbol,'ETHUSDT');assert.equal(h.ctx.window.LEVI_MA_SLOPE_DATA.bars[0].close,100);
 });

@@ -54,23 +54,40 @@
  const buy=$('manualBuyBtn'),sell=$('manualSellBtn');if(buy)buy.textContent='קנייה · LONG Spot';if(sell)sell.textContent='מכירה · LONG Spot';
  let snapshot=window.LEVI_DASHBOARD_SNAPSHOT||null,key='';
  function render(){
-  const selected=$('chartSymbol')?.textContent?.trim(),query=search.value.trim().toUpperCase().replace(/[\s/\-]/g,'');
-  const ctx=window.LEVI_MANUAL_TRADES?.context?.()||{};
-  const agents=snapshot?.agent?.agents||[];
-  const rows=agents.filter(a=>/^[A-Z0-9]+USDT$/.test(a.symbol)).map(a=>({symbol:a.symbol,long:a.position==='LONG',short:!!ctx.futures?.positions?.some(p=>p.symbol===a.symbol)}));
-  rows.sort((a,b)=>Number(b.long||b.short)-Number(a.long||a.short)||a.symbol.localeCompare(b.symbol));
-  const next=JSON.stringify([rows,selected,query,snapshot?.error]);if(next===key)return;key=next;
+  const selection=window.LEVI_CHART_SELECTION?.();
+  if(selection)market.value=selection.market;
+  const query=search.value.trim().toUpperCase().replace(/[\s/\-]/g,'');
+  const rows=new Map();
+  for(const a of snapshot?.agent?.agents||[]){
+   if(/^[A-Z0-9]+USDT$/.test(a.symbol))rows.set(a.symbol,{symbol:a.symbol,long:a.position==='LONG',short:false});
+  }
+  for(const balance of snapshot?.account?.balances||[]){
+   const row=rows.get(balance.asset+'USDT');
+   if(row&&Number(balance.valueUsdt)>=5)row.long=true;
+  }
+  for(const symbol of selection?.shortSymbols||[]){
+   if(!/^[A-Z0-9]+USDT$/.test(symbol))continue;
+   const row=rows.get(symbol)||{symbol,long:false};
+   row.short=true;rows.set(symbol,row);
+  }
+  const sorted=[...rows.values()].sort((a,b)=>Number(b.long||b.short)-Number(a.long||a.short)||a.symbol.localeCompare(b.symbol));
+  const next=JSON.stringify([sorted,selection?.symbol,selection?.market,query,snapshot?.error]);if(next===key)return;key=next;
   strip.replaceChildren();let count=0;
-  for(const row of rows){
+  for(const row of sorted){
    if(query&&!row.symbol.includes(query))continue;
-   const button=make('button',row.symbol+(row.long?' · LONG':'')+(row.short?' · SHORT':''),'unified-asset');button.type='button';button.dataset.symbol=row.symbol;button.setAttribute('aria-pressed',String(row.symbol===selected));
-   button.addEventListener('click',()=>{market.value=row.short&&!row.long?'FUTURES':'SPOT';window.dispatchEvent(new CustomEvent('levi-chart-market',{detail:market.value}));window.dispatchEvent(new CustomEvent('levi-dashboard-select',{detail:row.symbol}));});
-   strip.append(button);count++;
+   const markets=row.short?(row.long?['SPOT','FUTURES']:['FUTURES']):['SPOT'];
+   for(const venue of markets){
+    const label=row.symbol+(venue==='FUTURES'?' · SHORT':row.long?' · LONG':'');
+    const button=make('button',label,'unified-asset');button.type='button';button.dataset.symbol=row.symbol;
+    button.setAttribute('aria-pressed',String(row.symbol===selection?.symbol&&venue===selection.market));
+    button.addEventListener('click',()=>window.dispatchEvent(new CustomEvent('levi-dashboard-select',{detail:{symbol:row.symbol,market:row.long||row.short?venue:null}})));
+    strip.append(button);count++;
+   }
   }
   empty.hidden=count>0;empty.textContent=query?'לא נמצא נכס ברשימת המעקב':snapshot?.error?'רשימת הנכסים אינה זמינה כרגע':'ממתין לרשימת הנכסים';
  }
  search.addEventListener('input',render);
  window.addEventListener('levi:binance-dashboard',e=>{snapshot=e.detail;render();});
- new MutationObserver(render).observe($('chartSymbol'),{childList:true,subtree:true,characterData:true});
+ window.addEventListener('levi:chart-selection',render);
  render();window.dispatchEvent(new Event('resize'));
 })();

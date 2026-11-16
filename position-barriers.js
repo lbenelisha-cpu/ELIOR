@@ -14,11 +14,12 @@
   const fresh=t=>Number.isFinite(t)&&t>0&&t<=now&&now-t<=MAX_AGE;
   const stale=unavailable||!fresh(priceAt)||!fresh(checkedAt);
   const price=num(p.currentPrice??p.price??p.lastBid),armed=p.armed===true||p.profitFloorArmed===true||p.trailingActive===true;
-  const lines=[{kind:'entry',price:entry,label:'מחיר כניסה',color:'#b5cbe5'},
+  const cardLevels=[{kind:'entry',price:entry,label:'מחיר כניסה',color:'#b5cbe5'},
    {kind:'stop',price:stop,label:armed?'סטופ נגרר נוכחי':'סטופ נוכחי',color:'#ff8494'},
    {kind:'activation',price:activation,label:'הפעלת הגנת רווח',color:'#ffd166'},
-   {kind:'target',price:target,label:'יעד רווח TP',color:'#64e1ae'}].filter(x=>x.price!==null).map(x=>({...x,pct:direction*(x.price/entry-1)*100}));
-  return {side,entry,entryAt,stop,target,activation,price,priceAt,checkedAt,stale,armed,lines,missing:!stop||!target||(p.exitPolicy!=='FIXED_TP4_SL1_V1'&&!activation)};
+   {kind:'target',price:target,label:'יעד רווח TP',color:'#64e1ae'}];
+  const lines=cardLevels.filter(x=>x.price!==null).map(x=>({...x,pct:direction*(x.price/entry-1)*100}));
+  return {side,entry,entryAt,stop,target,activation,price,priceAt,checkedAt,stale,armed,lines,cardLevels,missing:!stop||!target||(p.exitPolicy!=='FIXED_TP4_SL1_V1'&&!activation)};
  }
  function fromSnapshot(snapshot,symbol,now=Date.now()){
   if(!snapshot)return null;let p,side,observedAt,unavailable=!!snapshot.error;

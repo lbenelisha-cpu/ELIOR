@@ -21,9 +21,9 @@ test('saved authentication bypasses prompts and 401 clears it without retrying t
 });
 function ui(){
  const elements=new Map();const get=id=>{if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,value:'',textContent:'',open:false,focus(){},showModal(){this.open=true;},close(){this.open=false;},addEventListener(){}});return elements.get(id);};
- const calls=[];let resolve,refreshes=0;const state={mode:'live',symbol:'BNBUSDT',capabilities:{version:1,maxOrderUsdt:400,maxPositions:5},account:{usdtFree:100,balances:[{asset:'BNB',free:.03886}]}};
- const c=vm.createContext({document:{getElementById:get},window:{LEVI_MANUAL_TRADES:{context:()=>state,submit:async input=>{calls.push({...input});return new Promise(r=>resolve=r);},refresh:async()=>refreshes++,forget(){}}},crypto:{randomUUID:()=>Math.random().toString().repeat(2)},setInterval(){}});
- vm.runInContext(read('binance-manual-trades.js'),c);return {get,calls,state,quick:c.window.LEVI_QUICK_TRADE,resolve:r=>resolve(r),get refreshes(){return refreshes;}};
+ const calls=[];let resolve,refreshes=0,filledPosition;const state={mode:'live',symbol:'BNBUSDT',capabilities:{version:1,maxOrderUsdt:400,maxPositions:5},account:{usdtFree:100,balances:[{asset:'BNB',free:.03886}]}};
+ const c=vm.createContext({document:{getElementById:get},window:{LEVI_MANUAL_TRADES:{context:()=>state,submit:async input=>{calls.push({...input});return new Promise(r=>resolve=r);},refresh:async position=>{refreshes++;filledPosition=position;},forget(){}}},crypto:{randomUUID:()=>Math.random().toString().repeat(2)},setInterval(){}});
+ vm.runInContext(read('binance-manual-trades.js'),c);return {get,calls,state,quick:c.window.LEVI_QUICK_TRADE,resolve:r=>resolve(r),get refreshes(){return refreshes;},get filledPosition(){return filledPosition;}};
 }
 test('sell requires final confirmation, double click never submits twice, uncertainty only checks same identity',async()=>{
  const h=ui();h.get('manualSellBtn').onclick();h.get('manualSellBtn').onclick();assert.equal(h.calls.length,0);h.get('manualTradeSubmit').onclick();h.get('manualTradeSubmit').onclick();assert.equal(h.calls.length,1);assert.equal(h.calls[0].side,'SELL');assert.equal(h.calls[0].all,true);assert.equal(h.get('manualTradeSubmit').disabled,true);
@@ -53,4 +53,18 @@ test('SHORT modal shows dynamic allocation above 35 and rechecks reduced capabil
  h.state.futuresCapabilities.maxOrderUsdt=40;await h.get('manualTradeSubmit').onclick();assert.equal(h.calls.length,0);
  h.get('manualQuoteAmount').value='40';const sent=h.get('manualTradeSubmit').onclick();assert.equal(h.calls[0].quoteUsdt,40);assert.equal(h.calls[0].side,'OPEN_SHORT');
  h.resolve({ok:false,error:'FUTURES_MIN_NOTIONAL_OR_QUANTITY'});await sent;assert.match(h.get('manualTradeResult').textContent,/מינימום/);
+});
+
+test('only a confirmed SHORT opening with executed quantity focuses its own Futures position',async()=>{
+ for(const [result,expected] of [
+  [{ok:true,order:{status:'FILLED',executedQty:2}},true],
+  [{ok:true,order:{status:'NEW',executedQty:0}},false],
+  [{ok:false,uncertain:true},false]
+ ]){
+  const h=ui();h.state.futuresCapabilities={version:1,maxOrderUsdt:30};h.state.futures={positions:[],account:{availableUsdt:40}};
+  h.quick('BUY','ETHUSDT','FUTURES');const sent=h.get('manualTradeSubmit').onclick();h.resolve(result);await sent;
+  assert.equal(h.calls.length,1);
+  if(expected)assert.deepEqual({...h.filledPosition},{symbol:'ETHUSDT',market:'FUTURES'});
+  else assert.ok(!h.filledPosition);
+ }
 });
