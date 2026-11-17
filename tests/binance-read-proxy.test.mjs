@@ -7,3 +7,22 @@ test('upstream errors are bounded and non-JSON responses are not injected into t
 test('chart and signed account reads have longer bounded budgets; bootstrap reads tolerate measured upstream latency',()=>{assert.equal(readTimeoutMs('/api/binance-chart'),25000);assert.equal(readTimeoutMs('/api/binance-live-account'),25000);assert.equal(readTimeoutMs('/api/binance-mode'),25000);assert.equal(readTimeoutMs('/api/binance-agent'),25000);assert.equal(readTimeoutMs('/api/binance-kelly'),10000);});
 test('trade history permits only its symbol query through the authenticated read proxy',()=>{assert.equal(readTarget('/api/binance-trade-history?symbol=ENAUSDT').pathname,'/api/binance-trade-history');assert.equal(readTimeoutMs('/api/binance-trade-history'),25000);assert.throws(()=>readTarget('/api/binance-trade-history?symbol=ENAUSDT&token=secret'));});
 test('equity history permits a private read without arbitrary query parameters',()=>{assert.equal(readTarget('/api/binance-equity-history').pathname,'/api/binance-equity-history');assert.throws(()=>readTarget('/api/binance-equity-history?account=other'));});
+
+test('private equity reads forward only a single supported market and the original device authorization',async()=>{
+ const token='Bearer '+'a'.repeat(40);
+ let reads=0;
+ const handler=createReadProxy(async(url,options)=>{
+  reads++;
+  assert.equal(url.search,'?market=FUTURES');
+  assert.equal(options.method,'GET');
+  assert.deepEqual(options.headers,{Accept:'application/json',Authorization:token});
+  return {status:200,headers:new Headers({'content-type':'application/json'}),json:async()=>({market:'FUTURES'})};
+ });
+ const request=query=>handler({httpMethod:'GET',queryStringParameters:{path:'/api/binance-equity-history'+query},headers:{authorization:token}});
+ assert.equal((await request('?market=FUTURES')).statusCode,200);
+ assert.equal(readTarget('/api/binance-equity-history?market=SPOT').search,'?market=SPOT');
+ for(const q of ['?market=', '?market=MARGIN','?market=FUTURES&market=SPOT','?market=FUTURES&account=other']){
+  assert.equal((await request(q)).statusCode,400);
+ }
+ assert.equal(reads,1);
+});

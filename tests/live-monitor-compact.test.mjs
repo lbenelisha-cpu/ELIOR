@@ -31,3 +31,14 @@ test('combined equity counts Spot once and Futures wallet plus open PnL, with pa
  payload.futures.positions=[];payload.spot.unpricedAssets=['UNKNOWN'];await api.load();assert.match(text(hero()),/נתונים חלקיים/);
  payload.spot.unpricedAssets=[];await api.load();assert.match(text(hero()),/380.00 USDT/);assert.match(text(hero()),/שווי התיק הכולל/);
 });
+
+test('monitor shares only timestamped complete Futures equity for the chart, including true zero',async()=>{
+ const host=new Element('section');host.dataset.compact='true';
+ const asOf=Date.now(),futures={ok:true,walletUsdt:80,positions:[{unrealizedPnlUsdt:-5}]};
+ const payload={ok:true,mode:'live',asOf,spot:{},futures};
+ const observed=[],api=createLiveMonitor(host,{read:async()=>payload,observeFutures:s=>observed.push(s)});
+ api.setConnected(true);await new Promise(setImmediate);
+ futures.positions[0].unrealizedPnlUsdt=null;await api.load();
+ futures.walletUsdt=0;futures.positions=[];await api.load();
+ assert.deepEqual(observed,[{at:asOf,valueUsdt:75},{at:asOf,valueUsdt:null},{at:asOf,valueUsdt:0}]);
+});

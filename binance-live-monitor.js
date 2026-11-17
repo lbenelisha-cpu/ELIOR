@@ -7,7 +7,12 @@ const time=x=>{const n=typeof x==='number'?x:Date.parse(x);return Number.isFinit
 const signClass=x=>finite(x)?x>0?'gain':x<0?'loss':'flat':'unknown';
 const statusLabel=x=>({WAITING:'ממתין לחציית POC',EXECUTING:'בביצוע',UNKNOWN:'ממתין לאימות ביצוע',FILLED:'בוצעה',CLOSED:'נסגרה',NO_FILL:'לא מולאה',FAILED:'נכשלה'}[x]||x||'—');
 
-export function createLiveMonitor(host,{read,now=Date.now}){
+function futuresOpenPnl(f){
+ return f?.ok&&Array.isArray(f.positions)&&f.positions.every(p=>finite(p.unrealizedPnlUsdt))?
+  f.positions.reduce((total,p)=>total+p.unrealizedPnlUsdt,0):null;
+}
+
+export function createLiveMonitor(host,{read,now=Date.now,observeFutures=()=>{}}){
  let data=null,busy=false,connected=false,generation=0,accountDetailsOpen=false;
  const compact=host.dataset?.compact==='true';
  if(compact)host.classList.add('live-monitor-integrated');
@@ -34,7 +39,7 @@ export function createLiveMonitor(host,{read,now=Date.now}){
   setSummaryReady(!!data);
   if(!data)return;
   const s=data.spot||{},f=data.futures||{},realized=data.realized||{};
-  const shortOpen=f.ok&&Array.isArray(f.positions)&&f.positions.every(p=>finite(p.unrealizedPnlUsdt))?(f.positions||[]).reduce((n,p)=>n+p.unrealizedPnlUsdt,0):null;
+  const shortOpen=futuresOpenPnl(f);
   if(compact){
    const spotValue=finite(s.equityUsdt)?s.equityUsdt:null;
    const futuresValue=f.ok&&finite(f.walletUsdt)&&finite(shortOpen)?f.walletUsdt+shortOpen:null;
@@ -85,11 +90,21 @@ export function createLiveMonitor(host,{read,now=Date.now}){
   if(!compact||executions.length)table('יומן ביצועי POC · LIVE',['נכס','כיוון','מצב','זמן ניסיון','כמות שבוצעה','פרטים'],executions,'עדיין אין ביצועי POC ביומן LIVE.');
  }
  async function load(){if(!connected||busy)return;busy=true;const request=++generation;refresh.disabled=true;
-  try{const next=await read();if(request!==generation)return;if(!next?.ok||next.mode!=='live'||!next.spot)throw Error('LIVE_DATA_UNAVAILABLE');data=next;render();}
-  catch(error){if(request!==generation)return;data=null;render();status.textContent=error.status===401?'נדרש חיבור מכשיר לצפייה בחשבון LIVE.':error.status===409?'המעקב מציג רק חשבון LIVE; מצב החשבון הנוכחי אינו LIVE.':'לא ניתן לאמת כרגע נתוני LIVE. נתונים קודמים הוסתרו.';}
+  const identity=window.LEVI_TRADE_AUTH?.read();
+  try{
+   const next=await read();
+   if(request!==generation||identity!==window.LEVI_TRADE_AUTH?.read())return;
+   if(!next?.ok||next.mode!=='live'||!next.spot)throw Error('LIVE_DATA_UNAVAILABLE');
+   data=next;render();
+   const f=next.futures,pnl=futuresOpenPnl(f);
+   const at=typeof next.asOf==='number'?next.asOf:Date.parse(next.asOf);
+   observeFutures({at,valueUsdt:finite(f?.walletUsdt)&&finite(pnl)?f.walletUsdt+pnl:null});
+  }
+  catch(error){if(request!==generation||identity!==window.LEVI_TRADE_AUTH?.read())return;data=null;render();if(error.status!==401)observeFutures({at:now(),valueUsdt:null});status.textContent=error.status===401?'נדרש חיבור מכשיר לצפייה בחשבון LIVE.':error.status===409?'המעקב מציג רק חשבון LIVE; מצב החשבון הנוכחי אינו LIVE.':'לא ניתן לאמת כרגע נתוני LIVE. נתונים קודמים הוסתרו.';}
   finally{if(request===generation){busy=false;refresh.disabled=false;}}
  }
  function setConnected(value){if(value===connected)return;connected=value;generation++;busy=false;data=null;render();refresh.disabled=!value;status.textContent=value?'טוען נתוני LIVE…':'נדרש חיבור מאובטח לחשבון LIVE.';if(value)void load();}
+ window.addEventListener('levi:refresh-futures-equity',load);
  refresh.addEventListener('click',load);setConnected(Boolean(window.LEVI_TRADE_AUTH?.read()));
  window.addEventListener('levi:binance-dashboard',()=>setConnected(Boolean(window.LEVI_TRADE_AUTH?.read())));
  window.addEventListener('trade-device-expired',()=>setConnected(false));
@@ -98,7 +113,7 @@ export function createLiveMonitor(host,{read,now=Date.now}){
 }
 
 const host=document.getElementById('pocLiveMonitor');
-if(host)createLiveMonitor(host,{read:async()=>{
+if(host)createLiveMonitor(host,{observeFutures:detail=>window.dispatchEvent(new CustomEvent('levi:futures-equity-observed',{detail})),read:async()=>{
  const url=window.API_BASE+'/api/binance-poc-live-monitor',response=await fetch(window.binanceReadUrl(url),{headers:window.binanceReadHeaders(url),cache:'no-store',signal:AbortSignal.timeout(25000)});
  if(!response.ok){const error=Error('LIVE_MONITOR_READ_FAILED');error.status=response.status;throw error;}return response.json();
 }});

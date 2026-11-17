@@ -1,7 +1,50 @@
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>המחשת גרף שווי התיק · נתוני הדגמה</title><link rel="stylesheet" href="/binance-equity-history.css?v=20261026-equity"><style>body{background:#08121f;color:#eaf5ff;font-family:system-ui;margin:0;padding:30px}main{max-width:1120px;margin:auto}.demo-label{border:1px solid #aa8a41;background:#332c1b;color:#ffe7a6;padding:14px;border-radius:12px}.text-action{background:none;border:1px solid #375367;padding:8px 18px;border-radius:9px;color:#bdeae4;cursor:pointer}@media(max-width:600px){body{padding:12px}}</style></head><body><main><p class="demo-label">המחשה בלבד · נתונים סינתטיים, אינם שווי התיק שלך.</p><section id="equityDemo" class="equity-panel"></section></main><script type="module">
-import {createEquityPanel} from './binance-equity-history.js?v=20261026-equity';
-const start=Date.parse('2026-10-26T07:00:00Z'),points=Array.from({length:361},(_,i)=>({at:start+i*60000,valueUsdt:1000+i*.08+Math.sin(i/22)*5-Math.sin(i/47)*7,unpricedAssets:[]}));
-const values=points.map(p=>p.valueUsdt),first=points[0],last=points.at(-1);
-const data={ok:true,points,summary:{currentUsdt:last.valueUsdt,firstUsdt:1000,firstAt:first.at,lastAt:last.at,changeUsdt:last.valueUsdt-1000,changePct:(last.valueUsdt/1000-1)*100,lowUsdt:Math.min(...values),highUsdt:Math.max(...values),count:points.length},unpricedAssets:[],stale:false,storageError:false};
-createEquityPanel(document.getElementById('equityDemo'),{read:async()=>data,now:()=>last.at}).setContext({mode:'live'});
-</script></body></html>
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>המחשת שווי התיק · Spot ו־Futures</title>
+  <link rel="stylesheet" href="/binance-equity-history.css?v=20261117-futures-equity">
+  <style>
+    body{background:#f4f6f3;color:#202723;font-family:system-ui;margin:0;padding:24px}
+    main{max-width:1120px;margin:auto}
+    .demo-label{color:#53635a}
+    .equity-panel{background:#fff;color:#202723;border-color:#c9d4cd}
+    .equity-panel :is(.equity-head p,.equity-status,.equity-note,.equity-stats span,.equity-stats small,summary){color:#53635a}
+    .equity-eyebrow,.equity-selection,.equity-panel .gain{color:#245d43}
+    .equity-panel .loss{color:#a34550}
+    .equity-axis{fill:#53635a}.equity-grid{stroke:#cbd6cf}.equity-line.gain{stroke:#28664d}.equity-line.loss{stroke:#a34550}
+    button{min-height:44px;background:#e3edf7;border:1px solid #50708d;border-radius:9px;padding:5px 12px;color:#173d5c;font:600 .8125rem system-ui;cursor:pointer}
+    button[aria-pressed=true]{background:#cee4f5;box-shadow:inset 0 -3px #365f80}
+    @media(max-width:600px){body{padding:12px}.equity-head{flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+<main>
+  <p class="demo-label">נתוני הדגמה · 17 בנובמבר 2026</p>
+  <section id="equityDemo" class="equity-panel"></section>
+</main>
+<script type="module">
+import {createEquityPanel} from './binance-equity-history.js?v=20261117-futures-equity';
+const start=Date.parse('2026-11-17T07:00:00Z');
+const end=start+360*60000;
+
+function example(market){
+  const futures=market==='FUTURES';
+  const points=Array.from({length:361},(_,i)=>({
+    at:start+i*60000,
+    valueUsdt:futures?270-i*.035+Math.sin(i/17)*4:1000+i*.08+Math.sin(i/22)*5-Math.sin(i/47)*7,
+    unpricedAssets:[]
+  }));
+  const values=points.map(p=>p.valueUsdt),first=values[0],last=values.at(-1);
+  return {
+    ok:true,market,source:futures?'BINANCE_FUTURES_USDT_ACCOUNT_SNAPSHOTS':'BINANCE_SPOT_ACCOUNT_SNAPSHOTS',
+    points,unpricedAssets:[],stale:false,storageError:false,
+    summary:{currentUsdt:last,firstUsdt:first,firstAt:start,lastAt:end,changeUsdt:last-first,
+      changePct:100*(last-first)/first,lowUsdt:Math.min(...values),highUsdt:Math.max(...values),count:points.length}
+  };
+}
+createEquityPanel(document.getElementById('equityDemo'),{read:async market=>example(market),now:()=>end}).setContext({mode:'live'});
+</script>
+</body>
+</html>

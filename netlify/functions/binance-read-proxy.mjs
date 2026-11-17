@@ -1,4 +1,5 @@
 import {compactChartResponse} from '../../lib/binance-chart-response.mjs';
+import {equityHistoryMarket} from '../../lib/binance-equity-history.mjs';
 const UPSTREAM='https://levi-binance.2-29-48-20.sslip.io';
 const READ_PATHS=new Set(['/api/binance-poc-paper','/api/binance-poc-live-monitor','/api/binance-live/poc','/api/binance-mode','/api/binance-agent','/api/binance-live-account','/api/binance-action-log','/api/binance-trading-pnl','/api/binance-trade-history','/api/binance-equity-history','/api/binance-ma-audit','/api/binance-chart','/api/binance-decision-history','/api/binance-market-watch','/api/binance-kelly','/api/binance-demo-account']);
 export const readTimeoutMs=path=>['/api/binance-chart','/api/binance-live-account','/api/binance-mode','/api/binance-agent','/api/binance-trade-history'].includes(path)?25000:10000;
@@ -7,6 +8,10 @@ export function readTarget(path){
  if(typeof path!=='string'||path.length>2048||!path.startsWith('/api/'))throw Error('INVALID_PATH');
  const url=new URL(path,UPSTREAM);
  if(url.origin!==UPSTREAM||url.hash||!READ_PATHS.has(url.pathname))throw Error('INVALID_PATH');
+ if(url.pathname==='/api/binance-equity-history'){
+  if(!equityHistoryMarket(url.searchParams))throw Error('INVALID_QUERY');
+  return url;
+ }
  const allowed=new Set(url.pathname==='/api/binance-chart'?['symbol','interval','range']:url.pathname==='/api/binance-decision-history'?['symbol','limit']:['/api/binance-trade-history','/api/binance-ma-audit'].includes(url.pathname)?['symbol']:[]);
  for(const key of url.searchParams.keys())if(!allowed.has(key))throw Error('INVALID_QUERY');
  return url;

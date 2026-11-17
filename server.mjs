@@ -34,7 +34,7 @@ import {externalBinanceEntry} from './lib/manual-holding-adoption.mjs';
 import {BinanceNativeProtection} from './lib/binance-native-protection.mjs';
 import {createExternalCostReader} from './lib/binance-external-cost.mjs';
 import {createTradeHistoryReader,historySymbol} from './lib/binance-trade-history.mjs';
-import {EquityHistory,createEquitySampler} from './lib/binance-equity-history.mjs';
+import {EquityHistory,createEquitySampler,equityHistoryMarket} from './lib/binance-equity-history.mjs';
 const tradeHistoryReader=createTradeHistoryReader({fetchTrades:(symbol,params)=>signedBinanceGet('/api/v3/myTrades',{symbol,...params})});
 const externalCostReader=createExternalCostReader({fetchTrades:symbol=>signedBinanceGet('/api/v3/myTrades',{symbol,limit:1000})});
 import {rsiSnapshot} from './lib/rsi-screener.mjs';
@@ -1135,9 +1135,18 @@ const sampleEquity=createEquitySampler({history:equityHistory,readAccount:()=>{
   if(lastDisplayAccount&&Date.now()-Date.parse(lastDisplayAccount.updatedAt)<15000)return lastDisplayAccount;
   return getLiveAccountSnapshot();
 }});
+const futuresEquityHistory=new EquityHistory({
+  market:'FUTURES',file:(process.env.BINANCE_EQUITY_HISTORY_FILE||'/var/data/binance-equity-history.json')+'.futures'
+});
+const sampleFuturesEquity=createEquitySampler({history:futuresEquityHistory,readAccount:async()=>{
+  const observedAt=Date.now();
+  const account=await pnlReadApi.get('/fapi/v2/account');
+  return {account,observedAt};
+}});
 if(KEYS_CONFIGURED){
-  setTimeout(()=>sampleEquity(),5000).unref();
-  setInterval(()=>sampleEquity(),60000).unref();
+  const sampleBothAccounts=()=>{sampleEquity();sampleFuturesEquity();};
+  setTimeout(sampleBothAccounts,5000).unref();
+  setInterval(sampleBothAccounts,60000).unref();
 }
 
 function isEligibleSymbol(x){
@@ -2602,7 +2611,11 @@ const server=http.createServer((req,res)=>{
   if(u.pathname==='/api/binance-kelly'&&req.method==='GET')return send(res,{ok:true,live:kellyLearningReport(liveActionLog)});
 
   if(u.pathname==='/api/binance-ma-audit'&&req.method==='GET'){maAudit.read({symbol:u.searchParams.get('symbol')||''}).then(data=>send(res,data)).catch(error=>send(res,{ok:false,error:error.message==='INVALID_SYMBOL'?'INVALID_SYMBOL':'AUDIT_READ_UNAVAILABLE'},error.message==='INVALID_SYMBOL'?400:503));return;}
-  if(u.pathname==='/api/binance-equity-history'&&req.method==='GET')return send(res,equityHistory.today());
+  if(u.pathname==='/api/binance-equity-history'&&req.method==='GET'){
+    const market=equityHistoryMarket(u.searchParams);
+    if(!market)return send(res,{error:'INVALID_EQUITY_MARKET'},400);
+    return send(res,(market==='FUTURES'?futuresEquityHistory:equityHistory).today());
+  }
 
   if(u.pathname==='/api/binance-poc-paper'&&req.method==='GET')return send(res,pocPaper.snapshot(),pocPaper.ledger.fatal?503:200);
 
