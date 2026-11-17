@@ -57,23 +57,44 @@ async function snapshot(platform) {
     candidates: Object.entries(data.checks || {}).filter(([,c]) => c.reason === 'READY' && c.technicalReady === true && Date.now() >= c.at && Date.now() - c.at < 60000)
       .slice(0,6).map(([symbol,c]) => ({symbol, at:c.at}))};
 }
+function updateSpotHandoff(card) {
+  const input = card.symbol.value.trim().toUpperCase();
+  const url = globalThis.LEVI_BINANCE_TRADINGVIEW_URL?.(input, 'SPOT');
+  const pair = url ? new URL(url).searchParams.get('symbol').slice('BINANCE:'.length) : '';
+  const aaoi = pair === 'AAOIBUSDT';
+  card.submit.disabled = !url || !!pending.BINANCE;
+  card.submit.textContent = url ? (aaoi ? pair + ' · bStock' : pair) + ' · פתח ב־TradingView' : 'פתח Binance Spot ב־TradingView';
+  card.limit.textContent = aaoi ? 'AAOIBUSDT הוא נייר ערך דיגיטלי של Binance העוקב אחרי מניית AAOI.' :
+    'הזן צמד Spot במטבע USDT. ב־TradingView בוחרים קנייה או מכירה, כמות ומחיר.';
+  return url;
+}
 function render(platform) {
   const c = cards[platform], s = snapshots[platform];
-  c.submit.disabled = busy[platform] || !s?.enabled || !!pending[platform];
+  const isBinance = platform === 'BINANCE';
+  if (isBinance) updateSpotHandoff(c);
+  else c.submit.disabled = busy[platform] || !s?.enabled || !!pending[platform];
   c.refresh.disabled = !!busy[platform]; c.check.hidden = !pending[platform];
   c.check.disabled = !!busy[platform] || sending;
   if (!s) return;
   c.status.textContent = s.status;
   c.status.className = 'paper-state' + (!s.enabled || s.buyBlocked ? ' attention' : '');
   c.details.replaceChildren(); s.details.forEach(text => add('li', text, c.details));
-  c.amount.max = Number.isFinite(s.maxAmount) ? String(s.maxAmount) : '';
-  c.limit.textContent = 'תקרה לפעולה: ' + (Number.isFinite(s.maxAmount) ? s.maxAmount : '—') + ' ' + configs[platform].currency +
-    (Number.isFinite(s.cash) ? ' · מזומן זמין: ' + s.cash.toLocaleString('he-IL', {maximumFractionDigits:2}) : ' · היתרה נבדקת בשרת לפני השליחה');
-  c.automatic.textContent = s.automatic ? 'קיים גם מנוע מסחר אוטומטי נפרד. אישור במסך זה אינו משהה אותו. פקודות הגנה קיימות ממשיכות לפי ההגדרות.' : 'המסך הזה אינו משנה מצב מסחר או מפעיל מנוע אוטומטי.';
+  if (isBinance) {
+    c.automatic.textContent = s.automatic ? 'מנוע המסחר האוטומטי של Binance פעיל.' : '';
+  } else {
+    c.amount.max = Number.isFinite(s.maxAmount) ? String(s.maxAmount) : '';
+    c.limit.textContent = 'תקרה לפעולה: ' + (Number.isFinite(s.maxAmount) ? s.maxAmount : '—') + ' ' + configs[platform].currency +
+      (Number.isFinite(s.cash) ? ' · מזומן זמין: ' + s.cash.toLocaleString('he-IL', {maximumFractionDigits:2}) : ' · היתרה נבדקת בשרת לפני השליחה');
+    c.automatic.textContent = s.automatic ? 'קיים גם מנוע מסחר אוטומטי נפרד. אישור במסך זה אינו משהה אותו. פקודות הגנה קיימות ממשיכות לפי ההגדרות.' : 'המסך הזה אינו משנה מצב מסחר או מפעיל מנוע אוטומטי.';
+  }
   c.candidates.replaceChildren();
   if (!s.candidates.length) add('p', 'אין כרגע איתות חדש ועדכני להצגה מהסורק. אפשר להכין עסקה ידנית לבדיקה.', c.candidates, 'hint');
-  for (const row of s.candidates) {const b = add('button', 'בדוק קנייה · ' + row.symbol, c.candidates, 'secondary'); b.type='button';
-    b.addEventListener('click', () => {c.symbol.value=row.symbol; c.side.value='BUY'; c.side.dispatchEvent(new Event('change')); c.amount.focus();});
+  for (const row of s.candidates) {const b = add('button', (isBinance ? 'בחר צמד · ' : 'בדוק קנייה · ') + row.symbol, c.candidates, 'secondary'); b.type='button';
+    b.addEventListener('click', () => {
+      c.symbol.value = row.symbol;
+      if (isBinance) {updateSpotHandoff(c); c.submit.focus();}
+      else {c.side.value='BUY'; c.side.dispatchEvent(new Event('change')); c.amount.focus();}
+    });
     add('small', 'איתות שנבדק: ' + at(row.at) + ' · בחירה אינה שולחת פקודה', c.candidates);}
 }
 async function refresh(platform) {
@@ -110,15 +131,29 @@ for (const [platform, config] of Object.entries(configs)) {
   const candidates=add('div','',host,'live-candidates');
   const form=add('form','',host,'live-form'), fields=add('div','',form,'fields');
   const field=(label,tag,type)=>{const l=add('label',label,fields),input=add(tag,'',l);if(type)input.type=type;input.required=true;return input;};
-  const symbol=field('סימול הנכס','input','text');symbol.name='symbol';symbol.dir='ltr';symbol.placeholder=platform==='BINANCE'?'BTCUSDT':'AAPL';symbol.maxLength=24;
-  const side=field('פעולה','select');side.name='side';for(const [value,label] of [['BUY','קנייה'],['SELL','מכירת כל הפוזיציה']]){const o=add('option',label,side);o.value=value;}
-  const amount=field('סכום קנייה ב־'+config.currency,'input','number');amount.name='amount';amount.min=platform==='BINANCE'?'5':'0.01';amount.step='0.01';
-  side.addEventListener('change',()=>{amount.disabled=side.value==='SELL';amount.required=side.value==='BUY';amount.parentElement.hidden=side.value==='SELL';});
+  const symbol=field(platform==='BINANCE'?'סימול Binance Spot':'סימול הנכס','input','text');symbol.name='symbol';symbol.dir='ltr';symbol.placeholder=platform==='BINANCE'?'BTCUSDT':'AAPL';symbol.maxLength=24;
+  let side, amount;
+  if (platform === 'COLMEX') {
+    side=field('פעולה','select');side.name='side';for(const [value,label] of [['BUY','קנייה'],['SELL','מכירת כל הפוזיציה']]){const o=add('option',label,side);o.value=value;}
+    amount=field('סכום קנייה ב־'+config.currency,'input','number');amount.name='amount';amount.min='0.01';amount.step='0.01';
+    side.addEventListener('change',()=>{amount.disabled=side.value==='SELL';amount.required=side.value==='BUY';amount.parentElement.hidden=side.value==='SELL';});
+  }
   const limit=add('p','',form,'hint');
   const submit=add('button','הצג עסקה לאישור שלי',form,'wide');submit.type='submit';submit.disabled=true;
-  const result=add('p',pending[platform]?'קיימת בקשה קודמת הממתינה לאימות. בדוק אותה לפני עסקה נוספת.':'טרם נשלחה עסקה ממסך זה.',host,'hint');result.setAttribute('role','status');
+  const result=add('p',pending[platform]?'קיימת בקשה קודמת הממתינה לאימות. בדוק אותה לפני עסקה נוספת.':platform==='BINANCE'?'':'טרם נשלחה עסקה ממסך זה.',host,'hint');result.setAttribute('role','status');
   const checkButton=add('button','בדוק תוצאת הבקשה הקודמת',host,'secondary');checkButton.type='button';checkButton.addEventListener('click',()=>check(platform));
   cards[platform]={host,status,details,automatic,candidates,symbol,side,amount,limit,submit,result,refresh:refreshButton,check:checkButton};
+  if (platform === 'BINANCE') {
+    const card = cards[platform];
+    symbol.addEventListener('input', () => updateSpotHandoff(card));
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const url = updateSpotHandoff(card);
+      if (url && !pending.BINANCE) globalThis.location.assign(url);
+    });
+    render(platform); if (token(platform)) refresh(platform);
+    continue;
+  }
   form.addEventListener('submit',async event=>{
     event.preventDefault();if(busy[platform]||pending[platform]||sending)return;
     const values={symbol:symbol.value,side:side.value,amount:amount.value};
@@ -130,7 +165,7 @@ for (const [platform, config] of Object.entries(configs)) {
         'מכירת כל הכמות הזמינה של '+review.symbol+' בעת ביצוע הבקשה. זו סגירת הפוזיציה, ולא מכירת כל התיק. עשויה להישאר שארית בגלל מגבלות הברוקר.';
       const s=snapshots[platform].settings;
       $('liveReviewProtection').textContent=review.side==='BUY'?'העסקה תיכנס לניהול ההגנות האוטומטי הקיים. הגדרות שנקראו כעת: סטופ '+(s?.stopLossPct??'—')+'%, יעד '+(s?.takeProfitPct??'—')+'%, הפעלת הגנה ב־'+(s?.profitActivationPct??'—')+'%. ההגדרות בשרת בזמן הביצוע קובעות; סטופ אינו מבטיח מחיר. קנייה ידנית זו אינה מחייבת איתות טכני.':
-        'השרת יבדוק את הפוזיציה וההוראות הקיימות. בבייננס ההגנות שמנהל הבוט ישוחררו לפני מכירה. פקודת השוק אינה מבטיחה מחיר.';
+        'השרת יבדוק את הפוזיציה וההוראות הקיימות. פקודת השוק אינה מבטיחה מחיר.';
       $('liveReviewResult').textContent='לא נשלחה הוראה. רק לחיצה על כפתור האישור הבא תשלח אותה בכסף אמיתי.';
       $('liveReviewConfirm').textContent=review.side==='BUY'?'אני מאשר קנייה בכסף אמיתי':'אני מאשר מכירה בכסף אמיתי';
       $('liveReviewConfirm').hidden=false;$('liveReviewConfirm').disabled=false;$('liveReviewCheck').hidden=true;
@@ -140,7 +175,7 @@ for (const [platform, config] of Object.entries(configs)) {
   render(platform); if(token(platform))refresh(platform);
 }
 $('liveReviewConfirm').addEventListener('click',async()=>{
-  if(!review||sending||pending[review.platform])return;
+  if(review?.platform!=='COLMEX'||sending||pending.COLMEX)return;
   const current=review,platform=current.platform;
   if(Date.now()-current.reviewedAt>REVIEW_MAX_AGE){$('liveReviewResult').textContent='עבר יותר מדקה מאז הבדיקה. סגור והכן את העסקה מחדש.';$('liveReviewConfirm').disabled=true;return;}
   sending=true;$('liveReviewConfirm').disabled=true;$('liveReviewCancel').disabled=true;
@@ -148,7 +183,7 @@ $('liveReviewConfirm').addEventListener('click',async()=>{
     // Capture exactly the reviewed fields. No UI change, poll or pairing sends this.
     const body=orderBody(current,crypto.randomUUID());remember(platform,body);review=null;
     $('liveReviewConfirm').hidden=true;render(platform);
-    const response=await api(platform,platform==='BINANCE'?'/api/binance-live/manual':'colmex-manual-trade',body);
+    const response=await api(platform,'colmex-manual-trade',body);
     showResult(platform,reviewOutcome(platform,response.data,response.status));
   } catch(error) {
     $('liveReviewResult').textContent=pending[platform]?'לא התקבלה תוצאה ודאית. אל תשלח שוב; בדוק את מצב אותה בקשה.':'מזהה הבקשה לא נשמר במכשיר. לא נשלחה הוראה.';

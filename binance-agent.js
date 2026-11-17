@@ -29,6 +29,7 @@ const put=(s,v)=>{const e=$(s);if(e)e.textContent=v};
 let selectedSymbol='BTCUSDT';
 let selectedChartMarket='SPOT';
 let chartMarketPreference=null;
+let chartSelectionPinned=false;
 function chartPositionSnapshot(){return selectedChartMarket==='FUTURES'?{venue:'BINANCE_FUTURES',shortTrading:futuresChartStatus,mode:currentMode}:{agent:currentAgentData,account:currentLiveAccount,mode:currentMode,receivedAt:Date.now()};}
 let currentAgentData=null;
 let currentMode='demo';
@@ -250,7 +251,7 @@ function mode(s){
   demoTradingEnabled=!!s.demoTradingEnabled;
   moneyUnit=isDemo&&demoTradingEnabled?'USDT':'₪';
   if(currentMode!==s.mode){
-    if(isDemo)futuresReadGeneration++;
+    if(isDemo){futuresReadGeneration++;chartMarketPreference=null;}
     const report=$('#spotPocReview');
     if(report)report.hidden=true;
   }
@@ -358,6 +359,7 @@ function activeContext(d,currentMode,liveAccount){
 }
 
 function selectScannerAsset(symbol,tr,market=null){
+  chartSelectionPinned=true;
   if(symbol!==selectedSymbol||market)chartMarketPreference=market;
   selectedSymbol=symbol;
   if($('#chartSection'))$('#chartSection').open=true;
@@ -369,6 +371,12 @@ function chartMarketForPosition(preference,shortPosition,hasLong){
 }
 function chartShortPosition(symbol){
   return currentMode==='live'?futuresChartStatus?.positions?.find(p=>p.symbol===symbol):null;
+}
+function reconcileScannerSelection(agents,activeAgents,mode){
+  if(chartSelectionPinned||currentVisibleAgents.some(a=>a.symbol===selectedSymbol))return;
+  if(mode==='live'&&(chartMarketPreference==='FUTURES'||chartShortPosition(selectedSymbol)))return;
+  chartMarketPreference=null;
+  selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
 }
 function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}){
   d={...d,agents:activeContext(d,currentMode,liveAccount).agents};
@@ -455,10 +463,7 @@ function render(d,currentMode='demo',liveAccount=null,{preserveScanner=false}={}
 
     return Number(b.score||0)-Number(a.score||0);
   });
-  if(!currentVisibleAgents.some(a=>a.symbol===selectedSymbol)&&!(currentMode==='live'&&(chartMarketPreference==='FUTURES'||chartShortPosition(selectedSymbol)))){
-    chartMarketPreference=null;
-    selectedSymbol=activeAgents[0]?.symbol||currentVisibleAgents[0]?.symbol||agents[0]?.symbol||'BTCUSDT';
-  }
+  reconcileScannerSelection(agents,activeAgents,currentMode);
 
   if(!preserveScanner)window.LEVI_SCANNER_VIEW.update($('#assetsBody'),currentVisibleAgents.map(a=>{
     const s=a.strategy||{};
@@ -520,13 +525,23 @@ function rotationGapText(a,d,currentMode,liveAccount){
 async function updateSelectedAsset(d=currentAgentData,currentModeArg=currentMode,liveAccount=currentLiveAccount,{statusOnly=false}={}){
   const a=d?.agents?.find(x=>x.symbol===selectedSymbol);
   const short=chartShortPosition(selectedSymbol);
-  if(currentModeArg!=='live')chartMarketPreference=null;
   const hasLong=a?.position==='LONG'||liveAccount?.balances?.some(b=>b.asset+'USDT'===selectedSymbol&&Number(b.valueUsdt)>=5);
   selectedChartMarket=chartMarketForPosition(chartMarketPreference,short,hasLong);
   put('#chartSymbol',selectedSymbol);
   globalThis.LEVI_EXIT_SNAPSHOT?.render($('#binanceExitSnapshot'),chartPositionSnapshot(),selectedSymbol);
   put('#chartSectionLabel',selectedSymbol+' · נרות, RSI ותעלות');
-  const tradingViewLink=$('#binanceTradingView');if(tradingViewLink)tradingViewLink.href=window.LEVI_TRADINGVIEW_URL('BINANCE:'+selectedSymbol+(selectedChartMarket==='FUTURES'?'.P':''));
+  const tradingViewLink=$('#binanceTradingView');
+  if(tradingViewLink){
+    const href=window.LEVI_BINANCE_TRADINGVIEW_URL(selectedSymbol,selectedChartMarket);
+    tradingViewLink.hidden=!href;
+    if(href){
+      const ticker=new URL(href).searchParams.get('symbol').replace(/^BINANCE:/,'');
+      const venue=selectedChartMarket==='FUTURES'?'Futures':'Spot';
+      tradingViewLink.href=href;
+      tradingViewLink.textContent='מסחר ב־TradingView · '+ticker+' · '+venue+' ↗';
+    }else tradingViewLink.removeAttribute('href');
+    put('#manualTradeHint',currentModeArg==='demo'?'הנתונים באפליקציה במצב DEMO. לפני אישור קנייה או מכירה, בדוק איזה חשבון נבחר ב־TradingView.':'ב־TradingView בוחרים את חשבון Binance, את צד העסקה ואת הכמות ומאשרים את הפקודה.');
+  }
   if(chartCandles.length&&chartAnalysisContext?.split(':')[0]===selectedSymbol)drawCandles(chartCandles);
   else refreshPositionPriceLegend();
   window.dispatchEvent(new Event('levi:chart-selection'));
@@ -1431,7 +1446,6 @@ document.getElementById('pricePrecisionAuto')?.addEventListener('click',()=>{pri
 window.LEVI_POC={read:()=>J(B+'/api/binance-live/poc'),write:body=>authenticatedControl(B+'/api/binance-live/poc',body)};
 window.LEVI_MANUAL_TRADES={
  context:()=>({symbol:selectedSymbol,mode:currentMode,account:currentLiveAccount,capabilities:manualTradeCapabilities,futuresCapabilities:futuresManualCapabilities,futures:futuresManualStatus}),
- submit:async body=>{try{return await authenticatedControl(B+(body.market==='FUTURES'?'/api/binance-live/futures-manual':'/api/binance-live/manual'),body);}catch(error){if(error.status>=400&&error.status<500&&!error.response?.uncertain)return {...error.response,ok:false,uncertain:false,error:error.message};throw error;}},
  connected:()=>Boolean(tradeControlToken),
  connect:()=>window.LEVI_DEVICE_ACCESS?.open(),
  pair:async code=>{
@@ -1497,6 +1511,7 @@ window.LEVI_CHART_SELECTION=()=>({
 });
 window.addEventListener('levi-chart-market',event=>{
   if(!['SPOT','FUTURES'].includes(event.detail))return;
+  chartSelectionPinned=true;
   chartMarketPreference=event.detail;
   updateSelectedAsset();
 });

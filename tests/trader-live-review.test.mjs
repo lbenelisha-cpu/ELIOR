@@ -41,7 +41,7 @@ test('broker acceptance is pending until filled, uncertainty is retained and sta
   assert.equal(reviewOutcome('BINANCE',{ok:true,order:{status:'NEW'}}).terminal,false);
   assert.equal(reviewOutcome('BINANCE',{ok:true,order:{status:'FILLED',executedQty:1,orderId:1}}).terminal,true);
 });
-function ui({failStorage=false,uncertain=false,unready=false}={}){
+function ui({failStorage=false,uncertain=false,unready=false,storedBinance,binanceDevice=true}={}){
   class Element{
     constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.value='';this.open=false;this.hidden=false;this.disabled=false;}
     append(...items){for(const item of items){this.children.push(item);item.parentElement=this;}}
@@ -52,7 +52,9 @@ function ui({failStorage=false,uncertain=false,unready=false}={}){
   }
   const elements=new Map(),get=id=>{if(!elements.has(id))elements.set(id,new Element(id));return elements.get(id);};
   const storage=new Map([['levi-binance-control-v1','test-device'],['levi-colmex-device-v1','test-device']]);
-  const calls=[],timers=[];
+  if(!binanceDevice)storage.delete('levi-binance-control-v1');
+  if(storedBinance)storage.set('levi-binance-review-pending-v1',JSON.stringify(storedBinance));
+  const calls=[],timers=[],navigations=[];
   const fetchImpl=async(url,options)=>{
     const body=options.body?JSON.parse(options.body):null;calls.push({url,options,body});
     if(body){
@@ -70,42 +72,68 @@ function ui({failStorage=false,uncertain=false,unready=false}={}){
     else throw Error('Unexpected read: '+path);
     return {status:200,ok:true,json:async()=>data};
   };
-  const context=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),hidden:false},localStorage:{getItem:k=>storage.get(k)||null,
+  const context=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],hidden:false},localStorage:{getItem:k=>storage.get(k)||null,
     setItem:(k,v)=>{if(failStorage)throw Error('denied');storage.set(k,v);},removeItem:k=>storage.delete(k)},
-    fetch:fetchImpl,AbortSignal,URL,Event:class{constructor(type){this.type=type;}},crypto:{randomUUID},setInterval:fn=>timers.push(fn),
+    location:{assign:url=>navigations.push(url)},fetch:fetchImpl,AbortSignal,URL,Event:class{constructor(type){this.type=type;}},crypto:{randomUUID},setInterval:fn=>timers.push(fn),
     reviewInput,orderBody,reviewOutcome,REVIEW_MAX_AGE,protectionState,accountCheckDetails});
   const source=fs.readFileSync(new URL('../trader-live-ui.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
+  vm.runInContext(fs.readFileSync(new URL('../tradingview-link.js',import.meta.url),'utf8'),context);
   vm.runInContext(source,context);
   const find=(el,predicate)=>predicate(el)?el:el.children.map(c=>find(c,predicate)).find(Boolean);
   const form=platform=>find(get('liveCards').children[platform==='BINANCE'?0:1],e=>e.tag==='form');
-  return {get,storage,calls,timers,context,form,field:(platform,name)=>find(form(platform),e=>e.name===name),post:()=>calls.filter(c=>c.options.method==='POST')};
+  return {get,storage,calls,timers,context,form,navigations,
+    button:(platform,label)=>find(get('liveCards').children[platform==='BINANCE'?0:1],e=>e.tag==='button'&&e.textContent.includes(label)),
+    field:(platform,name)=>find(form(platform),e=>e.name===name),post:()=>calls.filter(c=>c.options.method==='POST')};
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function prepare(h,platform,side='BUY'){
-  await flush();h.field(platform,'symbol').value=platform==='BINANCE'?(side==='BUY'?'BTCUSDT':'ETHUSDT'):(side==='BUY'?'AAPL':'MSFT');
-  h.field(platform,'side').value=side;h.field(platform,'amount').value='25';
-  await h.form(platform).listeners.submit({preventDefault(){}});
+async function prepareColmex(h,side='BUY'){
+  await flush();h.field('COLMEX','symbol').value=side==='BUY'?'AAPL':'MSFT';
+  h.field('COLMEX','side').value=side;h.field('COLMEX','amount').value='25';
+  await h.form('COLMEX').listeners.submit({preventDefault(){}});
 }
-test('both platforms read and prepare without any order; only final user confirmation posts once',async()=>{
-  for(const platform of ['BINANCE','COLMEX'])for(const side of ['BUY','SELL']){
-    const h=ui();await prepare(h,platform,side);assert.equal(h.post().length,0);assert.equal(h.get('liveReviewDialog').open,true);
+test('Colmex review confirms a buy or sell exactly once with the original amount and credential',async()=>{
+  for(const side of ['BUY','SELL']){
+    const h=ui();await prepareColmex(h,side);assert.equal(h.post().length,0);assert.equal(h.get('liveReviewDialog').open,true);
     const click=h.get('liveReviewConfirm').listeners.click();h.get('liveReviewConfirm').listeners.click();await click;
     assert.equal(h.post().length,1);assert.equal(h.post()[0].body.side,side);
-    assert.equal(h.post()[0].body.quoteUsdt??h.post()[0].body.amountUsd,side==='BUY'?25:undefined);
+    assert.equal(h.post()[0].body.amountUsd,side==='BUY'?25:undefined);
     assert.ok(h.post()[0].options.headers.Authorization);assert.ok(!h.post()[0].url.includes('test-device'));
   }
 });
-test('cancel, ordinary polling, failed account checks and failed local persistence never submit',async()=>{
-  const a=ui();await prepare(a,'BINANCE');a.get('liveReviewCancel').listeners.click();await a.get('liveReviewConfirm').listeners.click();
-  a.timers[0]();await flush();assert.equal(a.post().length,0);
-  const b=ui({unready:true});await prepare(b,'BINANCE');assert.equal(b.get('liveReviewDialog').open,false);assert.equal(b.post().length,0);
-  const c=ui({failStorage:true});await prepare(c,'COLMEX');await c.get('liveReviewConfirm').listeners.click();assert.equal(c.post().length,0);
+test('Binance research card opens the selected TradingView Spot instrument without a trade or a device token',async()=>{
+  const h=ui({unready:true,binanceDevice:false});
+  const pair=h.field('BINANCE','symbol'),form=h.form('BINANCE');
+  const submit=()=>form.listeners.submit({preventDefault(){}});
+  assert.equal(h.field('BINANCE','amount'),undefined);assert.equal(h.field('BINANCE','side'),undefined);
+  for(const [input,resolved] of [['BTCUSDT','BTCUSDT'],['AAOI','AAOIBUSDT'],['AAOIUSDT','AAOIBUSDT']]){
+    pair.value=input;pair.dispatchEvent({type:'input'});
+    const button=h.button('BINANCE',resolved);
+    assert.ok(button);assert.equal(button.disabled,false);
+    if(input.includes('AAOI'))assert.match(button.textContent,/bStock/);
+    submit();
+    const url=new URL(h.navigations.at(-1));
+    assert.equal(url.searchParams.get('symbol'),'BINANCE:'+resolved);assert.equal(url.searchParams.has('amount'),false);
+    assert.equal(h.get('liveReviewDialog').open,false);await h.get('liveReviewConfirm').listeners.click();assert.equal(h.post().length,0);
+  }
+  pair.value='https://elsewhere.test';submit();assert.equal(h.navigations.length,3);
+  assert.equal(h.storage.has('levi-binance-review-pending-v1'),false);
 });
-test('unknown results retain the request across reload and only the original identity is checked',async()=>{
-  const h=ui({uncertain:true});await prepare(h,'BINANCE');await h.get('liveReviewConfirm').listeners.click();
-  const original=h.post()[0].body;assert.ok(h.storage.get('levi-binance-review-pending-v1'));
-  await h.get('liveReviewCheck').listeners.click();assert.equal(h.post().length,2);assert.equal(h.post()[1].body.requestId,original.requestId);
-  assert.equal(h.post()[1].body.statusOnly,true);await h.get('liveReviewConfirm').listeners.click();assert.equal(h.post().length,2);
+test('cancel, ordinary polling and failed local persistence never submit a Colmex order',async()=>{
+  const a=ui();await prepareColmex(a);a.get('liveReviewCancel').listeners.click();await a.get('liveReviewConfirm').listeners.click();
+  a.timers[0]();await flush();assert.equal(a.post().length,0);
+  const c=ui({failStorage:true});await prepareColmex(c);await c.get('liveReviewConfirm').listeners.click();assert.equal(c.post().length,0);
+});
+test('legacy Binance requests are reconciled status-only, including uncertain responses after a reload',async()=>{
+  const original={requestId:randomUUID(),symbol:'BTCUSDT',side:'BUY',quoteUsdt:25};
+  for(const uncertain of [true,false]){
+    const h=ui({uncertain,storedBinance:original});await flush();
+    h.field('BINANCE','symbol').value='BTCUSDT';await h.form('BINANCE').listeners.submit({preventDefault(){}});
+    assert.deepEqual(h.navigations,[]);assert.equal(h.post().length,0);
+    await h.button('BINANCE','בדוק תוצאת').listeners.click();
+    assert.equal(h.post().length,1);assert.deepEqual(h.post()[0].body,{...original,statusOnly:true});
+    await h.get('liveReviewConfirm').listeners.click();assert.equal(h.post().length,1);
+    assert.equal(h.storage.has('levi-binance-review-pending-v1'),uncertain);
+  }
 });
 test('paper cron is now dormant by default and does not initialize either ledger',async()=>{
   let calls=0;const monitor=createPaperMonitor({env:{},getStore:()=>{calls++;throw Error('must not run');}});

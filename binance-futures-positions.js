@@ -10,10 +10,8 @@
  Object.assign(reasons,{CHANNEL_POC_READY:'חזרה ל־POC אושרה · בכפוף לבדיקת ביצוע',SHORT_POC_READY:'חזרה מלמטה ל־POC אושרה · SHORT',WAIT_POC_WAVE_CLOSE:'הגל קבע קיצון חדש בנר פתוח · ממתין לעדכון B והפרופיל בסגירת הנר',WAIT_POC_RETEST:'הפרופיל נקבע · ממתין לחזרה ל־POC',WAIT_POC_CHANNEL_BREAKOUT:'ממתין לפריצת התעלה ולקיבוע פרופיל הנפח',WAIT_INITIAL_CHANNEL_CONSOLIDATION:'ממתין לדשדוש בתחילת התעלה',WAIT_POC_VOLUME_DATA:'חסרים נתוני נפח לחישוב POC',POC_RETURN_ALREADY_EXECUTED:'אירוע החזרה הזה כבר נשלח · מניעת הוראה כפולה',POC_PRICE_INVALIDATED:'המחיר אינו בנקודת החזרה ל־POC',POC_MODEL_CHANGED:'פרופיל הנפח השתנה בבדיקה החוזרת',WAIT_FRESH_PRICE:'ממתין למחיר עדכני',GAPPED_CHANNEL_HISTORY:'חסרים נרות ברצף'});
  const reason=v=>reasons[v]||v||'לא נמסרה סיבה';
  function chartLink(symbol){
-  if(!/^[A-Z0-9]+USDT$/.test(symbol||''))return '';
-  const contract='BINANCE:'+symbol+'.P';
-  const url=root.LEVI_TRADINGVIEW_URL?.(contract)||'https://www.tradingview.com/chart/?symbol='+encodeURIComponent(contract)+'&interval=5';
-  return '<br><a class="tradingview-link short-chart-link" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer" aria-label="פתח גרף Futures של '+esc(symbol)+' ב־TradingView">גרף ↗</a>'+(globalThis.LEVI_ASSET_CHART?.actions(symbol,'FUTURES')||'');
+  const link=root.LEVI_ASSET_CHART?.html(symbol,'FUTURES');
+  return link?'<br>'+link:'';
  }
  function closedProtection(position,kind,planned){
   const priceText=value=>number(value)&&Number(value)>0?format(value,10):'לא תועד';

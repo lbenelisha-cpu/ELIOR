@@ -1,4 +1,4 @@
-/* Presentation only: reuse the existing chart, account updates and confirmation dialogs. */
+/* Trading workspace for the selected chart and live account. */
 (()=>{
  const $=id=>document.getElementById(id),chart=$('chartSection'),overview=document.querySelector('.overview');
  if(!chart||!overview)return;
@@ -14,20 +14,47 @@
  metrics.after(chart);chart.classList.add('app-view','trade-view','scans-view');chart.open=true;
  const body=chart.querySelector('.fold-body'),head=chart.querySelector('.selected-asset-head'),actions=chart.querySelector('.manual-trade-actions');
  const nav=make('section',null,'unified-assets');nav.setAttribute('aria-label','בחירת נכס למסחר');
- const search=make('input');search.type='search';search.placeholder='חיפוש נכס · BTC, ETH…';search.setAttribute('aria-label','חיפוש ברשימת הנכסים');search.autocomplete='off';
+ const search=make('input');search.type='search';search.placeholder='חיפוש נכס · BTC, AAOI…';search.setAttribute('aria-label','חיפוש נכס');search.autocomplete='off';
  const strip=make('div',null,'unified-asset-strip');strip.setAttribute('role','group');strip.setAttribute('aria-label','מעבר בין נכסים');
  const empty=make('small','ממתין לרשימת הנכסים');empty.setAttribute('role','status');
  nav.append(search,strip,empty);head.before(nav);
+ // The stock and its two Binance products have different exchange symbols.
+ // Offer the verified instruments even when the rotating scanner omits AAOI.
+ function addAaoiMarkets(input,after){
+  if(!input||!after)return;
+  const group=make('div',null,'aaoi-trading-markets');
+  group.setAttribute('role','group');group.setAttribute('aria-label','מסחר ב־AAOI דרך TradingView');
+  group.append(make('strong','AAOI ב־TradingView'));
+  const choices=[
+   {label:'Spot · bStock · AAOIBUSDT',matches:['AAOIB','AAOIBUSDT','BINANCE:AAOIBUSDT'],href:window.LEVI_BINANCE_TRADINGVIEW_URL?.('AAOIBUSDT','SPOT')},
+   {label:'Futures · חוזה · AAOIUSDT.P',matches:['AAOIUSDT','AAOIUSDT.P','BINANCE:AAOIUSDT.P'],href:window.LEVI_BINANCE_TRADINGVIEW_URL?.('AAOIUSDT','FUTURES')},
+   {label:'Colmex · מניה · NASDAQ:AAOI',matches:['NASDAQ:AAOI'],href:window.LEVI_COLMEX_TRADINGVIEW_URL?.('NASDAQ:AAOI')}
+  ].filter(choice=>choice.href);
+  for(const choice of choices){
+   const link=make('a',choice.label+' ↗','tradingview-link');
+   link.href=choice.href;link.target='_blank';link.rel='noopener noreferrer';link.dir='ltr';
+   group.append(link);choice.link=link;
+  }
+  function showMatches(){
+   const query=input.value.trim().toUpperCase().replace(/[\s/\-]/g,'');
+   for(const choice of choices)choice.link.hidden=query!=='AAOI'&&!choice.matches.includes(query);
+   group.hidden=choices.every(choice=>choice.link.hidden);
+  }
+  after.after(group);input.addEventListener('input',showMatches);showMatches();
+  return group;
+ }
+ const tradeMarkets=addAaoiMarkets(search,nav);
+ addAaoiMarkets($('assetSearch'),$('assetSearchStatus'));
  const market=make('select');market.setAttribute('aria-label','מסלול הפוזיציה המוצג');market.className='unified-market';
  for(const [value,label] of [['SPOT','LONG · Spot'],['FUTURES','SHORT · Futures']]){const option=make('option',label);option.value=value;market.append(option);}head.append(market);
  market.addEventListener('change',()=>window.dispatchEvent(new CustomEvent('levi-chart-market',{detail:market.value})));
  head.after(actions);
  const terminal=$('chartTerminal');actions.after(terminal);
- const note=make('p','גרף מחירי Spot · פעולות SHORT מבוצעות בחשבון Futures. רמות מחוץ לטווח מופיעות בכרטיסי המחירים.','unified-source');terminal.before(note);
+ const note=make('p','הנרות בגרף זה מציגים מחירי Spot. רמות מחוץ לטווח מופיעות בכרטיסי המחירים.','unified-source');terminal.before(note);
  // The price cards and candles are the single main view. Expanded diagnostics
  // retain all original DOM IDs, live subscriptions, and copy-to-TradingView controls.
  const details=make('details',null,'unified-details unified-analysis');details.append(make('summary','ניתוח הנכס · הגנות, אינדיקטורים וכלי גרף'));
- const keep=new Set([nav,head,actions,terminal,note]);
+ const keep=new Set([nav,tradeMarkets,head,actions,terminal,note]);
  for(const node of [...body.children])if(!keep.has(node))details.append(node);
  body.append(details);
  const connection=make('div',null,'unified-connection');connection.append($('manualConnectBtn'),$('manualForgetBtn'));details.append(connection);
@@ -50,8 +77,7 @@
   ['maDecisionJournal','יומן השוואת החלטות','app-view trade-view portfolio-view']
  ])fold([$(id)],title,classes);
  $('overviewTitle').textContent='מרכז המסחר שלך';
- const subtitle=overview.querySelector('.overview-sub');if(subtitle)subtitle.textContent='בחר נכס · עקוב אחר הגרף וההגנות · פעל מאותו מסך';
- const buy=$('manualBuyBtn'),sell=$('manualSellBtn');if(buy)buy.textContent='קנייה · LONG Spot';if(sell)sell.textContent='מכירה · LONG Spot';
+ const subtitle=overview.querySelector('.overview-sub');if(subtitle)subtitle.textContent='בחר נכס לצפייה בגרף ובהגנות או למסחר ידני ב־TradingView';
  let snapshot=window.LEVI_DASHBOARD_SNAPSHOT||null,key='';
  function render(){
   const selection=window.LEVI_CHART_SELECTION?.();

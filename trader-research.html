@@ -10,11 +10,11 @@
 <main>
   <div class="eyebrow">TRADER SKILL · RESEARCH DESK</div>
   <h1>עסקת LIVE — באישור שלך</h1>
-  <p class="lead">בדוק את נתוני החשבון והאיתותים, בחר נכס וסכום, ועבור למסך אישור מפורש לפני שליחת עסקה אמיתית.</p>
+  <p class="lead">בחר נכס בחשבון שבו תרצה לסחור. ב־Binance תבחר את פרטי ההוראה ותאשר אותה ב־TradingView.</p>
   <section class="panel auto-panel" id="live-approval" aria-labelledby="liveTitle">
     <div class="section-heading"><div><span class="eyebrow">LIVE TRADING / אישור ידני</span><h2 id="liveTitle">אתה בודק. אתה מאשר את העסקה.</h2></div><span class="badge live-badge">חשבון אמיתי</span></div>
-    <p class="hint">המסך קורא את מצב השרת הקיים. הכנת עסקה, בחירת איתות ורענון אינם שולחים פקודה. בכפתור האישור האחרון מוצגים הפלטפורמה, הנכס, סוג הפעולה והסכום. אין שליחה חוזרת אוטומטית.</p>
-    <p class="hint">מנועי מסחר אוטומטיים שכבר פועלים בחשבון אינם נעצרים מהמסך הזה. קנייה שתאשר תיכנס לניהול ההגנות הקיים, הכולל אפשרות למכירה אוטומטית לפי ההגדרות.</p>
+    <p class="hint">ב־Colmex Pro יוצגו לך פרטי העסקה לאישור לאחר בדיקת החשבון.</p>
+    <p class="hint">בקנייה שאושרה דרך טופס Colmex Pro, הגנות החשבון הקיימות עשויות לבצע מכירה אוטומטית.</p>
     <div id="liveCards" class="auto-cards"></div>
   </section>
   <dialog id="liveReviewDialog" aria-labelledby="liveReviewTitle"><h2 id="liveReviewTitle"></h2><p id="liveReviewSummary"></p><p id="liveReviewProtection" class="hint"></p><p id="liveReviewResult" role="status" aria-live="polite"></p><div class="live-dialog-actions"><button id="liveReviewConfirm" type="button">אני מאשר עסקה בכסף אמיתי</button><button id="liveReviewCheck" type="button" hidden>בדוק מצב — ללא שליחה חוזרת</button><button id="liveReviewCancel" type="button" class="secondary">סגור / ביטול</button></div></dialog>
@@ -76,6 +76,6 @@
 </main>
 <script type="module" src="/trader-research.js?v=20261030-live-review"></script>
 <script type="module" src="/trader-auto-ui.js?v=20261030-live-review"></script>
-<script type="module" src="/trader-live-ui.js?v=20261030-live-review"></script>
-<script src="/tradingview-link.js?v=20261114-stock-workspace"></script>
+<script type="module" src="/trader-live-ui.js?v=20261117-tv-orders"></script>
+<script src="/tradingview-link.js?v=20261117-tv-orders"></script>
 </body></html>

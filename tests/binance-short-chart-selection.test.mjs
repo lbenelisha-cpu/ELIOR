@@ -61,3 +61,44 @@ test('a Futures-only symbol survives an unrelated Spot scan and status refresh r
  await ctx.updateSelectedAsset(ctx.currentAgentData,'live',null,{statusOnly:true});
  assert.equal(renders,2);assert.deepEqual(reads,['SHORTUSDT']);assert.deepEqual(events,['levi:chart-selection','levi:chart-selection']);
 });
+
+test('main TradingView handoff follows the selected market even on an unpaired demo device',async()=>{
+ const link={removeAttribute(name){delete this[name];}},labels={};
+ const ctx=vm.createContext({
+  URL,Event,currentMode:'demo',currentAgentData:{agents:[]},currentLiveAccount:null,futuresChartStatus:null,
+  selectedSymbol:'AAOIBUSDT',chartMarketPreference:null,selectedChartMarket:'SPOT',chartCandles:[],activeView:'trade',
+  $:s=>s==='#binanceTradingView'?link:null,put:(k,v)=>{labels[k]=v;},chartPositionSnapshot:()=>({}),
+  refreshPositionPriceLegend(){},loadChart:async()=>{},dispatchEvent(){},fetch(){throw Error('Unexpected request');}
+ });
+ ctx.window=ctx;
+ vm.runInContext(read('tradingview-link.js'),ctx);
+ const update=source.slice(source.indexOf('async function updateSelectedAsset('),source.indexOf('function blockerLabel('));
+ vm.runInContext(selection+'\n'+update,ctx);
+ for(const [market,symbol] of [['SPOT','BINANCE:AAOIBUSDT'],['FUTURES','BINANCE:AAOIUSDT.P']]){
+  ctx.chartMarketPreference=market;await ctx.updateSelectedAsset();
+  const url=new URL(link.href);
+  assert.equal(link.hidden,false);assert.equal(url.searchParams.get('symbol'),symbol);
+  assert.equal(url.searchParams.get('trade-now'),'BINANCE');assert.ok(link.textContent.includes(symbol.slice(8)));assert.match(labels['#manualTradeHint'],/DEMO/);
+ }
+ ctx.selectedSymbol='<unrecognized>';await ctx.updateSelectedAsset();assert.equal(link.hidden,true);assert.equal(link.href,undefined);
+ const html=read('binance-agent.html');
+ assert.doesNotMatch(html,/binance-manual-trades\.js|id="manualTradeSubmit"/);
+ assert.match(html,/id="binanceTradingView"[^>]*target="_blank"[^>]*BTCUSDT[^>]*trade-now=BINANCE/);
+});
+
+test('scanner rotation can auto-select initially and preserves an explicitly chosen Spot or Futures trade target',()=>{
+ const nowVisible=[{symbol:'BTCUSDT',position:'LONG'}];
+ const ctx=vm.createContext({
+  chartSelectionPinned:false,currentMode:'live',currentAgentData:null,currentLiveAccount:null,$:()=>null,
+  document:{querySelectorAll:()=>[]},chartMarketPreference:null,currentVisibleAgents:nowVisible,
+  futuresChartStatus:null,selectedSymbol:'OLDUSDT',updateSelectedAsset(){}
+ });
+ vm.runInContext(selection,ctx);
+ ctx.reconcileScannerSelection(nowVisible,nowVisible,'live');
+ assert.equal(ctx.selectedSymbol,'BTCUSDT');
+ for(const market of ['SPOT','FUTURES']){
+  ctx.selectScannerAsset('AAOIBUSDT',null,market);
+  ctx.reconcileScannerSelection(nowVisible,nowVisible,'live');
+  assert.equal(ctx.selectedSymbol,'AAOIBUSDT');assert.equal(ctx.chartMarketPreference,market);
+ }
+});
