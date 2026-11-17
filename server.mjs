@@ -116,7 +116,8 @@ const LIVE=String(process.env.BINANCE_LIVE_TRADING_ENABLED||'false')==='true';
 const BINANCE_API_KEY=String(process.env.BINANCE_API_KEY||'').trim();
 const BINANCE_API_SECRET=String(process.env.BINANCE_API_SECRET||'').trim();
 const KEYS_CONFIGURED=Boolean(BINANCE_API_KEY&&BINANCE_API_SECRET);
-const AUTO_EXECUTION=String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
+const MONITOR_ONLY=String(process.env.LEVI_MONITOR_ONLY||'false').toLowerCase()==='true';
+const AUTO_EXECUTION=!MONITOR_ONLY&&String(process.env.AUTO_EXECUTION||'false').toLowerCase()==='true';
 const independentEntry=independentEntryConfig(process.env);
 const channelPrimary=channelEntryConfig(process.env);
 const marketNewsConfig={...newsConfig(process.env),enabled:false,error:null,policy:'OBSERVATION_ONLY',scope:'ASSET_WATCH'};
@@ -973,6 +974,7 @@ async function maybeExecuteLive(evals){
  return liveExecution.automatic(()=>executeLiveCycle(evals));
 }
 async function executeManualTrade(body,{pocGuard=null,poc=null}={}){
+ if(MONITOR_ONLY)throw Error('MONITOR_ONLY_TRADING_DISABLED');
  const input=manualTradeInput(body);
  if(mode!=='live'&&!manualRequests.rows?.[input.requestId]&&!input.statusOnly)throw Error('החשבון עבר למצב DEMO. לא נשלחה עסקה.');
  return liveExecution.manual(()=>manualRequests.execute(input,{
@@ -2281,7 +2283,7 @@ const displayChartReader=createChartReader(j);
 const futuresShort=new FuturesShortRunner({
  api:new FuturesShortAPI({key:BINANCE_API_KEY,secret:BINANCE_API_SECRET}),
  file:process.env.BINANCE_FUTURES_SHORT_FILE||LIVE_LOG_FILE+'.futures-short',
- config:shortConfig(process.env),settings:()=>tradeSettings.values,
+ config:{...shortConfig(process.env),monitorOnly:MONITOR_ONLY},settings:()=>tradeSettings.values,
  control:()=>({allowEntries:mode==='live'&&LIVE&&AUTO_EXECUTION&&!tradeControl.paused,resumedAt:Date.parse(tradeControl.resumedAt)||0}),
  permission:getApiRestrictions
 });
@@ -2472,6 +2474,7 @@ const server=http.createServer((req,res)=>{
   }
 
   if(u.pathname==='/api/binance-trade-control'&&req.method==='POST'){
+ if(MONITOR_ONLY)return send(res,{ok:false,error:'MONITOR_ONLY_TRADING_DISABLED'},409);
     let body='';
     req.on('data',chunk=>{body+=chunk;if(body.length>10000)req.destroy();});
     req.on('end',async()=>{
@@ -2556,6 +2559,7 @@ const server=http.createServer((req,res)=>{
       demoTradingError:authorized?demoTrader.error:null,
       liveTradingEnabled:LIVE,
       autoExecution:AUTO_EXECUTION,
+      monitorOnly:MONITOR_ONLY,
       keysConfigured:KEYS_CONFIGURED,
       liveReadOnly:KEYS_CONFIGURED&&(!LIVE||!AUTO_EXECUTION),
       liveMaxUsdt:LIVE_MAX_USDT
@@ -2581,6 +2585,7 @@ const server=http.createServer((req,res)=>{
   }
 
   if(['/api/binance-live/manual','/api/binance-live/buy','/api/binance-live/sell'].includes(u.pathname)&&req.method==='POST'){
+ if(MONITOR_ONLY)return send(res,{ok:false,error:'MONITOR_ONLY_TRADING_DISABLED'},409);
     let body='';req.on('data',chunk=>{body+=chunk;if(body.length>5000)req.destroy();});
     req.on('end',async()=>{
       try{const input=JSON.parse(body||'{}');

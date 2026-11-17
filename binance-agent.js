@@ -169,12 +169,12 @@ function renderTradeControlStatus(s){
   const health=s.liveState,blocked=s.mode==='live'&&health&&health.ready!==true;
   const active=known&&!paused&&!blocked;
   const executable=s.mode==='demo'||(s.liveTradingEnabled===true&&s.autoExecution===true);
-  el.classList.toggle('trading-active',active&&executable);
+  el.classList.toggle('trading-active',active&&executable&&s.monitorOnly!==true);
   el.classList.toggle('trading-paused',known&&paused);
   const reconciliation=health?.reconciliation||{};
   const symbols=items=>(Array.isArray(items)?items:[]).map(item=>typeof item==='string'?item:item?.symbol).filter(symbol=>/^[A-Z0-9]{2,30}$/.test(symbol||'')).join(', ');
   const reason=!health?.journalReady?'יומן העסקאות דורש בדיקה':health.pendingOrder?'ממתין לאימות פקודה':reconciliation.error?'לא ניתן לאמת את נתוני החשבון':health.missingProtection?.length?'הגנת בורסה טרם אומתה':symbols(reconciliation.unmanaged)?'יתרה לא מנוהלת ביומן: '+symbols(reconciliation.unmanaged):symbols(reconciliation.pending)?'פער בכמות ממתין לאימות: '+symbols(reconciliation.pending):symbols(reconciliation.unsettled)?'ממתין לאימות מילוי הגנה: '+symbols(reconciliation.unsettled):'ממתין להתאמת חשבון';
-  const label=blocked?'קניות חסומות · '+reason:!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
+  const label=s.monitorOnly===true?'מצב צפייה בלבד · הבוט אינו שולח פקודות קנייה או מכירה':blocked?'קניות חסומות · '+reason:!known?'מצב מסחר לא ידוע':paused?'מסחר עצור · אין קניות חדשות':!executable?'מסחר LIVE לא מופעל':'מסחר אוטומטי פעיל';
   // A resume timestamp is not the start of a reconciliation failure.
   const timestamp=Date.parse(blocked?reconciliation.checkedAt:paused?s.tradeControl?.pausedAt:known&&executable?s.tradeControl?.resumedAt:null);
   const minutes=Number.isFinite(timestamp)?Math.max(0,Math.floor((Date.now()-timestamp)/60000)):null;
